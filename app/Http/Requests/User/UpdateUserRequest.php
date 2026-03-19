@@ -33,6 +33,7 @@ class UpdateUserRequest extends FormRequest
             'referal_sms_code' => ['nullable', 'string', 'max:255'],
             'pin' => ['nullable', 'string', 'max:255'],
             'password' => ['sometimes', 'string', 'min:8'],
+            'role' => ['sometimes', 'string', 'in:user,admin'],
         ];
     }
 }

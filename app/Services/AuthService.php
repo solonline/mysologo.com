@@ -15,6 +15,8 @@ class AuthService
             'username' => $data['username'],
             'password' => $password,
         ]);
+
+        $user->assignRole($data['role'] ?? 'user');
         // Gera token com Sanctum
         return $this->login($data);
     }

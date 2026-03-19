@@ -10,9 +10,9 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    public function me()
+    public function me(Request $request)
     {
-        return UserResource::make(auth()->user());
+        return UserResource::make($request->user())->response()->setStatusCode(200);
     }
 
     public function update(UpdateUserRequest $request)

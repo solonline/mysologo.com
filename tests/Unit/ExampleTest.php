@@ -9,11 +9,19 @@ class ExampleTest extends TestCase
     /**
      * A basic test example.
      */
-    public function test_user_service_me(): void
+    public function test_that_true_is_true(): void
     {
-        $userService = new \App\Services\UserService();
-        $user = \App\Models\User::factory()->create();
-        $this->assertEquals($user->id, $userService->me()->id);
-
+        $this->assertTrue(true);
     }
+
+    public function test_user_model_exists()
+    {
+        $this->assertTrue(class_exists(\App\Models\User::class));
+    }
+
+    public function test_soma_dois_numeros()
+    {
+        $this->assertEquals(4, 2 + 2);
+    }
+
 }

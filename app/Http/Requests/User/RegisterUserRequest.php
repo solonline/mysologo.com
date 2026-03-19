@@ -28,6 +28,7 @@ class RegisterUserRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:20'],
             'username' => ['required', 'string', 'max:40', 'unique:users', 'regex:/^[a-zA-Z0-9_]+$/'],
             'password' => ['sometimes', 'string', 'min:8'],
+            'role' => ['sometimes', 'string', 'in:user,admin'],
         ];
     }
 }
