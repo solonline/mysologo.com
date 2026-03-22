@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\User\RegisterUserRequest;
 use App\Http\Resources\Auth\AuthResource;
+use App\Http\Resources\Auth\DiditSessionResource;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 
@@ -14,6 +15,15 @@ class AuthController extends Controller
     public function register(RegisterUserRequest $request)
     {
         return AuthResource::make((new AuthService())->register($request->validated()))->response()->setStatusCode(201);
+    }
+
+    public function createDiditSession()
+    {
+        $result = (new AuthService())->createDiditSession();
+        if (!$result) {
+            return response()->json(['message' => 'Failed to create Didit session'], 500);
+        }
+        return DiditSessionResource::make($result)->response()->setStatusCode(201);
     }
 
     public function login(LoginRequest $request)

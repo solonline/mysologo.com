@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'didit' => [
+        'api_key' => env('DIDIT_API_KEY'),
+        'api_secret' => env('DIDIT_API_SECRET'),
+        'base_url' => env('DIDIT_BASE_URL'),
+        'workflow_id' => env('DIDIT_WORKFLOW_ID'),
+    ],
+
 ];
