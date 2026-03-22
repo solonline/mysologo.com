@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('name', 200);
             $table->string('username', 40)->unique();
             $table->string('avatar')->nullable();
+            $table->string('language', 10)->default('en');
             $table->string('email', 100)->unique();
             $table->string('referal_email_code')->unique()->nullable();
             $table->timestamp('email_verified_at')->nullable();

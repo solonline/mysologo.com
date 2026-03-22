@@ -24,7 +24,7 @@ class UserTest extends TestCase
         ]);
         $response = $this->actingAs($user, 'sanctum')->getJson('/api/me');
         $response->assertOk();
-        $response->dump();
+        // $response->dump();
         $this->assertEquals($user->id, $response->json('data.id'));
     }
 }
