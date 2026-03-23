@@ -36,7 +36,7 @@ class DIditClient
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->apiKey,
             'Accept' => 'application/json',
-        ])->get($this->baseUrl . '/session/' . $sessionId);
+        ])->get($this->baseUrl . '/session/' . $sessionId . '/decision');
 
         return $response->json();
     }
