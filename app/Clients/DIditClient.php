@@ -14,13 +14,6 @@ class DIditClient
 
     public function __construct()
     {
-
-    \Log::info('variables didit', [
-        'base_url' => config('services.didit.base_url'),
-        'api_key' => config('services.didit.api_key'),
-        'api_secret' => config('services.didit.api_secret'),
-        'workflow_id' => config('services.didit.workflow_id'),
-    ]);
         $this->baseUrl = config('services.didit.base_url');
         $this->apiKey = config('services.didit.api_key');
         $this->apiSecret = config('services.didit.api_secret');
@@ -29,7 +22,6 @@ class DIditClient
 
     public function createSession(array $data): Response
     {
-        \Log::info('Creating Didit session with data', $data);
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->apiKey,
             'Content-Type' => 'application/json',

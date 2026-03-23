@@ -4,12 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class UserVerification extends Model
+class UserDiditSession extends Model
 {
+    //
+
     protected $fillable = [
         'user_id',
-        'didit_transaction_id',
         'status',
+        'session_id',
+        'workflow_id',
+        'session_url',
+        'callback',
+        'metadata',
     ];
 
     public function user()

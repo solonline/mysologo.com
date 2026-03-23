@@ -56,8 +56,13 @@ class User extends Authenticatable
         ];
     }
 
-    public function verifications()
+    public function diditSessions()
     {
-        return $this->hasMany(UserVerification::class);
+        return $this->hasMany(UserDiditSession::class);
+    }
+
+    public function devices()
+    {
+        return $this->hasMany(UserDevice::class);
     }
 }
