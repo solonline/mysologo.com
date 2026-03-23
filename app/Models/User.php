@@ -21,16 +21,17 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
-        'username',
-        'avatar',
-        'email',
-        'referal_email_code',
-        'email_verified_at',
-        'phone',
-        'referal_sms_code',
-        'pin',
-        'password',
+            'name',
+            'username',
+            'avatar',
+            'language',
+            'email',
+            'email_verified_at',
+            'referal_email_code',
+            'didit_user_id',
+            'doc_status',
+            'phone',
+            'password'
     ];
 
     /**
@@ -56,9 +57,9 @@ class User extends Authenticatable
         ];
     }
 
-    public function diditSessions()
+    public function diditSession()
     {
-        return $this->hasMany(UserDiditSession::class);
+        return $this->hasOne(UserDiditSession::class);
     }
 
     public function devices()

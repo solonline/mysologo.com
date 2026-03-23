@@ -12,9 +12,5 @@ Route::post('/login', [AuthController::class, 'login']);
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [UserController::class, 'me']);
-
-    Route::group(['prefix' => 'didit'], function () {
-      Route::post('/session', [AuthController::class, 'createDiditSession']);
-    //   Route::get('/session/{sessionId}', [AuthController::class, 'getDiditSessionStatus']);
-    });
+    Route::post('/create-pin', [\App\Http\Controllers\Api\Auth\PinController::class, 'store']);
 });

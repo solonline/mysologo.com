@@ -16,8 +16,10 @@ return new class extends Migration {
 
             $table->string('device_name')->nullable(); // ex: Chrome Windows
             $table->string('device_token')->unique();  // identificador seguro
+            $table->string('pin')->nullable();         // PIN para autenticação
 
-            $table->boolean('trusted')->default(false);
+            $table->timestamp('blocked_at')->nullable(s);
+            $table->integer('failed_attempts')->default(0);
 
             $table->timestamp('last_used_at')->nullable();
 

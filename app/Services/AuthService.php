@@ -2,97 +2,121 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\UserDevice;
+use App\Providers\DiditProvider;
+use App\Services\DeviceAuthService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 
 class AuthService
 {
+    public function __construct(protected KycService $kycService, protected DeviceAuthService $deviceAuthService)
+    {
+
+    }
     public function register(array $data)
     {
-        if (isset($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        }
-        $data['register'] = true; // Flag para indicar que é um registro, não login
+        $plainPassword = $data['password'];
+        $data['password'] = Hash::make($plainPassword);
+
+        // Filtra apenas campos permitidos pelo modelo User
+        $userFillable = (new User())->getFillable();
+        $userData = array_intersect_key($data, array_flip($userFillable));
 
         try {
             DB::beginTransaction();
-            $user = User::create($data);
-            \Log::info('User created with ID: ' . $user->id . ' and role: ' . $data['role']);
-            $user->assignRole(Role::findByName($data['role'], 'api'));
-            \Log::info('veja', ['role: ' => Role::findByName($data['role'], 'api')]);
+            $user = User::create($userData);
 
-            // Autentica o usuário para que auth()->id() funcione
-            auth()->login($user);
+            // Atribui role se existir
+            $role = isset($data['role']) ? Role::findByName($data['role'], 'api') : Role::findByName('retail_customer', 'api');
+            if ($role) {
+                $user->assignRole($role);
+            }
 
-            $this->createDiditSession();
 
-            $sessionDidit = $user->diditSessions()->latest()->first();
-
+            $loginData = $this->login([
+                'email' => $user->email,
+                'password' => $plainPassword,
+            ], true);
             DB::commit();
 
-            $loginData = $this->login($data);
-
-            return [
-                'user' => $loginData['user'],
-                'token' => $loginData['token'],
-                'didit_session' => $sessionDidit,
-            ];
+            return $loginData;
 
         } catch (\Exception $e) {
             DB::rollBack();
-            throw new \Exception('Invalid role provided.', 0, $e);
+            throw $e;
         }
     }
 
-    public function createDiditSession()
-    {
-        $diditService = new DiditService();
-        $sessionData = [
-            'workflow_id' => config('services.didit.workflow_id'),
-            'user_id' => auth()->id(),
-            'callback' => 'https://yourapp.com/api/didit/callback', //TODO definir callback
-            'language' => auth()->user()->language ?? 'en',
-        ];
-        $sessionInfo = $diditService->createSession($sessionData);
-
-        // Salva sessão no banco
-        $userDiditSession = new \App\Models\UserDiditSession();
-        $userDiditSession->user_id      = auth()->id();
-        $userDiditSession->session_id   = $sessionInfo['session_id'];
-        $userDiditSession->workflow_id  = $sessionInfo['workflow_id'];
-        $userDiditSession->session_url  = $sessionInfo['url'];
-        $userDiditSession->status       = $sessionInfo['status'];
-        $userDiditSession->save();
-    }
-
-    public function updateDiditSessionStatus(string $sessionId, string $status)
-    {
-        $session = \App\Models\UserDiditSession::where('session_id', $sessionId)->first();
-        if ($session) {
-            $session->status = $status;
-            $session->save();
-        }
-    }
-
-    public function login(array $data)
+    public function login(array $data, bool $isRegister = false)
     {
         $user = User::where('email', $data['email'])->first();
-        // Se for registro, não exige senha (cadastro por etapas)
-        if (isset($data['register']) && $data['register'] === true) {
-            if (!$user) {
-                return null;
-            }
-        } else {
-            if (!$user || !Hash::check($data['password'], $user->password)) {
-                return null;
-            }
+
+        if (!$user) {
+            return null;
         }
-        $token = $user->createToken('api_token', [], now()->addMinute())->plainTextToken;
+
+        if (!$isRegister && !Hash::check($data['password'], $user->password)) {
+            return null;
+        }
+
+        $token = $user->createToken('password_login', [], now()->addMinutes(10))->plainTextToken;
+
+        $this->kycService->ensureValidSession($user);
+
+        // Garante que diditSession existe antes de acessar refresh
+        $diditSession = $user->diditSession()->latest()->first();
+        return [
+            'user' => $user,
+            'token' => $token,
+            'didit_session' => $diditSession ? $diditSession : null,
+        ];
+    }
+
+    public function loginWithPin(array $data)
+    {
+        $device = UserDevice::where('device_token', $data['device_token'])
+            ->whereHas('user', fn($q) => $q->where('email', $data['email']))
+            ->first();
+        if (!$device || !$device->pin) {
+            return [
+                'success' => false,
+                'reason' => 'device_not_found_or_no_pin',
+            ];
+        }
+
+        $user = $device->user;
+
+        // Se device está bloqueado, exige login convencional para resetar PIN
+        if ($this->deviceAuthService->isBlocked($device)) {
+            return [
+                'success' => false,
+                'reason' => 'device_blocked',
+                'message' => 'PIN bloqueado. Faça login convencional e crie um novo PIN para este dispositivo.'
+            ];
+        }
+
+        if (!$user || !$device->trusted || !Hash::check($data['pin'], $device->pin)) {
+            $this->deviceAuthService->registerFailedAttempt($device);
+            return [
+                'success' => false,
+                'reason' => 'invalid_pin',
+            ];
+        }
+
+        // Sucesso: reseta tentativas
+        $this->deviceAuthService->resetAttempts($device);
+        $device->last_used_at = now();
+        $device->save();
+
+        $token = $user->createToken('device_pin_login_' . ($device->device_name ?? $device->id), [], now()->addMinutes(10))->plainTextToken;
 
         return [
-            'user' => $user->find($user->id),
+            'success' => true,
+            'user' => $user,
             'token' => $token,
+            'didit_session' => null,
         ];
     }
 }
