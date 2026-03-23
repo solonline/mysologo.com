@@ -92,9 +92,6 @@ class RegisterUserTest extends TestCase
             'Accept' => 'application/json',
         ]);
 
-        // $response->dump();
         $response->assertStatus(401);
     }
-
-
 }

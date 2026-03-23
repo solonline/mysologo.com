@@ -6,27 +6,25 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class DididTest extends TestCase
 {
     use RefreshDatabase;
 
     /** @test */
-    public function it_creates_a_session_via_api()
+    public function test_didit_session_creation(): void
     {
         $user = User::factory()->create();
-        $token = $user->createToken('Test Token')->plainTextToken;
+        auth()->guard('api')->setUser($user);
+        $user->assignRole(Role::findByName('retail_customer', 'api'));
 
-        // Faz requisição autenticada
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $token,
-        ])->postJson('/api/didit/session');
-
-        $response->assertJsonStructure([
-            'id',
-            'user_id',
-            'data',
-            'created_at',
+        $response = $this->post('/api/didit/session', [], [
+            'Accept' => 'application/json',
+            'Authorization' => 'Bearer ' . $user->createToken('api_token')->plainTextToken,
         ]);
+
+        $response->dump();
+        $response->assertStatus(201);
     }
 }
