@@ -12,6 +12,7 @@ use App\Http\Resources\UserResource;
 use App\Services\AuthService;
 use App\Services\DiditService;
 use App\Services\KycService;
+use App\Exceptions\ApiException;
 
 class AuthController extends Controller
 {
@@ -24,29 +25,29 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request)
     {
-        $result = $this->authService->login($request->validated());
-        if (!$result) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+        try {
+            $result = $this->authService->login($request->validated());
+            return AuthResource::make($result)->response()->setStatusCode(200);
+        } catch (ApiException $e) {
+            return response()->json([
+                'success' => false,
+                'reason' => $e->reason,
+                'message' => $e->getMessage(),
+            ], $e->status);
         }
-        return AuthResource::make($result)->response()->setStatusCode(200);
     }
 
     public function loginWithPin(LoginPinRequest $request)
     {
-        $result = $this->authService->loginWithPin($request->validated());
-        if (!isset($result['success']) || !$result['success']) {
-            $status = 401;
-            $message = 'Invalid credentials or PIN';
-            if (isset($result['reason']) && $result['reason'] === 'device_blocked') {
-                $status = 423;
-                $message = $result['message'] ?? 'PIN blocked. Please perform a conventional login and create a new PIN for this device.';
-            }
+        try {
+            $result = $this->authService->loginWithPin($request->validated());
+            return AuthResource::make($result)->response()->setStatusCode(200);
+        } catch (ApiException $e) {
             return response()->json([
                 'success' => false,
-                'reason' => $result['reason'] ?? 'invalid',
-                'message' => $message,
-            ], $status);
+                'reason' => $e->reason,
+                'message' => $e->getMessage(),
+            ], $e->status);
         }
-        return AuthResource::make($result)->response()->setStatusCode(200);
     }
 }

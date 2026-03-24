@@ -8,6 +8,9 @@ use App\Services\DeviceAuthService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
+use App\Exceptions\ApiException;
+use App\Exceptions\ErrorCode;
+use Illuminate\Support\Facades\Log;
 
 class AuthService
 {
@@ -20,32 +23,35 @@ class AuthService
         $plainPassword = $data['password'];
         $data['password'] = Hash::make($plainPassword);
 
-        // Filtra apenas campos permitidos pelo modelo User
         $userFillable = (new User())->getFillable();
         $userData = array_intersect_key($data, array_flip($userFillable));
 
         try {
-            DB::beginTransaction();
-            $user = User::create($userData);
-
-            // Atribui role se existir
-            $role = isset($data['role']) ? Role::findByName($data['role'], 'api') : Role::findByName('retail_customer', 'api');
-            if ($role) {
-                $user->assignRole($role);
-            }
-
-
-            $loginData = $this->login([
+            $user = DB::transaction(function () use ($userData, $data) {
+                $user = User::create($userData);
+                $role = isset($data['role'])
+                    ? Role::findByName($data['role'], 'api')
+                    : Role::findByName('retail_customer', 'api');
+                if ($role) {
+                    $user->assignRole($role);
+                }
+                return $user;
+            });
+            return $this->login([
                 'email' => $user->email,
                 'password' => $plainPassword,
             ], true);
-            DB::commit();
+        } catch (\Throwable $e) {
+            if ($e instanceof ApiException) {
+                throw $e;
+            }
 
-            return $loginData;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
+            throw new ApiException(
+                ErrorCode::INTERNAL_ERROR,
+                500,
+                'Error registering user.',
+                'authRegister' // evita duplicidade de log
+            );
         }
     }
 
@@ -53,12 +59,12 @@ class AuthService
     {
         $user = User::where('email', $data['email'])->first();
 
-        if (!$user) {
-            return null;
-        }
-
-        if (!$isRegister && !Hash::check($data['password'], $user->password)) {
-            return null;
+        if (!$user || (!$isRegister && !Hash::check($data['password'], $user->password))) {
+            throw new ApiException(
+                ErrorCode::INVALID_CREDENTIALS,
+                401,
+                'Invalid credentials.'
+            );
         }
 
         $token = $user->createToken('password_login', [], now()->addMinutes(10))->plainTextToken;
@@ -67,10 +73,11 @@ class AuthService
 
         // Garante que diditSession existe antes de acessar refresh
         $diditSession = $user->diditSession()->latest()->first();
+
         return [
             'user' => $user,
             'token' => $token,
-            'didit_session' => $diditSession ? $diditSession : null,
+            'didit_session' => $diditSession,
         ];
     }
 
@@ -80,29 +87,31 @@ class AuthService
             ->whereHas('user', fn($q) => $q->where('email', $data['email']))
             ->first();
         if (!$device || !$device->pin) {
-            return [
-                'success' => false,
-                'reason' => 'device_not_found_or_no_pin',
-            ];
+            throw new ApiException(
+                ErrorCode::DEVICE_NOT_FOUND,
+                404,
+                'Device not found or without PIN.'
+            );
         }
 
         $user = $device->user;
 
-        // Se device está bloqueado, exige login convencional para resetar PIN
+        // If device is blocked, require conventional login to reset PIN
         if ($this->deviceAuthService->isBlocked($device)) {
-            return [
-                'success' => false,
-                'reason' => 'device_blocked',
-                'message' => 'PIN bloqueado. Faça login convencional e crie um novo PIN para este dispositivo.'
-            ];
+            throw new ApiException(
+                ErrorCode::DEVICE_BLOCKED,
+                423,
+                'PIN blocked. Do login conventional to reset PIN.'
+            );
         }
 
         if (!$user || !$device->trusted || !Hash::check($data['pin'], $device->pin)) {
             $this->deviceAuthService->registerFailedAttempt($device);
-            return [
-                'success' => false,
-                'reason' => 'invalid_pin',
-            ];
+            throw new ApiException(
+                ErrorCode::INVALID_PIN,
+                401,
+                'Invalid PIN.'
+            );
         }
 
         // Sucesso: reseta tentativas
@@ -113,10 +122,9 @@ class AuthService
         $token = $user->createToken('device_pin_login_' . ($device->device_name ?? $device->id), [], now()->addMinutes(10))->plainTextToken;
 
         return [
-            'success' => true,
             'user' => $user,
             'token' => $token,
-            'didit_session' => null,
+            'didit_session' => ['status' => $user->diditSession?->status],
         ];
     }
 }

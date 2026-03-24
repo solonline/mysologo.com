@@ -127,6 +127,27 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'diditDocumentJob' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/didit_document_job.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
+        'diditUploadDocumentMediaJob' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/didit_upload_document_media_job.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
+        'authRegister' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/auth_register.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
