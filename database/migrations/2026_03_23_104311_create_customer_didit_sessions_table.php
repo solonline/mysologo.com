@@ -10,17 +10,17 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::create('user_didit_sessions', function (Blueprint $table) {
+        Schema::create('customer_didit_sessions', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('customer_id')->constrained()->cascadeOnDelete();
 
             // Status da sessão no Didit
             $table->string('status')->nullable();
 
             // ID da sessão no Didit
             $table->string('session_id')->unique();
-            $table->string('workflow_id')->unique();
+            $table->string('workflow_id')->nullable();
             $table->string('session_url')->unique();
             $table->string('callback')->nullable();
 
@@ -36,6 +36,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('user_didit_sessions');
+        Schema::dropIfExists('customer_didit_sessions');
     }
 };

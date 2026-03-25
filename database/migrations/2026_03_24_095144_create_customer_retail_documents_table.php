@@ -10,9 +10,11 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::create('user_documents', function (Blueprint $table) {
+        Schema::create('customer_retail_documents', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('customer_id')->constrained()->onDelete('cascade');
+            // Se o documento for de responsável de empresa, corporate_id referencia a empresa (customers)
+            $table->foreignId('corporate_id')->nullable()->constrained('customers')->nullOnDelete();
             $table->string('document_type')->default('Identity Card');
             $table->string('document_number');
             $table->string('personal_number')->nullable();
@@ -73,6 +75,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('user_documents');
+        Schema::dropIfExists('customer_retail_documents');
     }
 };

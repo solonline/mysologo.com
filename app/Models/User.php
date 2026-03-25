@@ -56,19 +56,4 @@ class User extends Authenticatable
             'password' => 'hashed'
         ];
     }
-
-    public function diditSession()
-    {
-        return $this->hasOne(UserDiditSession::class);
-    }
-
-    public function devices()
-    {
-        return $this->hasMany(UserDevice::class);
-    }
-
-    public function documents()
-    {
-        return $this->hasMany(UserDocument::class);
-    }
 }

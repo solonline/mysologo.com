@@ -10,9 +10,9 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::create('user_devices', function (Blueprint $table) {
+        Schema::create('customer_devices', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('customer_id')->constrained()->cascadeOnDelete();
 
             $table->string('device_name')->nullable(); // ex: Chrome Windows
             $table->string('device_token')->unique();  // identificador seguro
@@ -32,6 +32,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('user_devices');
+        Schema::dropIfExists('customer_devices');
     }
 };

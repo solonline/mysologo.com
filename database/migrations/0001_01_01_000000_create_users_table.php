@@ -17,8 +17,6 @@ return new class extends Migration
             $table->string('email', 100)->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('referal_email_code')->unique()->nullable();
-            $table->string('didit_user_id')->nullable()->index();
-            $table->enum('doc_status', ['pending', 'submitted', 'analysing', 'approved', 'rejected', 'retry'])->default('pending');
             $table->string('phone', 20)->nullable();
             $table->string('password')->nullable();
             $table->rememberToken();
