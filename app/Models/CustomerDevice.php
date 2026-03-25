@@ -4,10 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class UserDevice extends Model
+class CustomerDevice extends Model
 {
     protected $fillable = [
-        'user_id',
+        'customer_id',
         'device_name',
         'device_token',
         'pin',
@@ -21,8 +21,8 @@ class UserDevice extends Model
         'last_used_at' => 'datetime',
     ];
 
-    public function user()
+    public function customer()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Customer::class);
     }
 }

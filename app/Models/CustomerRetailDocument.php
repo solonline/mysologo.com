@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class UserDocument extends Model
+class CustomerRetailDocument extends Model
 {
     protected $fillable = [
-        'user_id',
+        'customer_id',
+        'corporate_id',
         'document_type',
         'document_number',
         'personal_number',
@@ -63,8 +64,13 @@ class UserDocument extends Model
         'phone_verifications' => 'array',
     ];
 
-    public function user()
+    public function customer()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function corporate()
+    {
+        return $this->belongsTo(Customer::class, 'corporate_id');
     }
 }

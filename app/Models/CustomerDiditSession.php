@@ -4,12 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class UserDiditSession extends Model
+class CustomerDiditSession extends Model
 {
     //
 
     protected $fillable = [
-        'user_id',
+        'customer_id',
         'status',
         'session_id',
         'workflow_id',
@@ -18,8 +18,8 @@ class UserDiditSession extends Model
         'metadata',
     ];
 
-    public function user()
+    public function customer()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Customer::class);
     }
 }
