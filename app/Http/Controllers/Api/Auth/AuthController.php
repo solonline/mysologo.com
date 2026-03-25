@@ -8,6 +8,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Resources\Auth\AuthResource;
 use App\Services\AuthService;
 use App\Exceptions\ApiException;
+use App\Http\Requests\Customer\RegisterCustomerCorporateRequest;
 use App\Http\Requests\Customer\RegisterCustomerRequest;
 
 class AuthController extends Controller
@@ -17,13 +18,23 @@ class AuthController extends Controller
     }
 
     /**
-     * Register
+     * Register Retail
      *
      * @unauthenticated
      */
-    public function register(RegisterCustomerRequest $request)
+    public function registerRetail(RegisterCustomerRequest $request)
     {
         return AuthResource::make($this->authService->register($request->validated()))->response()->setStatusCode(201);
+    }
+
+    /**
+     * Register Corporate
+     *
+     * @unauthenticated
+     */
+    public function registerCorporate(RegisterCustomerCorporateRequest $request)
+    {
+        return AuthResource::make($this->authService->register(array_merge($request->validated(), ['type' => 'corporate'])))->response()->setStatusCode(201);
     }
 
     /**

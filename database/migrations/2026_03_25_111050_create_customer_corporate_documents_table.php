@@ -21,19 +21,19 @@ return new class extends Migration {
             // Identificação Internacional (O "Coração" da tabela)
             $table->string('country_code', 2); // ISO 3166-1 alpha-2 (BR, PT, ES, GB, FR)
             $table->string('tax_id')->unique(); // O número do doc (CNPJ, NIF, CIF, etc)
-            $table->string('document_type'); // Nome do doc no país (ex: "CNPJ", "VAT", "SIRET")
+            $table->string('document_type')->nullable(); // Nome do doc no país (ex: "CNPJ", "VAT", "SIRET")
             $table->string('vat_number')->nullable()->unique(); // Comum na Europa (IVA)
 
             // Endereço Flexível
-            $table->string('address_line_1'); // Rua, número
+            $table->string('address_line_1')->nullable(); // Rua, número
             $table->string('address_line_2')->nullable(); // Bairro, complemento
-            $table->string('city');
+            $table->string('city')->nullable();
             $table->string('state_province')->nullable(); // Estado, Distrito ou Província
-            $table->string('postal_code'); // String pela variação de formatos (ex: SW1A 1AA)
+            $table->string('postal_code')->nullable(); // String pela variação de formatos (ex: SW1A 1AA)
 
             // Contato e Configurações
-            $table->string('email')->unique();
-            $table->string('phone_international'); // Deve conter DDI +55, +351...
+            $table->string('email')->nullable();
+            $table->string('phone_international')->nullable(); // Deve conter DDI +55, +351...
             $table->string('website')->nullable();
             $table->char('currency_code', 3)->default('EUR'); // BRL, EUR, GBP
 

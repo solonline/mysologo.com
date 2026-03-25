@@ -20,8 +20,6 @@ class AuthResource extends JsonResource
             'token'             => $this->resource['token'],
             'user'              => CustomerResource::make($this->resource['user']),
             'didit_session'     => DiditSessionResource::make($this->resource['didit_session']),
-            'requires_responsible' => $this->resource['requires_responsible'] ?? null,
-
         ];
     }
 }

@@ -23,31 +23,53 @@ class AuthService
         $plainPassword = $data['password'];
         $data['password'] = Hash::make($plainPassword);
 
-        $customerFillable = (new Customer())->getFillable();
-        $customerData = array_intersect_key($data, array_flip($customerFillable));
+        // Mapper: transforma o array conforme tipo
+        [$customerData, $documentData] = $this->mapCustomerData($data);
 
         try {
-            $customer = DB::transaction(function () use ($customerData, $data) {
+            $customer = DB::transaction(function () use ($customerData, $documentData) {
                 $customer = Customer::create($customerData);
+
+                if (!empty($documentData)) {
+                    $customer->corporateDocuments()->create($documentData);
+                }
 
                 return $customer;
             });
+
             return $this->login([
                 'email' => $customer->email,
                 'password' => $plainPassword,
             ], true);
         } catch (\Throwable $e) {
-            if ($e instanceof ApiException) {
+            if ($e instanceof ApiException)
                 throw $e;
-            }
 
             throw new ApiException(
                 ErrorCode::INTERNAL_ERROR,
                 500,
                 $e->getMessage(),
-                'authRegister' // evita duplicidade de log
+                'authRegister'
             );
         }
+    }
+
+    protected function mapCustomerData(array $data): array
+    {
+        $customerFillable = (new Customer())->getFillable();
+        $customerData = array_intersect_key($data, array_flip($customerFillable));
+
+        $documentData = [];
+        if (!empty($data['type']) && $data['type'] === 'corporate') {
+            $customerData['type'] = 'corporate';
+            $customerData['name'] = $data['legal_name'];
+            $customerData['username'] = str_replace(' ', '_', strtolower($data['trading_name'])); // ou algum outro campo que faça sentido
+
+            $documentFillable = (new \App\Models\CustomerCorporateDocument())->getFillable();
+            $documentData = array_intersect_key($data, array_flip($documentFillable));
+        }
+
+        return [$customerData, $documentData];
     }
 
     public function login(array $data, bool $isRegister = false)
@@ -67,10 +89,10 @@ class AuthService
         // 🔴 CORPORATE FLOW (sempre checa estado)
         if ($customer->type === 'corporate') {
 
-            $responsible = $customer->responsibles()->exists();
+            $responsible = $customer->responsibles()->first();
 
             // ❌ não tem responsável
-            if (!$responsible) {
+            if (is_null($responsible)) {
                 return [
                     'user' => $customer,
                     'token' => $token,
