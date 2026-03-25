@@ -1,9 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\AuthController;
-use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Webhooks\DiditWebhookController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -13,6 +12,11 @@ Route::post('/webhooks/didit', [DiditWebhookController::class, 'handle'])->name(
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/me', [UserController::class, 'me']);
+    Route::get('/me', [CustomerController::class, 'me']);
     Route::post('/create-pin', [\App\Http\Controllers\Api\Auth\PinController::class, 'store']);
+
+    Route::group(['corporate'], function () {
+        Route::post('/create-responsible/{customer}', [CustomerController::class, 'createResponsible']);
+        Route::post('/submit-corporate-documents', [CustomerController::class, 'submitCorporateDocuments']);
+    });
 });
