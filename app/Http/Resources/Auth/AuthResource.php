@@ -2,8 +2,8 @@
 
 namespace App\Http\Resources\Auth;
 
-use App\Http\Resources\UserDiditSession;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\CustomerResource;
+use App\Models\CustomerDiditSession;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,8 +18,10 @@ class AuthResource extends JsonResource
     {
         return [
             'token'             => $this->resource['token'],
-            'user'              => UserResource::make($this->resource['user']),
-            'didit_session'     => UserDiditSession::make($this->resource['didit_session']),
+            'user'              => CustomerResource::make($this->resource['user']),
+            'didit_session'     => DiditSessionResource::make($this->resource['didit_session']),
+            'requires_responsible' => $this->resource['requires_responsible'] ?? null,
+
         ];
     }
 }

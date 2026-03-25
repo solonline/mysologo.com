@@ -5,24 +5,32 @@ namespace App\Http\Controllers\Api\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginPinRequest;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Requests\User\RegisterUserRequest;
 use App\Http\Resources\Auth\AuthResource;
-use App\Http\Resources\Auth\DiditSessionResource;
-use App\Http\Resources\UserResource;
 use App\Services\AuthService;
-use App\Services\DiditService;
-use App\Services\KycService;
 use App\Exceptions\ApiException;
+use App\Http\Requests\Customer\RegisterCustomerRequest;
 
 class AuthController extends Controller
 {
-    public function __construct(private AuthService $authService) {}
+    public function __construct(private AuthService $authService)
+    {
+    }
 
-    public function register(RegisterUserRequest $request)
+    /**
+     * Register
+     *
+     * @unauthenticated
+     */
+    public function register(RegisterCustomerRequest $request)
     {
         return AuthResource::make($this->authService->register($request->validated()))->response()->setStatusCode(201);
     }
 
+    /**
+     * Login
+     *
+     * @unauthenticated
+     */
     public function login(LoginRequest $request)
     {
         try {
