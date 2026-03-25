@@ -1,8 +1,7 @@
 <?php
 namespace App\Services;
 
-use App\Models\UserDevice;
-use Illuminate\Support\Carbon;
+use App\Models\CustomerDevice;
 
 class DeviceAuthService
 {
@@ -11,7 +10,7 @@ class DeviceAuthService
     /**
      * Incrementa tentativas e bloqueia se necessário
      */
-    public function registerFailedAttempt(UserDevice $device): void
+    public function registerFailedAttempt(CustomerDevice $device): void
     {
         $device->failed_attempts = ($device->failed_attempts ?? 0) + 1;
         if ($device->failed_attempts >= self::MAX_FAILED_ATTEMPTS) {
@@ -23,7 +22,7 @@ class DeviceAuthService
     /**
      * Reseta tentativas ao sucesso
      */
-    public function resetAttempts(UserDevice $device): void
+    public function resetAttempts(CustomerDevice $device): void
     {
         $device->failed_attempts = 0;
         $device->blocked_at = null;
@@ -33,7 +32,7 @@ class DeviceAuthService
     /**
      * Verifica se o device está bloqueado
      */
-    public function isBlocked(UserDevice $device): bool
+    public function isBlocked(CustomerDevice $device): bool
     {
         return !is_null($device->blocked_at);
     }

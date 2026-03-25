@@ -18,16 +18,8 @@ class RenewTokenMiddleware
         if ($token) {
             $accessToken = PersonalAccessToken::findToken($token);
             if ($accessToken && $accessToken->expires_at && Carbon::parse($accessToken->expires_at)->isFuture()) {
-                $user = $accessToken->tokenable;
-                // Define tempo conforme role
 
-                match (true) {
-                    $user->hasRole('admin') => $minutes = 120,
-                    $user->hasRole('editor') => $minutes = 60,
-                    default => $minutes = (new SettingsService())->get('default_token_expiration'),
-                };
-
-                $accessToken->expires_at = now()->addMinutes($minutes);
+                $accessToken->expires_at = now()->addMinutes(2);
                 $accessToken->save();
             }
         }

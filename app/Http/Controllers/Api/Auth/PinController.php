@@ -10,9 +10,9 @@ class PinController extends Controller
 {
     public function store(CreatePinRequest $request)
     {
-        $user = $request->user();
+        $customer = $request->user();
 
-        $user->devices()->updateOrCreate(
+        $customer->devices()->updateOrCreate(
             ['device_token' => $request->input('device_token')],
             [
                 'device_name' => $request->input('device_name'),
