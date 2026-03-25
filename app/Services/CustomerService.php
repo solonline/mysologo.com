@@ -9,14 +9,13 @@ use Illuminate\Support\Facades\Hash;
 
 class CustomerService
 {
-    public function __construct(protected DiditService $diditService)
+    public function __construct(protected DiditService $diditService, protected KycService $kycService)
     {
 
     }
-
-    public function createResponsible(Customer $customer, array $data)
+    public function updateOrCreateResponsible(Customer $customer, array $data)
     {
-        if($customer->type != 'corporate') {
+        if ($customer->type !== 'corporate') {
             throw new ApiException(
                 ErrorCode::CORPORATE_WITHOUT_RESPONSIBLE,
                 403,
@@ -26,20 +25,30 @@ class CustomerService
 
         return DB::transaction(function () use ($customer, $data) {
 
-        $responsible = Customer::create([
-            ...$data,
-            'corporate_id' => $customer->id,
-            'type' => 'responsible',
-        ]);
+            // 🔍 tenta buscar responsável existente
+            $responsible = $customer->responsibles()->first();
 
-        $diditSession = $this->diditService->createSession($responsible);
+            // 🆕 se não existe, cria
+            if (!$responsible) {
+                $data['username'] = $customer->username . '_responsible_' . uniqid();
 
-        return [
-            'responsible' => $responsible,
-            'didit_session' => $diditSession,
-        ];
-    });
-        // Lógica para criar um responsável vinculado à empresa do usuário autenticado
+                $responsible = Customer::create([
+                    ...$data,
+                    'corporate_id' => $customer->id, // ⚠️ padroniza nome
+                    'type' => 'responsible',
+                ]);
+            }
+
+            // 🔁 garante sessão Didit válida
+            $this->kycService->ensureValidIndividualDocument($responsible);
+
+            $diditSession = $responsible->diditSessions()->latest()->first();
+
+            return [
+                'responsible' => $responsible,
+                'didit_session' => $diditSession,
+            ];
+        });
     }
     public function update(array $data)
     {

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CreateResponsibleRequest;
 use App\Http\Requests\Customer\RegisterCustomerRequest;
+use App\Http\Requests\Customer\UpdateCustomerRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Http\Resources\CustomerResource;
 use App\Services\CustomerService;
@@ -42,9 +44,9 @@ class CustomerController extends Controller
      * @authenticated
      * @header Authorization Bearer token
      */
-    public function createResponsible(RegisterCustomerRequest $request)
+    public function createResponsible(CreateResponsibleRequest $request)
     {
-        return $this->customerService->createResponsible($request->user(), $request->validated());
+        return $this->customerService->updateOrCreateResponsible($request->user(), $request->validated());
     }
 
     /**
