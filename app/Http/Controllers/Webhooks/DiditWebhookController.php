@@ -17,6 +17,9 @@ class DiditWebhookController extends Controller
         $this->diditService = $diditService;
     }
 
+    /**
+     * @hideFromApiDocs
+     */
     public function handle(Request $request)
     {
         // Validar assinatura X-Signature-V2

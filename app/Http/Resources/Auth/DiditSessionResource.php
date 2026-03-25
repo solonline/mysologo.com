@@ -14,16 +14,17 @@ class DiditSessionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        // Se houver erro, retorna apenas a mensagem customizada
-        if (isset($this->resource['success']) && $this->resource['success'] === false) {
             return [
-                'success' => false,
-                'message' => $this->resource['message'] ?? 'Não foi possível criar a sessão Didit.',
-                'detail' => $this->resource['detail'] ?? null,
-                'key' => $this->resource['key'] ?? null,
+                'id' => $this->resource->id,
+                'customer_id' => $this->resource->customer_id,
+                'status' => $this->resource->status,
+                'session_id' => $this->resource->session_id,
+                'workflow_id' => $this->resource->workflow_id,
+                'session_url' => $this->resource->session_url,
+                'callback' => $this->resource->callback,
+                'metadata' => $this->resource->metadata,
+                'created_at' => $this->resource->created_at,
+                'updated_at' => $this->resource->updated_at,
             ];
-        }
-        // Caso sucesso, retorna os dados válidos
-        return $this->resource;
     }
 }

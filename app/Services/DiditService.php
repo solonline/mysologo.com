@@ -1,9 +1,9 @@
 <?php
 namespace App\Services;
 
-use App\Models\User;
-use App\Models\UserDiditSession;
-use App\Models\UserDocument;
+use App\Models\Customer;
+use App\Models\CustomerDiditSession;
+use App\Models\CustomerRetailDocument;
 use App\Providers\DiditProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,18 +17,18 @@ class DiditService
         $this->diditProvider = new DiditProvider();
     }
 
-    public function createSession(User $user): array
+    public function createSession(Customer $customer): array
     {
         $sessionData = [
             'workflow_id' => config('services.didit.workflow_id'),
-            'user_id' => $user->id,
+            'customer_id' => $customer->id,
             'callback' => 'https://yourapp.com/api/didit/callback', //TODO definir callback
-            'language' => $user->language ?? 'en',
+            'language' => $customer->language ?? 'en',
         ];
 
         $diditSession = $this->diditProvider->createSession($sessionData);
 
-        $user->diditSession()->firstOrCreate([
+        $customer->diditSessions()->firstOrCreate([
             'session_id' => $diditSession['session_id']
         ], [
             'workflow_id' => $diditSession['workflow_id'],
@@ -36,7 +36,7 @@ class DiditService
             'status' => $diditSession['status'],
         ]);
 
-        return $user->diditSession()->latest()->first()->toArray();
+        return $customer->diditSessions()->latest()->first()->toArray();
     }
 
     public function getSessionStatus(string $sessionId): array
@@ -75,20 +75,20 @@ class DiditService
                 }
 
                 // Buscar a sessão Didit
-                $diditSession = UserDiditSession::where('session_id', $sessionId)->first();
+                $diditSession = CustomerDiditSession::where('session_id', $sessionId)->first();
                 if (!$diditSession) {
                     Log::warning('Sessão Didit não encontrada', ['session_id' => $sessionId]);
                     continue;
                 }
 
                 // Criar ou recuperar documento
-                $userDocument = UserDocument::firstOrCreate([
+                $customerDocument = CustomerRetailDocument::firstOrCreate([
                     'document_number' => $documentNumber
                 ], [
-                    'user_id' => $diditSession->user_id,
+                    'customer_id' => $diditSession->customer_id,
                 ]);
 
-                $fillable = (new UserDocument())->getFillable();
+                $fillable = (new CustomerRetailDocument())->getFillable();
 
                 // Combina os dados do documento, decisão e payload
                 $data = array_merge($idVerifications, $decision, $payload);
@@ -113,27 +113,27 @@ class DiditService
 
                 // Preencher campos do fillable
                 foreach ($filteredData as $field => $value) {
-                    $userDocument->{$field} = $value;
+                    $customerDocument->{$field} = $value;
 
                     if (in_array($field, $mediaFields) && !empty($value)) {
                         //TODO: Disparar job de upload para S3/CDN
-                        //UploadDocumentMediaJob::dispatch($userDocument->id, $field, $value);
+                        //UploadDocumentMediaJob::dispatch($customerDocument->id, $field, $value);
                     }
                 }
 
                 // Salvar apenas se houve mudança
-                if ($userDocument->isDirty()) {
+                if ($customerDocument->isDirty()) {
                     try {
-                        $userDocument->save();
+                        $customerDocument->save();
                         Log::channel('diditDocumentJob')->info('Documento processado com sucesso', [
-                            'user_id' => $userDocument->user_id,
+                            'customer_id' => $customerDocument->customer_id,
                             'session_id' => $sessionId,
-                            'document_number' => $userDocument->document_number,
-                            'fields_updated' => array_keys($userDocument->getChanges()),
+                            'document_number' => $customerDocument->document_number,
+                            'fields_updated' => array_keys($customerDocument->getChanges()),
                         ]);
                     } catch (\Throwable $e) {
                         Log::channel('diditDocumentJob')->error('Erro salvando documento', [
-                            'user_id' => $userDocument->user_id ?? null,
+                            'customer_id' => $customerDocument->customer_id ?? null,
                             'session_id' => $sessionId,
                             'document_number' => $documentNumber,
                             'exception' => $e->getMessage(),
