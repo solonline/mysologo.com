@@ -25,7 +25,6 @@ class AuthController extends Controller
     public function registerRetail(RegisterCustomerRequest $request)
     {
         $result = $this->authService->register($request->validated());
-        \Log::info('olha', ['result' => $result]);
         return AuthResource::make($result)->response()->setStatusCode(201);
     }
 
@@ -47,29 +46,13 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request)
     {
-        try {
-            $result = $this->authService->login($request->validated());
-            return AuthResource::make($result)->response()->setStatusCode(200);
-        } catch (ApiException $e) {
-            return response()->json([
-                'success' => false,
-                'reason' => $e->reason,
-                'message' => $e->getMessage(),
-            ], $e->status);
-        }
+        $result = $this->authService->login($request->validated());
+        return AuthResource::make($result)->response()->setStatusCode(200);
     }
 
     public function loginWithPin(LoginPinRequest $request)
     {
-        try {
-            $result = $this->authService->loginWithPin($request->validated());
-            return AuthResource::make($result)->response()->setStatusCode(200);
-        } catch (ApiException $e) {
-            return response()->json([
-                'success' => false,
-                'reason' => $e->reason,
-                'message' => $e->getMessage(),
-            ], $e->status);
-        }
+        $result = $this->authService->loginWithPin($request->validated());
+        return AuthResource::make($result)->response()->setStatusCode(200);
     }
 }

@@ -27,7 +27,7 @@ class RegisterCustomerRequest extends FormRequest
             'email' => ['required', 'string', 'email', 'max:100', 'unique:customers'],
             'username' => ['sometimes', 'string', 'max:40', 'unique:customers', 'regex:/^[a-zA-Z0-9_]+$/'],
             'password' => ['required_with:username', 'string', 'min:6'],
-            'type' => ['required', 'string', 'in:retail,corporate,responsible'],
+            'type' => ['sometimes', 'string', 'in:retail,corporate,responsible'],
 
         ];
     }
