@@ -15,6 +15,25 @@ class ApiException extends Exception
         $this->reason = $reason;
         $this->status = $status;
         $this->channel = $channel;
+
+        // Log automático se canal informado
+        if ($channel) {
+            try {
+                $logData = [
+                    'file' => $this->getFile(),
+                    'line' => $this->getLine(),
+                    'status' => $status,
+                    'message' => $message,
+                ];
+                // Se for erro de validação (422), loga resposta da API se disponível
+                if ($status === 422 && isset($reason) && is_array($reason)) {
+                    $logData['api_response'] = $reason;
+                }
+                \Log::channel($channel)->error('ApiException', $logData);
+            } catch (\Throwable $e) {
+                // fallback: não interrompe fluxo se canal não existir
+            }
+        }
     }
 
     public function toArray()

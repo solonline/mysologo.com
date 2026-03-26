@@ -12,4 +12,5 @@ class ErrorCode
     const CORPORATE_WITHOUT_RESPONSIBLE = 'corporate_without_responsible';
     const CORPORATE_DOCUMENT_INVALID = 'corporate_document_invalid';
     const CORPORATE_DOCUMENT_MISSING = 'corporate_document_missing';
+    const DIDIT_SESSION_CREATION_FAILED = 'didit_session_creation_failed';
 }

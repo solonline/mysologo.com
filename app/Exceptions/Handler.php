@@ -22,15 +22,11 @@ class Handler extends ExceptionHandler
     public function render($request, Throwable $exception)
     {
         if ($exception instanceof ApiException) {
-            if ($exception->channel) {
-                Log::channel($exception->channel)->error($exception->getMessage(), [
-                    'reason' => $exception->reason,
-                    'status' => $exception->status,
-                ]);
-            }
             return response()->json([
-                'error' => $exception->reason,
+                'success' => false,
+                'reason' => $exception->reason,
                 'message' => $exception->getMessage(),
+                'status' => $exception->status,
             ], $exception->status);
         }
         return parent::render($request, $exception);

@@ -148,6 +148,13 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'createDiditSession' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/create_didit_session.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
