@@ -24,6 +24,12 @@ class AuthResource extends JsonResource
         if (isset($this->resource['message'])) {
             $data['message'] = $this->resource['message'];
         }
+        if (isset($this->resource['requires_responsible'])) {
+            $data['requires_responsible'] = $this->resource['requires_responsible'];
+        }
+        if(isset($this->resource['kyc_required'])) {
+            $data['kyc_required'] = $this->resource['kyc_required'];
+        }
         return $data;
     }
 }

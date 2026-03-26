@@ -101,17 +101,20 @@ class AuthService
                     'token' => $token,
                     'didit_session' => null,
                     'requires_responsible' => true,
-                    'kyc_required' => true,
                 ];
             }
 
             // 🔵 tem responsável → verificar sessão Didit
             $diditSession = $responsible->diditSessions()->latest()->first();
-
+            \Log::info('Corporate login - responsible Didit session', [
+                'customer_id' => $customer->id,
+                'responsible_id' => $responsible->id,
+                'session' => $diditSession ? $diditSession->toArray() : null,
+            ]);
             return [
                 'user' => $customer,
                 'token' => $token,
-                'didit_session' => $diditSession,
+                'didit_session' => $diditSession ? $diditSession->toArray() : null,
                 'requires_responsible' => false,
                 'kyc_required' => true,
                 'message' => $diditSession ? null : 'No Didit session found for responsible. Please complete KYC.',
