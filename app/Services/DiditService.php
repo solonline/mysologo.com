@@ -1,6 +1,8 @@
 <?php
 namespace App\Services;
 
+use App\Exceptions\ApiException;
+use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerDiditSession;
 use App\Models\CustomerRetailDocument;
@@ -22,21 +24,39 @@ class DiditService
         $sessionData = [
             'workflow_id' => config('services.didit.workflow_id'),
             'customer_id' => $customer->id,
-            'callback' => 'https://yourapp.com/api/didit/callback', //TODO definir callback
+            // 'callback' => config('services.didit.callback_url'),
+            'callback' => 'https://frontend.com/callback', //TODO: Definir URL de callback real
+            'callback_method' => 'initiator',
             'language' => $customer->language ?? 'en',
         ];
 
-        $diditSession = $this->diditProvider->createSession($sessionData);
+        $result = $this->diditProvider->createSession($sessionData);
 
-        $customer->diditSessions()->firstOrCreate([
-            'session_id' => $diditSession['session_id']
-        ], [
-            'workflow_id' => $diditSession['workflow_id'],
-            'session_url' => $diditSession['url'],
-            'status' => $diditSession['status'],
-        ]);
+        if ($result['status'] === 'success' && isset($result['session']['session_id'])) {
+            $body = $result['session'];
+            $diditSession = $customer->diditSessions()->updateOrCreate(
+                ['session_id' => $body['session_id']],
+                [
+                    'workflow_id' => $body['workflow_id'] ?? null,
+                    'session_url' => $body['url'] ?? null,
+                    'status' => $body['status'] ?? 'pending',
+                    'callback' => $sessionData['callback'],
+                    'metadata' => $body['metadata'] ?? null,
+                ]
+            );
+            return [
+                'status' => 'success',
+                'message' => null,
+                'session' => $diditSession->toArray(),
+            ];
+        }
 
-        return $customer->diditSessions()->latest()->first()->toArray();
+        // Falha: retorna status e mensagem
+        return [
+            'status' => 'failed',
+            'message' => $result['message'] ?? 'Erro ao criar sessão Didit',
+            'session' => null,
+        ];
     }
 
     public function getSessionStatus(string $sessionId): array

@@ -16,10 +16,14 @@ class AuthResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        $data = [
             'token'             => $this->resource['token'],
             'user'              => CustomerResource::make($this->resource['user']),
-            'didit_session'     => DiditSessionResource::make($this->resource['didit_session']),
+            'didit_session'     => !is_null($this->resource['didit_session']) ? DiditSessionResource::make($this->resource['didit_session']) : null,
         ];
+        if (isset($this->resource['message'])) {
+            $data['message'] = $this->resource['message'];
+        }
+        return $data;
     }
 }

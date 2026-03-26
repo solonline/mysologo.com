@@ -14,17 +14,18 @@ class DiditSessionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-            return [
-                'id' => $this->resource->id,
-                'customer_id' => $this->resource->customer_id,
-                'status' => $this->resource->status,
-                'session_id' => $this->resource->session_id,
-                'workflow_id' => $this->resource->workflow_id,
-                'session_url' => $this->resource->session_url,
-                'callback' => $this->resource->callback,
-                'metadata' => $this->resource->metadata,
-                'created_at' => $this->resource->created_at,
-                'updated_at' => $this->resource->updated_at,
-            ];
+        $data = is_array($this->resource) ? $this->resource : (array) $this->resource;
+        return [
+            'id' => $data['id'] ?? null,
+            'customer_id' => $data['customer_id'] ?? null,
+            'status' => $data['status'] ?? null,
+            'session_id' => $data['session_id'] ?? null,
+            'workflow_id' => $data['workflow_id'] ?? null,
+            'session_url' => $data['session_url'] ?? null,
+            'callback' => $data['callback'] ?? null,
+            'metadata' => $data['metadata'] ?? null,
+            'created_at' => $data['created_at'] ?? null,
+            'updated_at' => $data['updated_at'] ?? null,
+        ];
     }
 }

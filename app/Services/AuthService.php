@@ -37,18 +37,21 @@ class AuthService
                 return $customer;
             });
 
+            // Após criar, faz login (que já retorna status do Didit)
             return $this->login([
                 'email' => $customer->email,
                 'password' => $plainPassword,
             ], true);
         } catch (\Throwable $e) {
-            if ($e instanceof ApiException)
+            // Sempre propaga ApiException original
+            if ($e instanceof ApiException) {
                 throw $e;
-
+            }
+            // Só lança ApiException genérica para erro inesperado
             throw new ApiException(
                 ErrorCode::INTERNAL_ERROR,
                 500,
-                $e->getMessage(),
+                'Erro inesperado ao registrar usuário.',
                 'authRegister'
             );
         }
@@ -111,23 +114,21 @@ class AuthService
                 'didit_session' => $diditSession,
                 'requires_responsible' => false,
                 'kyc_required' => true,
+                'message' => $diditSession ? null : 'No Didit session found for responsible. Please complete KYC.',
             ];
         }
 
         // 🔵 RETAIL FLOW
         if ($customer->type === 'retail') {
-
-            if ($isRegister) {
-                $this->kycService->ensureValidIndividualDocument($customer);
-            }
-
-            $diditSession = $customer->diditSessions()->latest()->first();
+            $kyc = $this->kycService->ensureValidIndividualDocument($customer);
 
             return [
                 'user' => $customer,
                 'token' => $token,
-                'didit_session' => $diditSession,
+                'didit_session' => $kyc['session'],
+                'didit_status' => $kyc['status'],
                 'kyc_required' => true,
+                'message' => $kyc['message'] ?? null,
             ];
         }
     }

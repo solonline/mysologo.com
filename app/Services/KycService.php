@@ -12,25 +12,32 @@ class KycService
     {
 
     }
-    public function ensureValidIndividualDocument(Customer $customer): void
+    public function ensureValidIndividualDocument(Customer $customer): array
     {
         $customerDiditSession = $customer->diditSessions()->latest()->first();
 
+        // Se não tem sessão ou está aprovada/não iniciada, tenta criar nova sessão se necessário
         if (!isset($customerDiditSession) ||  in_array($customerDiditSession->status, ['Approved', 'Not Started'])) {
             $diditService = $this->diditService;
             if (!isset($customerDiditSession) || $customerDiditSession->updated_at->addDays(7)->isPast()) {
-                $diditService->createSession($customer);
+                return $diditService->createSession($customer);
             } else {
                 $action = match ($customerDiditSession->status) {
                     'Declined', 'Abandoned', 'Expired' => function () use ($customer, $diditService) {
-                            $diditService->createSession($customer);
+                            return $diditService->createSession($customer);
                         },
                     default => null,
                 };
                 if ($action)
-                    $action();
+                    return $action();
             }
         }
+        // Se já tem sessão válida, retorna status success e sessão existente
+        return [
+            'status' => 'success',
+            'message' => null,
+            'session' => $customerDiditSession ? $customerDiditSession->toArray() : null,
+        ];
     }
 
     public function ensureValidCorporateAndResponsibleDocuments(Customer $customer): void
@@ -69,9 +76,5 @@ class KycService
                     'The company document is not valid. Current status: ' . $corporateDocument->status . $reason . '. Please resolve the issue to access the account.'
                 );
             }
-
-            // 2. Validação do documento do responsável (pessoa física)
-
-
     }
 }

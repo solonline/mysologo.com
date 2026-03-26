@@ -24,7 +24,9 @@ class AuthController extends Controller
      */
     public function registerRetail(RegisterCustomerRequest $request)
     {
-        return AuthResource::make($this->authService->register($request->validated()))->response()->setStatusCode(201);
+        $result = $this->authService->register($request->validated());
+        \Log::info('olha', ['result' => $result]);
+        return AuthResource::make($result)->response()->setStatusCode(201);
     }
 
     /**
@@ -34,7 +36,8 @@ class AuthController extends Controller
      */
     public function registerCorporate(RegisterCustomerCorporateRequest $request)
     {
-        return AuthResource::make($this->authService->register(array_merge($request->validated(), ['type' => 'corporate'])))->response()->setStatusCode(201);
+        $result = $this->authService->register(array_merge($request->validated(), ['type' => 'corporate']));
+        return AuthResource::make($result)->response()->setStatusCode(201);
     }
 
     /**
