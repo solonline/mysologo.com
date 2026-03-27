@@ -15,7 +15,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(\App\Clients\DIditClient::class, function ($app) {
+            return new \App\Clients\DIditClient();
+        });
+        $this->app->bind(\App\Providers\DiditProvider::class, function ($app) {
+            return new \App\Providers\DiditProvider($app->make(\App\Clients\DIditClient::class));
+        });
+        $this->app->bind(\App\Services\DiditService::class, function ($app) {
+            return new \App\Services\DiditService($app->make(\App\Providers\DiditProvider::class));
+        });
     }
 
     /**

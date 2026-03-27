@@ -4,13 +4,14 @@ namespace App\Providers;
 use App\Clients\DIditClient;
 use App\Exceptions\ApiException;
 
+
 class DiditProvider
 {
     protected DIditClient $client;
 
-    public function __construct()
+    public function __construct(DIditClient $client)
     {
-        $this->client = new DIditClient();
+        $this->client = $client;
     }
 
     public function createSession(array $data)

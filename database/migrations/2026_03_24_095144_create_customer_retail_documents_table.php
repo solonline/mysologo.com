@@ -17,6 +17,7 @@ return new class extends Migration {
             $table->foreignId('corporate_id')->nullable()->constrained('customers')->nullOnDelete();
             $table->string('document_type')->default('Identity Card');
             $table->string('document_number');
+            $table->string('file_path')->nullable();
             $table->string('personal_number')->nullable();
             $table->string('date_of_birth')->nullable();
             $table->integer('age')->nullable();
