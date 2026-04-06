@@ -24,6 +24,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(\App\Services\DiditService::class, function ($app) {
             return new \App\Services\DiditService($app->make(\App\Providers\DiditProvider::class));
         });
+
+        // Bind para KycService
+        $this->app->bind(\App\Services\KycService::class, function ($app) {
+            return new \App\Services\KycService($app->make(\App\Services\DiditService::class));
+        });
+
+        // Bind para RetailCustomerService
+        $this->app->bind(\App\Services\RetailCustomerService::class, function ($app) {
+            return new \App\Services\RetailCustomerService();
+        });
     }
 
     /**

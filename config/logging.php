@@ -162,6 +162,13 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'corporateDocumentUpload' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/corporate_document_upload.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

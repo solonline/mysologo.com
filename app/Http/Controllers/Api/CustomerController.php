@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\CreateResponsibleRequest;
+use App\Http\Requests\SubmitCorporateDocumentRequest;
 use App\Services\CustomerService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
 class CustomerController extends Controller
 {
-    public function __construct() {}
+    public function __construct(protected CustomerService $customerService)
+    {
+    }
 
     public function me(Request $request)
     {
@@ -17,17 +21,28 @@ class CustomerController extends Controller
 
     public function update(Request $request)
     {
-        // return $this->customerService->update($request->all());
+        return $this->customerService->update($request->all());
     }
 
-    public function createResponsible(Request $request)
+    /**
+     * Summary of createResponsible
+     * @param CreateResponsibleRequest $request
+     */
+    public function createResponsible(CreateResponsibleRequest $request)
     {
-        // return $this->customerService->updateOrCreateResponsible($request->user(), $request->all());
+        return $this->customerService->updateOrCreateResponsible($request->user(), $request->all());
     }
 
-    public function submitCorporateDocuments(Request $request)
+    // public function submitCorporateDocuments(SubmitCorporateDocumentRequest $request)
+    public function submitCorporateDocuments(SubmitCorporateDocumentRequest $request)
     {
-        // return $this->customerService->uploadDocument($request->user(), $request->all());
+        $result = $this->customerService->uploadDocument(
+            $request->user(),
+            $request->file('document'),      // UploadedFile
+            'front_document',                // field
+            $request->input('country')     // country
+        );
+        return response()->json($result, 201);
     }
 
     public function sendValidationEmail(Request $request)

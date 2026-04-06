@@ -12,6 +12,11 @@ Route::post('/webhooks/didit', [DiditWebhookController::class, 'handle'])->name(
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/customer/me', [\App\Http\Controllers\Api\CustomerController::class, 'me']);
-
+    Route::group(['prefix' => 'customer'], function () {
+        Route::get('/me', [\App\Http\Controllers\Api\CustomerController::class, 'me']);
+        Route::post('/update', [\App\Http\Controllers\Api\CustomerController::class, 'update']);
+        Route::post('/create-corporate-responsible', [\App\Http\Controllers\Api\CustomerController::class, 'createResponsible']);
+        Route::post('/submit-corporate-documents', [\App\Http\Controllers\Api\CustomerController::class, 'submitCorporateDocuments']);
+        Route::post('/send-validation-email', [\App\Http\Controllers\Api\CustomerController::class, 'sendValidationEmail']);
+    });
 });

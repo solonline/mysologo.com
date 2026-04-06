@@ -3,9 +3,11 @@ namespace App\Services;
 
 use App\Models\Customer;
 
-class RetailCustomerService extends CustomerService
+class RetailCustomerService
 {
-    // Adicione métodos e regras específicas para clientes do tipo retail
-    // Exemplo:
-    // public function processRetailDocument(Customer $customer, array $data) { ... }
+    public function submitedDocument(Customer $customer, $filePath )
+    {
+        // Lógica específica para clientes de varejo
+        // Exemplo: validação de tipos de documentos, integração com sistemas de terceiros, etc.
+    }
 }

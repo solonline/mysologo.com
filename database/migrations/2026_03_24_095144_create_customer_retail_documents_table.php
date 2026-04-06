@@ -13,8 +13,6 @@ return new class extends Migration {
         Schema::create('customer_retail_documents', function (Blueprint $table) {
             $table->id();
             $table->foreignId('customer_id')->constrained()->onDelete('cascade');
-            // Se o documento for de responsável de empresa, corporate_id referencia a empresa (customers)
-            $table->foreignId('corporate_id')->nullable()->constrained('customers')->nullOnDelete();
             $table->string('document_type')->default('Identity Card');
             $table->string('document_number');
             $table->string('file_path')->nullable();

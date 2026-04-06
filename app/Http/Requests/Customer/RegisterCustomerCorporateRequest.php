@@ -24,7 +24,7 @@ class RegisterCustomerCorporateRequest extends FormRequest
     {
         return [
             'legal_name' => ['required', 'string', 'max:200'],
-            'trading_name' => ['nullable', 'string', 'max:100'],
+            'trading_name' => ['nullable', 'string', 'max:100', 'unique:customers,username'],
             'email' => ['required', 'string', 'email', 'max:100', 'unique:customers'],
             'tax_id' => ['required', 'string', 'max:50', 'unique:customer_corporate_documents,tax_id'],
             'password' => ['required', 'string', 'min:6'],
