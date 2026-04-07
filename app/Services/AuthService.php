@@ -69,7 +69,7 @@ class AuthService
 
         $token = $customer->createToken('password_login', [], now()->addMinutes(10))->plainTextToken;
         $validatedEmail = $customer->hasVerifiedEmail();
-        $validatedDocument = $customer->corporateDocuments()->where('status', 'approved')->exists();
+        $validatedDocument = $customer->doc_status;
 
         // Valores padrão
         $diditSession = null;
