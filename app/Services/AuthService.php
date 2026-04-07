@@ -2,87 +2,64 @@
 namespace App\Services;
 
 use App\Events\CustomerRegistered;
-use App\Models\User;
-use App\Models\UserDevice;
 use App\Services\DeviceAuthService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Role;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
+use App\Contracts\CustomerRepositoryInterface;
+use App\DTOs\RegisterCustomerDTO;
+use App\DTOs\LoginCustomerDTO;
 use App\Models\CustomerDevice;
 use Illuminate\Support\Facades\URL;
 
+
 class AuthService
 {
-    public function __construct(protected KycService $kycService, protected DeviceAuthService $deviceAuthService)
+    public function __construct(
+        protected KycService $kycService,
+        protected DeviceAuthService $deviceAuthService,
+        protected CustomerRepositoryInterface $customerRepository
+    ) {}
+
+    public function register(RegisterCustomerDTO $dto)
     {
-
-    }
-    public function register(array $data)
-    {
-        $plainPassword = $data['password'];
-        $data['password'] = Hash::make($plainPassword);
-
-        // Mapper: transforma o array conforme tipo
-        [$customerData, $documentData] = $this->mapCustomerData($data);
-
         try {
-            $customer = DB::transaction(function () use ($customerData, $documentData) {
-                $customer = Customer::create($customerData);
-
-                if (!empty($documentData)) {
-                    $customer->corporateDocuments()->create($documentData);
-                }
-
+            $customer = DB::transaction(function () use ($dto) {
+                $customer = $this->customerRepository->createCustomer($dto);
+                // Aqui você pode adicionar lógica para documentos corporativos, se necessário
                 CustomerRegistered::dispatch($customer, $this->generateEmailValidationUrl($customer));
                 return $customer;
             });
 
             // Após criar, faz login (que já retorna status do Didit)
-            return $this->login([
-                'email' => $customer->email,
-                'password' => $plainPassword,
-            ], true);
+            return $this->login(new LoginCustomerDTO(
+                email: $customer->email,
+                password: $dto->password // já está hasheada, mas login espera plain, então ajuste se necessário
+            ), true);
         } catch (\Throwable $e) {
-            // Sempre propaga ApiException original
             if ($e instanceof ApiException) {
                 throw $e;
             }
-            // Só lança ApiException genérica para erro inesperado, mas propaga a original como previous
             throw new ApiException(
                 ErrorCode::INTERNAL_ERROR,
                 500,
                 'Erro inesperado ao registrar usuário.',
                 'authRegister',
-                $e // previous
+                $e
             );
         }
     }
 
-    protected function mapCustomerData(array $data): array
+    // Removido: toda lógica de mapeamento fica no DTO
+
+    public function login(LoginCustomerDTO $dto, bool $isRegister = false)
     {
-        $customerFillable = (new Customer())->getFillable();
-        $customerData = array_intersect_key($data, array_flip($customerFillable));
+        // Aqui você pode usar o repository se quiser customizar a busca do customer
+        $customer = Customer::where('email', $dto->email)->first();
 
-        $documentData = [];
-        if (isset($data['type']) && $data['type'] === 'corporate') {
-            $customerData['name'] = $data['legal_name'];
-            $customerData['username'] = str_replace(' ', '_', strtolower($data['trading_name'])); // ou algum outro campo que faça sentido
-
-            $documentFillable = (new \App\Models\CustomerCorporateDocument())->getFillable();
-            $documentData = array_intersect_key($data, array_flip($documentFillable));
-        }
-
-        return [$customerData, $documentData];
-    }
-
-    public function login(array $data, bool $isRegister = false)
-    {
-        $customer = Customer::where('email', $data['email'])->first();
-
-        if (!$customer || (!$isRegister && !Hash::check($data['password'], $customer->password))) {
+        if (!$customer || (!$isRegister && !Hash::check($dto->password, $customer->password))) {
             throw new ApiException(
                 ErrorCode::INVALID_CREDENTIALS,
                 401,
@@ -91,48 +68,45 @@ class AuthService
         }
 
         $token = $customer->createToken('password_login', [], now()->addMinutes(10))->plainTextToken;
+        $validatedEmail = $customer->hasVerifiedEmail();
+        $validatedDocument = $customer->corporateDocuments()->where('status', 'approved')->exists();
 
-        // 🔴 CORPORATE FLOW (sempre checa estado)
+        // Valores padrão
+        $diditSession = null;
+        $requiresResponsible = false;
+        $kycRequired = false;
+        $message = null;
+
         if ($customer->type === 'corporate') {
-
             $responsible = $customer->responsibles()->first();
-
-            // ❌ não tem responsável
             if (is_null($responsible)) {
-                return [
-                    'user' => $customer,
-                    'token' => $token,
-                    'didit_session' => null,
-                    'requires_responsible' => true,
-                ];
+                $requiresResponsible = true;
+                $kycRequired = false;
+            } else {
+                $diditSession = $responsible->diditSessions()->latest()->first();
+                $kycRequired = true;
+                if (!$diditSession) {
+                    $message = 'No Didit session found for responsible. Please complete KYC.';
+                }
+                $diditSession = $diditSession ? $diditSession->toArray() : null;
             }
-
-            // 🔵 tem responsável → verificar sessão Didit
-            $diditSession = $responsible->diditSessions()->latest()->first();
-
-            return [
-                'user' => $customer,
-                'token' => $token,
-                'didit_session' => $diditSession ? $diditSession->toArray() : null,
-                'requires_responsible' => false,
-                'kyc_required' => true,
-                'message' => $diditSession ? null : 'No Didit session found for responsible. Please complete KYC.',
-            ];
-        }
-
-        // 🔵 RETAIL FLOW
-        if ($customer->type === 'retail') {
+        } elseif ($customer->type === 'retail') {
             $kyc = $this->kycService->ensureValidIndividualDocument($customer);
-
-            return [
-                'user' => $customer,
-                'token' => $token,
-                'didit_session' => $kyc['session'],
-                'didit_status' => $kyc['status'],
-                'kyc_required' => true,
-                'message' => $kyc['message'] ?? null,
-            ];
+            $diditSession = $kyc['session'] ?? null;
+            $kycRequired = true;
+            $message = $kyc['message'] ?? null;
         }
+
+        return [
+            'user' => $customer,
+            'token' => $token,
+            'didit_session' => $diditSession,
+            'requires_responsible' => $requiresResponsible,
+            'kyc_required' => $kycRequired,
+            'email_verified' => $validatedEmail,
+            'document_verified' => $validatedDocument,
+            'message' => $message,
+        ];
     }
 
     public function loginWithPin(array $data)

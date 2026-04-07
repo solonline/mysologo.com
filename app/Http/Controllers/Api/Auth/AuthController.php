@@ -7,6 +7,8 @@ use App\Http\Requests\Auth\LoginPinRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Resources\Auth\AuthResource;
 use App\Services\AuthService;
+use App\DTOs\LoginCustomerDTO;
+use App\DTOs\RegisterCustomerDTO;
 use App\Exceptions\ApiException;
 use App\Http\Requests\Customer\RegisterCustomerCorporateRequest;
 use App\Http\Requests\Customer\RegisterCustomerRequest;
@@ -24,7 +26,9 @@ class AuthController extends Controller
      */
     public function registerRetail(RegisterCustomerRequest $request)
     {
-        $result = $this->authService->register($request->validated());
+        $data = $request->validated() + ['type' => 'retail'];
+        $dto = RegisterCustomerDTO::fromArray($data);
+        $result = $this->authService->register($dto);
         return AuthResource::make($result)->response()->setStatusCode(201);
     }
 
@@ -35,7 +39,9 @@ class AuthController extends Controller
      */
     public function registerCorporate(RegisterCustomerCorporateRequest $request)
     {
-        $result = $this->authService->register(array_merge($request->validated(), ['type' => 'corporate']));
+        $data = $request->validated() + ['type' => 'corporate'];
+        $dto = RegisterCustomerDTO::fromArray($data);
+        $result = $this->authService->register($dto);
         return AuthResource::make($result)->response()->setStatusCode(201);
     }
 
@@ -46,7 +52,8 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request)
     {
-        $result = $this->authService->login($request->validated());
+        $dto = LoginCustomerDTO::fromArray($request->validated());
+        $result = $this->authService->login($dto);
         return AuthResource::make($result)->response()->setStatusCode(200);
     }
 

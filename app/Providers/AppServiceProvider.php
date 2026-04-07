@@ -34,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(\App\Services\RetailCustomerService::class, function ($app) {
             return new \App\Services\RetailCustomerService();
         });
+
+        $this->app->bind(\App\Contracts\CustomerRepositoryInterface::class, function ($app) {
+            return new \App\Repositories\CustomerRepository();
+        });
     }
 
     /**
