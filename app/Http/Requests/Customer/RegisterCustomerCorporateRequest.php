@@ -23,8 +23,8 @@ class RegisterCustomerCorporateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:200'],
-            'username' => ['nullable', 'string', 'max:100', 'unique:customers,username'],
+            'name' => ['nullable', 'string', 'max:200'],
+            'username' => ['required', 'string', 'max:100', 'unique:customers,username'],
             'email' => ['required', 'string', 'email', 'max:100', 'unique:customers'],
             'tax_id' => ['required', 'string', 'max:50', 'unique:customer_corporate_documents,tax_id'],
             'password' => ['required', 'string', 'min:6'],
