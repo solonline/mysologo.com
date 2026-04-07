@@ -14,9 +14,9 @@ class DiditService
 {
     protected DiditProvider $diditProvider;
 
-    public function __construct()
+    public function __construct(DiditProvider $diditProvider)
     {
-        $this->diditProvider = new DiditProvider();
+        $this->diditProvider = $diditProvider;
     }
 
     public function createSession(Customer $customer): array

@@ -12,16 +12,19 @@ return new class extends Migration {
     {
         Schema::create('customer_corporate_documents', function (Blueprint $table) {
             $table->id();
-
+            // Se o documento for de responsável de empresa, customer_id referencia a empresa (customers)
+            $table->foreignId('customer_id')->nullable()->constrained('customers')->nullOnDelete();
             // Dados Básicos
             $table->string('legal_name'); // Razão Social
             $table->string('trading_name')->nullable(); // Nome Fantasia
             $table->enum('status', ['Valid', 'Inactive', 'Pending'])->nullable(); // Valido, Inativo, etc
+            $table->string('doc_status')->default('ANALYSIS'); // Status do documento (ANALYSIS, APPROVED, REJECTED)
             $table->string('motive')->nullable(); // Motivo de status pendente ou rejeitado
             // Identificação Internacional (O "Coração" da tabela)
             $table->string('country_code', 2); // ISO 3166-1 alpha-2 (BR, PT, ES, GB, FR)
             $table->string('tax_id')->unique(); // O número do doc (CNPJ, NIF, CIF, etc)
             $table->string('document_type')->nullable(); // Nome do doc no país (ex: "CNPJ", "VAT", "SIRET")
+            $table->string('file_path')->nullable();
             $table->string('vat_number')->nullable()->unique(); // Comum na Europa (IVA)
 
             // Endereço Flexível

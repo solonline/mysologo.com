@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 
+use App\Events\CustomerRegistered;
 use App\Models\User;
 use App\Models\UserDevice;
 use App\Services\DeviceAuthService;
@@ -11,6 +12,7 @@ use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
+use Illuminate\Support\Facades\URL;
 
 class AuthService
 {
@@ -34,6 +36,7 @@ class AuthService
                     $customer->corporateDocuments()->create($documentData);
                 }
 
+                CustomerRegistered::dispatch($customer, $this->generateEmailValidationUrl($customer));
                 return $customer;
             });
 
@@ -47,12 +50,13 @@ class AuthService
             if ($e instanceof ApiException) {
                 throw $e;
             }
-            // Só lança ApiException genérica para erro inesperado
+            // Só lança ApiException genérica para erro inesperado, mas propaga a original como previous
             throw new ApiException(
                 ErrorCode::INTERNAL_ERROR,
                 500,
                 'Erro inesperado ao registrar usuário.',
-                'authRegister'
+                'authRegister',
+                $e // previous
             );
         }
     }
@@ -63,8 +67,7 @@ class AuthService
         $customerData = array_intersect_key($data, array_flip($customerFillable));
 
         $documentData = [];
-        if (!empty($data['type']) && $data['type'] === 'corporate') {
-            $customerData['type'] = 'corporate';
+        if (isset($data['type']) && $data['type'] === 'corporate') {
             $customerData['name'] = $data['legal_name'];
             $customerData['username'] = str_replace(' ', '_', strtolower($data['trading_name'])); // ou algum outro campo que faça sentido
 
@@ -106,11 +109,7 @@ class AuthService
 
             // 🔵 tem responsável → verificar sessão Didit
             $diditSession = $responsible->diditSessions()->latest()->first();
-            \Log::info('Corporate login - responsible Didit session', [
-                'customer_id' => $customer->id,
-                'responsible_id' => $responsible->id,
-                'session' => $diditSession ? $diditSession->toArray() : null,
-            ]);
+
             return [
                 'user' => $customer,
                 'token' => $token,
@@ -181,5 +180,20 @@ class AuthService
             'token' => $token,
             'didit_session' => ['status' => $customer->diditSessions()->latest()->first()?->status],
         ];
+    }
+
+    /**
+     * Gera o link de validação de e-mail para o cliente.
+     */
+    private function generateEmailValidationUrl(Customer $customer): string
+    {
+        return URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(60),
+            [
+                'id' => $customer->id,
+                'hash' => sha1($customer->email),
+            ]
+        );
     }
 }

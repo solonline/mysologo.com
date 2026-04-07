@@ -13,4 +13,5 @@ class ErrorCode
     const CORPORATE_DOCUMENT_INVALID = 'corporate_document_invalid';
     const CORPORATE_DOCUMENT_MISSING = 'corporate_document_missing';
     const DIDIT_SESSION_CREATION_FAILED = 'didit_session_creation_failed';
+    const FILE_UPLOAD_FAILED = 'file_upload_failed';
 }

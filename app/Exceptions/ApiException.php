@@ -9,9 +9,9 @@ class ApiException extends Exception
     public int $status;
     public ?string $channel;
 
-    public function __construct(string $reason, int $status, string $message = '', ?string $channel = null)
+    public function __construct(string $reason, int $status, string $message = '', ?string $channel = null, ?\Throwable $previous = null)
     {
-        parent::__construct($message, $status);
+        parent::__construct($message, $status, $previous);
         $this->reason = $reason;
         $this->status = $status;
         $this->channel = $channel;
@@ -23,7 +23,8 @@ class ApiException extends Exception
                     'file' => $this->getFile(),
                     'line' => $this->getLine(),
                     'status' => $status,
-                    'message' => $message,
+                    // Se houver previous, loga a mensagem original, senão a customizada
+                    'message' => $previous ? $previous->getMessage() : $this->getMessage(),
                 ];
                 // Se for erro de validação (422), loga resposta da API se disponível
                 if ($status === 422 && isset($reason) && is_array($reason)) {
@@ -55,4 +56,3 @@ class ApiException extends Exception
         ];
     }
 }
-

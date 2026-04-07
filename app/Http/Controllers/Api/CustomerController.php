@@ -2,60 +2,54 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateResponsibleRequest;
-use App\Http\Requests\Customer\RegisterCustomerRequest;
-use App\Http\Requests\Customer\UpdateCustomerRequest;
-use App\Http\Requests\User\UpdateUserRequest;
-use App\Http\Resources\CustomerResource;
+use App\Http\Requests\SubmitCorporateDocumentRequest;
 use App\Services\CustomerService;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 
 class CustomerController extends Controller
 {
-
     public function __construct(protected CustomerService $customerService)
     {
     }
-    /**
-     * Me
-     *
-     * @authenticated
-     */
+
     public function me(Request $request)
     {
-        return CustomerResource::make($request->user())->response()->setStatusCode(200);
+        return response()->json($request->user());
     }
 
-    /**
-     * Atualiza os dados do usuário autenticado
-     *
-     * @authenticated
-     * @header Authorization Bearer token
-     */
-    public function update(UpdateUserRequest $request)
+    public function update(Request $request)
     {
-        // Lógica para atualizar os dados do usuário autenticado
+        return $this->customerService->update($request->all());
     }
 
     /**
-     * Create Responsible
-     *
-     * @authenticated
-     * @header Authorization Bearer token
+     * Summary of createResponsible
+     * @param CreateResponsibleRequest $request
      */
     public function createResponsible(CreateResponsibleRequest $request)
     {
-        return $this->customerService->updateOrCreateResponsible($request->user(), $request->validated());
+        return $this->customerService->updateOrCreateResponsible($request->user(), $request->all());
     }
 
-    /**
-     * Summary of submitCorporateDocuments
-     * @param Request $request
-     * @return void
-     */
-    public function submitCorporateDocuments(Request $request)
+    // public function submitCorporateDocuments(SubmitCorporateDocumentRequest $request)
+    public function submitCorporateDocuments(SubmitCorporateDocumentRequest $request)
     {
-        // Lógica para submissão de documentos corporativos
+        $result = $this->customerService->uploadDocument(
+            $request->user(),
+            $request->file('document'),      // UploadedFile
+            'front_document',                // field
+            $request->input('country')     // country
+        );
+        return response()->json($result, 201);
+    }
+
+    public function sendValidationEmail(Request $request)
+    {
+        // $customer = $request->user();
+        // $validationUrl = $this->customerService->generateEmailValidationUrl($customer);
+        // $this->customerService->sendValidationEmail($customer, $validationUrl);
+        return response()->json(['message' => 'Validation email sent.']);
     }
 }
