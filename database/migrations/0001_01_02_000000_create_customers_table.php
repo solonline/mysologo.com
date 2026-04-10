@@ -22,8 +22,8 @@ return new class extends Migration {
             $table->string('email', 100)->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('referal_email_code')->unique()->nullable();
-            $table->enum('status', ['pending', 'analysis', 'active', 'inactive', 'blocked'])->default('pending');
-            $table->enum('doc_status', ['pending', 'submitted', 'analysing', 'approved', 'rejected', 'retry'])->default('pending');
+            $table->enum('status', ['pending', 'analysing', 'active', 'inactive', 'blocked'])->default('pending');
+            $table->enum('doc_status', ['approved', 'declined', 'analysing', 'pending'])->default('pending');
             $table->string('phone', 20)->nullable();
             $table->string('password')->nullable();
             $table->rememberToken();

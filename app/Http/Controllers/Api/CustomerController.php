@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\DTOs\CreateResponsibleDTO;
+use App\DTOs\UpdateCustomerDTO;
 use App\Http\Requests\CreateResponsibleRequest;
 use App\Http\Requests\SubmitCorporateDocumentRequest;
+use App\Http\Requests\Customer\UpdateCustomerRequest;
 use App\Services\CustomerService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -19,18 +22,16 @@ class CustomerController extends Controller
         return response()->json($request->user());
     }
 
-    public function update(Request $request)
+    public function update(UpdateCustomerRequest $request)
     {
-        return $this->customerService->update($request->all());
+        $dto = UpdateCustomerDTO::fromArray($request->validated());
+        return $this->customerService->update($request->user(), $dto);
     }
 
-    /**
-     * Summary of createResponsible
-     * @param CreateResponsibleRequest $request
-     */
     public function createResponsible(CreateResponsibleRequest $request)
     {
-        return $this->customerService->updateOrCreateResponsible($request->user(), $request->all());
+        $dto = CreateResponsibleDTO::fromArray($request->validated());
+        return $this->customerService->updateOrCreateResponsible($request->user(), $dto);
     }
 
     // public function submitCorporateDocuments(SubmitCorporateDocumentRequest $request)

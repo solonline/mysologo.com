@@ -3,24 +3,24 @@ namespace App\Services;
 
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
+use App\Contracts\CustomerRepositoryInterface;
+use App\DTOs\CreateResponsibleDTO;
+use App\DTOs\UpdateCustomerDTO;
 use App\Models\Customer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Throwable;
 
 class CustomerService
 {
 
     public function __construct(
+        protected CustomerRepositoryInterface $customerRepository,
         protected DiditService $diditService,
         protected KycService $kycService,
         protected RetailCustomerService $retailCustomerService,
         protected CorporateCustomerService $corporateCustomerService
-    ) {
-
-    }
-    public function updateOrCreateResponsible(Customer $customer, array $data)
+    ) {}
+    public function updateOrCreateResponsible(Customer $customer, CreateResponsibleDTO $dto)
     {
         if ($customer->type !== 'corporate') {
             throw new ApiException(
@@ -30,23 +30,13 @@ class CustomerService
             );
         }
 
-        return DB::transaction(function () use ($customer, $data) {
-
-            // 🔍 tenta buscar responsável existente
+        return DB::transaction(function () use ($customer, $dto) {
             $responsible = $customer->responsibles()->first();
 
-            // 🆕 se não existe, cria
             if (!$responsible) {
-                $data['username'] = $customer->username . '_responsible_' . uniqid();
-
-                $responsible = Customer::create([
-                    ...$data,
-                    'corporate_id' => $customer->id, // ⚠️ padroniza nome
-                    'type' => 'responsible',
-                ]);
+                $responsible = $this->customerRepository->createResponsible($customer, $dto);
             }
 
-            // 🔁 garante sessão Didit válida
             $this->kycService->ensureValidIndividualDocument($responsible);
 
             $diditSession = $responsible->diditSessions()->latest()->first();
@@ -57,14 +47,9 @@ class CustomerService
             ];
         });
     }
-    public function update(array $data)
+    public function update(Customer $customer, UpdateCustomerDTO $dto)
     {
-        $customer = auth()->user();
-        if (isset($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        }
-        $customer->update($data);
-        return $customer;
+        return $this->customerRepository->updateCustomer($customer, $dto);
     }
 
     public function sendValidationEmail(Customer $customer, string $validationUrl)
