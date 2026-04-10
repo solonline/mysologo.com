@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Listeners;
+
+use App\Events\CustomerApproved;
+use App\Services\StripeService;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Log;
+
+class CreateStripeCustomer implements ShouldQueue
+{
+    use InteractsWithQueue;
+
+    public string $queue = 'stripe';
+
+    public function __construct(protected StripeService $stripeService)
+    {
+    }
+
+    public function handle(CustomerApproved $event): void
+    {
+        $customer = $event->customer;
+
+        try {
+            $this->stripeService->createCustomer($customer);
+        } catch (\Throwable $e) {
+            Log::warning('Falha ao criar customer no Stripe via listener', [
+                'customer_id' => $customer->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            $this->fail($e);
+        }
+    }
+}

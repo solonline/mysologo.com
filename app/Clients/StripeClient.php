@@ -1,0 +1,62 @@
+<?php
+namespace App\Clients;
+
+use App\Services\SettingsService;
+use Stripe\Event;
+use Stripe\StripeClient as Stripe;
+use Stripe\Webhook;
+
+class StripeClient
+{
+    protected string $secretKey;
+    protected string $webhookSecret;
+    protected Stripe $stripe;
+
+    public function __construct(protected SettingsService $settings)
+    {
+        $this->secretKey = $this->settings->getByKey('stripe_secret_key');
+        $this->webhookSecret = $this->settings->getByKey('stripe_webhook_secret');
+        $this->stripe = new Stripe($this->secretKey);
+    }
+
+    public function createCustomer(array $data): array
+    {
+        return $this->stripe->customers->create($data)->toArray();
+    }
+
+    public function getCustomer(string $customerId): array
+    {
+        return $this->stripe->customers->retrieve($customerId)->toArray();
+    }
+
+    public function createPaymentIntent(array $data): array
+    {
+        $intent = $this->stripe->paymentIntents->create($data);
+        return $intent->toArray();
+    }
+
+    public function getPaymentIntent(string $paymentIntentId): array
+    {
+        return $this->stripe->paymentIntents->retrieve($paymentIntentId)->toArray();
+    }
+
+    public function attachPaymentMethod(string $paymentMethodId, string $customerId): array
+    {
+        return $this->stripe->paymentMethods->attach($paymentMethodId, ['customer' => $customerId])->toArray();
+    }
+
+    public function createSubscription(array $data): array
+    {
+        return $this->stripe->subscriptions->create($data)->toArray();
+    }
+
+    public function cancelSubscription(string $subscriptionId): array
+    {
+        return $this->stripe->subscriptions->cancel($subscriptionId)->toArray();
+    }
+
+    public function constructWebhookEvent(string $payload, string $sigHeader): Event
+    {
+        return Webhook::constructEvent($payload, $sigHeader, $this->webhookSecret);
+    }
+}
