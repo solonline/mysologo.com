@@ -172,6 +172,11 @@ class AuthService
         ];
     }
 
+    public function logout(Customer $customer)
+    {
+        $customer->tokens()->delete();
+    }
+
     /**
      * Gera o link de validação de e-mail para o cliente.
      */

@@ -63,4 +63,10 @@ class AuthController extends Controller
         $result = $this->authService->loginWithPin($dto);
         return AuthResource::make($result)->response()->setStatusCode(200);
     }
+
+    public function logout()
+    {
+        $this->authService->logout(auth()->user());
+        return response()->json(['message' => 'Logged out successfully'], 200);
+    }
 }
