@@ -26,6 +26,7 @@ class CreateResponsibleRequest extends FormRequest
         $responsible = $this->user()->responsibles()->first();
         $responsibleId = $responsible?->id ?? null;
         return [
+            'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:200', 'unique:customers,username' . ($responsibleId ? ",{$responsibleId}" : '')],
             'email' => [
                 'required',
