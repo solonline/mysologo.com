@@ -15,7 +15,7 @@ class RolesSeeder extends Seeder
     {
         $roles = ['admin'];
         foreach ($roles as $role) {
-            Role::create(['name' => $role, 'guard_name' => 'api']);
+            Role::updateOrCreate(['name' => $role], ['guard_name' => 'api']);
         }
     }
 }

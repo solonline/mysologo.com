@@ -14,4 +14,8 @@ class ErrorCode
     const CORPORATE_DOCUMENT_MISSING = 'corporate_document_missing';
     const DIDIT_SESSION_CREATION_FAILED = 'didit_session_creation_failed';
     const FILE_UPLOAD_FAILED = 'file_upload_failed';
+    const STRIPE_CUSTOMER_CREATION_FAILED = 'stripe_customer_creation_failed';
+    const STRIPE_PAYMENT_INTENT_FAILED = 'stripe_payment_intent_failed';
+    const STRIPE_SUBSCRIPTION_FAILED = 'stripe_subscription_failed';
+    const STRIPE_SUBSCRIPTION_CANCEL_FAILED = 'stripe_subscription_cancel_failed';
 }
