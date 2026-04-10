@@ -1,24 +1,35 @@
 <?php
 namespace App\Services;
 
+use App\Contracts\SettingsRepositoryInterface;
+use App\DTOs\SettingDTO;
 use App\Models\Setting;
+use Illuminate\Database\Eloquent\Collection;
 
 class SettingsService
 {
-    public function get($key)
+    public function __construct(
+        private readonly SettingsRepositoryInterface $settingRepository
+    ) {}
+
+    public function get(SettingDTO $dto): ?Setting
     {
-        $setting = Setting::where('key', $key)->first();
-        return $setting ? $setting->value : null;
+        return $this->settingRepository->get($dto);
     }
 
-    public function set($key, $value)
+    public function all(): Collection
     {
-        $setting = Setting::where('key', $key)->first();
-        if ($setting) {
-            $setting->value = $value;
-            $setting->save();
-        } else {
-            Setting::create(['key' => $key, 'value' => $value]);
-        }
+        return $this->settingRepository->all();
+    }
+
+    /** internal queries */
+    public function getByKey(string $key): ?string
+    {
+        return $this->get(new SettingDTO($key, null))?->value;
+    }
+
+    public function set(SettingDTO $dto): void
+    {
+        $this->settingRepository->set($dto);
     }
 }

@@ -28,6 +28,10 @@ class SettingsSeeder extends Seeder
             ['key' => 'favicon', 'value' => '/storage/favicon.ico'],
             ['key' => 'timezone', 'value' => 'Europe/Lisbon'],
             ['key' => 'time_expires_token', 'value' => '1'],
+            ['key' => 'stripe_public_key', 'value' => ''],
+            ['key' => 'stripe_secret_key', 'value' => ''],
+            ['key' => 'stripe_webhook_secret', 'value' => 'whsec_1234567890abcdef'],
+            ['key' => 'stripe_url', 'value' => 'https://api.stripe.com/v1'],
         ];
         DB::table('settings')->insert($settings);
     }
