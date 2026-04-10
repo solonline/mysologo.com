@@ -1,8 +1,14 @@
 <?php
 namespace App\Services;
 
+use App\Enums\CustomerStatus;
+use App\Enums\DocumentStatus;
+use App\Events\CustomerApproved;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
+use App\Contracts\CustomerRepositoryInterface;
+use App\Contracts\DiditSessionRepositoryInterface;
+use App\Contracts\RetailDocumentRepositoryInterface;
 use App\Models\Customer;
 use App\Models\CustomerDiditSession;
 use App\Models\CustomerRetailDocument;
@@ -12,12 +18,12 @@ use Illuminate\Support\Facades\Log;
 
 class DiditService
 {
-    protected DiditProvider $diditProvider;
-
-    public function __construct(DiditProvider $diditProvider)
-    {
-        $this->diditProvider = $diditProvider;
-    }
+    public function __construct(
+        protected DiditProvider $diditProvider,
+        protected DiditSessionRepositoryInterface $diditSessionRepository,
+        protected RetailDocumentRepositoryInterface $retailDocumentRepository,
+        protected CustomerRepositoryInterface $customerRepository,
+    ) {}
 
     public function createSession(Customer $customer): array
     {
@@ -34,14 +40,15 @@ class DiditService
 
         if ($result['status'] === 'success' && isset($result['session']['session_id'])) {
             $body = $result['session'];
-            $diditSession = $customer->diditSessions()->updateOrCreate(
-                ['session_id' => $body['session_id']],
+            $diditSession = $this->diditSessionRepository->upsertBySessionId(
+                $customer,
+                $body['session_id'],
                 [
                     'workflow_id' => $body['workflow_id'] ?? null,
                     'session_url' => $body['url'] ?? null,
-                    'status' => $body['status'] ?? 'pending',
-                    'callback' => $sessionData['callback'],
-                    'metadata' => $body['metadata'] ?? null,
+                    'status'      => $body['status'] ?? 'pending',
+                    'callback'    => $sessionData['callback'],
+                    'metadata'    => $body['metadata'] ?? null,
                 ]
             );
             return [
@@ -95,18 +102,17 @@ class DiditService
                 }
 
                 // Buscar a sessão Didit
-                $diditSession = CustomerDiditSession::where('session_id', $sessionId)->first();
+                $diditSession = $this->diditSessionRepository->findBySessionId($sessionId);
                 if (!$diditSession) {
                     Log::warning('Sessão Didit não encontrada', ['session_id' => $sessionId]);
                     continue;
                 }
 
                 // Criar ou recuperar documento
-                $customerDocument = CustomerRetailDocument::firstOrCreate([
-                    'document_number' => $documentNumber
-                ], [
-                    'customer_id' => $diditSession->customer_id,
-                ]);
+                $customerDocument = $this->retailDocumentRepository->firstOrCreateByDocumentNumber(
+                    $documentNumber,
+                    $diditSession->customer_id
+                );
 
                 $fillable = (new CustomerRetailDocument())->getFillable();
 
@@ -141,25 +147,47 @@ class DiditService
                     }
                 }
 
+                $customer = $this->customerRepository->findById($customerDocument->customer_id);
+                $customer->status = CustomerStatus::PENDING;
+
                 // Salvar apenas se houve mudança
                 if ($customerDocument->isDirty()) {
                     try {
-                        $customerDocument->save();
+                        $this->retailDocumentRepository->save($customerDocument);
                         Log::channel('diditDocumentJob')->info('Documento processado com sucesso', [
-                            'customer_id' => $customerDocument->customer_id,
-                            'session_id' => $sessionId,
-                            'document_number' => $customerDocument->document_number,
-                            'fields_updated' => array_keys($customerDocument->getChanges()),
+                            'customer_id'       => $customerDocument->customer_id,
+                            'session_id'        => $sessionId,
+                            'document_number'   => $customerDocument->document_number,
+                            'fields_updated'    => array_keys($customerDocument->getChanges()),
                         ]);
                     } catch (\Throwable $e) {
                         Log::channel('diditDocumentJob')->error('Erro salvando documento', [
-                            'customer_id' => $customerDocument->customer_id ?? null,
-                            'session_id' => $sessionId,
-                            'document_number' => $documentNumber,
-                            'exception' => $e->getMessage(),
-                            'trace' => $e->getTraceAsString(),
+                            'customer_id'       => $customerDocument->customer_id ?? null,
+                            'session_id'        => $sessionId,
+                            'document_number'   => $documentNumber,
+                            'exception'         => $e->getMessage(),
+                            'trace'             => $e->getTraceAsString(),
                         ]);
                         throw $e; // Job poderá re-tentar
+                    }
+                   match($decision['status'] ?? null) {
+                        'Approved'              => $customer->doc_status = DocumentStatus::APPROVED,
+                        'Declined'              => $customer->doc_status = DocumentStatus::DECLINED,
+                        'In Review'             => $customer->doc_status = DocumentStatus::ANALYSING,
+                        'In Progress'           => $customer->doc_status = DocumentStatus::ANALYSING,
+                        'Not Started'           => $customer->doc_status = DocumentStatus::PENDING,
+                        default => null,
+                    };
+
+                    match($customer->doc_status) {
+                        DocumentStatus::APPROVED    => $customer->status = CustomerStatus::ACTIVE,
+                        DocumentStatus::PENDING     => $customer->status = CustomerStatus::PENDING,
+                        DocumentStatus::DECLINED     => $customer->status = CustomerStatus::BLOCKED,
+                        default => null,
+                    };
+                    $this->customerRepository->save($customer);
+                    if ($customer->status === CustomerStatus::ACTIVE) {
+                        CustomerApproved::dispatch($customer);
                     }
                 }
             }
