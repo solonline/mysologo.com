@@ -7,36 +7,55 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
-use App\Models\Customer;
 use App\Contracts\CustomerRepositoryInterface;
+use App\Contracts\DeviceRepositoryInterface;
+use App\Contracts\StripeAccountRepositoryInterface;
+use App\DTOs\CreateStripeAccountDTO;
+use App\DTOs\LoginWithPinDTO;
 use App\DTOs\RegisterCustomerDTO;
 use App\DTOs\LoginCustomerDTO;
-use App\Models\CustomerDevice;
+use App\Models\Customer;
 use Illuminate\Support\Facades\URL;
-
 
 class AuthService
 {
     public function __construct(
         protected KycService $kycService,
         protected DeviceAuthService $deviceAuthService,
-        protected CustomerRepositoryInterface $customerRepository
+        protected CustomerRepositoryInterface $customerRepository,
+        protected StripeAccountRepositoryInterface $stripeAccountRepository,
+        protected DeviceRepositoryInterface $deviceRepository,
+        protected StripeService $stripeService,
     ) {}
 
     public function register(RegisterCustomerDTO $dto)
     {
         try {
-            $customer = DB::transaction(function () use ($dto) {
-                $customer = $this->customerRepository->createCustomer($dto);
-                // Aqui você pode adicionar lógica para documentos corporativos, se necessário
+            $preparedDto = new RegisterCustomerDTO(
+                email: $dto->email,
+                password: Hash::make($dto->password),
+                type: $dto->type,
+                username: $dto->username ? strtolower(str_replace(' ', '_', $dto->username)) : null,
+                name: $dto->name,
+            );
+
+            $customer = DB::transaction(function () use ($preparedDto) {
+                $customer = $this->customerRepository->createCustomer($preparedDto);
+
+                $stripeCustomer = $this->stripeService->createCustomer($customer);
+
+                $this->stripeAccountRepository->create(new CreateStripeAccountDTO(
+                    customerId: $customer->id,
+                    stripeCustomerId: $stripeCustomer['id'],
+                ));
+
                 CustomerRegistered::dispatch($customer, $this->generateEmailValidationUrl($customer));
                 return $customer;
             });
 
-            // Após criar, faz login (que já retorna status do Didit)
             return $this->login(new LoginCustomerDTO(
                 email: $customer->email,
-                password: $dto->password // já está hasheada, mas login espera plain, então ajuste se necessário
+                password: $dto->password
             ), true);
         } catch (\Throwable $e) {
             if ($e instanceof ApiException) {
@@ -56,8 +75,7 @@ class AuthService
 
     public function login(LoginCustomerDTO $dto, bool $isRegister = false)
     {
-        // Aqui você pode usar o repository se quiser customizar a busca do customer
-        $customer = Customer::where('email', $dto->email)->first();
+        $customer = $this->customerRepository->findByEmail($dto->email);
 
         if (!$customer || (!$isRegister && !Hash::check($dto->password, $customer->password))) {
             throw new ApiException(
@@ -109,11 +127,10 @@ class AuthService
         ];
     }
 
-    public function loginWithPin(array $data)
+    public function loginWithPin(LoginWithPinDTO $dto)
     {
-        $device = CustomerDevice::where('device_token', $data['device_token'])
-            ->whereHas('customer', fn($q) => $q->where('email', $data['email']))
-            ->first();
+        $device = $this->deviceRepository->findByTokenAndEmail($dto->deviceToken, $dto->email);
+
         if (!$device || !$device->pin) {
             throw new ApiException(
                 ErrorCode::DEVICE_NOT_FOUND,
@@ -124,7 +141,6 @@ class AuthService
 
         $customer = $device->customer;
 
-        // If device is blocked, require conventional login to reset PIN
         if ($this->deviceAuthService->isBlocked($device)) {
             throw new ApiException(
                 ErrorCode::DEVICE_BLOCKED,
@@ -133,8 +149,9 @@ class AuthService
             );
         }
 
-        if (!$customer || !$device->trusted || !Hash::check($data['pin'], $device->pin)) {
+        if (!$customer || !$device->trusted || !Hash::check($dto->pin, $device->pin)) {
             $this->deviceAuthService->registerFailedAttempt($device);
+            $this->deviceRepository->save($device);
             throw new ApiException(
                 ErrorCode::INVALID_PIN,
                 401,
@@ -142,10 +159,9 @@ class AuthService
             );
         }
 
-        // Sucesso: reseta tentativas
         $this->deviceAuthService->resetAttempts($device);
         $device->last_used_at = now();
-        $device->save();
+        $this->deviceRepository->save($device);
 
         $token = $customer->createToken('device_pin_login_' . ($device->device_name ?? $device->id), [], now()->addMinutes(10))->plainTextToken;
 

@@ -8,8 +8,8 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Resources\Auth\AuthResource;
 use App\Services\AuthService;
 use App\DTOs\LoginCustomerDTO;
+use App\DTOs\LoginWithPinDTO;
 use App\DTOs\RegisterCustomerDTO;
-use App\Exceptions\ApiException;
 use App\Http\Requests\Customer\RegisterCustomerCorporateRequest;
 use App\Http\Requests\Customer\RegisterCustomerRequest;
 
@@ -59,7 +59,8 @@ class AuthController extends Controller
 
     public function loginWithPin(LoginPinRequest $request)
     {
-        $result = $this->authService->loginWithPin($request->validated());
+        $dto = LoginWithPinDTO::fromArray($request->validated());
+        $result = $this->authService->loginWithPin($dto);
         return AuthResource::make($result)->response()->setStatusCode(200);
     }
 }

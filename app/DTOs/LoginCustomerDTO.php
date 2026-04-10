@@ -5,8 +5,8 @@ namespace App\DTOs;
 class LoginCustomerDTO
 {
     public function __construct(
-        public string $email,
-        public string $password
+        public readonly string $email,
+        public readonly string $password
     ) {}
 
     public static function fromArray(array $data): self
