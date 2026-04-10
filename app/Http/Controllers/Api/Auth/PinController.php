@@ -2,23 +2,19 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
+use App\DTOs\CreatePinDTO;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\CreatePinRequest;
-use Illuminate\Support\Facades\Hash;
+use App\Services\DeviceAuthService;
 
 class PinController extends Controller
 {
+    public function __construct(private DeviceAuthService $deviceAuthService) {}
+
     public function store(CreatePinRequest $request)
     {
-        $customer = $request->user();
-
-        $customer->devices()->updateOrCreate(
-            ['device_token' => $request->input('device_token')],
-            [
-                'device_name' => $request->input('device_name'),
-                'pin' => Hash::make($request->input('pin'))
-            ]
-        );
+        $dto = CreatePinDTO::fromArray($request->validated());
+        $this->deviceAuthService->createPin($request->user(), $dto);
         return response()->json(['message' => 'PIN created successfully'], 201);
     }
 }

@@ -27,7 +27,7 @@ class CorporateCustomerService
                 'document_type' => $documentType,
                 'country_code' => $country,
                 'tax_id' => $customer->username . '_tax_' . uniqid(), // Placeholder, deve ser extraído do documento real
-                'doc_status' => DocumentStatus::ANALYSIS,
+                'doc_status' => DocumentStatus::ANALYSING,
             ]);
 
             $document->file_path = $filePath;

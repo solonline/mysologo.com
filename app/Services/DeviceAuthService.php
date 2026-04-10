@@ -1,11 +1,29 @@
 <?php
 namespace App\Services;
 
+use App\Contracts\DeviceRepositoryInterface;
+use App\DTOs\CreatePinDTO;
+use App\Models\Customer;
 use App\Models\CustomerDevice;
 
 class DeviceAuthService
 {
     const MAX_FAILED_ATTEMPTS = 5;
+
+    public function __construct(
+        protected DeviceRepositoryInterface $deviceRepository,
+    ) {}
+
+    public function createPin(Customer $customer, CreatePinDTO $dto): CustomerDevice
+    {
+        $hashedDto = new CreatePinDTO(
+            deviceToken: $dto->deviceToken,
+            deviceName: $dto->deviceName,
+            pin: \Illuminate\Support\Facades\Hash::make($dto->pin),
+        );
+
+        return $this->deviceRepository->upsertPin($customer, $hashedDto);
+    }
 
     /**
      * Incrementa tentativas e bloqueia se necessário
@@ -16,7 +34,6 @@ class DeviceAuthService
         if ($device->failed_attempts >= self::MAX_FAILED_ATTEMPTS) {
             $device->blocked_at = now();
         }
-        $device->save();
     }
 
     /**
@@ -26,7 +43,6 @@ class DeviceAuthService
     {
         $device->failed_attempts = 0;
         $device->blocked_at = null;
-        $device->save();
     }
 
     /**
