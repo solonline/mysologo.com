@@ -148,8 +148,9 @@ class AuthService
                 'PIN blocked. Do login conventional to reset PIN.'
             );
         }
+        \Log::info('dtopin', ['device' => $device, 'dto' => $dto]);
 
-        if (!$customer || !$device->trusted || !Hash::check($dto->pin, $device->pin)) {
+        if (!$customer || !Hash::check($dto->pin, $device->pin)) {
             $this->deviceAuthService->registerFailedAttempt($device);
             $this->deviceRepository->save($device);
             throw new ApiException(

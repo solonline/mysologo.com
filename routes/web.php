@@ -2,15 +2,11 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\EmailValidationController;
-
-Route::get('/', function () {
-    return view('welcome');
-});
-
 // Rotas de verificação de e-mail
 Route::get('email/verify', function () {
     return view('auth.verify-email');
 })->middleware('auth')->name('verification.notice');
+
 
 // Rota de verificação de e-mail assinada
 Route::get('email/verify/{id}/{hash}', [EmailValidationController::class, 'show'])

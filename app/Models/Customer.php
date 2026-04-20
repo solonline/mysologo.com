@@ -79,4 +79,9 @@ class Customer extends Model
     {
         return $this->hasOne(CustomerStripeAccount::class);
     }
+
+    public function devices()
+    {
+        return $this->hasMany(CustomerDevice::class);
+    }
 }
