@@ -6,6 +6,9 @@ class ErrorCode
     const INVALID_PIN = 'invalid_pin';
     const DEVICE_BLOCKED = 'device_blocked';
     const DEVICE_NOT_FOUND = 'device_not_found';
+    const ACCOUNT_NOT_ACTIVE = 'account_not_active';
+    const EMAIL_NOT_VERIFIED = 'email_not_verified';
+    const DOCUMENT_NOT_APPROVED = 'document_not_approved';
     const INVALID_CREDENTIALS = 'invalid_credentials';
     const INTERNAL_ERROR = 'internal_error';
     const KYC_REQUIRED = 'kyc_required';

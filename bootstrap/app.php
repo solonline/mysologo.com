@@ -2,6 +2,9 @@
 
 
 // Middleware customizado para idempotência de requisições
+use App\Http\Middleware\EnsureCustomerDocumentApprovedMiddleware;
+use App\Http\Middleware\EnsureCustomerEmailVerifiedMiddleware;
+use App\Http\Middleware\EnsureCustomerIsActiveMiddleware;
 use App\Http\Middleware\IdempotencyRequiredMiddleware;
 // Classe principal da aplicação Laravel
 use Illuminate\Foundation\Application;
@@ -24,8 +27,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Aplica o middleware de rate limit (ThrottleRequests) em todas as rotas API
         // $middleware->api(prepend:[ThrottleRequests::class]);
-        // Cria um alias para o middleware de idempotência
-        $middleware->alias(['idempotency', IdempotencyRequiredMiddleware::class]);
+        $middleware->alias([
+            'idempotency' => IdempotencyRequiredMiddleware::class,
+            'customer.active' => EnsureCustomerIsActiveMiddleware::class,
+            'customer.email.verified' => EnsureCustomerEmailVerifiedMiddleware::class,
+            'customer.document.approved' => EnsureCustomerDocumentApprovedMiddleware::class,
+        ]);
 
     })
     // Configura o tratamento de exceções globais

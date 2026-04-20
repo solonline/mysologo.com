@@ -20,16 +20,16 @@ Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])->nam
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/create-pin', [PinController::class, 'store']);
+    $customerEligibilityMiddlewares = [
+        'customer.active',
+        'customer.email.verified',
+        'customer.document.approved',
+    ];
 
     Route::group(['prefix' => 'settings'], function () {
         Route::get('/', [\App\Http\Controllers\Api\SettingController::class, 'index']);
         Route::get('/{key}', [\App\Http\Controllers\Api\SettingController::class, 'get'])->where('key', '[a-z_]+');
         Route::post('/{key}', [\App\Http\Controllers\Api\SettingController::class, 'set'])->where('key', '[a-z_]+');
-    });
-
-    Route::group(['prefix' => 'dashboard'], function () {
-        Route::get('/summary', [\App\Http\Controllers\Api\DashboardCustomerController::class, 'summary']);
     });
 
     Route::group(['prefix' => 'customer'], function () {
@@ -40,10 +40,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/send-validation-email', [\App\Http\Controllers\Api\CustomerController::class, 'sendValidationEmail']);
     });
 
-    Route::get('/dashboard', [\App\Http\Controllers\Api\DashboardCustomerController::class, 'summary']);
+    Route::middleware($customerEligibilityMiddlewares)->group(function () {
+        Route::post('/create-pin', [PinController::class, 'store']);
 
-    Route::group(['prefix' => 'stripe'], function () {
-        Route::get('/payment-methods', [\App\Http\Controllers\Api\StripeController::class, 'paymentMethods']);
-        Route::post('/create-intent-payment', [\App\Http\Controllers\Api\StripeController::class, 'create']);
+        Route::group(['prefix' => 'dashboard'], function () {
+            Route::get('/summary', [\App\Http\Controllers\Api\DashboardCustomerController::class, 'summary']);
+        });
+
+        Route::get('/dashboard', [\App\Http\Controllers\Api\DashboardCustomerController::class, 'summary']);
+
+        Route::group(['prefix' => 'stripe'], function () {
+            Route::get('/payment-methods', [\App\Http\Controllers\Api\StripeController::class, 'paymentMethods']);
+            Route::post('/create-intent-payment', [\App\Http\Controllers\Api\StripeController::class, 'create']);
+        });
     });
 });
