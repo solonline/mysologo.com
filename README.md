@@ -130,6 +130,40 @@ Copy the webhook signing secret shown and insert it into the settings table (ste
 
 ---
 
+## Troubleshooting
+
+### Didit vars not loaded (`configured: false` in logs)
+
+If you update `DIDIT_*` keys in `.env` and the app still shows them as empty, recreate `app` and `queue` so Docker reloads `env_file`:
+
+```bash
+cd /var/www/yoop
+docker compose up -d --force-recreate app queue
+```
+
+Then refresh Laravel config cache in both containers:
+
+```bash
+docker exec yoop_app php artisan config:clear
+docker exec yoop_app php artisan config:cache
+docker exec yoop_queue php artisan config:clear
+docker exec yoop_queue php artisan config:cache
+```
+
+### `php artisan db:seed` fails with `getaddrinfo for mysql failed`
+
+This happens when running Artisan on the host machine with `DB_HOST=mysql`. The hostname `mysql` is only resolvable inside Docker network.
+
+Run seed inside the `app` container:
+
+```bash
+docker compose exec app php artisan db:seed --force
+```
+
+If you really need host execution, set host-compatible DB values first (for example `DB_HOST=127.0.0.1` and mapped port).
+
+---
+
 ## Useful commands
 
 ```bash

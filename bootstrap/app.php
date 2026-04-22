@@ -1,6 +1,5 @@
 <?php
-
-
+use App\Exceptions\ApiException;
 // Middleware customizado para idempotência de requisições
 use App\Http\Middleware\EnsureCustomerDocumentApprovedMiddleware;
 use App\Http\Middleware\EnsureCustomerEmailVerifiedMiddleware;
@@ -14,6 +13,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 // Middleware de rate limit padrão do Laravel
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Log;
 
 return Application::configure(basePath: dirname(__DIR__))
     // Define os arquivos de rotas da aplicação
@@ -34,10 +34,24 @@ return Application::configure(basePath: dirname(__DIR__))
             'customer.document.approved' => EnsureCustomerDocumentApprovedMiddleware::class,
         ]);
 
+        // Adiciona o CorsMiddleware globalmente
+        $middleware->append([
+            \App\Http\Middleware\CorsMiddleware::class,
+        ]);
     })
     // Configura o tratamento de exceções globais
     ->withExceptions(function (Exceptions $exceptions): void {
-        // Adicione handlers customizados aqui, se necessário
+        $exceptions->render(function (ApiException $exception) {
+            return response()->json($exception->toArray(), $exception->status);
+        });
+
+        $exceptions->report(function (ApiException $exception) {
+            Log::warning('ApiException', [
+                'reason' => $exception->reason,
+                'status' => $exception->status,
+                'message' => $exception->getMessage(),
+            ]);
+        });
     })
     // Cria e retorna a instância da aplicação
     ->create();

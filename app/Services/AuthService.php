@@ -76,6 +76,7 @@ class AuthService
     public function login(LoginCustomerDTO $dto, bool $isRegister = false)
     {
         $customer = $this->customerRepository->findByEmail($dto->email);
+        \Log::info('customer', ['customer' => $customer, 'dto' => $dto, 'isRegister' => $isRegister]);
 
         if (!$customer || (!$isRegister && !Hash::check($dto->password, $customer->password))) {
             throw new ApiException(

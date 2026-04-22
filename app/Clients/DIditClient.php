@@ -22,6 +22,7 @@ class DIditClient
 
     public function createSession(array $data): Response
     {
+        \Log::info('Didit API key configured', ['configured' => !empty($this->apiKey)]);
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->apiKey,
             'Content-Type' => 'application/json',
