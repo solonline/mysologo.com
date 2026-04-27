@@ -80,6 +80,11 @@ class Customer extends Model
         return $this->hasOne(CustomerStripeAccount::class);
     }
 
+    public function wallesterAccounts()
+    {
+        return $this->hasOne(CustomerWallesterAccount::class);
+    }
+
     public function devices()
     {
         return $this->hasMany(CustomerDevice::class);

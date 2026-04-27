@@ -9,12 +9,15 @@ use App\Exceptions\ErrorCode;
 use App\Contracts\CustomerRepositoryInterface;
 use App\Contracts\DiditSessionRepositoryInterface;
 use App\Contracts\RetailDocumentRepositoryInterface;
+use App\Contracts\StripeAccountRepositoryInterface;
+use App\Contracts\WallesterAccountRepositoryInterface;
+use App\DTOs\CreateStripeAccountDTO;
 use App\Models\Customer;
-use App\Models\CustomerDiditSession;
 use App\Models\CustomerRetailDocument;
 use App\Providers\DiditProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Jobs\UploadDocumentMediaJob;
 
 class DiditService
 {
@@ -23,6 +26,11 @@ class DiditService
         protected DiditSessionRepositoryInterface $diditSessionRepository,
         protected RetailDocumentRepositoryInterface $retailDocumentRepository,
         protected CustomerRepositoryInterface $customerRepository,
+        protected StripeAccountRepositoryInterface $stripeAccountRepository,
+        protected StripeService $stripeService,
+        protected CreateStripeAccountDTO $createStripeAccountDTO,
+        protected WallesterService $walletService,
+        protected WallesterAccountRepositoryInterface $wallesterAccountRepository,
     ) {}
 
     public function createSession(Customer $customer): array
@@ -143,7 +151,7 @@ class DiditService
 
                     if (in_array($field, $mediaFields) && !empty($value)) {
                         //TODO: Disparar job de upload para S3/CDN
-                        //UploadDocumentMediaJob::dispatch($customerDocument->id, $field, $value);
+                        UploadDocumentMediaJob::dispatch($customerDocument->id, $field, $value);
                     }
                 }
 
@@ -185,6 +193,30 @@ class DiditService
                         DocumentStatus::DECLINED     => $customer->status = CustomerStatus::BLOCKED,
                         default => null,
                     };
+
+                    if($customer->doc_status === DocumentStatus::APPROVED) {
+
+                        // Create Stripe Customer
+                        $stripeCustomer = $this->stripeService->createCustomer($customer);
+                        $this->createStripeAccountDTO->customerId = $customer->id;
+                        $this->createStripeAccountDTO->stripeCustomerId = $stripeCustomer['id'];
+                        $this->stripeAccountRepository->create($this->createStripeAccountDTO);
+
+                        // Create Wallester Account
+                        $wallesterAccount = $this->walletService->createAccount([
+                            'name' => $customer->name,
+                        ]);
+
+
+                        // Persistir dados da conta Wallester
+                        if ($wallesterAccount && isset($wallesterAccount['id'])) {
+                            $this->wallesterAccountRepository->create([
+                                'customer_id' => $customer->id,
+                                'wallester_account_id' => $wallesterAccount['id'],
+                                // Adicione outros campos necessários do retorno aqui
+                            ]);
+                        }
+                    }
                     $this->customerRepository->save($customer);
                     if ($customer->status === CustomerStatus::ACTIVE) {
                         CustomerApproved::dispatch($customer);
