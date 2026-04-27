@@ -16,6 +16,7 @@ class CustomerStripeAccount extends Model
         'stripe_payment_method_id',
         'currency',
         'status',
+        'viban'
     ];
 
     public function customer()

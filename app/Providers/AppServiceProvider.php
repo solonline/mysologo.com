@@ -18,6 +18,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Wallester
+        $this->app->bind(\App\Clients\WallesterClient::class, function ($app) {
+            return new \App\Clients\WallesterClient();
+        });
+        $this->app->bind(\App\Providers\WallesterProvider::class, function ($app) {
+            return new \App\Providers\WallesterProvider($app->make(\App\Clients\WallesterClient::class));
+        });
+        $this->app->bind(\App\Contracts\WallesterProviderInterface::class, function ($app) {
+            return $app->make(\App\Providers\WallesterProvider::class);
+        });
         $this->app->bind(\App\Contracts\SettingsRepositoryInterface::class, function ($app) {
             return new \App\Repositories\SettingRepository();
         });
@@ -46,6 +56,11 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(\App\Contracts\DiditSessionRepositoryInterface::class),
                 $app->make(\App\Contracts\RetailDocumentRepositoryInterface::class),
                 $app->make(\App\Contracts\CustomerRepositoryInterface::class),
+                $app->make(\App\Contracts\StripeAccountRepositoryInterface::class),
+                $app->make(\App\Services\StripeService::class),
+                $app->make(\App\DTOs\CreateStripeAccountDTO::class),
+                $app->make(\App\Services\WallesterService::class),
+                $app->make(\App\Contracts\WallesterAccountRepositoryInterface::class),
             );
         });
 
@@ -99,6 +114,10 @@ class AppServiceProvider extends ServiceProvider
             return new \App\Services\DashboardService(
                 $app->make(\App\Contracts\TransactionRepositoryInterface::class)
             );
+        });
+
+        $this->app->bind(\App\Contracts\WallesterAccountRepositoryInterface::class, function ($app) {
+            return new \App\Repositories\WallesterAccountRepository();
         });
     }
 

@@ -23,9 +23,7 @@ class AuthService
         protected KycService $kycService,
         protected DeviceAuthService $deviceAuthService,
         protected CustomerRepositoryInterface $customerRepository,
-        protected StripeAccountRepositoryInterface $stripeAccountRepository,
         protected DeviceRepositoryInterface $deviceRepository,
-        protected StripeService $stripeService,
     ) {}
 
     public function register(RegisterCustomerDTO $dto)
@@ -41,13 +39,6 @@ class AuthService
 
             $customer = DB::transaction(function () use ($preparedDto) {
                 $customer = $this->customerRepository->createCustomer($preparedDto);
-
-                $stripeCustomer = $this->stripeService->createCustomer($customer);
-
-                $this->stripeAccountRepository->create(new CreateStripeAccountDTO(
-                    customerId: $customer->id,
-                    stripeCustomerId: $stripeCustomer['id'],
-                ));
 
                 CustomerRegistered::dispatch($customer, $this->generateEmailValidationUrl($customer));
                 return $customer;
@@ -148,7 +139,6 @@ class AuthService
                 'PIN blocked. Do login conventional to reset PIN.'
             );
         }
-        \Log::info('dtopin', ['device' => $device, 'dto' => $dto]);
 
         if (!$customer || !Hash::check($dto->pin, $device->pin)) {
             $this->deviceAuthService->registerFailedAttempt($device);

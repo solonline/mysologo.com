@@ -43,4 +43,10 @@ return [
         'webhook_secret' => env('DIDIT_WEBHOOK_SECRET'),
     ],
 
+    'wallester' => [
+        'base_url' => env('WALLESTER_BASE_URL'),
+        'api_key' => env('WALLESTER_API_KEY'),
+        'private_key' => env('WALLESTER_PRIVATE_KEY'), // Coloque a chave privada PEM aqui ou use variável de ambiente
+    ],
+
 ];
