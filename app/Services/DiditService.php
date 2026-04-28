@@ -28,7 +28,6 @@ class DiditService
         protected CustomerRepositoryInterface $customerRepository,
         protected StripeAccountRepositoryInterface $stripeAccountRepository,
         protected StripeService $stripeService,
-        protected CreateStripeAccountDTO $createStripeAccountDTO,
         protected WallesterService $walletService,
         protected WallesterAccountRepositoryInterface $wallesterAccountRepository,
     ) {}
@@ -198,9 +197,11 @@ class DiditService
 
                         // Create Stripe Customer
                         $stripeCustomer = $this->stripeService->createCustomer($customer);
-                        $this->createStripeAccountDTO->customerId = $customer->id;
-                        $this->createStripeAccountDTO->stripeCustomerId = $stripeCustomer['id'];
-                        $this->stripeAccountRepository->create($this->createStripeAccountDTO);
+                        $createStripeAccountDTO = new CreateStripeAccountDTO(
+                            $customer->id,
+                            $stripeCustomer['id']
+                        );
+                        $this->stripeAccountRepository->create($createStripeAccountDTO);
 
                         // Create Wallester Account
                         $wallesterAccount = $this->walletService->createAccount([

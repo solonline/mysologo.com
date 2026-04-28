@@ -1,9 +1,10 @@
 <?php
 namespace App\Repositories;
 
+use App\Contracts\WallesterAccountRepositoryInterface;
 use App\Models\CustomerWallesterAccount;
 
-class WallesterAccountRepository
+class WallesterAccountRepository implements WallesterAccountRepositoryInterface
 {
     public function create(array $data): CustomerWallesterAccount
     {

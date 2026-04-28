@@ -17,6 +17,7 @@ Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 Route::post('/webhooks/didit', [DiditWebhookController::class, 'handle'])->name('didit.webhook');
 Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])->name('stripe.webhook');
+Route::get('/basic-system-info', [\App\Http\Controllers\Api\BasicSystemInfo::class, 'get']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
