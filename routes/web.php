@@ -1,4 +1,5 @@
 <?php
+use App\Services\WallesterService;
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\EmailValidationController;
@@ -20,3 +21,19 @@ Route::post('email/verification-notification', function () {
     request()->user()->sendEmailVerificationNotification();
     return back()->with('message', 'Verification link sent!');
 })->middleware(['auth', 'throttle:6,1'])->name('verification.send');
+
+
+Route::get('/test-wallester-account', function (WallesterService $wallesterService) {
+    $data = [
+        'name' => 'Test Account via Route',
+    ];
+    try {
+        $result = $wallesterService->createAccount($data);
+        return response()->json($result);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ], 500);
+    }
+});

@@ -58,7 +58,6 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(\App\Contracts\CustomerRepositoryInterface::class),
                 $app->make(\App\Contracts\StripeAccountRepositoryInterface::class),
                 $app->make(\App\Services\StripeService::class),
-                $app->make(\App\DTOs\CreateStripeAccountDTO::class),
                 $app->make(\App\Services\WallesterService::class),
                 $app->make(\App\Contracts\WallesterAccountRepositoryInterface::class),
             );
