@@ -48,9 +48,9 @@ class CustomerController extends Controller
 
     public function sendValidationEmail(Request $request)
     {
-        // $customer = $request->user();
-        // $validationUrl = $this->customerService->generateEmailValidationUrl($customer);
-        // $this->customerService->sendValidationEmail($customer, $validationUrl);
+        $customer = $request->user();
+        $validationUrl = $this->customerService->generateEmailValidationUrl($customer);
+        $this->customerService->sendValidationEmail($customer, $validationUrl);
         return response()->json(['message' => 'Validation email sent.']);
     }
 }

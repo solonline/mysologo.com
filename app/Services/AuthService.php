@@ -174,7 +174,8 @@ class AuthService
      */
     private function generateEmailValidationUrl(Customer $customer): string
     {
-        return URL::temporarySignedRoute(
+        // Gera a URL assinada do backend
+        $signedUrl = URL::temporarySignedRoute(
             'verification.verify',
             now()->addMinutes(60),
             [
@@ -182,5 +183,33 @@ class AuthService
                 'hash' => sha1($customer->email),
             ]
         );
+
+        // Pega a URL do frontend do .env
+        $frontendBase = env('URL_FRONTEND');
+        \Log::info('Generating email validation URL', [
+            'signedUrl' => $signedUrl,
+            'frontendBase' => $frontendBase,
+        ]);
+        if (!$frontendBase) {
+            // fallback para APP_URL se não houver URL_FRONTEND
+            $frontendBase = config('app.url');
+        }
+        // Extrai os parâmetros da URL assinada
+        $parsed = parse_url($signedUrl);
+        $query = isset($parsed['query']) ? $parsed['query'] : '';
+        $path = isset($parsed['path']) ? $parsed['path'] : '';
+
+        // Extrai id e hash do path
+        $matches = [];
+        preg_match('#/email/verify/(\d+)/(\w+)#', $path, $matches);
+        $id = $matches[1] ?? null;
+        $hash = $matches[2] ?? null;
+
+        // Monta a URL do frontend
+        $frontendUrl = rtrim($frontendBase, '/') . "//email/verify/$id/$hash";
+        if ($query) {
+            $frontendUrl .= '?' . $query;
+        }
+        return $frontendUrl;
     }
 }

@@ -8,22 +8,28 @@ use Illuminate\Support\Facades\Auth;
 
 class EmailValidationController extends Controller
 {
-    public function show(Request $request)
+    public function verifyFrontend(Request $request, $id, $hash)
     {
+        // dd($request->all());
         $redirect = $request->query('redirect', '/');
+        $name = $request->query('name', '');
 
-        // Verifica se a URL é válida (assinada)
-        if (!$request->hasValidSignature()) {
-            return redirect($redirect . '?status=expired');
+        if (!$id || !$hash) {
+            return response()->json(['message' => 'Invalid parameters'], 400);
         }
 
-        $customer = Customer::findOrFail($request->query('id'));
-
+        $customer = Customer::find($id);
+       
+        if (!$customer) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+        if (sha1($customer->email) !== $hash) {
+            return response()->json(['message' => 'Invalid hash'], 400);
+        }
         if ($customer->hasVerifiedEmail()) {
-            return redirect($redirect . '?status=already_verified&name=' . urlencode($customer->name));
+            return response()->json(['status' => 'already_verified', 'name' => $customer->name], 409);
         }
         $customer->markEmailAsVerified();
-
-        return redirect($redirect . '?status=success&name=' . urlencode($customer->name));
+        return response()->json(['status' => 'success', 'name' => $customer->name]);
     }
 }

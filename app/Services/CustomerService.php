@@ -9,6 +9,8 @@ use App\DTOs\UpdateCustomerDTO;
 use App\Models\Customer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
+
 
 class CustomerService
 {
@@ -59,16 +61,43 @@ class CustomerService
 
     public function generateEmailValidationUrl(Customer $customer): string
     {
-        return \URL::temporarySignedRoute(
-            'email.validated',
+        // Gera a URL assinada do backend
+        $signedUrl = URL::temporarySignedRoute(
+            'verification.verify',
             now()->addMinutes(60),
             [
                 'id' => $customer->id,
                 'hash' => sha1($customer->email),
-                'redirect' => env('URL_FRONTEND') . '/email-validated',
-                'name' => $customer->name,
             ]
         );
+
+        // Pega a URL do frontend da config
+        $frontendBase = config('app.url_frontend') ?? env('URL_FRONTEND');
+        \Log::info('Generating email validation URL', [
+            'signedUrl' => $signedUrl,
+            'frontendBase' => $frontendBase,
+        ]);
+        if (!$frontendBase) {
+            // fallback para APP_URL se não houver URL_FRONTEND
+            $frontendBase = config('app.url');
+        }
+        // Extrai os parâmetros da URL assinada
+        $parsed = parse_url($signedUrl);
+        $query = isset($parsed['query']) ? $parsed['query'] : '';
+        $path = isset($parsed['path']) ? $parsed['path'] : '';
+
+        // Extrai id e hash do path
+        $matches = [];
+        preg_match('#/email/verify/(\d+)/(\w+)#', $path, $matches);
+        $id = $matches[1] ?? null;
+        $hash = $matches[2] ?? null;
+
+        // Monta a URL do frontend (corrige barra dupla)
+        $frontendUrl = rtrim($frontendBase, '/') . "/email/verify/$id/$hash";
+        if ($query) {
+            $frontendUrl .= '?' . $query;
+        }
+        return $frontendUrl;
     }
 
 

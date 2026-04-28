@@ -10,7 +10,7 @@ Route::get('email/verify', function () {
 
 
 // Rota de verificação de e-mail assinada
-Route::get('email/verify/{id}/{hash}', [EmailValidationController::class, 'show'])
+Route::get('email/verify/{id}/{hash}', [EmailValidationController::class, 'verifyFrontend'])
     ->middleware(['signed'])
     ->name('verification.verify');
 

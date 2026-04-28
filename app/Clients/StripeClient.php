@@ -14,10 +14,6 @@ class StripeClient
 
     public function __construct(protected SettingsService $settings)
     {
-        \Log::info('Initializing StripeClient with settings: ' . json_encode([
-            'stripe_secret_key' => $this->settings->getByKey('stripe_secret_key') ? '***' : null,
-            'stripe_webhook_secret' => $this->settings->getByKey('stripe_webhook_secret') ? '***' : null,
-        ]));
         $this->secretKey = $this->settings->getByKey('stripe_secret_key');
         $this->webhookSecret = $this->settings->getByKey('stripe_webhook_secret');
         $this->stripe = new Stripe($this->secretKey);
