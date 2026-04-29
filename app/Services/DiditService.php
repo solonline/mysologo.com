@@ -38,7 +38,7 @@ class DiditService
             'workflow_id' => config('services.didit.workflow_id'),
             'customer_id' => $customer->id,
             // 'callback' => config('services.didit.callback_url'),
-            'callback' => 'https://frontend.com/callback', //TODO: Definir URL de callback real
+            'callback' => config('app.url_frontend') . '/verification-pending', //TODO: Definir URL de callback real
             'callback_method' => 'initiator',
             'language' => $customer->language ?? 'en',
         ];

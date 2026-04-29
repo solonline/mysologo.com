@@ -16,12 +16,14 @@ use App\DTOs\LoginWithPinDTO;
 use App\DTOs\RegisterCustomerDTO;
 use App\Http\Requests\Customer\RegisterCustomerCorporateRequest;
 use App\Http\Requests\Customer\RegisterCustomerRequest;
+use App\Services\SettingsService;
 
 class AuthController extends Controller
 {
     public function __construct(
         private AuthService $authService,
-        private PasswordResetService $passwordResetService
+        private PasswordResetService $passwordResetService,
+        private SettingsService $settingsService
     ) {}
     /**
      * Forgot Password
@@ -34,7 +36,7 @@ class AuthController extends Controller
         if (!$token) {
             return response()->json(['message' => 'Usuário não encontrado.'], 404);
         }
-        SendPasswordResetEmail::dispatch($email, $token);
+        SendPasswordResetEmail::dispatch($email, $token, $this->settingsService);
         return response()->json(['message' => 'E-mail de redefinição enviado.'], 200);
     }
 

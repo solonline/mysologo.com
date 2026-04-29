@@ -17,6 +17,6 @@ class SendValidationEmail implements ShouldQueue
      */
     public function handle(CustomerRegistered $event): void
     {
-       Mail::to($event->customer->email)->send(new ValidationEmail($event->customer, $event->validationUrl));
+        Mail::to($event->customer->email)->send(new ValidationEmail($event->customer, $event->validationUrl, $event->infoSystem));
     }
 }

@@ -18,7 +18,7 @@ class CustomerRegistered
     /**
      * Create a new event instance.
      */
-    public function __construct(public Customer $customer, public ?string $validationUrl = null)
+    public function __construct(public Customer $customer, public ?string $validationUrl = null, public array $infoSystem = [])
     {
         //
     }

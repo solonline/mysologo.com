@@ -123,6 +123,6 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    'url_frontend' => env('URL_FRONTEND', 'https://front.yooppayments.eu'),
+    'url_frontend' => env('URL_FRONTEND', 'https://app.yooppayments.eu'),
 
 ];

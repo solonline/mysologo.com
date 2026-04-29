@@ -1,19 +1,16 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Redefinição de Senha</title>
-</head>
-<body>
+@extends('emails.layouts.base')
+
+@section('title', 'Redefinição de Senha')
+
+@section('content')
     <h2>Olá, {{ $customer->name ?? $customer->email }}</h2>
-    <p>Recebemos uma solicitação para redefinir sua senha.</p>
-    <p>Para redefinir sua senha, clique no botão abaixo ou copie o link e cole no seu navegador:</p>
-    <p>
-        <a href="{{ url('/password/reset?email=' . urlencode($customer->email) . '&token=' . urlencode($token)) }}" style="display:inline-block;padding:10px 20px;background:#6366f1;color:#fff;text-decoration:none;border-radius:5px;">Redefinir Senha</a>
-    </p>
-    <p>Ou copie e cole este link no navegador:</p>
-    <p>{{ url('/password/reset?email=' . urlencode($customer->email) . '&token=' . urlencode($token)) }}</p>
-    <p>Se você não solicitou a redefinição, ignore este e-mail.</p>
-    <p>Atenciosamente,<br>Equipe Yoop</p>
-</body>
-</html>
+    <p>Recebemos uma solicitação para redefinir a senha da sua conta na <strong>{{ $infoSystem['company_name'] ?? 'Yoop' }}</strong>.</p>
+    <p>Para garantir a segurança da sua conta, clique no botão abaixo para criar uma nova senha. Se você não fez essa solicitação, pode ignorar este e-mail com segurança.</p>
+    <div style="text-align:center;">
+        <a href="{{ config('app.url_frontend') . '/password/reset?email=' . urlencode($customer->email) . '&token=' . urlencode($token) }}" class="button">Redefinir Senha</a>
+    </div>
+    <p style="margin-top:24px;">Se o botão não funcionar, copie e cole o link abaixo no seu navegador:</p>
+    <div class="info-block">
+        {{ config('app.url_frontend') . '/password/reset?email=' . urlencode($customer->email) . '&token=' . urlencode($token) }}
+    </div>
+@endsection

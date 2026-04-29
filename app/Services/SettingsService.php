@@ -22,6 +22,17 @@ class SettingsService
         return $this->settingRepository->all();
     }
 
+    public function getInfoSystem(): array
+    {
+        $infoSytem = [];
+        $infoBasics = ['company_name', 'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country', 'fiscal_id', 'website', 'support_email', 'description', 'social_links', 'maintenance_mode', 'logo', 'favicon', 'timezone'];
+        foreach ($infoBasics as $key) {
+            $value = $this->getByKey($key);
+            $infoSytem[$key] = $value;
+        }
+        return $infoSytem;
+    }
+
     /** internal queries */
     public function getByKey(string $key): ?string
     {

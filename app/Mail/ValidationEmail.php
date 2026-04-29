@@ -18,7 +18,7 @@ class ValidationEmail extends Mailable
     /**
      * Create a new message instance.
      */
-    public function __construct(public Customer $customer, public string $validationUrl)
+    public function __construct(public Customer $customer, public string $validationUrl, public array $infoSystem = [])
     {
         //
     }
@@ -29,7 +29,7 @@ class ValidationEmail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Welcome Mail',
+            subject: 'Confirmation of your email address',
         );
     }
 
@@ -43,6 +43,7 @@ class ValidationEmail extends Mailable
             with: [
                 'customer' => $this->customer,
                 'validationUrl' => $this->validationUrl,
+                'infoSystem' => $this->infoSystem,
             ],
         );
     }

@@ -17,7 +17,7 @@ class SendPasswordResetEmail implements ShouldQueue
     public string $email;
     public string $token;
 
-    public function __construct(string $email, string $token)
+    public function __construct(string $email, string $token, protected \App\Services\SettingsService $settingsService)
     {
         $this->email = $email;
         $this->token = $token;
@@ -26,10 +26,12 @@ class SendPasswordResetEmail implements ShouldQueue
     public function handle()
     {
         $customer = Customer::where('email', $this->email)->first();
+        $infoSytem = $this->settingsService->getInfoSystem();
         if ($customer) {
             Mail::send('emails.password_reset', [
                 'token' => $this->token,
                 'customer' => $customer,
+                'infoSystem' => $infoSytem,
             ], function ($message) use ($customer) {
                 $message->to($customer->email);
                 $message->subject('Password Reset Request');

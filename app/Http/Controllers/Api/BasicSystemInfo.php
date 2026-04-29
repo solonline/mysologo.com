@@ -19,12 +19,11 @@ class BasicSystemInfo extends Controller
      */
     public function get()
     {
-        $infoBasics = ['company_name', 'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country', 'fiscal_id', 'website', 'support_email', 'description', 'social_links', 'maintenance_mode', 'logo', 'favicon', 'timezone'];
-        $settings = [];
-        foreach ($infoBasics as $key) {
-            $value = $this->settingsService->getByKey($key);
-            $settings[] = new SettingDTO($key, $value);
+        $info = $this->settingsService->getInfoSystem();
+        $list = [];
+        foreach ($info as $key => $value) {
+            $list[] = ['key' => $key, 'value' => $value];
         }
-        return BasicSystemInfoResource::collection($settings);
+        return BasicSystemInfoResource::collection($list);
     }
 }
