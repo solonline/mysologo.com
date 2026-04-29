@@ -39,8 +39,11 @@ class AuthService
 
             $customer = DB::transaction(function () use ($preparedDto) {
                 $customer = $this->customerRepository->createCustomer($preparedDto);
-
-                CustomerRegistered::dispatch($customer, $this->generateEmailValidationUrl($customer));
+                $settingsService = app(\App\Services\SettingsService::class);
+                $infoSystem = $settingsService->getInfoSystem();
+                $customerService = app(\App\Services\CustomerService::class);
+                $validationUrl = $customerService->generateEmailValidationUrl($customer);
+                CustomerRegistered::dispatch($customer, $validationUrl, $infoSystem);
                 return $customer;
             });
 
@@ -67,8 +70,7 @@ class AuthService
     public function login(LoginCustomerDTO $dto, bool $isRegister = false)
     {
         $customer = $this->customerRepository->findByEmail($dto->email);
-        \Log::info('customer', ['customer' => $customer, 'dto' => $dto, 'isRegister' => $isRegister]);
-
+       
         if (!$customer || (!$isRegister && !Hash::check($dto->password, $customer->password))) {
             throw new ApiException(
                 ErrorCode::INVALID_CREDENTIALS,
@@ -102,6 +104,7 @@ class AuthService
             }
         } elseif ($customer->type === 'retail') {
             $kyc = $this->kycService->ensureValidIndividualDocument($customer);
+            \Log::info('KYC check for retail customer', ['customer_id' => $customer->id, 'kyc_result' => $kyc]);
             $diditSession = $kyc['session'] ?? null;
             $kycRequired = true;
             $message = $kyc['message'] ?? null;
@@ -186,10 +189,7 @@ class AuthService
 
         // Pega a URL do frontend do .env
         $frontendBase = env('URL_FRONTEND');
-        \Log::info('Generating email validation URL', [
-            'signedUrl' => $signedUrl,
-            'frontendBase' => $frontendBase,
-        ]);
+       
         if (!$frontendBase) {
             // fallback para APP_URL se não houver URL_FRONTEND
             $frontendBase = config('app.url');

@@ -73,14 +73,7 @@ class CustomerService
 
         // Pega a URL do frontend da config
         $frontendBase = config('app.url_frontend') ?? env('URL_FRONTEND');
-        \Log::info('Generating email validation URL', [
-            'signedUrl' => $signedUrl,
-            'frontendBase' => $frontendBase,
-        ]);
-        if (!$frontendBase) {
-            // fallback para APP_URL se não houver URL_FRONTEND
-            $frontendBase = config('app.url');
-        }
+               
         // Extrai os parâmetros da URL assinada
         $parsed = parse_url($signedUrl);
         $query = isset($parsed['query']) ? $parsed['query'] : '';
