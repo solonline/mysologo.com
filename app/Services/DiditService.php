@@ -93,11 +93,6 @@ class DiditService
         $decision = $payload['decision'] ?? [];
         $idVerificationsArray = $decision['id_verifications'] ?? [];
 
-        if (!$sessionId || empty($idVerificationsArray)) {
-            Log::warning('Webhook data.updated inválido', ['payload' => $payload]);
-            return;
-        }
-
         DB::transaction(function () use ($payload, $decision, $idVerificationsArray, $sessionId) {
 
             foreach ($idVerificationsArray as $idVerifications) {

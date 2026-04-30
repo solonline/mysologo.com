@@ -96,7 +96,7 @@ class AuthService
                 $kycRequired = false;
             } else {
                 $diditSession = $responsible->diditSessions()->latest()->first();
-                $kycRequired = true;
+                $kycRequired = $customer->doc_status;
                 if (!$diditSession) {
                     $message = 'No Didit session found for responsible. Please complete KYC.';
                 }
@@ -106,7 +106,7 @@ class AuthService
             $kyc = $this->kycService->ensureValidIndividualDocument($customer);
             \Log::info('KYC check for retail customer', ['customer_id' => $customer->id, 'kyc_result' => $kyc]);
             $diditSession = $kyc['session'] ?? null;
-            $kycRequired = true;
+            $kycRequired = $customer->doc_status;
             $message = $kyc['message'] ?? null;
         }
 
@@ -115,7 +115,7 @@ class AuthService
             'token' => $token,
             'didit_session' => $diditSession,
             'requires_responsible' => $requiresResponsible,
-            'kyc_required' => $kycRequired,
+            'kyc_status' => $kycRequired,
             'email_verified' => $validatedEmail,
             'document_verified' => $validatedDocument,
             'message' => $message,
