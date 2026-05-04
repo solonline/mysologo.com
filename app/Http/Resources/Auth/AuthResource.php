@@ -24,6 +24,7 @@ class AuthResource extends JsonResource
             'kyc_status' => $this->resource['kyc_status'] ?? false,
             'email_verified' => $this->resource['email_verified'] ?? false,
             'document_verified' => $this->resource['document_verified'] ?? false,
+            'phone_verified' => $this->resource['phone_verified'] ?? false,
             'message' => $this->resource['message'] ?? null,
         ];
     }

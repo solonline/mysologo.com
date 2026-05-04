@@ -10,8 +10,8 @@ class SettingsSeeder extends Seeder
     public function run(): void
     {
         $settings = [
-            ['key' => 'company_name', 'value' => 'Empresa Exemplo'],
-            ['key' => 'email', 'value' => 'contato@empresa.com'],
+            ['key' => 'company_name', 'value' => 'Yoop'],
+            ['key' => 'email', 'value' => 'hello@yooppayments.eu'],
             ['key' => 'phone', 'value' => '+351999999999'],
             ['key' => 'address', 'value' => 'Rua Exemplo, 123'],
             ['key' => 'city', 'value' => 'Lisboa'],
@@ -32,7 +32,14 @@ class SettingsSeeder extends Seeder
             ['key' => 'stripe_secret_key', 'value' => ''],
             ['key' => 'stripe_webhook_secret', 'value' => 'whsec_1234567890abcdef'],
             ['key' => 'stripe_url', 'value' => 'https://api.stripe.com/v1'],
+            ['key' => 'app360_base_url', 'value' => 'https://dashboard.360nrs.com/api/rest'],
+            ['key' => 'app360_auth_token', 'value' => 'your_app360_auth_token_here'],
         ];
-        DB::table('settings')->insert($settings);
+        foreach ($settings as $setting) {
+            $exists = DB::table('settings')->where('key', $setting['key'])->exists();
+            if (!$exists) {
+                DB::table('settings')->insert($setting);
+            }
+        }
     }
 }

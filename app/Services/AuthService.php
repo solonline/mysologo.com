@@ -24,6 +24,7 @@ class AuthService
         protected DeviceAuthService $deviceAuthService,
         protected CustomerRepositoryInterface $customerRepository,
         protected DeviceRepositoryInterface $deviceRepository,
+        protected PhoneVerificationService $phoneVerificationService,
     ) {}
 
     public function register(RegisterCustomerDTO $dto)
@@ -32,7 +33,7 @@ class AuthService
             $preparedDto = new RegisterCustomerDTO(
                 email: $dto->email,
                 password: Hash::make($dto->password),
-                // phone: $dto->phone,
+                phone: $dto->phone,
                 type: $dto->type,
                 username: $dto->username ? strtolower(str_replace(' ', '_', $dto->username)) : null,
                 name: $dto->name,
@@ -119,6 +120,7 @@ class AuthService
             'kyc_status' => $kycRequired,
             'email_verified' => $validatedEmail,
             'document_verified' => $validatedDocument,
+            'phone_verified' => $this->phoneVerificationService->isVerified($customer, $customer->phone),
             'message' => $message,
         ];
     }

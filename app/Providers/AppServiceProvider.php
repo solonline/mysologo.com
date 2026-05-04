@@ -60,6 +60,7 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(\App\Services\StripeService::class),
                 $app->make(\App\Services\WallesterService::class),
                 $app->make(\App\Contracts\WallesterAccountRepositoryInterface::class),
+                $app->make(\App\Services\PhoneVerificationService::class),
             );
         });
 
@@ -117,6 +118,18 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(\App\Contracts\WallesterAccountRepositoryInterface::class, function ($app) {
             return new \App\Repositories\WallesterAccountRepository();
+        });
+
+        // App360
+        $this->app->bind(\App\Clients\App360Client::class, function ($app) {
+            return new \App\Clients\App360Client($app->make(\App\Services\SettingsService::class));
+        });
+        $this->app->bind(\App\Providers\App360Provider::class, function ($app) {
+            return new \App\Providers\App360Provider($app->make(\App\Clients\App360Client::class));
+        });
+
+        $this->app->bind(\App\Contracts\PhoneVerificationRepositoryInterface::class, function ($app) {
+            return new \App\Repositories\PhoneVerificationRepository();
         });
     }
 

@@ -32,6 +32,7 @@ class DiditService
         protected StripeService $stripeService,
         protected WallesterService $walletService,
         protected WallesterAccountRepositoryInterface $wallesterAccountRepository,
+        protected PhoneVerificationService $phoneVerificationService,
     ) {}
 
     public function createSession(Customer $customer): array
@@ -186,6 +187,10 @@ class DiditService
                     };
                     if ($statusForEmail) {
                         SendDocumentStatusEmail::dispatch($customer, $statusForEmail)->onQueue('emails');
+                    }
+                    //send sms
+                    if(in_array($decision['status'] ?? null, ['Approved', 'In Review', 'In Progress'])) {
+                        $this->phoneVerificationService->sendSms($customer, $customer->phone);
                     }
                    match($decision['status'] ?? null) {
                         'Approved'              => $customer->doc_status = DocumentStatus::APPROVED,
