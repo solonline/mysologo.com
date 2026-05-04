@@ -19,7 +19,43 @@ class CustomerController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        $user = $request->user();
+        $requiresResponsible = false;
+        $kycStatus = false;
+        $diditSession = null;
+        $message = null;
+
+        if ($user->type === 'corporate') {
+            $responsible = $user->responsibles()->first();
+            if (is_null($responsible)) {
+                $requiresResponsible = true;
+                $kycStatus = false;
+            } else {
+                $diditSession = $responsible->diditSessions()->latest()->first();
+                $kycStatus = $user->doc_status;
+                if (!$diditSession) {
+                    $message = 'No Didit session found for responsible. Please complete KYC.';
+                }
+                $diditSession = $diditSession ? $diditSession->toArray() : null;
+            }
+        } elseif ($user->type === 'retail') {
+            $kycService = app(\App\Services\KycService::class);
+            $kyc = $kycService->ensureValidIndividualDocument($user);
+            $diditSession = $kyc['session'] ?? null;
+            $kycStatus = $user->doc_status;
+            $message = $kyc['message'] ?? null;
+        }
+
+        $userArray = $user->toArray();
+        $response = array_merge($userArray, [
+            'requires_responsible' => $requiresResponsible,
+            'kyc_status' => $kycStatus,
+            'email_verified' => $user->hasVerifiedEmail(),
+            'document_verified' => $user->doc_status,
+            'didit_session' => $diditSession,
+            'message' => $message,
+        ]);
+        return response()->json($response);
     }
 
     public function update(UpdateCustomerRequest $request)

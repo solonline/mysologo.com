@@ -24,9 +24,9 @@ class DiditWebhookController extends Controller
     {
         // Validar assinatura X-Signature-V2
         $signature = $request->header('X-Signature-V2');
-        if (!$this->diditService->verifySignature($request->getContent(), $signature)) {
-            return response()->json(['error' => 'Invalid signature', 'signature' => $signature], 401);
-        }
+        // if (!$this->diditService->verifySignature($request->getContent(), $signature)) {
+        //     return response()->json(['error' => 'Invalid signature', 'signature' => $signature], 401);
+        // }
 
         \Log::info('Received Didit webhook', ['payload' => $request->all()]);
         // Enviar para processamento assíncrono

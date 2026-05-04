@@ -8,6 +8,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use App\Models\CustomerRetailDocument;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class UploadDocumentMediaJob implements ShouldQueue
 {
@@ -32,17 +33,31 @@ class UploadDocumentMediaJob implements ShouldQueue
      */
     public function handle()
     {
-        // Exemplo: baixar a mídia e salvar em S3
         try {
             $document = CustomerRetailDocument::findOrFail($this->documentId);
-            // Aqui você pode baixar a mídia de $this->mediaUrl e salvar no storage/S3
-            // Exemplo fictício:
-            // $contents = file_get_contents($this->mediaUrl);
-            // Storage::disk('s3')->put("didit/{$document->id}/{$this->field}.jpg", $contents);
+
+            // Baixar o conteúdo do arquivo
+            $contents = @file_get_contents($this->mediaUrl);
+            if ($contents === false) {
+                throw new \Exception('Não foi possível baixar o arquivo da URL: ' . $this->mediaUrl);
+            }
+
+            // Definir extensão baseada na URL ou default
+            $extension = pathinfo(parse_url($this->mediaUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
+            $filename = "customer/{$document->customer_id}/didit/{$document->id}/{$this->field}.{$extension}";
+
+            // Salvar no storage local (pode trocar para 's3' se necessário)
+            Storage::disk('public')->put($filename, $contents);
+
+            // Atualizar o campo na model
+            $document->{$this->field} = $filename;
+            $document->save();
+
             Log::info('UploadDocumentMediaJob executado', [
                 'document_id' => $this->documentId,
                 'field' => $this->field,
                 'media_url' => $this->mediaUrl,
+                'saved_path' => $filename,
             ]);
         } catch (\Throwable $e) {
             Log::error('Erro no UploadDocumentMediaJob', [
