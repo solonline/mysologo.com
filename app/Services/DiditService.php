@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Jobs\UploadDocumentMediaJob;
 
+use App\Jobs\SendDocumentStatusEmail;
+
 class DiditService
 {
     public function __construct(
@@ -172,6 +174,19 @@ class DiditService
                         ]);
                         throw $e; // Job poderá re-tentar
                     }
+                    // Enviar email de status do documento
+                    $statusForEmail = null;
+                    match($decision['status'] ?? null) {
+                        'Approved'  => $statusForEmail = 'approved',
+                        'Declined'  => $statusForEmail = 'declined',
+                        'In Review' => $statusForEmail = 'pending',
+                        'In Progress' => $statusForEmail = 'pending',
+                        'Not Started' => $statusForEmail = 'pending',
+                        default => $statusForEmail = strtolower($decision['status'] ?? 'pending'),
+                    };
+                    if ($statusForEmail) {
+                        SendDocumentStatusEmail::dispatch($customer, $statusForEmail)->onQueue('emails');
+                    }
                    match($decision['status'] ?? null) {
                         'Approved'              => $customer->doc_status = DocumentStatus::APPROVED,
                         'Declined'              => $customer->doc_status = DocumentStatus::DECLINED,
@@ -187,6 +202,8 @@ class DiditService
                         DocumentStatus::DECLINED     => $customer->status = CustomerStatus::BLOCKED,
                         default => null,
                     };
+
+
 
                     if($customer->doc_status === DocumentStatus::APPROVED) {
 

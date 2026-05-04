@@ -32,6 +32,7 @@ class AuthService
             $preparedDto = new RegisterCustomerDTO(
                 email: $dto->email,
                 password: Hash::make($dto->password),
+                // phone: $dto->phone,
                 type: $dto->type,
                 username: $dto->username ? strtolower(str_replace(' ', '_', $dto->username)) : null,
                 name: $dto->name,
@@ -70,7 +71,7 @@ class AuthService
     public function login(LoginCustomerDTO $dto, bool $isRegister = false)
     {
         $customer = $this->customerRepository->findByEmail($dto->email);
-       
+
         if (!$customer || (!$isRegister && !Hash::check($dto->password, $customer->password))) {
             throw new ApiException(
                 ErrorCode::INVALID_CREDENTIALS,
@@ -189,7 +190,7 @@ class AuthService
 
         // Pega a URL do frontend do .env
         $frontendBase = env('URL_FRONTEND');
-       
+
         if (!$frontendBase) {
             // fallback para APP_URL se não houver URL_FRONTEND
             $frontendBase = config('app.url');
