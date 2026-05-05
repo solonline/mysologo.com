@@ -63,4 +63,18 @@ class StripeClient
 
         return Webhook::constructEvent($payload, $sigHeader, $this->webhookSecret);
     }
+
+        /**
+     * Cria funding instructions para um customer usando o endpoint preview do Stripe
+     * @see https://stripe.com/docs/api/previews/funding_instructions_create_customer
+     */
+    public function createCustomerFundingInstructions(string $customerId, array $data): array
+    {
+        $headers = [
+            'Stripe-Version' => '2026-04-22.preview',
+        ];
+        $url = "/v1/customers/{$customerId}/funding_instructions";
+        $response = $this->stripe->request('post', $url, $data, ['headers' => $headers]);
+        return $response->toArray();
+    }
 }

@@ -39,10 +39,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/create-corporate-responsible', [\App\Http\Controllers\Api\CustomerController::class, 'createResponsible']);
         Route::post('/submit-corporate-documents', [\App\Http\Controllers\Api\CustomerController::class, 'submitCorporateDocuments']);
         Route::post('/send-validation-email', [\App\Http\Controllers\Api\CustomerController::class, 'sendValidationEmail']);
+         // Phone Verification
+        Route::post('/phone/send', [\App\Http\Controllers\Api\Auth\PhoneVerificationController::class, 'send']);
+        Route::post('/phone/validate', [\App\Http\Controllers\Api\Auth\PhoneVerificationController::class, 'validateCode']);
     });
 
     Route::middleware($customerEligibilityMiddlewares)->group(function () {
         Route::post('/create-pin', [PinController::class, 'store']);
+
+
 
         Route::group(['prefix' => 'dashboard'], function () {
             Route::get('/summary', [\App\Http\Controllers\Api\DashboardCustomerController::class, 'summary']);

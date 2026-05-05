@@ -89,4 +89,9 @@ class Customer extends Model
     {
         return $this->hasMany(CustomerDevice::class);
     }
+
+    public function phoneVerifications()
+    {
+        return $this->hasMany(PhoneVerification::class)->orderBy('created_at', 'desc');
+    }
 }

@@ -53,7 +53,7 @@ class CustomerController extends Controller
             'email_verified' => $user->hasVerifiedEmail(),
             'document_verified' => $user->doc_status,
             'didit_session' => $diditSession,
-            'phone_verified' => $user->phone_verifications()->where('verified_at', '!=', null)->exists(),
+            'phone_verified' => $user->phoneVerifications()->where('verified_at', '!=', null)->exists(),
             'message' => $message,
         ]);
         return response()->json($response);

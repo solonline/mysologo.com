@@ -8,12 +8,14 @@ use Illuminate\Support\Facades\Http;
 class App360Client
 {
     protected string $baseUrl;
-    protected string $authToken;
+    protected string $username;
+    protected string $password;
 
     public function __construct(protected SettingsService $settingsService)
     {
         $this->baseUrl = $this->settingsService->getByKey('app360_base_url');
-        $this->authToken = $this->settingsService->getByKey('app360_auth_token');
+        $this->username = $this->settingsService->getByKey('app360_username');
+        $this->password = $this->settingsService->getByKey('app360_password');
     }
 
     /**
@@ -25,9 +27,10 @@ class App360Client
      */
     public function sendSms(array $to, string $from, string $message): array
     {
+        $basicAuth = base64_encode($this->username . ':' . $this->password);
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
-            'Authorization' => 'Basic ' . $this->authToken,
+            'Authorization' => 'Basic ' . $basicAuth,
         ])->post($this->baseUrl . '/sms', [
             'to' => $to,
             'from' => $from,

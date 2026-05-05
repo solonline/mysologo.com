@@ -34,6 +34,8 @@ class SettingsSeeder extends Seeder
             ['key' => 'stripe_url', 'value' => 'https://api.stripe.com/v1'],
             ['key' => 'app360_base_url', 'value' => 'https://dashboard.360nrs.com/api/rest'],
             ['key' => 'app360_auth_token', 'value' => 'your_app360_auth_token_here'],
+            ['key' => 'app360_username', 'value' => 'your_app360_username_here'],
+            ['key' => 'app360_password', 'value' => 'your_app360_password_here'],
         ];
         foreach ($settings as $setting) {
             $exists = DB::table('settings')->where('key', $setting['key'])->exists();
