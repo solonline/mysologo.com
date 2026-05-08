@@ -37,6 +37,8 @@ class AuthService
                 type: $dto->type,
                 username: $dto->username ? strtolower(str_replace(' ', '_', $dto->username)) : null,
                 name: $dto->name,
+                language: $dto->language,
+                currency: $dto->currency
             );
 
             $customer = DB::transaction(function () use ($preparedDto) {

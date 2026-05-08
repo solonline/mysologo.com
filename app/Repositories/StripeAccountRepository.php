@@ -16,4 +16,9 @@ class StripeAccountRepository implements StripeAccountRepositoryInterface
             'currency'           => $dto->currency,
         ]);
     }
+
+    public function getStripeId(int $customerId): ?string
+    {
+        return CustomerStripeAccount::where('customer_id', $customerId)->first()?->stripe_customer_id;
+    }
 }

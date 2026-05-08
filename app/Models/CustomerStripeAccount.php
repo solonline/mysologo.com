@@ -16,7 +16,18 @@ class CustomerStripeAccount extends Model
         'stripe_payment_method_id',
         'currency',
         'status',
-        'viban'
+        'viban',
+        'funding_type',
+        'bank_transfer_type',
+        'funding_iban',
+        'funding_bic',
+        'funding_account_holder_name',
+        'funding_country',
+        'funding_financial_addresses',
+    ];
+
+    protected $casts = [
+        'funding_financial_addresses' => 'array',
     ];
 
     public function customer()

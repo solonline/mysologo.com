@@ -10,7 +10,9 @@ class RegisterCustomerDTO
         public readonly string $phone,
         public readonly string $type,
         public readonly ?string $username = null,
-        public readonly ?string $name = null
+        public readonly ?string $name = null,
+        public readonly ?string $language = null,
+        public readonly ?string $currency = null
     ) {
     }
 
@@ -22,7 +24,9 @@ class RegisterCustomerDTO
             phone: $data['phone'],
             type: $data['type'],
             username: $data['username'] ?? null,
-            name: $data['name'] ?? null
+            name: $data['name'] ?? null,
+            language: $data['language'] ?? null,
+            currency: $data['currency'] ?? null
         );
     }
 }

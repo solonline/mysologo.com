@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureCustomerDocumentApprovedMiddleware;
 use App\Http\Middleware\EnsureCustomerEmailVerifiedMiddleware;
 use App\Http\Middleware\EnsureCustomerIsActiveMiddleware;
 use App\Http\Middleware\IdempotencyRequiredMiddleware;
+use App\Http\Middleware\MaintenanceModeMiddleware;
 // Classe principal da aplicação Laravel
 use Illuminate\Foundation\Application;
 // Configuração de tratamento de exceções
@@ -14,14 +15,34 @@ use Illuminate\Foundation\Configuration\Middleware;
 // Middleware de rate limit padrão do Laravel
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     // Define os arquivos de rotas da aplicação
     ->withRouting(
-        web: __DIR__ . '/../routes/web.php', // Rotas web
-        api: __DIR__ . '/../routes/api.php', // Rotas API
-        commands: __DIR__ . '/../routes/console.php', // Comandos Artisan customizados
-        health: '/up', // Endpoint de health check
+        channels: __DIR__.'/../routes/channels.php',
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
+        health: '/up',
+        then: function () {
+            // Rotas de domínio para o dashboard
+            $dashboardDomain = config('app.dashboard_domain');
+            if ($dashboardDomain) {
+                Route::domain($dashboardDomain)
+                    ->middleware('web')
+                    ->group(base_path('routes/web.php'));
+            }
+
+            // Rotas de domínio para a API
+            $apiDomain = config('app.api_domain');
+            if ($apiDomain) {
+                Route::domain($apiDomain)
+                    ->middleware('api')
+                    ->prefix('api')
+                    ->group(base_path('routes/api.php'));
+            }
+        },
     )
     // Configura os middlewares globais e de grupos
     ->withMiddleware(function (Middleware $middleware): void {
@@ -32,6 +53,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'customer.active' => EnsureCustomerIsActiveMiddleware::class,
             'customer.email.verified' => EnsureCustomerEmailVerifiedMiddleware::class,
             'customer.document.approved' => EnsureCustomerDocumentApprovedMiddleware::class,
+            'maintenance' => MaintenanceModeMiddleware::class,
+        ]);
+
+        $middleware->api(prepend: [
+            MaintenanceModeMiddleware::class,
         ]);
 
         // Adiciona o CorsMiddleware globalmente

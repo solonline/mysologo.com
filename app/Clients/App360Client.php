@@ -13,9 +13,9 @@ class App360Client
 
     public function __construct(protected SettingsService $settingsService)
     {
-        $this->baseUrl = $this->settingsService->getByKey('app360_base_url');
-        $this->username = $this->settingsService->getByKey('app360_username');
-        $this->password = $this->settingsService->getByKey('app360_password');
+        $this->baseUrl = $this->settingsService->getByKey('app360.base_url');
+        $this->username = $this->settingsService->getByKey('app360.username');
+        $this->password = $this->settingsService->getByKey('app360.password');
     }
 
     /**

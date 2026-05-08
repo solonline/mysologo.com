@@ -47,4 +47,27 @@ class StripeController extends Controller
             'client_secret' => $result['client_secret'],
         ], 201);
     }
+
+    public function createFunding(Request $request)
+    {
+        try {
+            $funding = $this->stripeService->createVban($request->user());
+        } catch (ApiException $e) {
+            return response()->json($e->toArray(), $e->status);
+        }
+
+        return response()->json(['data' => $funding], 201);
+    }
+
+    public function getFundingInstructions(Request $request)
+    {
+        try {
+            $instructions = $this->stripeService->getFundingInstructions($request->user());
+        } catch (ApiException $e) {
+            return response()->json($e->toArray(), $e->status);
+        }
+
+        return response()->json(['data' => $instructions]);
+    }
+
 }

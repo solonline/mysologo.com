@@ -19,6 +19,7 @@ class Customer extends Model
         'corporate_id',
         'avatar',
         'language',
+        'currency',
         'email',
         'email_verified_at',
         'referal_email_code',

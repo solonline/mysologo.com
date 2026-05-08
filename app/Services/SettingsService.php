@@ -10,7 +10,8 @@ class SettingsService
 {
     public function __construct(
         private readonly SettingsRepositoryInterface $settingRepository
-    ) {}
+    ) {
+    }
 
     public function get(SettingDTO $dto): ?Setting
     {
@@ -25,7 +26,7 @@ class SettingsService
     public function getInfoSystem(): array
     {
         $infoSytem = [];
-        $infoBasics = ['company_name', 'email', 'phone', 'address', 'city', 'state', 'postal_code', 'country', 'fiscal_id', 'website', 'support_email', 'description', 'social_links', 'maintenance_mode', 'logo', 'favicon', 'timezone'];
+        $infoBasics = ['company.name', 'company.email', 'company.phone', 'address.street', 'address.city', 'address.state', 'address.postal_code', 'address.country', 'company.fiscal_id', 'company.website', 'company.support_email', 'company.description', 'company.social_links', 'system.maintenance_mode', 'company.logo', 'company.favicon', 'system.timezone', 'currency.accepted'];
         foreach ($infoBasics as $key) {
             $value = $this->getByKey($key);
             $infoSytem[$key] = $value;

@@ -58,6 +58,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::group(['prefix' => 'stripe'], function () {
             Route::get('/payment-methods', [\App\Http\Controllers\Api\StripeController::class, 'paymentMethods']);
             Route::post('/create-intent-payment', [\App\Http\Controllers\Api\StripeController::class, 'create']);
+            Route::post('/create-funding', [\App\Http\Controllers\Api\StripeController::class, 'createFunding']);
+            Route::get('/get-funding-instructions', [\App\Http\Controllers\Api\StripeController::class, 'getFundingInstructions']);
+        });
+
+        Route::group(['prefix' => 'account'], function () {
+            Route::get('/', [\App\Http\Controllers\Api\AccountController::class, 'index']);
+            Route::get('/balance', [\App\Http\Controllers\Api\AccountController::class, 'balance']);
+        });
+
+        // Notifications
+        Route::group(['prefix' => 'notifications'], function () {
+            Route::get('/', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
+            Route::post('/{notification}/read', [\App\Http\Controllers\Api\NotificationController::class, 'markRead']);
+            Route::post('/read-all', [\App\Http\Controllers\Api\NotificationController::class, 'markAllRead']);
         });
     });
 });

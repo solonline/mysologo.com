@@ -54,6 +54,10 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // Subdomains para roteamento separado
+    'api_domain'       => env('API_DOMAIN'),
+    'dashboard_domain' => env('DASHBOARD_DOMAIN'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

@@ -141,6 +141,67 @@ class StripeProvider
         }
     }
 
+    public function getCashBalance(string $customerId): array
+    {
+        try {
+            return $this->successResponse($this->client->getCashBalance($customerId));
+        } catch (ApiErrorException $e) {
+            \Log::warning('Falha ao buscar cash balance no Stripe', [
+                'status' => $e->getHttpStatus(),
+                'message' => $e->getMessage(),
+                'customer_id' => $customerId,
+            ]);
+            return $this->errorResponse($e->getMessage());
+        } catch (\Throwable $e) {
+            \Log::warning('Erro de comunicação com Stripe ao buscar cash balance', [
+                'exception' => $e,
+                'customer_id' => $customerId,
+            ]);
+            return $this->errorResponse('Erro de comunicação com Stripe.');
+        }
+    }
+
+    public function createCustomerFundingInstructions(string $customerId, array $data): array
+    {
+
+        try {
+            return $this->successResponse($this->client->createCustomerFundingInstructions($customerId, $data));
+        } catch (ApiErrorException $e) {
+            \Log::warning('Falha ao criar funding instructions no Stripe', [
+                'status' => $e->getHttpStatus(),
+                'message' => $e->getMessage(),
+                'customer_id' => $customerId
+            ]);
+            return $this->errorResponse($e->getMessage());
+        } catch (\Throwable $e) {
+            \Log::warning('Erro de comunicação com Stripe ao criar funding instructions', [
+                'exception' => $e,
+                'customer_id' => $customerId
+            ]);
+            return $this->errorResponse('Erro de comunicação com Stripe.');
+        }
+    }
+
+    public function getCustomerFundingInstructions(string $customerId): array
+    {
+        try {
+            return $this->successResponse($this->client->getCustomerFundingInstructions($customerId));
+        } catch (ApiErrorException $e) {
+            \Log::warning('Falha ao buscar funding instructions no Stripe', [
+                'status' => $e->getHttpStatus(),
+                'message' => $e->getMessage(),
+                'customer_id' => $customerId
+            ]);
+            return $this->errorResponse($e->getMessage());
+        } catch (\Throwable $e) {
+            \Log::warning('Erro de comunicação com Stripe ao buscar funding instructions', [
+                'exception' => $e,
+                'customer_id' => $customerId
+            ]);
+            return $this->errorResponse('Erro de comunicação com Stripe.');
+        }
+    }
+
     protected function successResponse(array $data): array
     {
         return [

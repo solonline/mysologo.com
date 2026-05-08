@@ -14,8 +14,8 @@ class StripeClient
 
     public function __construct(protected SettingsService $settings)
     {
-        $this->secretKey = $this->settings->getByKey('stripe_secret_key');
-        $this->webhookSecret = $this->settings->getByKey('stripe_webhook_secret');
+        $this->secretKey = $this->settings->getByKey('stripe.secret_key');
+        $this->webhookSecret = $this->settings->getByKey('stripe.webhook_secret');
         $this->stripe = new Stripe($this->secretKey);
     }
 
@@ -77,4 +77,24 @@ class StripeClient
         $response = $this->stripe->request('post', $url, $data, ['headers' => $headers]);
         return $response->toArray();
     }
+
+    public function getCustomerFundingInstructions(string $customerId): array
+    {
+        $headers = [
+            'Stripe-Version' => '2026-04-22.preview',
+        ];
+        $url = "/v1/customers/{$customerId}/funding_instructions";
+        $response = $this->stripe->request('get', $url, [], ['headers' => $headers]);
+        return $response->toArray();
+    }
+
+    /*
+    *
+    */
+    public function getCashBalance(string $customerId): array
+    {
+        $response = $this->stripe->customers->retrieveCashBalance($customerId);
+        return $response->toArray();
+    }
+
 }

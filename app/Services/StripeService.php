@@ -53,7 +53,7 @@ class StripeService
     ): array {
         $stripeAccount = $customer->stripeAccount;
 
-        if (! $stripeAccount) {
+        if (!$stripeAccount) {
             throw new ApiException(
                 ErrorCode::STRIPE_CUSTOMER_CREATION_FAILED,
                 422,
@@ -65,7 +65,7 @@ class StripeService
             ->where('is_active', true)
             ->first();
 
-        if (! $feeConfig) {
+        if (!$feeConfig) {
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 422,
@@ -76,13 +76,13 @@ class StripeService
         $fees = $feeConfig->calculateFees($amount);
 
         $result = $this->stripeProvider->createPaymentIntent([
-            'amount'               => $amount,
-            'currency'             => $currency,
-            'customer'             => $stripeAccount->stripe_customer_id,
+            'amount' => $amount,
+            'currency' => $currency,
+            'customer' => $stripeAccount->stripe_customer_id,
             'payment_method_types' => [$feeConfig->payment_method],
-            'description'          => $description,
-            'metadata'             => [
-                'customer_id'        => $customer->id,
+            'description' => $description,
+            'metadata' => [
+                'customer_id' => $customer->id,
                 'payment_method_fee' => $feeConfig->payment_method,
             ],
         ]);
@@ -90,8 +90,8 @@ class StripeService
         if ($result['status'] !== 'success') {
             Log::warning('Falha ao criar payment intent no Stripe', [
                 'customer_id' => $customer->id,
-                'amount'      => $amount,
-                'message'     => $result['message'],
+                'amount' => $amount,
+                'message' => $result['message'],
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
@@ -103,25 +103,25 @@ class StripeService
         $intent = $result['data'];
 
         $transaction = Transaction::create([
-            'customer_id'                  => $customer->id,
+            'customer_id' => $customer->id,
             'stripe_payment_method_fee_id' => $feeConfig->id,
-            'type'                         => TransactionType::Stripe,
-            'direction'                    => TransactionDirection::Credit,
-            'stripe_payment_intent_id'     => $intent['id'],
-            'payment_method_type'          => $feeConfig->payment_method,
-            'amount'                       => $amount,
-            'stripe_fee'                   => $fees['stripe_fee'],
-            'platform_fee'                 => $fees['platform_fee'],
-            'net_amount'                   => $fees['net_amount'],
-            'currency'                     => strtoupper($currency),
-            'status'                       => 'pending',
-            'description'                  => $description,
-            'stripe_metadata'              => $intent,
-            'stripe_created_at'            => isset($intent['created']) ? now()->setTimestamp($intent['created']) : now(),
+            'type' => TransactionType::Stripe,
+            'direction' => TransactionDirection::Credit,
+            'stripe_payment_intent_id' => $intent['id'],
+            'payment_method_type' => $feeConfig->payment_method,
+            'amount' => $amount,
+            'stripe_fee' => $fees['stripe_fee'],
+            'platform_fee' => $fees['platform_fee'],
+            'net_amount' => $fees['net_amount'],
+            'currency' => strtoupper($currency),
+            'status' => 'pending',
+            'description' => $description,
+            'stripe_metadata' => $intent,
+            'stripe_created_at' => isset($intent['created']) ? now()->setTimestamp($intent['created']) : now(),
         ]);
 
         return [
-            'transaction'   => $transaction,
+            'transaction' => $transaction,
             'client_secret' => $intent['client_secret'],
         ];
     }
@@ -178,27 +178,160 @@ class StripeService
     public function handleWebhook(array $payload): void
     {
         $eventType = $payload['type'] ?? null;
-        $object    = $payload['data']['object'] ?? [];
+        $object = $payload['data']['object'] ?? [];
 
         match ($eventType) {
-            'payment_intent.succeeded'      => $this->handlePaymentIntentSucceeded($object),
+            'payment_intent.succeeded' => $this->handlePaymentIntentSucceeded($object),
             'payment_intent.payment_failed' => $this->handlePaymentIntentFailed($object),
-            'charge.updated'                => $this->handleChargeUpdated($object),
-            default                         => Log::info('Stripe webhook ignorado', ['type' => $eventType]),
+            'charge.updated' => $this->handleChargeUpdated($object),
+            default => Log::info('Stripe webhook ignorado', ['type' => $eventType]),
         };
+    }
+
+    public function getCashBalance(string $customerId): array
+    {
+        $result = $this->stripeProvider->getCashBalance($customerId);
+
+        if ($result['status'] !== 'success') {
+            Log::warning('Falha ao buscar cash balance no Stripe', [
+                'customer_id' => $customerId,
+                'message' => $result['message'],
+            ]);
+            throw new ApiException(
+                ErrorCode::STRIPE_CASH_BALANCE_FAILED,
+                502,
+                $result['message'] ?? 'Erro ao buscar saldo no Stripe.'
+            );
+        }
+
+        return $result['data'];
+    }
+
+    public function getFundingInstructions(Customer $customer): array
+    {
+        $stripeAccount = $customer->stripeAccount;
+
+        if (! $stripeAccount) {
+            throw new ApiException(
+                ErrorCode::STRIPE_CUSTOMER_CREATION_FAILED,
+                422,
+                'Cliente não possui conta Stripe associada.'
+            );
+        }
+
+        return [
+            'funding_type'                => $stripeAccount->funding_type,
+            'bank_transfer_type'          => $stripeAccount->bank_transfer_type,
+            'funding_iban'                => $stripeAccount->funding_iban,
+            'funding_bic'                 => $stripeAccount->funding_bic,
+            'funding_account_holder_name' => $stripeAccount->funding_account_holder_name,
+            'funding_country'             => $stripeAccount->funding_country,
+            'funding_financial_addresses' => $stripeAccount->funding_financial_addresses,
+        ];
+    }
+
+    public function createVban(Customer $customer): array
+    {
+        $stripeAccount = $customer->stripeAccount;
+
+        if (!$stripeAccount) {
+            throw new ApiException(
+                ErrorCode::STRIPE_CUSTOMER_CREATION_FAILED,
+                422,
+                'Cliente não possui conta Stripe associada.'
+            );
+        }
+
+        $currency = strtolower($customer->currency ?? 'eur');
+
+        // Apenas USD, EUR e GBP são suportados pelo Stripe bank_transfer.
+        // Qualquer outro valor recai no padrão EUR.
+        $transferMap = [
+            'usd' => ['type' => 'us_bank_transfer', 'extra' => []],
+            'gbp' => ['type' => 'gb_bank_transfer', 'extra' => []],
+            'eur' => ['type' => 'eu_bank_transfer', 'extra' => ['eu_bank_transfer' => ['country' => 'DE']]],
+        ];
+
+        $transfer = $transferMap[$currency] ?? $transferMap['eur'];
+        $currency  = array_key_exists($currency, $transferMap) ? $currency : 'eur';
+
+        $data = [
+            'funding_type' => 'bank_transfer',
+            'bank_transfer' => array_merge(['type' => $transfer['type']], $transfer['extra']),
+            'currency'     => $currency,
+        ];
+
+        $result = $this->stripeProvider->createCustomerFundingInstructions($stripeAccount->stripe_customer_id, $data);
+
+        \Log::info('Resultado do createCustomerFundingInstructions', ['result' => $result]);
+        if ($result['status'] !== 'success') {
+            Log::warning('Falha ao criar funding instructions no Stripe', [
+                'customer_id' => $customer->id,
+                'message' => $result['message'],
+            ]);
+            throw new ApiException(
+                ErrorCode::STRIPE_FUNDING_INSTRUCTIONS_FAILED,
+                502,
+                $result['message'] ?? 'Erro ao criar funding instructions.'
+            );
+        }
+
+        $funding = $result['data'];
+        $bankTransfer = $funding['bank_transfer'] ?? [];
+        $financialAddresses = $bankTransfer['financial_addresses'] ?? [];
+        $addresses = collect($financialAddresses);
+
+        // Tenta extrair campos canónicos por prioridade: iban > swift > aba
+        $ibanAddr  = $addresses->firstWhere('type', 'iban');
+        $swiftAddr = $addresses->firstWhere('type', 'swift');
+        $abaAddr   = $addresses->firstWhere('type', 'aba');
+
+        if ($ibanAddr) {
+            $detail               = $ibanAddr['iban'];
+            $fundingIban          = $detail['iban'] ?? null;
+            $fundingBic           = $detail['bic'] ?? null;
+            $fundingAccountHolder = $detail['account_holder_name'] ?? null;
+            $fundingCountry       = $detail['country'] ?? $bankTransfer['country'] ?? null;
+        } elseif ($swiftAddr) {
+            $detail               = $swiftAddr['swift'];
+            $fundingIban          = $detail['account_number'] ?? null; // número da conta
+            $fundingBic           = $detail['swift_code'] ?? null;
+            $fundingAccountHolder = $detail['account_holder_name'] ?? null;
+            $fundingCountry       = $detail['account_holder_address']['country'] ?? $bankTransfer['country'] ?? null;
+        } elseif ($abaAddr) {
+            $detail               = $abaAddr['aba'];
+            $fundingIban          = $detail['account_number'] ?? null;
+            $fundingBic           = $detail['routing_number'] ?? null;
+            $fundingAccountHolder = $detail['account_holder_name'] ?? null;
+            $fundingCountry       = $detail['account_holder_address']['country'] ?? $bankTransfer['country'] ?? null;
+        } else {
+            $fundingIban = $fundingBic = $fundingAccountHolder = $fundingCountry = null;
+        }
+
+        $stripeAccount->update([
+            'funding_type'                => $funding['funding_type'] ?? null,
+            'bank_transfer_type'          => $bankTransfer['type'] ?? null,
+            'funding_iban'                => $fundingIban,
+            'funding_bic'                 => $fundingBic,
+            'funding_account_holder_name' => $fundingAccountHolder,
+            'funding_country'             => $fundingCountry,
+            'funding_financial_addresses' => $financialAddresses,
+        ]);
+
+        return $funding;
     }
 
     private function handlePaymentIntentSucceeded(array $intent): void
     {
         $transaction = Transaction::where('stripe_payment_intent_id', $intent['id'])->first();
 
-        if (! $transaction) {
+        if (!$transaction) {
             Log::warning('Stripe webhook: transaction não encontrada', ['payment_intent_id' => $intent['id']]);
             return;
         }
 
         $transaction->update([
-            'status'          => 'succeeded',
+            'status' => 'succeeded',
             'stripe_metadata' => $intent,
         ]);
 
@@ -209,13 +342,13 @@ class StripeService
     {
         $transaction = Transaction::where('stripe_payment_intent_id', $intent['id'])->first();
 
-        if (! $transaction) {
+        if (!$transaction) {
             Log::warning('Stripe webhook: transaction não encontrada', ['payment_intent_id' => $intent['id']]);
             return;
         }
 
         $transaction->update([
-            'status'          => 'failed',
+            'status' => 'failed',
             'stripe_metadata' => $intent,
         ]);
 
@@ -226,7 +359,7 @@ class StripeService
     {
         $paymentIntentId = $charge['payment_intent'] ?? null;
 
-        if (! $paymentIntentId) {
+        if (!$paymentIntentId) {
             return;
         }
 

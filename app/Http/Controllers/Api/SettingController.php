@@ -39,18 +39,4 @@ class SettingController extends Controller
 
         return SettingResource::make($setting);
     }
-
-    /**
-     * Summary of set
-     * @param SetSettingRequest $request
-     * @param string $key
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function set(SetSettingRequest $request, string $key)
-    {
-        $dto = SettingDTO::fromArray(['key' => $key, 'value' => $request->validated('value')]);
-        $this->settingsService->set($dto);
-
-        return response()->json(['message' => 'Setting updated successfully']);
-    }
 }

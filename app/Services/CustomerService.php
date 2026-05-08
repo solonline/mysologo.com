@@ -7,6 +7,7 @@ use App\Contracts\CustomerRepositoryInterface;
 use App\DTOs\CreateResponsibleDTO;
 use App\DTOs\UpdateCustomerDTO;
 use App\Models\Customer;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
@@ -73,7 +74,7 @@ class CustomerService
 
         // Pega a URL do frontend da config
         $frontendBase = config('app.url_frontend') ?? env('URL_FRONTEND');
-               
+
         // Extrai os parâmetros da URL assinada
         $parsed = parse_url($signedUrl);
         $query = isset($parsed['query']) ? $parsed['query'] : '';
@@ -154,6 +155,24 @@ class CustomerService
             'path' => $storagePath,
             'url' => asset('storage/' . $storagePath),
         ];
+    }
+
+    public function paginate(array $filters): LengthAwarePaginator
+    {
+        return $this->customerRepository->paginate($filters);
+    }
+
+    public function getStats(): array
+    {
+        return $this->customerRepository->getStats();
+    }
+
+    public function loadForDashboard(Customer $customer): Customer
+    {
+        return $this->customerRepository->loadRelations(
+            $customer,
+            ['documents', 'responsibles', 'transactions', 'stripeAccount', 'phoneVerifications']
+        );
     }
 
 }

@@ -21,4 +21,7 @@ class ErrorCode
     const STRIPE_PAYMENT_INTENT_FAILED = 'stripe_payment_intent_failed';
     const STRIPE_SUBSCRIPTION_FAILED = 'stripe_subscription_failed';
     const STRIPE_SUBSCRIPTION_CANCEL_FAILED = 'stripe_subscription_cancel_failed';
+    const STRIPE_CASH_BALANCE_FAILED = 'stripe_cash_balance_failed';
+    const STRIPE_FUNDING_INSTRUCTIONS_FAILED = 'stripe_funding_instructions_failed';
+    const MAINTENANCE_MODE = 'maintenance_mode';
 }
