@@ -18,7 +18,7 @@ $tabs = [
     'address' => ['label' => 'Endereço',  'title' => 'Morada'],
     'system'  => ['label' => 'Sistema',   'title' => 'Sistema'],
     'stripe'  => ['label' => 'Stripe',    'title' => 'Stripe'],
-    'app360'  => ['label' => 'App360',    'title' => 'App360'],
+    'sms'       => ['label' => 'Sms',    'title' => 'Sms'],
     'social'  => ['label' => 'Redes Sociais', 'title' => 'Redes Sociais'],
     'currency' => ['label' => 'Moedas',    'title' => 'Configurações de Moedas'],
 ];

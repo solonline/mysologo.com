@@ -120,12 +120,12 @@ class AppServiceProvider extends ServiceProvider
             return new \App\Repositories\WallesterAccountRepository();
         });
 
-        // App360
-        $this->app->bind(\App\Clients\App360Client::class, function ($app) {
-            return new \App\Clients\App360Client($app->make(\App\Services\SettingsService::class));
+        // Sms
+        $this->app->bind(\App\Clients\SmsClient::class, function ($app) {
+            return new \App\Clients\SmsClient($app->make(\App\Services\SettingsService::class));
         });
-        $this->app->bind(\App\Providers\App360Provider::class, function ($app) {
-            return new \App\Providers\App360Provider($app->make(\App\Clients\App360Client::class));
+        $this->app->bind(\App\Providers\SmsProvider::class, function ($app) {
+            return new \App\Providers\SmsProvider($app->make(\App\Clients\SmsClient::class));
         });
 
         $this->app->bind(\App\Contracts\PhoneVerificationRepositoryInterface::class, function ($app) {

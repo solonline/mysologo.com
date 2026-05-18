@@ -5,7 +5,7 @@ namespace App\Clients;
 use App\Services\SettingsService;
 use Illuminate\Support\Facades\Http;
 
-class App360Client
+class SmsClient
 {
     protected string $baseUrl;
     protected string $username;
@@ -13,9 +13,9 @@ class App360Client
 
     public function __construct(protected SettingsService $settingsService)
     {
-        $this->baseUrl = $this->settingsService->getByKey('app360.base_url');
-        $this->username = $this->settingsService->getByKey('app360.username');
-        $this->password = $this->settingsService->getByKey('app360.password');
+        $this->baseUrl = $this->settingsService->getByKey('sms.base_url');
+        $this->username = $this->settingsService->getByKey('sms.username');
+        $this->password = $this->settingsService->getByKey('sms.password');
     }
 
     /**
@@ -31,7 +31,7 @@ class App360Client
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
             'Authorization' => 'Basic ' . $basicAuth,
-        ])->post($this->baseUrl . '/sms', [
+        ])->post($this->baseUrl . '/message', [
             'to' => $to,
             'from' => $from,
             'message' => $message,

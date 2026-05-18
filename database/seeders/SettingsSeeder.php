@@ -47,16 +47,18 @@ class SettingsSeeder extends Seeder
             ['key' => 'stripe.secret_key',      'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
             ['key' => 'stripe.webhook_secret',  'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => 'whsec_1234567890abcdef'],
             ['key' => 'stripe.url',             'label' => 'URL da API',              'type' => 'url',    'value' => 'https://api.stripe.com/v1'],
-            // App360
-            ['key' => 'app360.base_url',    'label' => 'URL Base',   'type' => 'url',    'value' => 'https://dashboard.360nrs.com/api/rest'],
-            ['key' => 'app360.auth_token',  'label' => 'Auth Token', 'type' => 'secret', 'value' => 'your_app360_auth_token_here'],
-            ['key' => 'app360.username',    'label' => 'Username',   'type' => 'text',   'value' => 'your_app360_username_here'],
-            ['key' => 'app360.password',    'label' => 'Password',   'type' => 'secret', 'value' => 'your_app360_password_here'],
+            // sms
+            ['key' => 'sms.base_url',    'label' => 'URL Base',   'type' => 'url',    'value' => 'https://dashboard.wausms.com/Api/rest'],
+            ['key' => 'sms.auth_token',  'label' => 'Auth Token', 'type' => 'secret', 'value' => ''],
+            ['key' => 'sms.username',    'label' => 'Username',   'type' => 'text',   'value' => 'your_sms_username_here'],
+            ['key' => 'sms.password',    'label' => 'Password',   'type' => 'secret', 'value' => 'your_sms_password_here'],
             // Social links
             ['key' => 'social.facebook',   'label' => 'Facebook URL',  'type' => 'url',    'value' => 'https://facebook.com/yooppayments'],
             ['key' => 'social.instagram',  'label' => 'Instagram URL', 'type' => 'url',    'value' => 'https://instagram.com/yooppayments'],
             //currencies
             ['key' => 'currency.accepted',  'label' => 'Accepted Currencies', 'type' => 'json',   'value' => json_encode(['EUR', 'USD', 'GBP','CHF'])],
+            //Payment methods
+            ['key' => 'payment_methods.enabled',  'label' => 'Enabled Payment Methods', 'type' => 'json',   'value' => json_encode(['card', 'card_non_eea', 'sepa_debit', 'mb_way', 'multibanco', 'bank_transfer'])],
         ];
 
         foreach ($settings as $setting) {

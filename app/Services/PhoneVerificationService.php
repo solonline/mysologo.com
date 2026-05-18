@@ -47,7 +47,7 @@ class PhoneVerificationService
         $message .= "Obrigado por escolher a Yoop!";
 
         // Envia SMS
-        app(\App\Providers\App360Provider::class)->sendSms([$phone], $message);
+        app(\App\Providers\SmsProvider::class)->sendSms([$phone], $message);
         return true;
     }
 }

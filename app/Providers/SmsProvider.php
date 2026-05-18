@@ -2,16 +2,16 @@
 
 namespace App\Providers;
 
-use App\Clients\App360Client;
+use App\Clients\SmsClient;
 
-class App360Provider
+class SmsProvider
 {
-    public function __construct(protected App360Client $client, protected string $from = 'Yoop')
+    public function __construct(protected SmsClient $client, protected string $from = 'Yoop')
     {
     }
 
     /**
-     * Envia SMS usando o client App360
+     * Envia SMS usando o client Sms
      * @param array $to
      * @param string $message
      * @return array
