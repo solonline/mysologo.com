@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Stripe Sim — Yoop</title>
+<script src="https://js.stripe.com/v3/"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --stripe:#7c6cfc; --stripe-d:#5b4de0;
+  --violet:#7c3aed; --emerald:#10b981; --amber:#f59e0b; --red:#ef4444;
+  --s50:#f8fafc;  --s100:#f1f5f9; --s200:#e2e8f0; --s300:#cbd5e1;
+  --s400:#94a3b8; --s500:#64748b; --s600:#475569; --s700:#334155;
+  --s800:#1e293b; --s900:#0f172a;
+  --t-bg:#0d0f14; --t-card:#161920; --t-bdr:#262b35; --t-mute:#6b7280;
+  --t-ok:#4ade80; --t-err:#f87171; --t-info:#60a5fa; --t-warn:#fbbf24;
+}
+
+body{
+  font-family:'Inter',sans-serif;
+  background:radial-gradient(ellipse at 30% 20%,#1e1b4b 0%,var(--s900) 60%);
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  padding:32px 24px; gap:28px;
+}
+
+/* ── Phone ─────────────────────────────────────── */
+#phone{
+  width:390px; min-width:390px; height:820px;
+  background:#fff; border-radius:48px;
+  box-shadow:0 0 0 10px var(--s800),0 0 0 12px var(--s700),0 40px 80px rgba(0,0,0,.65);
+  overflow:hidden; display:flex; flex-direction:column; position:relative; flex-shrink:0;
+}
+#phone::before{
+  content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+  width:120px; height:30px; background:var(--s800);
+  border-radius:0 0 20px 20px; z-index:100;
+}
+#status-bar{
+  height:44px; display:flex; align-items:flex-end;
+  justify-content:space-between; padding:0 28px 6px;
+  font-size:12px; font-weight:600; color:var(--s900);
+  position:relative; z-index:10; flex-shrink:0; transition:color .25s;
+}
+#status-bar.light{color:#fff}
+#status-icons{display:flex;align-items:center;gap:5px}
+
+/* ── Screens ────────────────────────────────────── */
+#screens{flex:1;position:relative;overflow:hidden}
+.screen{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  background:#fff; opacity:0; transform:translateX(28px);
+  pointer-events:none; transition:opacity .22s ease,transform .22s ease;
+  overflow-y:auto; overflow-x:hidden;
+}
+.screen.active {opacity:1;transform:translateX(0);pointer-events:all}
+.screen.exit   {opacity:0;transform:translateX(-28px);pointer-events:none}
+
+/* ── Bottom nav ─────────────────────────────────── */
+#bottom-nav{
+  height:72px; background:#fff;
+  border-top:1px solid var(--s100);
+  display:flex; align-items:center; justify-content:space-around;
+  padding:0 4px 8px; flex-shrink:0; transition:opacity .2s;
+}
+#bottom-nav.hidden{opacity:0;pointer-events:none}
+.nav-item{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:8px 14px;border-radius:14px;cursor:pointer;
+  transition:background .15s;border:none;background:none;
+  color:var(--s400);font-family:'Inter',sans-serif;position:relative;
+}
+.nav-item span{font-size:10px;font-weight:500}
+.nav-item svg {width:22px;height:22px}
+.nav-item.active{color:var(--stripe)}
+.nav-item.active span{font-weight:600}
+.nav-item:active{background:var(--s50)}
+.nav-badge{
+  position:absolute;top:6px;right:8px;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--red);border:1.5px solid #fff;
+  display:none;
+}
+.nav-badge.show{display:block}
+
+/* ── Shared: screen-header ──────────────────────── */
+.screen-header{
+  display:flex;align-items:center;gap:12px;
+  padding:16px 20px 12px;
+  border-bottom:1px solid var(--s100); flex-shrink:0;
+}
+.screen-header h2{font-size:17px;font-weight:700;color:var(--s900)}
+.back-btn{
+  width:36px;height:36px;border-radius:10px;background:var(--s50);
+  border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--s700);flex-shrink:0;transition:background .12s;
+}
+.back-btn:active{background:var(--s100)}
+
+/* ── Shared: section ─────────────────────────────── */
+.section{padding:0 16px;margin-bottom:18px}
+.section-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.section-title{
+  font-size:11px;font-weight:700;color:var(--s500);
+  letter-spacing:.08em;text-transform:uppercase;
+}
+.section-action{
+  font-size:11px;font-weight:600;color:var(--stripe);
+  background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;
+}
+
+/* ── Shared: info card ───────────────────────────── */
+.info-card{
+  background:#fff;border-radius:14px;border:1px solid var(--s100);
+  overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04);
+}
+.info-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 14px;border-bottom:1px solid var(--s50);
+}
+.info-row:last-child{border-bottom:none}
+.info-label{font-size:12px;color:var(--s500)}
+.info-value{
+  font-size:12px;font-weight:600;color:var(--s800);
+  text-align:right;max-width:60%;word-break:break-all;
+}
+.info-value.mono{font-family:'Fira Code',monospace;font-size:11px}
+
+/* ── Shared: badge ───────────────────────────────── */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;padding:2px 8px;
+  border-radius:100px;
+}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+.badge.active  {background:#d1fae5;color:#065f46}
+.badge.pending {background:#fef3c7;color:#92400e}
+.badge.blocked {background:#fee2e2;color:#991b1b}
+.badge.inactive{background:var(--s100);color:var(--s500)}
+.badge.paid    {background:#d1fae5;color:#065f46}
+.badge.failed  {background:#fee2e2;color:#991b1b}
+
+/* ── Shared: forms ───────────────────────────────── */
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-label{font-size:11px;font-weight:600;color:var(--s500);letter-spacing:.07em;text-transform:uppercase}
+.form-input{
+  width:100%;background:var(--s50);border:1.5px solid var(--s200);
+  border-radius:12px;padding:10px 14px;font-size:14px;
+  font-family:'Inter',sans-serif;color:var(--s900);transition:border-color .15s;
+}
+.form-input:focus{outline:none;border-color:var(--stripe);background:#fff}
+.form-select{
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;
+}
+
+/* ── Shared: spinner ─────────────────────────────── */
+.spin{
+  width:18px;height:18px;border:2.5px solid rgba(255,255,255,.25);
+  border-top-color:#fff;border-radius:50%;
+  animation:rotate .6s linear infinite;flex-shrink:0;
+}
+.spin.dark{border-color:var(--s200);border-top-color:var(--stripe)}
+@keyframes rotate{to{transform:rotate(360deg)}}
+
+/* ── Shared: empty state ─────────────────────────── */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:40px 24px;gap:10px;
+  color:var(--s400);text-align:center;
+}
+.empty-state svg{width:40px;height:40px;opacity:.4}
+.empty-state p{font-size:13px}
+
+/* ── Shared: skeleton ────────────────────────────── */
+.skel{
+  background:linear-gradient(90deg,var(--s100) 25%,var(--s200) 50%,var(--s100) 75%);
+  background-size:200% 100%;animation:shimmer 1.2s infinite;
+  border-radius:6px;height:14px;display:block;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── Toast ───────────────────────────────────────── */
+#phone-msg{
+  position:absolute;bottom:86px;left:50%;
+  transform:translateX(-50%) translateY(10px);
+  white-space:nowrap;font-size:12px;font-weight:600;
+  padding:8px 18px;border-radius:100px;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s,transform .2s;z-index:200;
+  max-width:340px;white-space:normal;text-align:center;
+}
+#phone-msg.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#phone-msg.ok {background:#065f46;color:#fff}
+#phone-msg.err{background:#991b1b;color:#fff}
+#phone-msg.info{background:var(--s800);color:#fff}
+
+/* ══════════════════════════════════════════════════
+   LOGIN
+═══════════════════════════════════════════════════ */
+#screen-login{
+  background:linear-gradient(160deg,#1e1b4b 0%,#312e81 40%,#4338ca 100%);
+  justify-content:space-between;padding:56px 32px 40px;
+}
+.login-hero h1{font-size:34px;font-weight:700;letter-spacing:-.02em;color:#fff;line-height:1.1}
+.login-hero p {font-size:13px;color:rgba(255,255,255,.5);margin-top:6px}
+.login-card{
+  background:rgba(255,255,255,.08);backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,.15);border-radius:24px;
+  padding:28px 24px;display:flex;flex-direction:column;gap:14px;
+}
+.login-field label{
+  display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.5);
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;
+}
+.login-field input{
+  width:100%;background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.18);border-radius:12px;
+  padding:12px 16px;font-size:15px;font-family:'Inter',sans-serif;
+  color:#fff;transition:border-color .15s,background .15s;
+}
+.login-field input::placeholder{color:rgba(255,255,255,.3)}
+.login-field input:focus{outline:none;border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.15)}
+.btn-login{
+  width:100%;background:#fff;color:var(--stripe-d);border:none;
+  border-radius:14px;padding:14px;font-size:15px;font-weight:700;
+  font-family:'Inter',sans-serif;cursor:pointer;
+  box-shadow:0 4px 20px rgba(0,0,0,.2);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .1s;
+}
+.btn-login:active{transform:scale(.98)}
+.btn-login:disabled{opacity:.6;cursor:not-allowed;transform:none}
+
+/* ══════════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════════ */
+#screen-dashboard{background:var(--s50)}
+.dash-header{
+  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
+  padding:16px 20px 36px;color:#fff;position:relative;overflow:hidden;flex-shrink:0;
+}
+.dash-header::after{
+  content:'';position:absolute;bottom:-28px;left:-20px;right:-20px;
+  height:56px;background:var(--s50);border-radius:50% 50% 0 0;
+}
+.dash-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.dash-greeting{font-size:12px;color:rgba(255,255,255,.65)}
+.dash-name   {font-size:18px;font-weight:700}
+.dash-notif-btn{
+  width:34px;height:34px;border-radius:10px;
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+  color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  position:relative;transition:background .12s;
+}
+.dash-notif-btn:hover{background:rgba(255,255,255,.25)}
+.notif-dot{
+  position:absolute;top:5px;right:5px;
+  width:7px;height:7px;border-radius:50%;
+  background:var(--red);border:1.5px solid rgba(124,108,252,1);display:none;
+}
+.notif-dot.show{display:block}
+
+/* Balance carousel */
+.balance-carousel{
+  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18);
+  border-radius:18px;padding:16px;backdrop-filter:blur(8px);
+}
+.carousel-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.carousel-arrow{
+  width:28px;height:28px;border-radius:8px;
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+  color:#fff;font-size:14px;cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;transition:background .12s;
+}
+.carousel-arrow:hover{background:rgba(255,255,255,.25)}
+.carousel-label{font-size:12px;font-weight:700;color:#fff;letter-spacing:.04em}
+.balance-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bal-block{display:flex;flex-direction:column;gap:2px}
+.bal-lbl{font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.08em;text-transform:uppercase}
+.bal-val{font-size:24px;font-weight:700;letter-spacing:-.02em}
+.bal-val.avail{color:#4ade80}
+.bal-val.pend {color:var(--amber)}
+.carousel-dots{display:flex;gap:5px;justify-content:center;margin-top:10px}
+.cdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.25);transition:background .2s}
+.cdot.active{background:#fff}
+
+/* Quick actions */
+.quick-actions{display:flex;justify-content:space-around;padding:26px 12px 14px}
+.qa-btn{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;
+}
+.qa-icon{
+  width:52px;height:52px;border-radius:16px;
+  display:flex;align-items:center;justify-content:center;transition:transform .1s;
+}
+.qa-btn:active .qa-icon{transform:scale(.9)}
+.qa-btn span{font-size:11px;font-weight:500;color:var(--s600)}
+.qa-icon.v {background:#ede9fe;color:var(--stripe)}
+.qa-icon.g {background:#d1fae5;color:#059669}
+.qa-icon.a {background:#fef3c7;color:#d97706}
+.qa-icon.b {background:#e0f2fe;color:#0284c7}
+
+/* Transaction list */
+.tx-list{display:flex;flex-direction:column}
+.tx-item{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 14px;border-bottom:1px solid var(--s50);
+}
+.tx-item:last-child{border-bottom:none}
+.tx-icon-wrap{
+  width:38px;height:38px;border-radius:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.tx-icon-wrap.credit{background:#d1fae5;color:#059669}
+.tx-icon-wrap.debit {background:#fee2e2;color:var(--red)}
+.tx-meta{flex:1;min-width:0}
+.tx-type{font-size:12px;font-weight:600;color:var(--s800);display:block;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-date{font-size:11px;color:var(--s400);display:block}
+.tx-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
+.tx-amount{font-size:13px;font-weight:700}
+.tx-amount.credit{color:#059669}
+.tx-amount.debit {color:var(--red)}
+
+/* ══════════════════════════════════════════════════
+   PAYMENT
+═══════════════════════════════════════════════════ */
+#screen-payment{background:#fff}
+.pay-body{padding:16px 18px;flex:1;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.logged-as-bar{
+  font-size:12px;color:#059669;font-weight:600;
+  padding:8px 12px;background:#f0fdf4;border-radius:10px;border:1px solid #a7f3d0;
+}
+.pm-list{display:flex;flex-direction:column;gap:6px}
+.pm-option{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 13px;border-radius:12px;border:1.5px solid var(--s200);
+  cursor:pointer;font-size:13px;color:var(--s700);transition:border-color .15s,background .12s;
+}
+.pm-option:has(input:checked){border-color:var(--stripe);background:#f5f3ff;color:var(--s900)}
+.pm-option input[type=radio]{accent-color:var(--stripe)}
+.stripe-wrap{border:1.5px solid var(--s200);border-radius:12px;padding:12px;background:var(--s50)}
+.stripe-wrap:focus-within{border-color:var(--stripe);background:#fff}
+.btn-pay{
+  width:100%;padding:14px;
+  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
+  color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;
+  font-family:'Inter',sans-serif;cursor:pointer;
+  box-shadow:0 4px 20px rgba(124,108,252,.3);
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .1s;
+}
+.btn-pay:active{transform:scale(.98)}
+.btn-pay:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.sec-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn-sec{
+  padding:10px;border-radius:12px;border:1.5px solid;cursor:pointer;
+  font-size:11px;font-weight:600;font-family:'Inter',sans-serif;background:#fff;
+  display:flex;align-items:center;justify-content:center;gap:5px;transition:background .12s;
+}
+.btn-sec:disabled{opacity:.5;cursor:not-allowed}
+.btn-sec.v {color:var(--stripe);border-color:var(--stripe)}
+.btn-sec.g {color:#059669;border-color:#a7f3d0}
+.btn-sec.a {color:#d97706;border-color:#fde68a}
+.btn-sec.r {color:var(--red);border-color:#fca5a5}
+.btn-sec.v:hover{background:#f5f3ff}
+.btn-sec.g:hover{background:#f0fdf4}
+.btn-sec.a:hover{background:#fffbeb}
+.btn-sec.r:hover{background:#fef2f2}
+.btn-sec.full{grid-column:1/-1}
+
+/* ══════════════════════════════════════════════════
+   TOP-UP
+═══════════════════════════════════════════════════ */
+#screen-topup{background:var(--s50)}
+.topup-body{padding:16px;flex:1;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
+.vban-card{
+  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
+  border-radius:20px;padding:20px;color:#fff;position:relative;overflow:hidden;
+}
+.vban-card::before{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:120px;height:120px;border-radius:50%;
+  background:rgba(255,255,255,.06);
+}
+.vban-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.vban-title{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+.vban-type-badge{
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;
+  background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.25);color:#fff;
+}
+.vban-field{margin-bottom:12px}
+.vban-field:last-child{margin-bottom:0}
+.vban-field-label{font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.vban-field-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.vban-field-value{font-size:13px;font-weight:600;font-family:'Fira Code',monospace;color:#fff;word-break:break-all}
+.copy-btn{
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+  border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;
+  color:rgba(255,255,255,.8);font-family:'Inter',sans-serif;font-weight:600;
+  transition:background .12s;flex-shrink:0;
+}
+.copy-btn:hover{background:rgba(255,255,255,.25)}
+.copy-btn:active{transform:scale(.95)}
+.no-vban-card{
+  background:#fff;border-radius:16px;border:2px dashed var(--s200);
+  padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;
+}
+.no-vban-card p{font-size:13px;color:var(--s500)}
+.btn-create{
+  width:100%;padding:13px;
+  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
+  color:#fff;border:none;border-radius:13px;font-size:14px;font-weight:700;
+  font-family:'Inter',sans-serif;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .1s;
+}
+.btn-create:active{transform:scale(.98)}
+.btn-create:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* ══════════════════════════════════════════════════
+   PROFILE
+═══════════════════════════════════════════════════ */
+#screen-profile{background:var(--s50)}
+.profile-header{
+  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
+  padding:20px 20px 36px;color:#fff;position:relative;flex-shrink:0;
+}
+.profile-header::after{
+  content:'';position:absolute;bottom:-28px;left:-20px;right:-20px;
+  height:56px;background:var(--s50);border-radius:50% 50% 0 0;
+}
+.avatar{
+  width:64px;height:64px;border-radius:50%;
+  background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.4);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;font-weight:700;color:#fff;margin-bottom:10px;
+}
+.profile-name {font-size:20px;font-weight:700;margin-bottom:2px}
+.profile-email{font-size:12px;color:rgba(255,255,255,.65);margin-bottom:8px}
+.profile-body {padding:28px 16px 16px;flex:1;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
+.btn-logout{
+  margin-top:auto;width:100%;padding:13px;
+  background:#fff;border:1.5px solid #fca5a5;color:var(--red);
+  border-radius:14px;font-size:14px;font-weight:700;
+  font-family:'Inter',sans-serif;cursor:pointer;transition:background .12s;
+}
+.btn-logout:hover{background:#fef2f2}
+
+/* ══════════════════════════════════════════════════
+   NOTIFICATIONS
+═══════════════════════════════════════════════════ */
+#screen-notifications{background:#fff}
+.notif-list{flex:1;overflow-y:auto}
+.notif-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:14px 18px;border-bottom:1px solid var(--s50);
+  cursor:pointer;transition:background .12s;
+}
+.notif-item:active{background:var(--s50)}
+.notif-item.unread{background:#f5f3ff}
+.notif-unread-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--stripe);flex-shrink:0;margin-top:5px;
+}
+.notif-icon-wrap{
+  width:38px;height:38px;border-radius:12px;background:#ede9fe;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px;
+}
+.notif-content{flex:1;min-width:0}
+.notif-title{font-size:13px;font-weight:600;color:var(--s900);margin-bottom:2px}
+.notif-body {font-size:12px;color:var(--s500);line-height:1.4}
+.notif-time {font-size:11px;color:var(--s300);margin-top:4px}
+
+/* ══════════════════════════════════════════════════
+   LOG PANEL
+═══════════════════════════════════════════════════ */
+#log-panel{
+  width:380px;height:820px;background:var(--t-bg);
+  border-radius:24px;border:1px solid var(--t-bdr);
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#log-header{
+  padding:14px 18px;border-bottom:1px solid var(--t-bdr);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.log-title{display:flex;align-items:center;gap:8px}
+.log-title span{font-size:11px;font-weight:700;color:var(--stripe);letter-spacing:.1em;text-transform:uppercase}
+.log-live-dot{width:7px;height:7px;border-radius:50%;background:var(--t-ok);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.log-toolbar{display:flex;align-items:center;gap:8px}
+.log-clear{
+  font-size:10px;font-weight:600;color:var(--t-mute);background:none;
+  border:1px solid var(--t-bdr);border-radius:5px;padding:3px 9px;
+  cursor:pointer;font-family:'Inter',sans-serif;transition:color .12s,border-color .12s;
+}
+.log-clear:hover{color:var(--t-err);border-color:var(--t-err)}
+.log-count{font-size:10px;color:var(--t-mute);font-family:'Fira Code',monospace}
+#log-entries{
+  flex:1;overflow-y:auto;display:flex;flex-direction:column;
+  padding:4px 0;
+}
+#log-entries::-webkit-scrollbar{width:3px}
+#log-entries::-webkit-scrollbar-thumb{background:var(--t-bdr);border-radius:2px}
+.log-entry{
+  display:grid;grid-template-columns:auto 1fr auto;
+  align-items:start;gap:8px;padding:5px 14px;
+  border-bottom:1px solid rgba(38,43,53,.4);
+  animation:fadeSlide .12s ease;
+}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(-3px)}to{opacity:1}}
+.log-badge{
+  font-size:9px;font-weight:700;letter-spacing:.06em;padding:2px 6px;
+  border-radius:4px;flex-shrink:0;margin-top:2px;
+}
+.log-badge.ok  {background:rgba(74,222,128,.12);color:var(--t-ok)}
+.log-badge.err {background:rgba(248,113,113,.12);color:var(--t-err)}
+.log-badge.info{background:rgba(96,165,250,.12); color:var(--t-info)}
+.log-badge.warn{background:rgba(251,191,36,.12); color:var(--t-warn)}
+.log-text{font-size:11px;color:#c9d1d9;line-height:1.5;font-family:'Fira Code',monospace;word-break:break-word}
+.log-ts  {font-size:10px;color:rgba(38,43,53,1.3);color:#3d4451;margin-top:3px;font-family:'Fira Code',monospace;flex-shrink:0}
+#log-empty{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:10px;color:var(--t-mute);font-size:12px;
+}
+#log-empty svg{width:28px;height:28px;opacity:.3}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PHONE ═══════════ -->
+<div id="phone">
+
+  <div id="status-bar" class="light">
+    <span id="clock">09:41</span>
+    <div id="status-icons">
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><rect x="0" y="4" width="3" height="8" rx="1"/><rect x="4.5" y="2.5" width="3" height="9.5" rx="1"/><rect x="9" y="0" width="3" height="12" rx="1"/><rect x="13.5" y="0" width="2" height="12" rx="1" opacity=".3"/></svg>
+      <svg width="16" height="12" viewBox="0 0 20 14" fill="currentColor"><path d="M10 3C6.7 3 3.7 4.3 1.5 6.5L0 5C2.6 2.3 6.1.5 10 .5s7.4 1.8 10 4.5L18.5 6.5C16.3 4.3 13.3 3 10 3z"/><path d="M10 7.5c-2.1 0-4 .9-5.4 2.3L3.2 8.4C5 6.7 7.4 5.5 10 5.5s5 1.2 6.8 2.9L15.4 9.8C14 8.4 12.1 7.5 10 7.5z"/><circle cx="10" cy="13" r="1.5"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y=".5" width="21" height="11" rx="3.5" stroke="currentColor" stroke-opacity=".35"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 0 0 0-3z" fill="currentColor" opacity=".4"/></svg>
+    </div>
+  </div>
+
+  <div id="screens">
+
+    <!-- ── Login ────────────────────────────── -->
+    <div id="screen-login" class="screen active">
+      <div class="login-hero">
+        <h1>Yoop<br>Stripe</h1>
+        <p>Simulação de pagamentos</p>
+      </div>
+      <div class="login-card">
+        <div class="login-field">
+          <label>E-mail</label>
+          <input type="email" id="login-email" value="corporate@example.com"/>
+        </div>
+        <div class="login-field">
+          <label>Senha</label>
+          <input type="password" id="login-password" value="string"/>
+        </div>
+        <button class="btn-login" id="login-btn" onclick="doLogin()">Entrar</button>
+      </div>
+    </div>
+
+    <!-- ── Dashboard ─────────────────────────── -->
+    <div id="screen-dashboard" class="screen">
+      <div class="dash-header">
+        <div class="dash-top">
+          <div>
+            <div class="dash-greeting">Bem-vindo de volta,</div>
+            <div class="dash-name" id="dash-name">—</div>
+          </div>
+          <button class="dash-notif-btn" onclick="navigate('notifications')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <div class="notif-dot" id="notif-dot"></div>
+          </button>
+        </div>
+        <div class="balance-carousel">
+          <div class="carousel-nav">
+            <button class="carousel-arrow" onclick="carouselPrev()">&#8592;</button>
+            <span class="carousel-label" id="carousel-label">EUR — Euro (€)</span>
+            <button class="carousel-arrow" onclick="carouselNext()">&#8594;</button>
+          </div>
+          <div class="balance-row">
+            <div class="bal-block">
+              <span class="bal-lbl">Disponível</span>
+              <span class="bal-val avail" id="bal-available">—</span>
+            </div>
+            <div class="bal-block">
+              <span class="bal-lbl">Pendente</span>
+              <span class="bal-val pend" id="bal-pending">—</span>
+            </div>
+          </div>
+          <div class="carousel-dots" id="carousel-dots"></div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="quick-actions">
+        <button class="qa-btn" onclick="navigate('payment')">
+          <div class="qa-icon v"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+          <span>Pagar</span>
+        </button>
+        <button class="qa-btn" onclick="navigate('topup')">
+          <div class="qa-icon g"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>
+          <span>Depositar</span>
+        </button>
+        <button class="qa-btn" onclick="navigate('profile')">
+          <div class="qa-icon a"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <span>Perfil</span>
+        </button>
+        <button class="qa-btn" onclick="navigate('notifications')">
+          <div class="qa-icon b" id="qa-notif-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+          <span>Notif.</span>
+        </button>
+      </div>
+
+      <!-- Recent transactions -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Atividade recente</span>
+          <button class="section-action" onclick="loadDashboard()">Atualizar</button>
+        </div>
+        <div class="info-card">
+          <div id="tx-list" class="tx-list">
+            <div style="padding:14px 16px"><span class="skel" style="width:80%"></span></div>
+            <div style="padding:14px 16px"><span class="skel" style="width:65%"></span></div>
+            <div style="padding:14px 16px"><span class="skel" style="width:75%"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account summary -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Resumo da conta</span>
+        </div>
+        <div class="info-card" id="dash-account-card">
+          <div class="info-row"><span class="info-label">Stripe Customer</span><span class="info-value mono skel" id="dash-stripe-id" style="width:120px;height:12px">&nbsp;</span></div>
+          <div class="info-row"><span class="info-label">VBAN Status</span><span class="info-value" id="dash-vban-status">—</span></div>
+          <div class="info-row"><span class="info-label">Wallester</span><span class="info-value" id="dash-wallester">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Payment ───────────────────────────── -->
+    <div id="screen-payment" class="screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="navigate('dashboard')">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <h2>Pagamento</h2>
+      </div>
+      <div class="pay-body">
+        <div class="logged-as-bar" id="logged-as">—</div>
+
+        <div class="form-group">
+          <label class="form-label">Método de pagamento</label>
+          <div class="pm-list" id="methods-container">
+            <div style="padding:12px"><span class="skel" style="width:70%"></span></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Moeda</label>
+          <select class="form-input form-select" id="currency-select" onchange="onCurrencyChange()">
+            <option value="eur">EUR — Euro (€)</option>
+            <option value="gbp">GBP — British Pound (£)</option>
+            <option value="usd">USD — US Dollar ($)</option>
+            <option value="brl">BRL — Brazilian Real (R$)</option>
+            <option value="chf">CHF — Swiss Franc (Fr)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Valor</label>
+          <input class="form-input" type="number" id="amount" value="10" min="1"/>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Detalhes do cartão</label>
+          <div class="stripe-wrap"><div id="payment-element"></div></div>
+        </div>
+
+        <button class="btn-pay" id="btn-pay" onclick="run()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          Pagar
+        </button>
+
+        <div class="sec-actions">
+          <button class="btn-sec v" id="btn-funding"     onclick="createFunding()">+ Criar Funding</button>
+          <button class="btn-sec g" id="btn-account"     onclick="getAccount()">Ver Account</button>
+          <button class="btn-sec a full" id="btn-get-funding" onclick="getFundingInstructions()">Ver Funding Instructions</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Top-up ─────────────────────────────── -->
+    <div id="screen-topup" class="screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="navigate('dashboard')">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <h2>Adicionar Fundos</h2>
+        <button class="section-action" style="margin-left:auto" onclick="loadTopup()">Atualizar</button>
+      </div>
+      <div class="topup-body" id="topup-body">
+        <div class="empty-state"><div class="spin dark"></div><p>Carregando...</p></div>
+      </div>
+    </div>
+
+    <!-- ── Profile ───────────────────────────── -->
+    <div id="screen-profile" class="screen">
+      <div class="profile-header">
+        <div class="avatar" id="profile-avatar">?</div>
+        <div class="profile-name"  id="profile-name">—</div>
+        <div class="profile-email" id="profile-email">—</div>
+        <span id="profile-badge"></span>
+      </div>
+      <div class="profile-body" id="profile-body">
+        <div class="empty-state"><div class="spin dark"></div><p>Carregando...</p></div>
+      </div>
+    </div>
+
+    <!-- ── Notifications ─────────────────────── -->
+    <div id="screen-notifications" class="screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="navigate('dashboard')">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <h2>Notificações</h2>
+        <button class="section-action" style="margin-left:auto" onclick="markAllRead()">Marcar lidas</button>
+      </div>
+      <div class="notif-list" id="notif-list">
+        <div class="empty-state"><div class="spin dark"></div></div>
+      </div>
+    </div>
+
+  </div><!-- /screens -->
+
+  <div id="phone-msg"></div>
+
+  <nav id="bottom-nav" class="hidden">
+    <button class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-item" id="nav-payment" onclick="navigate('payment')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <span>Pagar</span>
+    </button>
+    <button class="nav-item" id="nav-topup" onclick="navigate('topup')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      <span>Depositar</span>
+    </button>
+    <button class="nav-item" id="nav-profile" onclick="navigate('profile')">
+      <div class="nav-badge" id="nav-notif-badge"></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>Perfil</span>
+    </button>
+  </nav>
+
+</div><!-- /phone -->
+
+<!-- ═══════════ LOG PANEL ═══════════ -->
+<div id="log-panel">
+  <div id="log-header">
+    <div class="log-title">
+      <div class="log-live-dot"></div>
+      <span>Console</span>
+    </div>
+    <div class="log-toolbar">
+      <span class="log-count" id="log-count">0 entradas</span>
+      <button class="log-clear" onclick="clearLog()">Limpar</button>
+    </div>
+  </div>
+  <div id="log-entries">
+    <div id="log-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      <span>Aguardando atividade...</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ─────────────────────────────────────────────
+const CONFIG = {
+  pk:  'pk_test_51T2hGe2QaRyGWkxZfszIzoH8ptXpnvyZJKbSsxkooaxf8qLbhk1zbhr01eU7sutPuYVHS8WwS2sFRUvcAlWgZGdH00xWuRIIUp',
+  api: 'http://yoop.test/api',
+};
+
+const CURRENCIES = [
+  { code:'EUR', sym:'€',  label:'Euro'   },
+  { code:'GBP', sym:'£',  label:'Pound'  },
+  { code:'USD', sym:'$',  label:'Dollar' },
+  { code:'BRL', sym:'R$', label:'Real'   },
+  { code:'CHF', sym:'Fr', label:'Franco' },
+];
+
+// ── State ──────────────────────────────────────────────
+let stripe, elements, selectedMethod;
+let apiToken    = null;
+let currentScreen = 'login';
+let carouselIndex = 0;
+let balances    = [];
+let logCount    = 0;
+let unreadCount = 0;
+let _toastTimer;
+let _swipeX     = 0;
+
+// ── Clock ──────────────────────────────────────────────
+function tick() {
+  const n = new Date();
+  document.getElementById('clock').textContent =
+    String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+}
+tick(); setInterval(tick, 15000);
+
+// ── Navigation ─────────────────────────────────────────
+function navigate(screen) {
+  const prev = document.getElementById('screen-' + currentScreen);
+  prev.classList.remove('active'); prev.classList.add('exit');
+  setTimeout(() => prev.classList.remove('exit'), 280);
+
+  currentScreen = screen;
+  document.getElementById('screen-' + screen).classList.add('active');
+
+  // nav tab active states
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  const tabs = ['dashboard','payment','topup','profile'];
+  if (tabs.includes(screen)) {
+    document.getElementById('nav-' + screen)?.classList.add('active');
+  }
+
+  // status bar color — light on gradient screens
+  const lightScreens = ['login','dashboard','profile'];
+  document.getElementById('status-bar').className = lightScreens.includes(screen) ? 'light' : '';
+
+  // lazy-load screens
+  if (screen === 'topup')         loadTopup();
+  if (screen === 'profile')       loadProfile();
+  if (screen === 'notifications') loadNotifications();
+}
+
+// swipe support on dashboard
+document.getElementById('screen-dashboard').addEventListener('touchstart', e => { _swipeX = e.changedTouches[0].clientX; }, {passive:true});
+document.getElementById('screen-dashboard').addEventListener('touchend',   e => {
+  const dx = e.changedTouches[0].clientX - _swipeX;
+  if (Math.abs(dx) > 50) dx < 0 ? carouselNext() : carouselPrev();
+}, {passive:true});
+
+// ── Toast ──────────────────────────────────────────────
+function toast(type, msg) {
+  const el = document.getElementById('phone-msg');
+  el.textContent = msg; el.className = 'show ' + type;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ''; }, 3200);
+}
+
+// ── API helper ─────────────────────────────────────────
+async function api(method, path, body) {
+  const headers = { 'Accept':'application/json', 'Content-Type':'application/json' };
+  if (apiToken) headers['Authorization'] = apiToken;
+  const res  = await fetch(CONFIG.api + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
+// ── Log ────────────────────────────────────────────────
+function log(type, msg) {
+  const wrap  = document.getElementById('log-entries');
+  const empty = document.getElementById('log-empty');
+  if (empty) empty.remove();
+
+  const n = new Date();
+  const ts = String(n.getHours()).padStart(2,'0') + ':' +
+             String(n.getMinutes()).padStart(2,'0') + ':' +
+             String(n.getSeconds()).padStart(2,'0');
+
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="log-badge ${type}">${type.toUpperCase()}</span>
+    <span class="log-text">${msg}</span>
+    <span class="log-ts">${ts}</span>`;
+  wrap.prepend(el);
+
+  logCount++;
+  document.getElementById('log-count').textContent = logCount + (logCount === 1 ? ' entrada' : ' entradas');
+}
+
+function clearLog() {
+  document.getElementById('log-entries').innerHTML =
+    `<div id="log-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg><span>Aguardando atividade...</span></div>`;
+  logCount = 0;
+  document.getElementById('log-count').textContent = '0 entradas';
+}
+
+// ── Unread badge ───────────────────────────────────────
+function setUnreadBadge(count) {
+  unreadCount = count;
+  const show = count > 0;
+  document.getElementById('notif-dot').classList.toggle('show', show);
+  document.getElementById('nav-notif-badge').classList.toggle('show', show);
+}
+
+// ── Stripe init ────────────────────────────────────────
+const stripeAppearance = {
+  theme: 'stripe',
+  variables: { colorPrimary:'#7c6cfc', fontFamily:'Inter, sans-serif', borderRadius:'8px', colorBackground:'#f8fafc' },
+  rules: {
+    '.Input':       { border:'1.5px solid #e2e8f0', boxShadow:'none' },
+    '.Input:focus': { border:'1.5px solid #7c6cfc', boxShadow:'none' },
+  }
+};
+
+window.addEventListener('DOMContentLoaded', () => {
+  stripe = Stripe(CONFIG.pk);
+  document.getElementById('amount').addEventListener('change', () => {
+    if (selectedMethod) mountElement(selectedMethod.payment_method);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════
+async function doLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { toast('err', 'Preencha e-mail e senha.'); return; }
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin" style="border-top-color:var(--stripe-d)"></div>';
+
+  log('info', `POST /login → ${email}`);
+  try {
+    const { res, data } = await api('POST', '/login', { email, password });
+    if (!res.ok) throw new Error(data.message || 'HTTP ' + res.status);
+    const token = data.data?.token ?? data.token;
+    if (!token) throw new Error('token não encontrado na resposta');
+    apiToken = 'Bearer ' + token;
+    log('ok', 'login ok — token guardado');
+
+    document.getElementById('logged-as').textContent = 'Autenticado como ' + email;
+    document.getElementById('bottom-nav').classList.remove('hidden');
+
+    navigate('dashboard');
+    initCarousel();
+    await Promise.all([
+      loadDashboard(),
+      loadPaymentMethods(),
+      loadDashboardAccount(),
+      loadNotifCount(),
+    ]);
+    toast('ok', 'Login realizado!');
+  } catch (e) {
+    log('err', e.message);
+    toast('err', e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+}
+
+async function doLogout() {
+  log('info', 'POST /logout');
+  try {
+    await api('POST', '/logout');
+    log('ok', 'logout ok');
+  } catch {}
+  apiToken = null;
+  document.getElementById('bottom-nav').classList.add('hidden');
+  navigate('login');
+  toast('info', 'Sessão encerrada.');
+}
+
+// ═══════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════
+function initCarousel() {
+  carouselIndex = 0;
+  updateCarousel();
+}
+
+function updateCarousel() {
+  const b = balances[carouselIndex];
+  if (!b) return;
+  const fmt = v => (v / 100).toFixed(2);
+  document.getElementById('carousel-label').textContent = b.currency;
+  document.getElementById('bal-available').textContent  = fmt(b.available);
+  document.getElementById('bal-pending').textContent    = fmt(b.pending);
+  document.querySelectorAll('.cdot').forEach((d, i) => d.classList.toggle('active', i === carouselIndex));
+}
+
+function carouselPrev() {
+  if (!balances.length) return;
+  carouselIndex = (carouselIndex - 1 + balances.length) % balances.length;
+  updateCarousel();
+}
+function carouselNext() {
+  if (!balances.length) return;
+  carouselIndex = (carouselIndex + 1) % balances.length;
+  updateCarousel();
+}
+
+async function loadDashboard() {
+  log('info', 'GET /dashboard');
+  try {
+    const { res, data } = await api('GET', '/dashboard');
+    if (!res.ok) throw new Error('API ' + res.status);
+    const d   = data.data;
+    const fmt = v => (v / 100).toFixed(2);
+
+    document.getElementById('dash-name').textContent =
+      d.customer?.name || d.customer?.first_name || document.getElementById('dash-name').textContent;
+
+    // Balances carousel
+    balances = d.balances ?? [];
+    const dots = document.getElementById('carousel-dots');
+    dots.innerHTML = balances.map((_, i) => `<span class="cdot ${i===0?'active':''}"></span>`).join('');
+    carouselIndex = Math.min(carouselIndex, Math.max(0, balances.length - 1));
+    updateCarousel();
+
+    // Transaction list
+    const txEl = document.getElementById('tx-list');
+    if (!d.transactions?.length) {
+      txEl.innerHTML = `<div class="empty-state" style="padding:20px"><p>Sem transações ainda</p></div>`;
+    } else {
+      txEl.innerHTML = d.transactions.map(t => {
+        const isCredit = t.direction === 'credit';
+        const sign     = isCredit ? '+' : '−';
+        const amt      = fmt(t.net_amount);
+        const cur      = (t.currency || '').toUpperCase();
+        const date     = t.created_at ? new Date(t.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '—';
+        const icon     = isCredit
+          ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`
+          : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
+        return `<div class="tx-item">
+          <div class="tx-icon-wrap ${isCredit?'credit':'debit'}">${icon}</div>
+          <div class="tx-meta">
+            <span class="tx-type">${t.type}</span>
+            <span class="tx-date">${date}</span>
+          </div>
+          <div class="tx-right">
+            <span class="tx-amount ${isCredit?'credit':'debit'}">${sign}${amt} ${cur}</span>
+            <span class="badge ${t.status}">${t.status}</span>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    log('ok', `dashboard ok — ${balances.length} balance(s), ${d.transactions?.length ?? 0} transação(ões)`);
+  } catch (e) { log('err', 'dashboard: ' + e.message); }
+}
+
+async function loadDashboardAccount() {
+  log('info', 'GET /account');
+  try {
+    const { res, data } = await api('GET', '/account');
+    if (!res.ok) throw new Error('API ' + res.status);
+    const s = data.stripe, w = data.wallester;
+    if (s) {
+      document.getElementById('dash-stripe-id').textContent = s.stripe_customer_id || '—';
+      document.getElementById('dash-stripe-id').className   = 'info-value mono';
+      const hasFunding = !!(s.funding_iban || s.viban);
+      document.getElementById('dash-vban-status').innerHTML =
+        hasFunding
+          ? `<span class="badge active">Ativo</span>`
+          : `<span class="badge inactive">Sem VBAN</span>`;
+    }
+    if (w) {
+      document.getElementById('dash-wallester').textContent = w.wallester_account_id
+        ? w.iban ? w.iban : w.wallester_account_id
+        : '—';
+    } else {
+      document.getElementById('dash-wallester').textContent = 'N/A';
+    }
+    log('ok', `account ok — stripe: ${s?.stripe_customer_id || '—'}`);
+  } catch (e) { log('err', 'account: ' + e.message); }
+}
+
+async function loadNotifCount() {
+  try {
+    const { res, data } = await api('GET', '/notifications');
+    if (!res.ok) return;
+    const items = data?.data ?? (Array.isArray(data) ? data : []);
+    const unread = items.filter(n => !n.read_at).length;
+    setUnreadBadge(unread);
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════════════
+// PAYMENT (Stripe)
+// ═══════════════════════════════════════════════════════
+async function loadPaymentMethods() {
+  log('info', 'GET /stripe/payment-methods');
+  try {
+    const { res, data } = await api('GET', '/stripe/payment-methods');
+    if (!res.ok) throw new Error('API ' + res.status);
+    const methods = data.data;
+    if (!methods?.length) throw new Error('Nenhum método disponível.');
+    renderMethods(methods);
+    selectMethod(methods[0]);
+    log('ok', `${methods.length} método(s) carregado(s)`);
+  } catch (e) { log('err', e.message); }
+}
+
+function renderMethods(methods) {
+  document.getElementById('methods-container').innerHTML = methods.map((m, i) =>
+    `<label class="pm-option">
+       <input type="radio" name="pm" value="${m.id}" ${i===0?'checked':''}/>
+       ${m.label || m.payment_method}
+     </label>`
+  ).join('');
+  document.querySelectorAll('#methods-container input').forEach((inp, i) => {
+    inp.addEventListener('change', () => selectMethod(methods[i]));
+  });
+}
+
+function selectMethod(method) {
+  selectedMethod = method;
+  log('info', `método: ${method.label || method.payment_method}`);
+  mountElement(method.payment_method);
+}
+
+function getCurrency()     { return document.getElementById('currency-select').value; }
+function onCurrencyChange(){ if (selectedMethod) mountElement(selectedMethod.payment_method); }
+
+function mountElement(pmType) {
+  const amount   = (parseInt(document.getElementById('amount').value) || 10) * 100;
+  elements       = stripe.elements({ appearance: stripeAppearance, mode:'payment', amount, currency: getCurrency(), paymentMethodTypes:[pmType] });
+  const el       = elements.create('payment');
+  document.getElementById('payment-element').innerHTML = '';
+  el.mount('#payment-element');
+  log('info', `element montado: ${pmType} — teste: 4242 4242 4242 4242`);
+}
+
+async function run() {
+  if (!selectedMethod) { toast('err', 'Selecione um método.'); return; }
+  const btn = document.getElementById('btn-pay');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Processando...';
+
+  try {
+    const amount = parseInt(document.getElementById('amount').value) * 100;
+    log('info', 'validando elemento...');
+    const { error: submitErr } = await elements.submit();
+    if (submitErr) throw submitErr;
+
+    log('info', `POST /stripe/create-intent-payment — amount:${amount} method:${selectedMethod.id}`);
+    const { res, data } = await api('POST', '/stripe/create-intent-payment', {
+      amount, payment_method_id: selectedMethod.id, currency: getCurrency(),
+    });
+    if (!res.ok) throw new Error(`API ${res.status}: ${data.message || ''}`);
+    const clientSecret = data.client_secret;
+    const piId         = data.transaction?.stripe_payment_intent_id ?? '—';
+    if (!clientSecret) throw new Error('client_secret não encontrado');
+    log('ok', `intent criado: ${piId}`);
+
+    log('info', 'confirmando pagamento...');
+    const { error: confirmErr, paymentIntent } = await stripe.confirmPayment({
+      elements, clientSecret,
+      confirmParams: { return_url:'https://localhost' },
+      redirect: 'if_required',
+    });
+    if (confirmErr) throw confirmErr;
+    log('ok', `pago! status: ${paymentIntent.status}`);
+    log('warn', 'aguarda webhook para creditar a wallet');
+    toast('ok', `Pagamento ${paymentIntent.status}`);
+    setTimeout(loadDashboard, 3000);
+  } catch (e) {
+    log('err', e.message || JSON.stringify(e));
+    toast('err', e.message || 'Erro desconhecido');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> Pagar';
+}
+
+async function getFundingInstructions() {
+  const btn = document.getElementById('btn-get-funding');
+  btn.disabled = true;
+  log('info', 'GET /stripe/get-funding-instructions');
+  try {
+    const { res, data } = await api('GET', '/stripe/get-funding-instructions');
+    if (!res.ok) throw new Error(data.message || 'HTTP ' + res.status);
+    const d = data.data;
+    if (!d?.funding_type) { log('warn', 'funding não criado para esta conta'); toast('err', 'Funding não encontrado.'); btn.disabled = false; return; }
+    log('ok', `tipo:${d.bank_transfer_type||'—'} | iban:${d.funding_iban||'—'} | bic:${d.funding_bic||'—'} | titular:${d.funding_account_holder_name||'—'}`);
+    (d.funding_financial_addresses||[]).forEach(a => log('info', `address[${a.type}]: ${JSON.stringify(a[a.type]??a)}`));
+    toast('ok', 'Funding instructions carregadas.');
+  } catch (e) { log('err', e.message); toast('err', e.message); }
+  btn.disabled = false;
+}
+
+async function getAccount() {
+  const btn = document.getElementById('btn-account');
+  btn.disabled = true;
+  log('info', 'GET /account');
+  try {
+    const { res, data } = await api('GET', '/account');
+    if (!res.ok) throw new Error(data.message || 'HTTP ' + res.status);
+    const s = data.stripe, w = data.wallester;
+    if (s) log('ok', `Stripe — customer:${s.stripe_customer_id} | viban:${s.viban||'—'} | iban:${s.funding_iban||'—'} | bic:${s.funding_bic||'—'} | status:${s.status}`);
+    if (w) log('ok', `Wallester — id:${w.wallester_account_id} | iban:${w.iban||'—'} | status:${w.status}`);
+    if (!s && !w) log('warn', 'nenhuma conta associada');
+    toast('ok', 'Account info carregada.');
+  } catch (e) { log('err', e.message); toast('err', e.message); }
+  btn.disabled = false;
+}
+
+async function createFunding() {
+  const btn = document.getElementById('btn-funding');
+  btn.disabled = true;
+  log('info', 'POST /stripe/create-funding');
+  try {
+    const { res, data } = await api('POST', '/stripe/create-funding');
+    if (!res.ok) throw new Error(data.message || 'HTTP ' + res.status);
+    const f    = data.data;
+    const addr = f?.bank_transfer?.financial_addresses?.[0];
+    const iban = addr?.iban?.iban ?? addr?.sort_code?.account_number ?? '—';
+    log('ok', `funding criado — tipo:${f?.bank_transfer?.type||'—'} | iban/ref:${iban}`);
+    toast('ok', 'Funding criado! IBAN: ' + iban);
+    if (currentScreen === 'topup') loadTopup();
+  } catch (e) { log('err', e.message); toast('err', e.message); }
+  btn.disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════
+// TOP-UP
+// ═══════════════════════════════════════════════════════
+async function loadTopup() {
+  const body = document.getElementById('topup-body');
+  body.innerHTML = `<div class="empty-state"><div class="spin dark"></div><p>Carregando instruções...</p></div>`;
+  log('info', 'GET /stripe/get-funding-instructions');
+  try {
+    const { res, data } = await api('GET', '/stripe/get-funding-instructions');
+    if (!res.ok) throw new Error(data.message || 'HTTP ' + res.status);
+    const d = data.data;
+
+    if (!d?.funding_type) {
+      body.innerHTML = `
+        <div class="no-vban-card">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <p>Você ainda não possui uma conta virtual (VBAN). Crie agora para receber transferências bancárias.</p>
+        </div>
+        <button class="btn-create" id="btn-create-topup" onclick="createFundingFromTopup()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          Criar Conta Virtual
+        </button>`;
+      log('warn', 'nenhum funding encontrado para esta conta');
+      return;
+    }
+
+    const addrs = d.funding_financial_addresses ?? [];
+    const ibanAddr = addrs.find(a => a.type === 'iban') ?? addrs[0];
+
+    const iban    = d.funding_iban    ?? ibanAddr?.iban?.iban ?? '—';
+    const bic     = d.funding_bic     ?? ibanAddr?.iban?.bic  ?? '—';
+    const holder  = d.funding_account_holder_name ?? '—';
+    const country = d.funding_country ?? '—';
+    const type    = d.bank_transfer_type ?? d.funding_type ?? '—';
+
+    body.innerHTML = `
+      <div class="vban-card">
+        <div class="vban-top">
+          <span class="vban-title">Conta Virtual</span>
+          <span class="vban-type-badge">${type.toUpperCase()}</span>
+        </div>
+        <div class="vban-field">
+          <div class="vban-field-label">IBAN</div>
+          <div class="vban-field-row">
+            <span class="vban-field-value">${iban}</span>
+            <button class="copy-btn" onclick="copyText('${iban}', this)">Copiar</button>
+          </div>
+        </div>
+        <div class="vban-field">
+          <div class="vban-field-label">BIC / SWIFT</div>
+          <div class="vban-field-row">
+            <span class="vban-field-value">${bic}</span>
+            <button class="copy-btn" onclick="copyText('${bic}', this)">Copiar</button>
+          </div>
+        </div>
+        <div class="vban-field">
+          <div class="vban-field-label">Titular</div>
+          <span class="vban-field-value">${holder}</span>
+        </div>
+        <div class="vban-field">
+          <div class="vban-field-label">País</div>
+          <span class="vban-field-value">${country.toUpperCase()}</span>
+        </div>
+      </div>
+      ${addrs.length > 0 ? renderFinancialAddresses(addrs) : ''}
+      <div style="padding:0">
+        <div class="section-title" style="margin-bottom:10px">Informações adicionais</div>
+        <div class="info-card">
+          <div class="info-row"><span class="info-label">Tipo de funding</span><span class="info-value">${d.funding_type||'—'}</span></div>
+          <div class="info-row"><span class="info-label">Transfer type</span><span class="info-value">${type}</span></div>
+          <div class="info-row"><span class="info-label">País</span><span class="info-value">${country.toUpperCase()}</span></div>
+          <div class="info-row"><span class="info-label">Endereços</span><span class="info-value">${addrs.length}</span></div>
+        </div>
+      </div>`;
+    log('ok', `topup ok — iban:${iban} | bic:${bic}`);
+  } catch (e) {
+    body.innerHTML = `<div class="empty-state"><p>Erro: ${e.message}</p></div>`;
+    log('err', 'topup: ' + e.message);
+  }
+}
+
+function renderFinancialAddresses(addrs) {
+  if (!addrs.length) return '';
+  return `
+    <div>
+      <div class="section-title" style="margin-bottom:10px">Endereços financeiros</div>
+      <div class="info-card">
+        ${addrs.map(a => {
+          const detail = a[a.type] ?? {};
+          return `<div class="info-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+            <span class="info-label" style="text-transform:uppercase;font-weight:700">${a.type}</span>
+            ${Object.entries(detail).map(([k,v]) =>
+              `<div style="display:flex;justify-content:space-between;width:100%;font-size:11px">
+                 <span style="color:var(--s400)">${k}</span>
+                 <span style="font-family:'Fira Code',monospace;color:var(--s700);max-width:55%;text-align:right;word-break:break-all">${v}</span>
+               </div>`
+            ).join('')}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+async function createFundingFromTopup() {
+  const btn = document.getElementById('btn-create-topup');
+  if (btn) btn.disabled = true;
+  log('info', 'POST /stripe/create-funding');
+  try {
+    const { res, data } = await api('POST', '/stripe/create-funding');
+    if (!res.ok) throw new Error(data.message || 'HTTP ' + res.status);
+    const f    = data.data;
+    const addr = f?.bank_transfer?.financial_addresses?.[0];
+    const iban = addr?.iban?.iban ?? addr?.sort_code?.account_number ?? '—';
+    log('ok', `funding criado — tipo:${f?.bank_transfer?.type||'—'} | iban:${iban}`);
+    toast('ok', 'Conta virtual criada!');
+    await loadTopup();
+  } catch (e) {
+    log('err', e.message);
+    toast('err', e.message);
+    if (btn) btn.disabled = false;
+  }
+}
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copiado!';
+    log('info', `copiado: ${text}`);
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// PROFILE
+// ═══════════════════════════════════════════════════════
+async function loadProfile() {
+  log('info', 'GET /customer/me + /account');
+  document.getElementById('profile-body').innerHTML =
+    `<div class="empty-state"><div class="spin dark"></div><p>Carregando...</p></div>`;
+
+  try {
+    const [meR, accR, sysR] = await Promise.all([
+      api('GET', '/customer/me'),
+      api('GET', '/account'),
+      api('GET', '/basic-system-info'),
+    ]);
+
+    const c = meR.data?.data ?? meR.data?.customer ?? meR.data ?? {};
+    const name   = c.name || c.full_name || c.first_name || 'Usuário';
+    const email  = c.email || '—';
+    const initials = name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+    const status = c.status || 'unknown';
+
+    document.getElementById('profile-avatar').textContent = initials;
+    document.getElementById('profile-name').textContent   = name;
+    document.getElementById('profile-email').textContent  = email;
+    document.getElementById('profile-badge').innerHTML    = `<span class="badge ${status}">${status}</span>`;
+    document.getElementById('dash-name').textContent      = name.split(' ')[0];
+
+    const typeLabel = c.type === 'corporate' ? 'Pessoa Jurídica' : c.type === 'retail' ? 'Pessoa Física' : c.type || '—';
+    const docStatus = c.doc_status || '—';
+    const emailV    = c.email_verified_at
+      ? '<span style="color:#059669">✓ Verificado</span>'
+      : '<span style="color:#d97706">✗ Pendente</span>';
+    const phoneV    = c.phone || '—';
+    const createdAt = c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '—';
+
+    const s = accR.data?.stripe, w = accR.data?.wallester;
+    const sys = sysR.data?.data ?? sysR.data ?? {};
+
+    const stripeBlock = s ? `
+      <div class="section-header"><span class="section-title">Stripe</span></div>
+      <div class="info-card">
+        <div class="info-row"><span class="info-label">Customer ID</span><span class="info-value mono">${s.stripe_customer_id||'—'}</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value">${s.status||'—'}</span></div>
+        ${s.funding_iban ? `<div class="info-row"><span class="info-label">IBAN</span><span class="info-value mono" style="font-size:10px">${s.funding_iban}</span></div>` : ''}
+        ${s.funding_bic  ? `<div class="info-row"><span class="info-label">BIC</span><span class="info-value mono">${s.funding_bic}</span></div>` : ''}
+        ${s.viban        ? `<div class="info-row"><span class="info-label">VBAN</span><span class="info-value mono">${s.viban}</span></div>` : ''}
+      </div>` : '';
+
+    const wallesterBlock = w ? `
+      <div class="section-header"><span class="section-title">Wallester</span></div>
+      <div class="info-card">
+        <div class="info-row"><span class="info-label">Account ID</span><span class="info-value mono">${w.wallester_account_id||'—'}</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value">${w.status||'—'}</span></div>
+        ${w.iban ? `<div class="info-row"><span class="info-label">IBAN</span><span class="info-value mono" style="font-size:10px">${w.iban}</span></div>` : ''}
+      </div>` : '';
+
+    const sysBlock = Object.keys(sys).length ? `
+      <div class="section-header"><span class="section-title">Sistema</span></div>
+      <div class="info-card">
+        ${Object.entries(sys).slice(0,6).map(([k,v]) =>
+          `<div class="info-row"><span class="info-label">${k}</span><span class="info-value">${v}</span></div>`
+        ).join('')}
+      </div>` : '';
+
+    document.getElementById('profile-body').innerHTML = `
+      <div>
+        <div class="section-header"><span class="section-title">Cliente</span></div>
+        <div class="info-card">
+          <div class="info-row"><span class="info-label">Nome</span><span class="info-value">${name}</span></div>
+          <div class="info-row"><span class="info-label">Tipo</span><span class="info-value">${typeLabel}</span></div>
+          <div class="info-row"><span class="info-label">Telefone</span><span class="info-value">${phoneV}</span></div>
+          <div class="info-row"><span class="info-label">E-mail</span><span class="info-value">${emailV}</span></div>
+          <div class="info-row"><span class="info-label">Documento</span><span class="info-value">${docStatus}</span></div>
+          <div class="info-row"><span class="info-label">Membro desde</span><span class="info-value">${createdAt}</span></div>
+        </div>
+      </div>
+      ${stripeBlock ? `<div>${stripeBlock}</div>` : ''}
+      ${wallesterBlock ? `<div>${wallesterBlock}</div>` : ''}
+      ${sysBlock ? `<div>${sysBlock}</div>` : ''}
+      <button class="btn-logout" onclick="doLogout()">Encerrar sessão</button>`;
+
+    log('ok', `perfil ok — ${name} | ${status} | ${typeLabel}`);
+    if (s) log('ok', `stripe: ${s.stripe_customer_id} | status: ${s.status}`);
+    if (w) log('ok', `wallester: ${w.wallester_account_id} | status: ${w.status}`);
+  } catch (e) {
+    document.getElementById('profile-body').innerHTML =
+      `<div class="empty-state"><p>Erro: ${e.message}</p></div><button class="btn-logout" onclick="doLogout()">Encerrar sessão</button>`;
+    log('err', 'perfil: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════════════════
+async function loadNotifications() {
+  const list = document.getElementById('notif-list');
+  list.innerHTML = `<div class="empty-state"><div class="spin dark"></div></div>`;
+  log('info', 'GET /notifications');
+  try {
+    const { res, data } = await api('GET', '/notifications');
+    if (!res.ok) throw new Error('API ' + res.status);
+    const items = data?.data ?? (Array.isArray(data) ? data : []);
+    setUnreadBadge(items.filter(n => !n.read_at).length);
+
+    if (!items.length) {
+      list.innerHTML = `<div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <p>Nenhuma notificação</p></div>`;
+      return;
+    }
+
+    list.innerHTML = items.map(n => {
+      const read  = !!n.read_at;
+      const title = n.data?.title ?? n.type?.split('\\').pop() ?? 'Notificação';
+      const body  = n.data?.message ?? n.data?.body ?? '';
+      const time  = n.created_at
+        ? new Date(n.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})
+        : '';
+      return `<div class="notif-item${read?'':' unread'}" onclick="readNotif('${n.id}', this)">
+        ${read ? '<div style="width:7px;flex-shrink:0"></div>' : '<div class="notif-unread-dot"></div>'}
+        <div class="notif-icon-wrap">🔔</div>
+        <div class="notif-content">
+          <div class="notif-title">${title}</div>
+          ${body ? `<div class="notif-body">${body}</div>` : ''}
+          <div class="notif-time">${time}</div>
+        </div>
+      </div>`;
+    }).join('');
+    log('ok', `${items.length} notificação(ões) — ${items.filter(n=>!n.read_at).length} não lidas`);
+  } catch (e) {
+    list.innerHTML = `<div class="empty-state"><p>Erro: ${e.message}</p></div>`;
+    log('err', 'notificações: ' + e.message);
+  }
+}
+
+async function readNotif(id, el) {
+  el.classList.remove('unread');
+  el.querySelector('.notif-unread-dot')?.remove();
+  const dot = document.createElement('div');
+  dot.style.cssText = 'width:7px;flex-shrink:0';
+  el.insertBefore(dot, el.firstChild);
+  await api('POST', `/notifications/${id}/read`);
+  setUnreadBadge(Math.max(0, unreadCount - 1));
+  log('info', `notif ${id} marcada como lida`);
+}
+
+async function markAllRead() {
+  log('info', 'POST /notifications/read-all');
+  try {
+    const { res } = await api('POST', '/notifications/read-all');
+    if (!res.ok) throw new Error('API ' + res.status);
+    document.querySelectorAll('.notif-item.unread').forEach(el => {
+      el.classList.remove('unread');
+      const dot = el.querySelector('.notif-unread-dot');
+      if (dot) { const placeholder = document.createElement('div'); placeholder.style.cssText='width:7px;flex-shrink:0'; el.replaceChild(placeholder, dot); }
+    });
+    setUnreadBadge(0);
+    log('ok', 'todas as notificações marcadas como lidas');
+    toast('ok', 'Tudo marcado como lido.');
+  } catch (e) { log('err', e.message); }
+}
+
+// ── Enter on login ─────────────────────────────────────
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+</script>
+</body>
+</html>

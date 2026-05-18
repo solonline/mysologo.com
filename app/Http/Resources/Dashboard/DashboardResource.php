@@ -10,7 +10,7 @@ class DashboardResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'balance'      => $this->resource['balance'],
+            'balances'      => $this->resource['balances'],
             'transactions' => DashboardTransactionResource::collection($this->resource['transactions']),
         ];
     }

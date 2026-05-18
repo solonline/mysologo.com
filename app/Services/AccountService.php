@@ -2,16 +2,12 @@
 
 namespace App\Services;
 
-use App\Exceptions\ApiException;
-use App\Exceptions\ErrorCode;
 use App\Models\Customer;
-use Illuminate\Support\Facades\Log;
+use App\Models\CustomerBalance;
 
 class AccountService
 {
-    public function __construct(protected StripeService $stripeService)
-    {
-    }
+    public function __construct() {}
 
     public function getDetails(Customer $customer): array
     {
@@ -50,51 +46,17 @@ class AccountService
         ];
     }
 
-    public function getBalances(Customer $customer): array
+    public function getBalances(Customer $customer, ?string $currency = null): array
     {
-        $stripeBalance    = $this->getStripeBalance($customer);
-        $wallesterBalance = $this->getWallesterBalance($customer);
-
-        return [
-            'stripe'    => $stripeBalance,
-            'wallester' => $wallesterBalance,
-        ];
-    }
-
-    private function getStripeBalance(Customer $customer): ?array
-    {
-        $stripeAccount = $customer->stripeAccount;
-
-        if (! $stripeAccount) {
-            return null;
-        }
-
-        try {
-            return $this->stripeService->getCashBalance($stripeAccount->stripe_customer_id);
-        } catch (ApiException $e) {
-            Log::warning('Falha ao obter saldo Stripe para account details', [
-                'customer_id' => $customer->id,
-                'message'     => $e->getMessage(),
-            ]);
-            return null;
-        }
-    }
-
-    private function getWallesterBalance(Customer $customer): ?array
-    {
-        $wallesterAccount = $customer->wallesterAccounts;
-
-        if (! $wallesterAccount) {
-            return null;
-        }
-
-        return [
-            'balance'          => $wallesterAccount->balance,
-            'available_amount' => $wallesterAccount->available_amount,
-            'blocked_amount'   => $wallesterAccount->blocked_amount,
-            'credit_limit'     => $wallesterAccount->credit_limit,
-            'used_credit'      => $wallesterAccount->used_credit,
-            'currency_code'    => $wallesterAccount->currency_code,
-        ];
+        return CustomerBalance::where('customer_id', $customer->id)
+            ->when($currency, fn($q) => $q->where('currency', strtolower($currency)))
+            ->get()
+            ->map(fn($b) => [
+                'currency'  => strtoupper($b->currency),
+                'available' => $b->available,
+                'pending'   => $b->pending,
+            ])
+            ->values()
+            ->toArray();
     }
 }

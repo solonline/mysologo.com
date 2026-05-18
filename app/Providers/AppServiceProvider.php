@@ -112,7 +112,8 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(\App\Services\DashboardService::class, function ($app) {
             return new \App\Services\DashboardService(
-                $app->make(\App\Contracts\TransactionRepositoryInterface::class)
+                $app->make(\App\Contracts\TransactionRepositoryInterface::class),
+                $app->make(\App\Services\AccountService::class)
             );
         });
 

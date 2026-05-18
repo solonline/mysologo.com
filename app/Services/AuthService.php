@@ -113,6 +113,14 @@ class AuthService
             $kycRequired = $customer->doc_status;
             $message = $kyc['message'] ?? null;
         }
+        \Log::info('customer data', [
+            'customer_id' => $customer->id,
+            'email_verified' => $validatedEmail,
+            'document_verified' => $validatedDocument,
+            'phone' => $customer->phone,
+            'kyc_required' => $kycRequired,
+            'requires_responsible' => $requiresResponsible,
+        ]);
 
         return [
             'user' => $customer,
@@ -122,7 +130,7 @@ class AuthService
             'kyc_status' => $kycRequired,
             'email_verified' => $validatedEmail,
             'document_verified' => $validatedDocument,
-            'phone_verified' => $this->phoneVerificationService->isVerified($customer, $customer->phone),
+            'phone_verified' => $customer->phone ? $this->phoneVerificationService->isVerified($customer, $customer->phone) : false,
             'message' => $message,
         ];
     }

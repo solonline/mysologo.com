@@ -21,6 +21,7 @@ class CustomerRepository implements CustomerRepositoryInterface
             'type'     => $dto->type,
             'name'     => $dto->name,
             'username' => $dto->username,
+            'phone'    => $dto->phone,
         ], fn($v) => !is_null($v)));
     }
 

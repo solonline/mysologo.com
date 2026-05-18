@@ -15,4 +15,12 @@ class TransactionRepository implements TransactionRepositoryInterface
             ->latest()
             ->get();
     }
+
+    public function getRecent(Customer $customer, int $limit = 10): Collection
+    {
+        return Transaction::where('customer_id', $customer->id)
+            ->latest()
+            ->limit($limit)
+            ->get();
+    }
 }

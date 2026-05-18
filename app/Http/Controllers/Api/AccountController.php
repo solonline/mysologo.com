@@ -22,7 +22,7 @@ class AccountController extends Controller
 
     public function balance(Request $request): JsonResponse
     {
-        $balances = $this->accountService->getBalances($request->user());
+        $balances = $this->accountService->getBalances($request->user(), $request->query('currency'));
 
         return response()->json($balances);
     }
