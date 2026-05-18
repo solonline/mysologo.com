@@ -4,6 +4,7 @@ namespace App\Services;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
+use App\Models\CustomerBalance;
 use App\Models\StripePaymentMethodFee;
 use App\Models\Transaction;
 use App\Providers\StripeProvider;
@@ -55,7 +56,7 @@ class StripeService
 
         if (!$stripeAccount) {
             throw new ApiException(
-                ErrorCode::STRIPE_CUSTOMER_CREATION_FAILED,
+                ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 422,
                 'Cliente não possui conta Stripe associada.'
             );
@@ -73,6 +74,15 @@ class StripeService
             );
         }
 
+        if (strtolower($currency) !== strtolower($feeConfig->currency)) {
+            throw new ApiException(
+                ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
+                422,
+                'Moeda incompatível com a configuração do método de pagamento.'
+            );
+        }
+
+        $currency = strtolower($currency);
         $fees = $feeConfig->calculateFees($amount);
 
         $result = $this->stripeProvider->createPaymentIntent([
@@ -91,6 +101,8 @@ class StripeService
             Log::warning('Falha ao criar payment intent no Stripe', [
                 'customer_id' => $customer->id,
                 'amount' => $amount,
+                'currency' => $currency,
+                'payment_method' => $feeConfig->payment_method,
                 'message' => $result['message'],
             ]);
             throw new ApiException(
@@ -102,23 +114,40 @@ class StripeService
 
         $intent = $result['data'];
 
-        $transaction = Transaction::create([
-            'customer_id' => $customer->id,
-            'stripe_payment_method_fee_id' => $feeConfig->id,
-            'type' => TransactionType::Stripe,
-            'direction' => TransactionDirection::Credit,
-            'stripe_payment_intent_id' => $intent['id'],
-            'payment_method_type' => $feeConfig->payment_method,
-            'amount' => $amount,
-            'stripe_fee' => $fees['stripe_fee'],
-            'platform_fee' => $fees['platform_fee'],
-            'net_amount' => $fees['net_amount'],
-            'currency' => strtoupper($currency),
-            'status' => 'pending',
-            'description' => $description,
-            'stripe_metadata' => $intent,
-            'stripe_created_at' => isset($intent['created']) ? now()->setTimestamp($intent['created']) : now(),
-        ]);
+        try {
+            $transaction = Transaction::create([
+                'customer_id' => $customer->id,
+                'stripe_payment_method_fee_id' => $feeConfig->id,
+                'type' => TransactionType::Stripe,
+                'direction' => TransactionDirection::Credit,
+                'stripe_payment_intent_id' => $intent['id'],
+                'payment_method_type' => $feeConfig->payment_method,
+                'amount' => $amount,
+                'stripe_fee' => $fees['stripe_fee'],
+                'platform_fee' => $fees['platform_fee'],
+                'net_amount' => $fees['net_amount'],
+                'currency' => strtoupper($currency),
+                'status' => 'pending',
+                'description' => $description,
+                'stripe_metadata' => $intent,
+                'stripe_created_at' => isset($intent['created'])
+                    ? \Carbon\Carbon::createFromTimestamp($intent['created'])
+                    : now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Falha ao registrar transaction após criar payment intent', [
+                'customer_id' => $customer->id,
+                'stripe_payment_intent_id' => $intent['id'],
+                'exception' => $e->getMessage(),
+            ]);
+            throw new ApiException(
+                ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
+                502,
+                'Erro ao registrar a transação. Payment intent criado no Stripe: ' . $intent['id']
+            );
+        }
+
+        $this->incrementBalance($customer->id, strtoupper($currency), pending: $fees['net_amount']);
 
         return [
             'transaction' => $transaction,
@@ -335,7 +364,72 @@ class StripeService
             'stripe_metadata' => $intent,
         ]);
 
+        // pending → available para o customer
+        $this->incrementBalance(
+            $transaction->customer_id,
+            $transaction->currency,
+            available: $transaction->net_amount,
+            pending: -$transaction->net_amount,
+        );
+
+        $this->createPlatformTransfer($transaction);
+
         Log::info('Stripe webhook: payment_intent.succeeded', ['pi' => $intent['id'], 'transaction_id' => $transaction->id]);
+    }
+
+    private function  createPlatformTransfer(Transaction $sourceTransaction): void
+    {
+        $platformCustomer = Customer::where('type', 'platform')->first();
+
+        if (!$platformCustomer) {
+            Log::warning('Stripe webhook: conta platform não encontrada para transfer', [
+                'transaction_id' => $sourceTransaction->id,
+            ]);
+            return;
+        }
+
+        try {
+            Transaction::create([
+                'customer_id'                  => $platformCustomer->id,
+                'stripe_payment_method_fee_id' => $sourceTransaction->stripe_payment_method_fee_id,
+                'related_transaction_id'       => $sourceTransaction->id,
+                'type'                         => TransactionType::P2P,
+                'direction'                    => TransactionDirection::Credit,
+                'stripe_payment_intent_id'     => $sourceTransaction->stripe_payment_intent_id,
+                'stripe_charge_id'             => $sourceTransaction->stripe_charge_id,
+                'payment_method_type'          => $sourceTransaction->payment_method_type,
+                'amount'                       => $sourceTransaction->net_amount,
+                'stripe_fee'                   => 0,
+                'platform_fee'                 => 0,
+                'net_amount'                   => $sourceTransaction->net_amount,
+                'currency'                     => $sourceTransaction->currency,
+                'status'                       => 'succeeded',
+                'description'                  => "Platform transfer from transaction #{$sourceTransaction->id}",
+                'stripe_created_at'            => now(),
+            ]);
+
+            $this->incrementBalance(
+                $platformCustomer->id,
+                $sourceTransaction->currency,
+                available: $sourceTransaction->net_amount,
+            );
+        } catch (\Throwable $e) {
+            Log::error('Falha ao criar platform transfer transaction', [
+                'source_transaction_id' => $sourceTransaction->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function incrementBalance(int $customerId, string $currency, int $available = 0, int $pending = 0): void
+    {
+        $balance = CustomerBalance::firstOrCreate(
+            ['customer_id' => $customerId, 'currency' => strtoupper($currency)],
+            ['available' => 0, 'pending' => 0],
+        );
+
+        $balance->increment('available', $available);
+        $balance->increment('pending', $pending);
     }
 
     private function handlePaymentIntentFailed(array $intent): void
@@ -351,6 +445,13 @@ class StripeService
             'status' => 'failed',
             'stripe_metadata' => $intent,
         ]);
+
+        // reverte o pending do customer
+        $this->incrementBalance(
+            $transaction->customer_id,
+            $transaction->currency,
+            pending: -$transaction->net_amount,
+        );
 
         Log::info('Stripe webhook: payment_intent.payment_failed', ['pi' => $intent['id'], 'transaction_id' => $transaction->id]);
     }

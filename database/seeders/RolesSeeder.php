@@ -36,6 +36,11 @@ class RolesSeeder extends Seeder
             // Configurações
             'settings.view',
             'settings.edit',
+            // Taxas Stripe
+            'stripe_fees.view',
+            'stripe_fees.create',
+            'stripe_fees.edit',
+            'stripe_fees.delete',
         ];
 
         foreach ($permissions as $permission) {

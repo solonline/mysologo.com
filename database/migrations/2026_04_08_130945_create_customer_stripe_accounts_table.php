@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->string('stripe_customer_id')->unique();
             $table->string('stripe_payment_method_id')->nullable();
             $table->string('currency', 3)->default('EUR');
-            $table->string('viban')->nullable();
+            $table->string('viban')->nullable()->unique();
             $table->enum('status', ['active', 'inactive', 'blocked'])->default('active');
             $table->timestamps();
             $table->softDeletes();

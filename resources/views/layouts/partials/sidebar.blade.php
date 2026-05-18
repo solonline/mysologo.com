@@ -115,6 +115,16 @@
             <span x-show="!sidebarCollapsed" x-cloak class="text-sm font-medium">Relatórios</span>
         </a>
 
+        @can('stripe_fees.view')
+        <a href="{{ route('dashboard.stripe-fees') }}"
+           class="sidebar-item {{ request()->routeIs('dashboard.stripe-fees*') ? 'active' : '' }} flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:text-white transition-all duration-150 cursor-pointer group">
+            <svg class="sidebar-icon w-5 h-5 flex-shrink-0 transition-transform duration-150" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+            </svg>
+            <span x-show="!sidebarCollapsed" x-cloak class="text-sm font-medium">Taxas Stripe</span>
+        </a>
+        @endcan
+
         {{-- Section: Sistema --}}
         <div x-show="!sidebarCollapsed" x-cloak class="px-3 mb-2 mt-6">
             <span class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Sistema</span>

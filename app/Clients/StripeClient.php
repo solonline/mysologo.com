@@ -97,4 +97,36 @@ class StripeClient
         return $response->toArray();
     }
 
+    public function listPaymentMethods(string $type = 'card', string $customerId = null): array
+    {
+        $response = $this->stripe->paymentMethods->all([
+            'customer' => $customerId,
+            'type' => $type,
+        ]);
+
+        return $response->toArray();
+    }
+
+    /**
+     * Returns a map of payment_method_type => bool (available on this Stripe account),
+     * extracted from the default PaymentMethodConfiguration.
+     */
+    public function getPaymentMethodAvailability(): array
+    {
+        $configs = $this->stripe->paymentMethodConfigurations->all(['limit' => 1]);
+
+        if (empty($configs->data)) {
+            return [];
+        }
+
+        $availability = [];
+        foreach ($configs->data[0]->toArray() as $key => $value) {
+            if (\is_array($value) && \array_key_exists('available', $value)) {
+                $availability[$key] = (bool) $value['available'];
+            }
+        }
+
+        return $availability;
+    }
+
 }

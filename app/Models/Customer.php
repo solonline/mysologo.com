@@ -95,4 +95,9 @@ class Customer extends Model
     {
         return $this->hasMany(PhoneVerification::class)->orderBy('created_at', 'desc');
     }
+
+    public function balances()
+    {
+        return $this->hasMany(CustomerBalance::class);
+    }
 }

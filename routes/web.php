@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Dashboard\CustomerController;
 use App\Http\Controllers\Dashboard\RoleController;
 use App\Http\Controllers\Dashboard\SettingsController;
+use App\Http\Controllers\Dashboard\StripeFeeController;
 use App\Http\Controllers\Dashboard\UserController;
 
 // ==================== AUTH ====================
@@ -58,6 +59,20 @@ Route::prefix('dashboard')->name('dashboard')->middleware(['web', 'auth'])->grou
     // Settings
     Route::get('/settings', [SettingsController::class, 'index'])->name('.settings')->middleware('can:settings.view');
     Route::post('/settings', [SettingsController::class, 'update'])->name('.settings.update')->middleware('can:settings.edit');
+
+    // Stripe Fees
+    Route::middleware('can:stripe_fees.view')->group(function () {
+        Route::get('/stripe-fees', [StripeFeeController::class, 'index'])->name('.stripe-fees');
+    });
+    Route::middleware('can:stripe_fees.create')->group(function () {
+        Route::get('/stripe-fees/create', [StripeFeeController::class, 'create'])->name('.stripe-fees.create');
+        Route::post('/stripe-fees', [StripeFeeController::class, 'store'])->name('.stripe-fees.store');
+    });
+    Route::middleware('can:stripe_fees.edit')->group(function () {
+        Route::get('/stripe-fees/{stripeFee}/edit', [StripeFeeController::class, 'edit'])->name('.stripe-fees.edit');
+        Route::put('/stripe-fees/{stripeFee}', [StripeFeeController::class, 'update'])->name('.stripe-fees.update');
+    });
+    Route::delete('/stripe-fees/{stripeFee}', [StripeFeeController::class, 'destroy'])->name('.stripe-fees.destroy')->middleware('can:stripe_fees.delete');
 
     // Notifications (JSON — chamados via fetch pelo navbar)
     Route::get('/notifications', [\App\Http\Controllers\Dashboard\NotificationController::class, 'index'])->name('.notifications');
