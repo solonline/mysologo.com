@@ -48,10 +48,10 @@ class SettingsSeeder extends Seeder
             ['key' => 'stripe.webhook_secret',  'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => 'whsec_1234567890abcdef'],
             ['key' => 'stripe.url',             'label' => 'URL da API',              'type' => 'url',    'value' => 'https://api.stripe.com/v1'],
             // sms
-            ['key' => 'sms.base_url',    'label' => 'URL Base',   'type' => 'url',    'value' => 'https://dashboard.wausms.com/Api/rest'],
+            ['key' => 'sms.base_url',    'label' => 'URL Base',   'type' => 'url',    'value' => 'https://messaging.gatewayapi.com'],
             ['key' => 'sms.auth_token',  'label' => 'Auth Token', 'type' => 'secret', 'value' => ''],
-            ['key' => 'sms.username',    'label' => 'Username',   'type' => 'text',   'value' => 'your_sms_username_here'],
-            ['key' => 'sms.password',    'label' => 'Password',   'type' => 'secret', 'value' => 'your_sms_password_here'],
+            ['key' => 'sms.key',    'label' => 'key',   'type' => 'text',   'value' => ''],
+            ['key' => 'sms.secret',    'label' => 'Secret',   'type' => 'secret', 'value' => ''],
             // Social links
             ['key' => 'social.facebook',   'label' => 'Facebook URL',  'type' => 'url',    'value' => 'https://facebook.com/yooppayments'],
             ['key' => 'social.instagram',  'label' => 'Instagram URL', 'type' => 'url',    'value' => 'https://instagram.com/yooppayments'],

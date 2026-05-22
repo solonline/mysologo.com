@@ -2,221 +2,130 @@
 namespace App\Providers;
 
 use App\Clients\StripeClient;
-use App\Models\Customer;
+use Stripe\Exception\ApiConnectionException;
 use Stripe\Exception\ApiErrorException;
+use Stripe\Exception\AuthenticationException;
+use Stripe\Exception\CardException;
+use Stripe\Exception\InvalidRequestException;
+use Stripe\Exception\RateLimitException;
 
 class StripeProvider
 {
-    protected StripeClient $client;
-
-    public function __construct(StripeClient $client)
-    {
-        $this->client = $client;
-    }
+    public function __construct(protected StripeClient $client) {}
 
     public function createCustomer(array $customer): array
     {
-        $payload = [
-            'name' => $customer['name'] ?? null,
+        return $this->run('createCustomer', fn () => $this->client->createCustomer([
+            'name'  => $customer['name']  ?? null,
             'email' => $customer['email'] ?? null,
             'phone' => $customer['phone'] ?? null,
-        ];
-        try {
-            return $this->successResponse($this->client->createCustomer($payload));
-        } catch (ApiErrorException $e) {
-            \Log::warning('Falha ao criar customer no Stripe', [
-                'status' => $e->getHttpStatus(),
-                'message' => $e->getMessage(),
-                'customer_id' => $customer['id'] ?? null,
-            ]);
-            return $this->errorResponse($e->getMessage());
-        } catch (\Throwable $e) {
-            \Log::warning('Erro de comunicação com Stripe ao criar customer', [
-                'exception' => $e,
-                'customer_id' => $customer['id'] ?? null,
-            ]);
-            return $this->errorResponse('Erro de comunicação com Stripe.');
-        }
+        ]));
     }
 
     public function getCustomer(string $customerId): array
     {
-        try {
-            return $this->successResponse($this->client->getCustomer($customerId));
-        } catch (ApiErrorException $e) {
-            \Log::warning('Falha ao buscar customer no Stripe', [
-                'status' => $e->getHttpStatus(),
-                'message' => $e->getMessage(),
-                'customer_id' => $customerId,
-            ]);
-            return $this->errorResponse($e->getMessage());
-        } catch (\Throwable $e) {
-            \Log::warning('Erro de comunicação com Stripe ao buscar customer', [
-                'exception' => $e,
-                'customer_id' => $customerId,
-            ]);
-            return $this->errorResponse('Erro de comunicação com Stripe.');
-        }
+        return $this->run('getCustomer', fn () => $this->client->getCustomer($customerId));
     }
 
     public function createPaymentIntent(array $data): array
     {
-        try {
-            return $this->successResponse($this->client->createPaymentIntent($data));
-        } catch (ApiErrorException $e) {
-            \Log::warning('Falha ao criar payment intent no Stripe', [
-                'status' => $e->getHttpStatus(),
-                'message' => $e->getMessage(),
-                'data' => $data,
-            ]);
-            return $this->errorResponse($e->getMessage());
-        } catch (\Throwable $e) {
-            \Log::warning('Erro de comunicação com Stripe ao criar payment intent', [
-                'exception' => $e,
-                'data' => $data,
-            ]);
-            return $this->errorResponse('Erro de comunicação com Stripe.');
-        }
+        return $this->run('createPaymentIntent', fn () => $this->client->createPaymentIntent($data));
     }
 
     public function attachPaymentMethod(string $paymentMethodId, string $customerId): array
     {
-        try {
-            return $this->successResponse($this->client->attachPaymentMethod($paymentMethodId, $customerId));
-        } catch (ApiErrorException $e) {
-            \Log::warning('Falha ao anexar payment method no Stripe', [
-                'status' => $e->getHttpStatus(),
-                'message' => $e->getMessage(),
-                'payment_method_id' => $paymentMethodId,
-                'customer_id' => $customerId,
-            ]);
-            return $this->errorResponse($e->getMessage());
-        } catch (\Throwable $e) {
-            \Log::warning('Erro de comunicação com Stripe ao anexar payment method', [
-                'exception' => $e,
-                'payment_method_id' => $paymentMethodId,
-                'customer_id' => $customerId,
-            ]);
-            return $this->errorResponse('Erro de comunicação com Stripe.');
-        }
+        return $this->run('attachPaymentMethod', fn () =>
+            $this->client->attachPaymentMethod($paymentMethodId, $customerId)
+        );
     }
 
     public function createSubscription(array $data): array
     {
-        try {
-            return $this->successResponse($this->client->createSubscription($data));
-        } catch (ApiErrorException $e) {
-            \Log::warning('Falha ao criar subscription no Stripe', [
-                'status' => $e->getHttpStatus(),
-                'message' => $e->getMessage(),
-                'data' => $data,
-            ]);
-            return $this->errorResponse($e->getMessage());
-        } catch (\Throwable $e) {
-            \Log::warning('Erro de comunicação com Stripe ao criar subscription', [
-                'exception' => $e,
-                'data' => $data,
-            ]);
-            return $this->errorResponse('Erro de comunicação com Stripe.');
-        }
+        return $this->run('createSubscription', fn () => $this->client->createSubscription($data));
     }
 
     public function cancelSubscription(string $subscriptionId): array
     {
-        try {
-            return $this->successResponse($this->client->cancelSubscription($subscriptionId));
-        } catch (ApiErrorException $e) {
-            \Log::warning('Falha ao cancelar subscription no Stripe', [
-                'status' => $e->getHttpStatus(),
-                'message' => $e->getMessage(),
-                'subscription_id' => $subscriptionId,
-            ]);
-            return $this->errorResponse($e->getMessage());
-        } catch (\Throwable $e) {
-            \Log::warning('Erro de comunicação com Stripe ao cancelar subscription', [
-                'exception' => $e,
-                'subscription_id' => $subscriptionId,
-            ]);
-            return $this->errorResponse('Erro de comunicação com Stripe.');
-        }
+        return $this->run('cancelSubscription', fn () => $this->client->cancelSubscription($subscriptionId));
     }
 
     public function getCashBalance(string $customerId): array
     {
-        try {
-            return $this->successResponse($this->client->getCashBalance($customerId));
-        } catch (ApiErrorException $e) {
-            \Log::warning('Falha ao buscar cash balance no Stripe', [
-                'status' => $e->getHttpStatus(),
-                'message' => $e->getMessage(),
-                'customer_id' => $customerId,
-            ]);
-            return $this->errorResponse($e->getMessage());
-        } catch (\Throwable $e) {
-            \Log::warning('Erro de comunicação com Stripe ao buscar cash balance', [
-                'exception' => $e,
-                'customer_id' => $customerId,
-            ]);
-            return $this->errorResponse('Erro de comunicação com Stripe.');
-        }
+        return $this->run('getCashBalance', fn () => $this->client->getCashBalance($customerId));
     }
 
     public function createCustomerFundingInstructions(string $customerId, array $data): array
     {
-
-        try {
-            return $this->successResponse($this->client->createCustomerFundingInstructions($customerId, $data));
-        } catch (ApiErrorException $e) {
-            \Log::warning('Falha ao criar funding instructions no Stripe', [
-                'status' => $e->getHttpStatus(),
-                'message' => $e->getMessage(),
-                'customer_id' => $customerId
-            ]);
-            return $this->errorResponse($e->getMessage());
-        } catch (\Throwable $e) {
-            \Log::warning('Erro de comunicação com Stripe ao criar funding instructions', [
-                'exception' => $e,
-                'customer_id' => $customerId
-            ]);
-            return $this->errorResponse('Erro de comunicação com Stripe.');
-        }
+        return $this->run('createCustomerFundingInstructions', fn () =>
+            $this->client->createCustomerFundingInstructions($customerId, $data)
+        );
     }
 
     public function getCustomerFundingInstructions(string $customerId): array
     {
+        return $this->run('getCustomerFundingInstructions', fn () =>
+            $this->client->getCustomerFundingInstructions($customerId)
+        );
+    }
+
+    public function getBalanceTransaction(string $balanceTransactionId): array
+    {
+        return $this->run('getBalanceTransaction', fn () =>
+            $this->client->getBalanceTransaction($balanceTransactionId)
+        );
+    }
+
+    // ── Private helpers ───────────────────────────────────
+
+    private function run(string $operation, callable $fn): array
+    {
         try {
-            return $this->successResponse($this->client->getCustomerFundingInstructions($customerId));
+            return $this->successResponse($fn());
+        } catch (CardException $e) {
+            return $this->handleStripeException($operation, $e, $e->getError()?->message ?? $e->getMessage());
+        } catch (RateLimitException $e) {
+            return $this->handleStripeException($operation, $e, 'Limite de requisições Stripe atingido.');
+        } catch (InvalidRequestException $e) {
+            return $this->handleStripeException($operation, $e, $e->getMessage());
+        } catch (AuthenticationException $e) {
+            return $this->handleStripeException($operation, $e, 'Erro de autenticação com o Stripe.');
+        } catch (ApiConnectionException $e) {
+            return $this->handleStripeException($operation, $e, 'Não foi possível conectar ao Stripe.');
         } catch (ApiErrorException $e) {
-            \Log::warning('Falha ao buscar funding instructions no Stripe', [
-                'status' => $e->getHttpStatus(),
-                'message' => $e->getMessage(),
-                'customer_id' => $customerId
-            ]);
-            return $this->errorResponse($e->getMessage());
+            return $this->handleStripeException($operation, $e, $e->getMessage());
         } catch (\Throwable $e) {
-            \Log::warning('Erro de comunicação com Stripe ao buscar funding instructions', [
-                'exception' => $e,
-                'customer_id' => $customerId
+            \Log::channel('stripe')->error("stripe_unexpected: {$operation}", [
+                'exception' => $e::class,
+                'message'   => $e->getMessage(),
             ]);
-            return $this->errorResponse('Erro de comunicação com Stripe.');
+            return $this->errorResponse('Erro inesperado na comunicação com o Stripe.');
         }
+    }
+
+    private function handleStripeException(string $operation, ApiErrorException $e, string $userMessage): array
+    {
+        $error = $e->getError();
+
+        \Log::channel('stripe')->error("stripe_error: {$operation}", \array_filter([
+            'http_status'  => $e->getHttpStatus(),
+            'request_id'   => $e->getRequestId(),
+            'type'         => $error?->type,
+            'code'         => $error?->code,
+            'decline_code' => $error?->decline_code,
+            'param'        => $error?->param,
+            'message'      => $e->getMessage(),
+        ]));
+
+        return $this->errorResponse($userMessage);
     }
 
     protected function successResponse(array $data): array
     {
-        return [
-            'status' => 'success',
-            'message' => null,
-            'data' => $data,
-        ];
+        return ['status' => 'success', 'message' => null, 'data' => $data];
     }
 
     protected function errorResponse(string $message): array
     {
-        return [
-            'status' => 'failed',
-            'message' => $message,
-            'data' => null,
-        ];
+        return ['status' => 'failed', 'message' => $message, 'data' => null];
     }
 }

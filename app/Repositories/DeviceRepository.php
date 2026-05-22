@@ -16,6 +16,13 @@ class DeviceRepository implements DeviceRepositoryInterface
             ->first();
     }
 
+    public function findByCustomerAndToken(Customer $customer, string $deviceToken): ?CustomerDevice
+    {
+        return CustomerDevice::where('customer_id', $customer->id)
+            ->where('device_token', $deviceToken)
+            ->first();
+    }
+
     public function save(CustomerDevice $device): void
     {
         $device->save();

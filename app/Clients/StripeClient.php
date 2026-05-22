@@ -14,9 +14,9 @@ class StripeClient
 
     public function __construct(protected SettingsService $settings)
     {
-        $this->secretKey = $this->settings->getByKey('stripe.secret_key');
+        $this->secretKey     = $this->settings->getByKey('stripe.secret_key');
         $this->webhookSecret = $this->settings->getByKey('stripe.webhook_secret');
-        $this->stripe = new Stripe($this->secretKey);
+        $this->stripe        = new Stripe($this->secretKey);
     }
 
     public function createCustomer(array $data): array
@@ -31,8 +31,7 @@ class StripeClient
 
     public function createPaymentIntent(array $data): array
     {
-        $intent = $this->stripe->paymentIntents->create($data);
-        return $intent->toArray();
+        return $this->stripe->paymentIntents->create($data)->toArray();
     }
 
     public function getPaymentIntent(string $paymentIntentId): array
@@ -55,62 +54,35 @@ class StripeClient
         return $this->stripe->subscriptions->cancel($subscriptionId)->toArray();
     }
 
-    public function constructWebhookEvent(string $payload, string $sigHeader): Event
-    {
-        if (empty($this->webhookSecret)) {
-            throw new \RuntimeException('Stripe is not configured: stripe_webhook_secret is missing.');
-        }
-
-        return Webhook::constructEvent($payload, $sigHeader, $this->webhookSecret);
-    }
-
-        /**
-     * Cria funding instructions para um customer usando o endpoint preview do Stripe
-     * @see https://stripe.com/docs/api/previews/funding_instructions_create_customer
-     */
     public function createCustomerFundingInstructions(string $customerId, array $data): array
     {
-        $headers = [
-            'Stripe-Version' => '2026-04-22.preview',
-        ];
-        $url = "/v1/customers/{$customerId}/funding_instructions";
-        $response = $this->stripe->request('post', $url, $data, ['headers' => $headers]);
-        return $response->toArray();
+        return $this->stripe->request('post', "/v1/customers/{$customerId}/funding_instructions", $data, [
+            'headers' => ['Stripe-Version' => '2026-04-22.preview'],
+        ])->toArray();
     }
 
     public function getCustomerFundingInstructions(string $customerId): array
     {
-        $headers = [
-            'Stripe-Version' => '2026-04-22.preview',
-        ];
-        $url = "/v1/customers/{$customerId}/funding_instructions";
-        $response = $this->stripe->request('get', $url, [], ['headers' => $headers]);
-        return $response->toArray();
+        return $this->stripe->request('get', "/v1/customers/{$customerId}/funding_instructions", [], [
+            'headers' => ['Stripe-Version' => '2026-04-22.preview'],
+        ])->toArray();
     }
 
-    /*
-    *
-    */
     public function getCashBalance(string $customerId): array
     {
-        $response = $this->stripe->customers->retrieveCashBalance($customerId);
-        return $response->toArray();
+        return $this->stripe->customers->retrieveCashBalance($customerId)->toArray();
     }
 
-    public function listPaymentMethods(string $type = 'card', string $customerId = null): array
+    public function getBalanceTransaction(string $balanceTransactionId): array
     {
-        $response = $this->stripe->paymentMethods->all([
-            'customer' => $customerId,
-            'type' => $type,
-        ]);
-
-        return $response->toArray();
+        return $this->stripe->balanceTransactions->retrieve($balanceTransactionId)->toArray();
     }
 
-    /**
-     * Returns a map of payment_method_type => bool (available on this Stripe account),
-     * extracted from the default PaymentMethodConfiguration.
-     */
+    public function listPaymentMethods(string $type = 'card', ?string $customerId = null): array
+    {
+        return $this->stripe->paymentMethods->all(['customer' => $customerId, 'type' => $type])->toArray();
+    }
+
     public function getPaymentMethodAvailability(): array
     {
         $configs = $this->stripe->paymentMethodConfigurations->all(['limit' => 1]);
@@ -121,7 +93,7 @@ class StripeClient
 
         $availability = [];
         foreach ($configs->data[0]->toArray() as $key => $value) {
-            if (\is_array($value) && \array_key_exists('available', $value)) {
+            if (is_array($value) && array_key_exists('available', $value)) {
                 $availability[$key] = (bool) $value['available'];
             }
         }
@@ -129,4 +101,12 @@ class StripeClient
         return $availability;
     }
 
+    public function constructWebhookEvent(string $payload, string $sigHeader): Event
+    {
+        if (empty($this->webhookSecret)) {
+            throw new \RuntimeException('Stripe is not configured: stripe_webhook_secret is missing.');
+        }
+
+        return Webhook::constructEvent($payload, $sigHeader, $this->webhookSecret);
+    }
 }

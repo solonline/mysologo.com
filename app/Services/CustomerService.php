@@ -50,6 +50,21 @@ class CustomerService
             ];
         });
     }
+    public function findByUsername(string $username, array $filters = [], ?int $excludeId = null): Customer
+    {
+        $customer = $this->customerRepository->findByUsername($username, $filters, $excludeId);
+
+        if (!$customer) {
+            throw new ApiException(
+                ErrorCode::CUSTOMER_NOT_FOUND,
+                404,
+                'Customer not found.'
+            );
+        }
+
+        return $customer;
+    }
+
     public function update(Customer $customer, UpdateCustomerDTO $dto)
     {
         return $this->customerRepository->updateCustomer($customer, $dto);
@@ -94,6 +109,18 @@ class CustomerService
         return $frontendUrl;
     }
 
+
+    public function uploadAvatar(Customer $customer, UploadedFile $file): Customer
+    {
+        $path = $this->storeFile(
+            $customer,
+            $file->getRealPath(),
+            'avatar',
+            $file->getClientOriginalExtension()
+        );
+
+        return $this->customerRepository->updateAvatar($customer, $path);
+    }
 
     public function uploadDocument(Customer $customer, UploadedFile $file, string $field, $country): array
     {

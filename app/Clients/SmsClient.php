@@ -8,39 +8,41 @@ use Illuminate\Support\Facades\Http;
 class SmsClient
 {
     protected string $baseUrl;
-    protected string $username;
-    protected string $password;
+    protected string $key;
+    protected string $secret;
+    protected string $authToken;
 
     public function __construct(protected SettingsService $settingsService)
     {
         $this->baseUrl = $this->settingsService->getByKey('sms.base_url');
-        $this->username = $this->settingsService->getByKey('sms.username');
-        $this->password = $this->settingsService->getByKey('sms.password');
+        $this->key = $this->settingsService->getByKey('sms.key');
+        $this->secret = $this->settingsService->getByKey('sms.secret');
+        $this->authToken = $this->settingsService->getByKey('sms.auth_token');
     }
 
-    /**
-     * Envia SMS via 360NRS
-     * @param array $to Números de destino
-     * @param string $from Remetente
-     * @param string $message Mensagem
-     * @return array
-     */
     public function sendSms(array $to, string $from, string $message): array
     {
-        $basicAuth = base64_encode($this->username . ':' . $this->password);
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Basic ' . $basicAuth,
-        ])->post($this->baseUrl . '/message', [
-            'to' => $to,
-            'from' => $from,
-            'message' => $message,
-        ]);
+        $results = [];
 
-        return [
-            'status' => $response->successful() ? 'success' : 'failed',
-            'body' => $response->json(),
-            'http_code' => $response->status(),
-        ];
+        foreach ($to as $number) {
+            $msisdn = (int) ltrim($number, '+');
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Token ' . $this->authToken,
+                'Content-Type'  => 'application/json',
+            ])->post($this->baseUrl . '/mobile/single', [
+                'recipient' => $msisdn,
+                'sender'    => $from,
+                'message'   => $message,
+            ]);
+
+            $results[] = [
+                'status'    => $response->successful() ? 'success' : 'failed',
+                'body'      => $response->json(),
+                'http_code' => $response->status(),
+            ];
+        }
+
+        return count($results) === 1 ? $results[0] : $results;
     }
 }

@@ -30,6 +30,16 @@ class CustomerRepository implements CustomerRepositoryInterface
         return Customer::where('email', $email)->first();
     }
 
+    public function findByUsername(string $username, array $filters = [], ?int $excludeId = null): ?Customer
+    {
+        return Customer::where('username', $username)
+            ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
+            ->when(isset($filters['type']), fn($q) => $q->where('type', $filters['type']))
+            ->when(isset($filters['status']), fn($q) => $q->where('status', $filters['status']))
+            ->when(isset($filters['doc_status']), fn($q) => $q->where('doc_status', $filters['doc_status']))
+            ->first();
+    }
+
     public function findById(int $id): ?Customer
     {
         return Customer::find($id);
@@ -43,6 +53,12 @@ class CustomerRepository implements CustomerRepositoryInterface
     public function save(Customer $customer): void
     {
         $customer->save();
+    }
+
+    public function updateAvatar(Customer $customer, string $path): Customer
+    {
+        $customer->update(['avatar' => $path]);
+        return $customer->fresh();
     }
 
     public function updateCustomer(Customer $customer, UpdateCustomerDTO $dto): Customer

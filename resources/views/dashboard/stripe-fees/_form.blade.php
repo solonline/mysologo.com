@@ -76,16 +76,16 @@
     </div>
 </div>
 
-{{-- Taxa Stripe --}}
+{{-- Taxa Stripe (Referência) --}}
 <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
     <div class="px-6 py-5 border-b border-slate-100">
-        <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">Taxa Stripe</h2>
-        <p class="text-xs text-slate-400 mt-1">Taxa cobrada diretamente pelo Stripe.</p>
+        <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">Taxa Stripe <span class="normal-case font-normal text-slate-400">(referência)</span></h2>
+        <p class="text-xs text-slate-400 mt-1">Usada apenas para estimativas no dashboard e simulação. O valor real vem do <code class="text-indigo-500">balance_transaction</code> após pagamento.</p>
     </div>
     <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
             <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                Percentagem <span class="text-red-400">*</span>
+                Percentagem
             </label>
             <div class="relative">
                 <input type="number" name="stripe_fee_percentage" step="0.01" min="0" max="100"
@@ -101,7 +101,7 @@
 
         <div>
             <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                Valor Fixo <span class="text-red-400">*</span>
+                Valor Fixo
             </label>
             <div class="relative">
                 <span id="currency_symbol_stripe" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">€</span>
@@ -181,41 +181,48 @@
         <div class="overflow-y-auto px-6 py-4">
             @php
             $stripeAvailability = $stripeAvailability ?? [];
-            // [id, label, note, stripe_pct (%), stripe_fixed (€)]
-            // Taxas sugeridas baseadas no preçário público da Stripe para a Europa/PT
+            // [id, label, note, group]
+            // Cartões: categorias internas (classificadas automaticamente no charge.updated)
+            // Outros: identificador Stripe directo
             $stripeMethods = [
-                ['card',              'Cartão EEA',           'Visa, Mastercard, Amex — emitidos na EEA',   1.5,  0.25],
-                ['sepa_debit',        'SEPA Direct Debit',    'Débito bancário em euros (Europa)',           0.8,  0.35],
-                ['multibanco',        'Multibanco',           'Portugal — referência gerada no ATM',         1.0,  0.25],
-                ['mb_way',            'MB WAY',               'Portugal — pagamento via app móvel',          1.5,  0.25],
-                ['bank_transfer',     'Transferência Bancária','Transferência SEPA/SWIFT manual',            0.5,  0.0 ],
-                ['ideal',             'iDEAL',                'Países Baixos',                              0.8,  0.25],
-                ['bancontact',        'Bancontact',           'Bélgica',                                    1.4,  0.25],
-                ['eps',               'EPS',                  'Áustria',                                    1.4,  0.25],
-                ['p24',               'Przelewy24',           'Polónia',                                    1.4,  0.25],
-                ['giropay',           'Giropay',              'Alemanha',                                   1.4,  0.25],
-                ['sofort',            'SOFORT',               'Europa — redirect banking',                  1.4,  0.25],
-                ['klarna',            'Klarna',               'Buy now, pay later',                         1.49, 0.25],
-                ['afterpay_clearpay', 'Afterpay / Clearpay',  'Buy now, pay later (UK/AU/US)',               2.0,  0.30],
-                ['link',              'Link by Stripe',       'Carteira digital do Stripe',                 1.5,  0.25],
-                ['paypal',            'PayPal',               'Carteira digital',                           1.9,  0.49],
-                ['revolut_pay',       'Revolut Pay',          'Carteira digital Revolut',                   1.2,  0.20],
-                ['amazon_pay',        'Amazon Pay',           'Carteira digital Amazon',                    1.5,  0.25],
-                ['cashapp',           'Cash App Pay',         'EUA',                                        2.5,  0.0 ],
-                ['us_bank_account',   'ACH Direct Debit',     'Débito bancário (EUA)',                      0.8,  0.0 ],
-                ['acss_debit',        'Pre-authorized Debit', 'Débito pré-autorizado (Canadá)',              0.75, 0.0 ],
-                ['becs_debit',        'BECS Direct Debit',    'Débito bancário (Austrália)',                 0.75, 0.0 ],
-                ['boleto',            'Boleto',               'Brasil',                                     1.5,  0.0 ],
-                ['oxxo',              'OXXO',                 'México',                                     1.9,  0.30],
-                ['alipay',            'Alipay',               'China',                                      1.5,  0.25],
-                ['wechat_pay',        'WeChat Pay',           'China',                                      1.5,  0.25],
-                ['grabpay',           'GrabPay',              'Sudeste Asiático',                           1.5,  0.25],
-                ['customer_balance',  'Saldo do Cliente',     'Saldo em conta no Stripe',                   0.0,  0.0 ],
+                // Cartões — categorias internas
+                ['card_eea',          'Cartão EEA',            'Visa/MC/Amex emitidos na EEA (AT,BE,DE,ES,FR,PT...)', 'card'],
+                ['card_uk',           'Cartão Reino Unido',    'Cartões emitidos no Reino Unido (GB)',                 'card'],
+                ['card_international','Cartão Internacional',  'Cartões fora da EEA e do Reino Unido',                'card'],
+                // Débito bancário
+                ['sepa_debit',        'SEPA Direct Debit',     'Débito bancário em euros (Europa)',     'bank'],
+                ['bank_transfer',     'Transferência Bancária','Transferência SEPA via VIBAN',          'bank'],
+                ['us_bank_account',   'ACH Direct Debit',      'Débito bancário (EUA)',                 'bank'],
+                ['acss_debit',        'Pre-authorized Debit',  'Débito pré-autorizado (Canadá)',        'bank'],
+                ['becs_debit',        'BECS Direct Debit',     'Débito bancário (Austrália)',           'bank'],
+                // Portugal
+                ['multibanco',        'Multibanco',            'Referência gerada no ATM',              'local'],
+                ['mb_way',            'MB WAY',                'Pagamento via app móvel',               'local'],
+                // Europa local
+                ['ideal',             'iDEAL',                 'Países Baixos',                        'local'],
+                ['bancontact',        'Bancontact',            'Bélgica',                              'local'],
+                ['eps',               'EPS',                   'Áustria',                              'local'],
+                ['p24',               'Przelewy24',            'Polónia',                              'local'],
+                ['giropay',           'Giropay',               'Alemanha',                             'local'],
+                ['sofort',            'SOFORT',                'Europa — redirect banking',            'local'],
+                // Carteiras digitais
+                ['link',              'Link by Stripe',        'Carteira digital do Stripe',           'wallet'],
+                ['paypal',            'PayPal',                'Carteira digital',                     'wallet'],
+                ['revolut_pay',       'Revolut Pay',           'Carteira digital Revolut',             'wallet'],
+                ['amazon_pay',        'Amazon Pay',            'Carteira digital Amazon',              'wallet'],
+                ['cashapp',           'Cash App Pay',          'EUA',                                  'wallet'],
+                // BNPL
+                ['klarna',            'Klarna',                'Buy now, pay later',                   'bnpl'],
+                ['afterpay_clearpay', 'Afterpay / Clearpay',   'Buy now, pay later (UK/AU/US)',        'bnpl'],
+                // Regional
+                ['boleto',            'Boleto',                'Brasil',                               'regional'],
+                ['oxxo',              'OXXO',                  'México',                               'regional'],
+                ['alipay',            'Alipay',                'China',                                'regional'],
+                ['wechat_pay',        'WeChat Pay',            'China',                                'regional'],
+                ['grabpay',           'GrabPay',               'Sudeste Asiático',                     'regional'],
+                // Interno
+                ['customer_balance',  'Saldo do Cliente',      'Saldo em conta no Stripe',             'internal'],
             ];
-            // Ordenar: disponíveis na conta Stripe primeiro
-            usort($stripeMethods, fn($a, $b) =>
-                ($stripeAvailability[$b[0]] ?? false) <=> ($stripeAvailability[$a[0]] ?? false)
-            );
             @endphp
 
             @if(empty($stripeAvailability))
@@ -230,26 +237,32 @@
                         <th class="pb-2 font-semibold">Identificador</th>
                         <th class="pb-2 font-semibold">Nome</th>
                         <th class="pb-2 font-semibold text-center">Disponível</th>
-                        <th class="pb-2 font-semibold text-right">Taxa sugerida</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
-                    @foreach($stripeMethods as [$id, $name, $note, $pct, $fixed])
-                    @php $available = $stripeAvailability[$id] ?? null; @endphp
+                    @foreach($stripeMethods as [$id, $name, $note, $group])
+                    @php
+                        $isCardCategory = $group === 'card';
+                        $available = $isCardCategory ? null : ($stripeAvailability[$id] ?? null);
+                    @endphp
                     <tr @unless($fee)
-                            onclick="selectPaymentMethod('{{ $id }}', '{{ $name }}', {{ $pct }}, {{ $fixed }})"
+                            onclick="selectPaymentMethod('{{ $id }}', '{{ $name }}')"
                             class="hover:bg-indigo-50 cursor-pointer group"
                         @else
                             class="hover:bg-slate-50/50"
                         @endunless
                         title="{{ $note }}">
-                        <td class="py-2.5 pr-3 font-mono text-indigo-600 font-medium">
+                        <td class="py-2.5 pr-3 font-mono font-medium {{ $isCardCategory ? 'text-violet-600' : 'text-indigo-600' }}">
                             {{ $id }}
-
+                            @if($isCardCategory)
+                                <span class="ml-1 text-[10px] font-sans text-violet-400 uppercase tracking-wide">interno</span>
+                            @endif
                         </td>
                         <td class="py-2.5 pr-3 text-slate-700">{{ $name }}</td>
-                        <td class="py-2.5 pr-3 text-center">
-                            @if($available === true)
+                        <td class="py-2.5 text-center">
+                            @if($isCardCategory)
+                                <span class="text-slate-300" title="Classificado automaticamente pelo país do cartão">auto</span>
+                            @elseif($available === true)
                                 <span class="inline-block w-2 h-2 rounded-full bg-emerald-400" title="Ativo na conta Stripe"></span>
                             @elseif($available === false)
                                 <span class="inline-block w-2 h-2 rounded-full bg-slate-200" title="Inativo na conta Stripe"></span>
@@ -257,16 +270,10 @@
                                 <span class="text-slate-300">—</span>
                             @endif
                         </td>
-                        <td class="py-2.5 text-right font-mono text-slate-500 whitespace-nowrap">
-                            {{ $pct }}% + €{{ number_format($fixed, 2) }}
-                        </td>
                     </tr>
                     @endforeach
                 </tbody>
             </table>
-            <p class="mt-3 text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
-                As taxas apresentadas são sugestões baseadas no preçário público da Stripe (EU/PT) e podem não refletir os valores negociados da sua conta. Verifique sempre no dashboard da Stripe.
-            </p>
         </div>
     </div>
 </div>
@@ -287,16 +294,12 @@
         updateSymbols(select.value);
     }
 
-    window.selectPaymentMethod = function (id, name, stripePct, stripeFixed) {
-        const methodInput      = document.getElementById('payment_method');
-        const labelInput       = document.querySelector('input[name="label"]');
-        const stripePctInput   = document.querySelector('input[name="stripe_fee_percentage"]');
-        const stripeFixedInput = document.querySelector('input[name="stripe_fee_fixed"]');
+    window.selectPaymentMethod = function (id, name) {
+        const methodInput = document.getElementById('payment_method');
+        const labelInput  = document.querySelector('input[name="label"]');
 
         if (methodInput) methodInput.value = id;
-        if (labelInput   && !labelInput.value)       labelInput.value       = name;
-        if (stripePctInput   && !stripePctInput.value)   stripePctInput.value   = stripePct;
-        if (stripeFixedInput && !stripeFixedInput.value) stripeFixedInput.value = stripeFixed;
+        if (labelInput && !labelInput.value) labelInput.value = name;
 
         document.getElementById('modal_payment_method_info').classList.add('hidden');
     };

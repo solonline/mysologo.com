@@ -17,7 +17,6 @@ class CreatePaymentIntentRequest extends FormRequest
             'amount'             => ['required', 'integer', 'min:1'],
             'payment_method_id'  => ['required', 'integer', 'exists:stripe_payment_method_fees,id'],
             'currency'           => ['sometimes', 'string', 'size:3'],
-            'description'        => ['sometimes', 'nullable', 'string', 'max:500'],
         ];
     }
 }

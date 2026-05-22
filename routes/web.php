@@ -4,6 +4,7 @@ use App\Services\WallesterService;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\EmailValidationController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Dashboard\AccountPayableController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Dashboard\CustomerController;
 use App\Http\Controllers\Dashboard\RoleController;
@@ -73,6 +74,25 @@ Route::prefix('dashboard')->name('dashboard')->middleware(['web', 'auth'])->grou
         Route::put('/stripe-fees/{stripeFee}', [StripeFeeController::class, 'update'])->name('.stripe-fees.update');
     });
     Route::delete('/stripe-fees/{stripeFee}', [StripeFeeController::class, 'destroy'])->name('.stripe-fees.destroy')->middleware('can:stripe_fees.delete');
+
+    // Accounts Payable
+    Route::middleware('can:accounts_payable.view')->group(function () {
+        Route::get('/accounts-payable', [AccountPayableController::class, 'index'])->name('.accounts-payable');
+        Route::get('/accounts-payable/{accountPayable}/edit', [AccountPayableController::class, 'edit'])->name('.accounts-payable.edit');
+        Route::get('/accounts-payable/{accountPayable}/attachments/{attachment}', [AccountPayableController::class, 'downloadAttachment'])->name('.accounts-payable.attachments.download');
+    });
+    Route::middleware('can:accounts_payable.create')->group(function () {
+        Route::get('/accounts-payable/create', [AccountPayableController::class, 'create'])->name('.accounts-payable.create');
+        Route::post('/accounts-payable', [AccountPayableController::class, 'store'])->name('.accounts-payable.store');
+    });
+    Route::middleware('can:accounts_payable.edit')->group(function () {
+        Route::put('/accounts-payable/{accountPayable}', [AccountPayableController::class, 'update'])->name('.accounts-payable.update');
+        Route::post('/accounts-payable/{accountPayable}/attachments', [AccountPayableController::class, 'storeAttachment'])->name('.accounts-payable.attachments.store');
+        Route::delete('/accounts-payable/{accountPayable}/attachments/{attachment}', [AccountPayableController::class, 'destroyAttachment'])->name('.accounts-payable.attachments.destroy');
+        Route::post('/accounts-payable/{accountPayable}/cancel', [AccountPayableController::class, 'cancel'])->name('.accounts-payable.cancel');
+    });
+    Route::post('/accounts-payable/{accountPayable}/paid', [AccountPayableController::class, 'markPaid'])->name('.accounts-payable.paid')->middleware('can:accounts_payable.pay');
+    Route::delete('/accounts-payable/{accountPayable}', [AccountPayableController::class, 'destroy'])->name('.accounts-payable.destroy')->middleware('can:accounts_payable.delete');
 
     // Notifications (JSON — chamados via fetch pelo navbar)
     Route::get('/notifications', [\App\Http\Controllers\Dashboard\NotificationController::class, 'index'])->name('.notifications');

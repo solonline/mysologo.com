@@ -21,6 +21,10 @@ class StripeWebhookController extends Controller
         $payload   = $request->getContent();
         $sigHeader = $request->header('Stripe-Signature');
 
+        Log::info('Recebido webhook Stripe', [
+            'event' => $request->input('type'),
+            'payload' => $payload,
+        ]);
         if (! $sigHeader) {
             return response()->json(['error' => 'Missing Stripe-Signature header'], 400);
         }
@@ -34,6 +38,6 @@ class StripeWebhookController extends Controller
 
         ProcessStripeWebhook::dispatch($event->toArray())->onQueue('stripe-webhooks');
 
-        return response()->json(['success' => true]);
+        return response()->json(['success' => true], 200);
     }
 }

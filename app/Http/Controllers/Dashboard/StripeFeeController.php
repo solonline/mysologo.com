@@ -60,17 +60,17 @@ class StripeFeeController extends Controller
                 'required', 'string', 'max:100',
                 Rule::unique('stripe_payment_method_fees')->where('currency', $request->input('currency')),
             ],
-            'label'                   => ['required', 'string', 'max:150'],
-            'stripe_fee_percentage'   => ['required', 'numeric', 'min:0', 'max:100'],
-            'stripe_fee_fixed'        => ['required', 'numeric', 'min:0'],
-            'platform_fee_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
-            'platform_fee_fixed'      => ['required', 'numeric', 'min:0'],
-            'currency'                => ['required', 'string', 'size:3', Rule::in($currencies)],
-            'is_active'               => ['boolean'],
+            'label'                    => ['required', 'string', 'max:150'],
+            'stripe_fee_percentage'    => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'stripe_fee_fixed'         => ['nullable', 'numeric', 'min:0'],
+            'platform_fee_percentage'  => ['required', 'numeric', 'min:0', 'max:100'],
+            'platform_fee_fixed'       => ['required', 'numeric', 'min:0'],
+            'currency'                 => ['required', 'string', 'size:3', Rule::in($currencies)],
+            'is_active'                => ['boolean'],
         ]);
 
-        $data['is_active'] = $request->boolean('is_active');
-        $data['stripe_fee_percentage']   = $data['stripe_fee_percentage'] / 100;
+        $data['is_active']               = $request->boolean('is_active');
+        $data['stripe_fee_percentage']   = ($data['stripe_fee_percentage']  ?? 0) / 100;
         $data['platform_fee_percentage'] = $data['platform_fee_percentage'] / 100;
 
         StripePaymentMethodFee::create($data);
@@ -89,25 +89,25 @@ class StripeFeeController extends Controller
 
     public function update(Request $request, StripePaymentMethodFee $stripeFee)
     {
-        $paymentMethods = json_decode($this->settingsService->getByKey('payment_methods.enabled'), true) ?: [];
         $currencies     = json_decode($this->settingsService->getByKey('currency.accepted'), true) ?: [];
 
         $data = $request->validate([
             'payment_method'          => [
                 'required', 'string', 'max:100',
-                Rule::in($paymentMethods),
                 Rule::unique('stripe_payment_method_fees')->where('currency', $request->input('currency'))->ignore($stripeFee->id),
             ],
-            'label'                   => ['required', 'string', 'max:150'],
-            'stripe_fee_percentage'   => ['required', 'numeric', 'min:0', 'max:1'],
-            'stripe_fee_fixed'        => ['required', 'numeric', 'min:0'],
-            'platform_fee_percentage' => ['required', 'numeric', 'min:0', 'max:1'],
-            'platform_fee_fixed'      => ['required', 'numeric', 'min:0'],
-            'currency'                => ['required', 'string', 'size:3', Rule::in($currencies)],
-            'is_active'               => ['boolean'],
+            'label'                    => ['required', 'string', 'max:150'],
+            'stripe_fee_percentage'    => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'stripe_fee_fixed'         => ['nullable', 'numeric', 'min:0'],
+            'platform_fee_percentage'  => ['required', 'numeric', 'min:0', 'max:100'],
+            'platform_fee_fixed'       => ['required', 'numeric', 'min:0'],
+            'currency'                 => ['required', 'string', 'size:3', Rule::in($currencies)],
+            'is_active'                => ['boolean'],
         ]);
 
-        $data['is_active'] = $request->boolean('is_active');
+        $data['is_active']               = $request->boolean('is_active');
+        $data['stripe_fee_percentage']   = ($data['stripe_fee_percentage']  ?? 0) / 100;
+        $data['platform_fee_percentage'] = $data['platform_fee_percentage'] / 100;
 
         $stripeFee->update($data);
 

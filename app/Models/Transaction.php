@@ -8,6 +8,26 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+/**
+ * @property int         $id
+ * @property int         $customer_id
+ * @property int|null    $stripe_payment_method_fee_id
+ * @property int|null    $related_transaction_id
+ * @property string      $type
+ * @property string      $direction
+ * @property string|null $stripe_payment_intent_id
+ * @property string|null $stripe_charge_id
+ * @property string      $payment_method_type
+ * @property int         $amount
+ * @property int         $stripe_fee
+ * @property int         $platform_fee
+ * @property int         $net_amount
+ * @property string      $currency
+ * @property string      $status
+ * @property string|null $description
+ * @property array|null  $stripe_metadata
+ * @property \Carbon\Carbon|null $stripe_created_at
+ */
 class Transaction extends Model
 {
     use HasFactory, SoftDeletes;
@@ -41,12 +61,21 @@ class Transaction extends Model
     ];
 
     protected $casts = [
-        'type'              => TransactionType::class,
         'direction'         => TransactionDirection::class,
         'stripe_metadata'   => 'array',
         'stripe_created_at' => 'datetime',
         'settles_at'        => 'datetime',
     ];
+
+    public function getTypeAttribute(mixed $value): ?TransactionType
+    {
+        return TransactionType::tryFrom((string) $value);
+    }
+
+    public function setTypeAttribute(TransactionType|string $value): void
+    {
+        $this->attributes['type'] = $value instanceof TransactionType ? $value->value : $value;
+    }
 
     public function customer()
     {

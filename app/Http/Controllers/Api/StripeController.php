@@ -20,6 +20,7 @@ class StripeController extends Controller
     {
         $methods = StripePaymentMethodFee::where('is_active', true)
             ->where('currency', strtoupper($request->query('currency', 'EUR')))
+            ->orderBy('id')
             ->get(['id', 'payment_method', 'label', 'stripe_fee_percentage', 'stripe_fee_fixed', 'platform_fee_percentage', 'platform_fee_fixed', 'currency']);
 
         return response()->json(['data' => $methods]);
@@ -35,8 +36,7 @@ class StripeController extends Controller
                 customer: $customer,
                 amount: $data['amount'],
                 paymentMethodFeeId: $data['payment_method_id'],
-                currency: $data['currency'] ?? 'eur',
-                description: $data['description'] ?? null,
+                currency: $data['currency'] ?? 'eur'
             );
         } catch (ApiException $e) {
             return response()->json($e->toArray(), $e->status);
@@ -68,6 +68,17 @@ class StripeController extends Controller
         }
 
         return response()->json(['data' => $instructions]);
+    }
+
+    public function feeEstimates(Request $request)
+    {
+        $currency = strtoupper($request->query('currency', 'EUR'));
+
+        $fees = StripePaymentMethodFee::where('is_active', true)
+            ->where('currency', $currency)
+            ->get(['payment_method', 'label', 'platform_fee_percentage', 'platform_fee_fixed', 'stripe_fee_percentage', 'stripe_fee_fixed']);
+
+        return response()->json(['data' => $fees, 'currency' => $currency]);
     }
 
 }

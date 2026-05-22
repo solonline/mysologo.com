@@ -3,8 +3,11 @@ namespace App\Services;
 
 use App\Contracts\DeviceRepositoryInterface;
 use App\DTOs\CreatePinDTO;
+use App\Exceptions\ApiException;
+use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
+use Illuminate\Support\Facades\Hash;
 
 class DeviceAuthService
 {
@@ -51,5 +54,54 @@ class DeviceAuthService
     public function isBlocked(CustomerDevice $device): bool
     {
         return !is_null($device->blocked_at);
+    }
+
+    public function hasPin(Customer $customer): bool
+    {
+        return $customer->devices()->whereNotNull('pin')->exists();
+    }
+
+    public function verifyPin(Customer $customer, string $deviceToken, string $pin): void
+    {
+        if (! $this->hasPin($customer)) {
+            throw new ApiException(
+                ErrorCode::PIN_NOT_CONFIGURED,
+                422,
+                'É necessário configurar um PIN antes de realizar transferências.',
+            );
+        }
+
+        $device = $this->deviceRepository->findByCustomerAndToken($customer, $deviceToken);
+
+        if (! $device || ! $device->pin) {
+            throw new ApiException(
+                ErrorCode::DEVICE_NOT_FOUND,
+                404,
+                'Dispositivo não encontrado.',
+            );
+        }
+
+        if ($this->isBlocked($device)) {
+            throw new ApiException(
+                ErrorCode::DEVICE_BLOCKED,
+                423,
+                'PIN bloqueado. Faça login convencional para desbloquear.',
+            );
+        }
+
+        if (! Hash::check($pin, $device->pin)) {
+            $this->registerFailedAttempt($device);
+            $this->deviceRepository->save($device);
+
+            throw new ApiException(
+                ErrorCode::INVALID_PIN,
+                401,
+                'PIN inválido.',
+            );
+        }
+
+        $this->resetAttempts($device);
+        $device->last_used_at = now();
+        $this->deviceRepository->save($device);
     }
 }

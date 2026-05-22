@@ -41,6 +41,12 @@ class RolesSeeder extends Seeder
             'stripe_fees.create',
             'stripe_fees.edit',
             'stripe_fees.delete',
+            // Contas a pagar
+            'accounts_payable.view',
+            'accounts_payable.create',
+            'accounts_payable.edit',
+            'accounts_payable.delete',
+            'accounts_payable.pay',
         ];
 
         foreach ($permissions as $permission) {
@@ -68,6 +74,7 @@ class RolesSeeder extends Seeder
             'customers.view', 'customers.create', 'customers.edit',
             'transactions.view',
             'reports.view',
+            'accounts_payable.view', 'accounts_payable.create', 'accounts_payable.edit', 'accounts_payable.pay',
         ]);
 
         // support — só leitura

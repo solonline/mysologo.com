@@ -20,16 +20,26 @@ class ApiException extends Exception
         if ($channel) {
             try {
                 $logData = [
-                    'file' => $this->getFile(),
-                    'line' => $this->getLine(),
-                    'status' => $status,
-                    // Se houver previous, loga a mensagem original, senão a customizada
+                    'reason'  => $reason,
+                    'status'  => $status,
                     'message' => $previous ? $previous->getMessage() : $this->getMessage(),
+                    'file'    => $this->getFile(),
+                    'line'    => $this->getLine(),
                 ];
-                // Se for erro de validação (422), loga resposta da API se disponível
-                if ($status === 422 && isset($reason) && is_array($reason)) {
-                    $logData['api_response'] = $reason;
+
+                // Contexto extra para erros do Stripe SDK
+                if ($previous instanceof \Stripe\Exception\ApiErrorException) {
+                    $stripeError            = $previous->getError();
+                    $logData['stripe']      = array_filter([
+                        'request_id'   => $previous->getRequestId(),
+                        'http_status'  => $previous->getHttpStatus(),
+                        'code'         => $stripeError?->code,
+                        'decline_code' => $stripeError?->decline_code,
+                        'param'        => $stripeError?->param,
+                        'type'         => $stripeError?->type,
+                    ]);
                 }
+
                 \Log::channel($channel)->error('ApiException', $logData);
             } catch (\Throwable $e) {
                 // fallback: não interrompe fluxo se canal não existir

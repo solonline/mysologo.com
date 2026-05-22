@@ -39,6 +39,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/create-corporate-responsible', [\App\Http\Controllers\Api\CustomerController::class, 'createResponsible']);
         Route::post('/submit-corporate-documents', [\App\Http\Controllers\Api\CustomerController::class, 'submitCorporateDocuments']);
         Route::post('/send-validation-email', [\App\Http\Controllers\Api\CustomerController::class, 'sendValidationEmail']);
+        Route::post('/upload-avatar', [\App\Http\Controllers\Api\CustomerController::class, 'uploadAvatar']);
+        Route::get('/find/{username}', [\App\Http\Controllers\Api\CustomerController::class, 'findByUsername'])->where('username', '[a-zA-Z0-9_]+');
          // Phone Verification
         Route::post('/phone/send', [\App\Http\Controllers\Api\Auth\PhoneVerificationController::class, 'send']);
         Route::post('/phone/validate', [\App\Http\Controllers\Api\Auth\PhoneVerificationController::class, 'validateCode']);
@@ -57,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::group(['prefix' => 'stripe'], function () {
             Route::get('/payment-methods', [\App\Http\Controllers\Api\StripeController::class, 'paymentMethods']);
+            Route::get('/fee-estimates', [\App\Http\Controllers\Api\StripeController::class, 'feeEstimates']);
             Route::post('/create-intent-payment', [\App\Http\Controllers\Api\StripeController::class, 'create']);
             Route::post('/create-funding', [\App\Http\Controllers\Api\StripeController::class, 'createFunding']);
             Route::get('/get-funding-instructions', [\App\Http\Controllers\Api\StripeController::class, 'getFundingInstructions']);
@@ -65,6 +68,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::group(['prefix' => 'account'], function () {
             Route::get('/', [\App\Http\Controllers\Api\AccountController::class, 'index']);
             Route::get('/balance', [\App\Http\Controllers\Api\AccountController::class, 'balance']);
+        });
+
+        Route::group(['prefix' => 'transactions'], function () {
+            Route::get('/', [\App\Http\Controllers\Api\TransactionController::class, 'index']);
+            Route::get('/{id}', [\App\Http\Controllers\Api\TransactionController::class, 'show'])->where('id', '[0-9]+');
+            Route::post('/p2p', [\App\Http\Controllers\Api\TransactionController::class, 'p2p']);
         });
 
         // Notifications

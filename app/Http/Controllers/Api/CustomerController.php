@@ -4,10 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\DTOs\CreateResponsibleDTO;
 use App\DTOs\UpdateCustomerDTO;
+use App\Enums\CustomerStatus;
+use App\Enums\DocumentStatus;
 use App\Http\Requests\CreateResponsibleRequest;
 use App\Http\Requests\SubmitCorporateDocumentRequest;
 use App\Http\Requests\Customer\UpdateCustomerRequest;
+use App\Http\Requests\Customer\FindByUsernameRequest;
+use App\Http\Requests\Customer\UploadAvatarRequest;
+use App\Http\Resources\PublicCustomerResource;
 use App\Services\CustomerService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
@@ -81,6 +87,33 @@ class CustomerController extends Controller
             $request->input('country')     // country
         );
         return response()->json($result, 201);
+    }
+
+    public function uploadAvatar(UploadAvatarRequest $request)
+    {
+        $customer = $this->customerService->uploadAvatar(
+            $request->user(),
+            $request->file('avatar')
+        );
+
+        return response()->json([
+            'avatar' => $customer->avatar,
+            'avatar_url' => asset('storage/' . $customer->avatar),
+        ]);
+    }
+
+    public function findByUsername(FindByUsernameRequest $request): JsonResponse
+    {
+        $customer = $this->customerService->findByUsername(
+            username:  $request->route('username'),
+            filters:   [
+                'status'     => CustomerStatus::ACTIVE,
+                'doc_status' => DocumentStatus::APPROVED,
+            ],
+            excludeId: $request->user()->id,
+        );
+
+        return response()->json(new PublicCustomerResource($customer));
     }
 
     public function sendValidationEmail(Request $request)

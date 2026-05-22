@@ -8,6 +8,20 @@ use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * @property int    $id
+ * @property string $name
+ * @property string $email
+ * @property string|null $phone
+ * @property string|null $currency
+ * @property string|null $avatar
+ * @property string $type
+ * @property string $status
+ * @property string|null $doc_status
+ * @property \Carbon\Carbon|null $email_verified_at
+ * @property \Carbon\Carbon $created_at
+ * @property \Carbon\Carbon $updated_at
+ */
 class Customer extends Model
 {
     use HasApiTokens, HasFactory, Notifiable, MustVerifyEmail;

@@ -10,33 +10,48 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --stripe:#7c6cfc; --stripe-d:#5b4de0;
+  --stripe:#7c6cfc; --stripe-d:#5b4de0; --stripe-l:#a78bfa;
   --violet:#7c3aed; --emerald:#10b981; --amber:#f59e0b; --red:#ef4444;
   --s50:#f8fafc;  --s100:#f1f5f9; --s200:#e2e8f0; --s300:#cbd5e1;
   --s400:#94a3b8; --s500:#64748b; --s600:#475569; --s700:#334155;
   --s800:#1e293b; --s900:#0f172a;
-  --t-bg:#0d0f14; --t-card:#161920; --t-bdr:#262b35; --t-mute:#6b7280;
-  --t-ok:#4ade80; --t-err:#f87171; --t-info:#60a5fa; --t-warn:#fbbf24;
+  --t-bg:#090c12; --t-card:#111418; --t-bdr:#1e2330; --t-mute:#4b5563;
+  --t-ok:#34d399; --t-err:#f87171; --t-info:#60a5fa; --t-warn:#fbbf24;
+  --glow:rgba(124,108,252,.25);
 }
 
 body{
   font-family:'Inter',sans-serif;
-  background:radial-gradient(ellipse at 30% 20%,#1e1b4b 0%,var(--s900) 60%);
+  background-color:#080b12;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 18% 10%,#1e1b4b 0%,transparent 60%),
+    radial-gradient(ellipse 60% 50% at 82% 88%,#1a0a3e 0%,transparent 55%),
+    radial-gradient(ellipse 40% 40% at 50% 50%,#0e1428 0%,transparent 80%);
   min-height:100vh; display:flex; align-items:center; justify-content:center;
-  padding:32px 24px; gap:28px;
+  padding:32px 24px; gap:32px;
 }
 
 /* ── Phone ─────────────────────────────────────── */
 #phone{
   width:390px; min-width:390px; height:820px;
-  background:#fff; border-radius:48px;
-  box-shadow:0 0 0 10px var(--s800),0 0 0 12px var(--s700),0 40px 80px rgba(0,0,0,.65);
+  background:#fff; border-radius:50px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.06),
+    0 0 0 11px #0f1520,
+    0 0 0 13px #1e2a40,
+    0 50px 100px rgba(0,0,0,.8),
+    0 0 80px var(--glow);
   overflow:hidden; display:flex; flex-direction:column; position:relative; flex-shrink:0;
 }
 #phone::before{
   content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
-  width:120px; height:30px; background:var(--s800);
-  border-radius:0 0 20px 20px; z-index:100;
+  width:126px; height:34px; background:#0f1520;
+  border-radius:0 0 22px 22px; z-index:100;
+  box-shadow:inset 0 -1px 0 rgba(255,255,255,.05);
+}
+#phone::after{
+  content:''; position:absolute; top:120px; right:-3px;
+  width:3px; height:60px; background:#1e2a40; border-radius:0 3px 3px 0;
 }
 #status-bar{
   height:44px; display:flex; align-items:flex-end;
@@ -51,8 +66,9 @@ body{
 #screens{flex:1;position:relative;overflow:hidden}
 .screen{
   position:absolute;inset:0;display:flex;flex-direction:column;
-  background:#fff; opacity:0; transform:translateX(28px);
-  pointer-events:none; transition:opacity .22s ease,transform .22s ease;
+  background:#fff; opacity:0; transform:translateX(24px);
+  pointer-events:none;
+  transition:opacity .25s cubic-bezier(.4,0,.2,1),transform .25s cubic-bezier(.4,0,.2,1);
   overflow-y:auto; overflow-x:hidden;
 }
 .screen.active {opacity:1;transform:translateX(0);pointer-events:all}
@@ -60,23 +76,30 @@ body{
 
 /* ── Bottom nav ─────────────────────────────────── */
 #bottom-nav{
-  height:72px; background:#fff;
-  border-top:1px solid var(--s100);
+  height:76px; background:rgba(255,255,255,.93);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-top:1px solid rgba(0,0,0,.05);
   display:flex; align-items:center; justify-content:space-around;
-  padding:0 4px 8px; flex-shrink:0; transition:opacity .2s;
+  padding:0 8px 10px; flex-shrink:0; transition:opacity .2s;
 }
 #bottom-nav.hidden{opacity:0;pointer-events:none}
 .nav-item{
-  display:flex;flex-direction:column;align-items:center;gap:3px;
-  padding:8px 14px;border-radius:14px;cursor:pointer;
-  transition:background .15s;border:none;background:none;
-  color:var(--s400);font-family:'Inter',sans-serif;position:relative;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:7px 18px;border-radius:16px;cursor:pointer;
+  transition:background .2s,transform .1s,color .15s;border:none;background:none;
+  color:var(--s300);font-family:'Inter',sans-serif;position:relative;
 }
-.nav-item span{font-size:10px;font-weight:500}
-.nav-item svg {width:22px;height:22px}
+.nav-item span{font-size:10px;font-weight:500;transition:font-weight .1s}
+.nav-item svg {width:22px;height:22px;transition:filter .2s}
 .nav-item.active{color:var(--stripe)}
-.nav-item.active span{font-weight:600}
-.nav-item:active{background:var(--s50)}
+.nav-item.active span{font-weight:700}
+.nav-item.active::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:32px;height:3px;border-radius:0 0 3px 3px;
+  background:var(--stripe);box-shadow:0 0 8px rgba(124,108,252,.5);
+}
+.nav-item.active svg{filter:drop-shadow(0 0 4px rgba(124,108,252,.35))}
+.nav-item:active{transform:scale(.88)}
 .nav-badge{
   position:absolute;top:6px;right:8px;
   width:8px;height:8px;border-radius:50%;
@@ -88,16 +111,25 @@ body{
 /* ── Shared: screen-header ──────────────────────── */
 .screen-header{
   display:flex;align-items:center;gap:12px;
-  padding:16px 20px 12px;
-  border-bottom:1px solid var(--s100); flex-shrink:0;
+  padding:16px 20px 15px;
+  background:#fff;flex-shrink:0;position:relative;
+  border-bottom:1px solid transparent;
 }
-.screen-header h2{font-size:17px;font-weight:700;color:var(--s900)}
+.screen-header::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent 0%,rgba(124,108,252,.25) 30%,rgba(124,108,252,.25) 70%,transparent 100%);
+}
+.screen-header h2{font-size:17px;font-weight:800;color:var(--s900);letter-spacing:-.02em}
+.screen-header-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
 .back-btn{
-  width:36px;height:36px;border-radius:10px;background:var(--s50);
-  border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  color:var(--s700);flex-shrink:0;transition:background .12s;
+  width:34px;height:34px;border-radius:10px;
+  background:var(--s50);border:1px solid var(--s100);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--s600);flex-shrink:0;transition:background .12s,transform .1s;
 }
-.back-btn:active{background:var(--s100)}
+.back-btn:hover{background:var(--s100)}
+.back-btn:active{transform:scale(.9)}
 
 /* ── Shared: section ─────────────────────────────── */
 .section{padding:0 16px;margin-bottom:18px}
@@ -116,15 +148,17 @@ body{
 
 /* ── Shared: info card ───────────────────────────── */
 .info-card{
-  background:#fff;border-radius:14px;border:1px solid var(--s100);
-  overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04);
+  background:#fff;border-radius:18px;
+  border:1px solid rgba(0,0,0,.05);
+  overflow:hidden;
+  box-shadow:0 2px 6px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.04);
 }
 .info-row{
   display:flex;align-items:center;justify-content:space-between;
-  padding:11px 14px;border-bottom:1px solid var(--s50);
+  padding:13px 16px;border-bottom:1px solid rgba(0,0,0,.04);
 }
 .info-row:last-child{border-bottom:none}
-.info-label{font-size:12px;color:var(--s500)}
+.info-label{font-size:12px;color:var(--s400);font-weight:500}
 .info-value{
   font-size:12px;font-weight:600;color:var(--s800);
   text-align:right;max-width:60%;word-break:break-all;
@@ -134,26 +168,29 @@ body{
 /* ── Shared: badge ───────────────────────────────── */
 .badge{
   display:inline-flex;align-items:center;gap:4px;
-  font-size:10px;font-weight:700;padding:2px 8px;
-  border-radius:100px;
+  font-size:10px;font-weight:700;padding:3px 9px;
+  border-radius:100px;letter-spacing:.02em;
 }
 .badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
-.badge.active  {background:#d1fae5;color:#065f46}
-.badge.pending {background:#fef3c7;color:#92400e}
-.badge.blocked {background:#fee2e2;color:#991b1b}
-.badge.inactive{background:var(--s100);color:var(--s500)}
-.badge.paid    {background:#d1fae5;color:#065f46}
-.badge.failed  {background:#fee2e2;color:#991b1b}
+.badge.active   {background:#d1fae5;color:#065f46}
+.badge.succeeded{background:#d1fae5;color:#065f46}
+.badge.pending  {background:#fef3c7;color:#92400e}
+.badge.blocked  {background:#fee2e2;color:#991b1b}
+.badge.inactive {background:var(--s100);color:var(--s500)}
+.badge.paid     {background:#d1fae5;color:#065f46}
+.badge.failed   {background:#fee2e2;color:#991b1b}
 
 /* ── Shared: forms ───────────────────────────────── */
-.form-group{display:flex;flex-direction:column;gap:5px}
-.form-label{font-size:11px;font-weight:600;color:var(--s500);letter-spacing:.07em;text-transform:uppercase}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-label{font-size:10px;font-weight:700;color:var(--s400);letter-spacing:.1em;text-transform:uppercase}
 .form-input{
-  width:100%;background:var(--s50);border:1.5px solid var(--s200);
-  border-radius:12px;padding:10px 14px;font-size:14px;
-  font-family:'Inter',sans-serif;color:var(--s900);transition:border-color .15s;
+  width:100%;background:#fff;border:1.5px solid var(--s200);
+  border-radius:12px;padding:11px 14px;font-size:14px;
+  font-family:'Inter',sans-serif;color:var(--s900);
+  transition:border-color .15s,box-shadow .15s;
+  box-shadow:0 1px 3px rgba(0,0,0,.05);
 }
-.form-input:focus{outline:none;border-color:var(--stripe);background:#fff}
+.form-input:focus{outline:none;border-color:var(--stripe);box-shadow:0 0 0 3px rgba(124,108,252,.1),0 1px 3px rgba(0,0,0,.04)}
 .form-select{
   appearance:none;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -197,261 +234,358 @@ body{
   max-width:340px;white-space:normal;text-align:center;
 }
 #phone-msg.show{opacity:1;transform:translateX(-50%) translateY(0)}
-#phone-msg.ok {background:#065f46;color:#fff}
-#phone-msg.err{background:#991b1b;color:#fff}
-#phone-msg.info{background:var(--s800);color:#fff}
+#phone-msg.ok  {background:#059669;color:#fff;box-shadow:0 8px 24px rgba(5,150,105,.3)}
+#phone-msg.err {background:#dc2626;color:#fff;box-shadow:0 8px 24px rgba(220,38,38,.3)}
+#phone-msg.info{background:var(--s800);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.3)}
 
 /* ══════════════════════════════════════════════════
    LOGIN
 ═══════════════════════════════════════════════════ */
 #screen-login{
-  background:linear-gradient(160deg,#1e1b4b 0%,#312e81 40%,#4338ca 100%);
-  justify-content:space-between;padding:56px 32px 40px;
+  background:linear-gradient(160deg,#1a1245 0%,#2d1b69 38%,#1e40af 100%);
+  justify-content:space-between;padding:60px 32px 44px;
 }
-.login-hero h1{font-size:34px;font-weight:700;letter-spacing:-.02em;color:#fff;line-height:1.1}
-.login-hero p {font-size:13px;color:rgba(255,255,255,.5);margin-top:6px}
+.login-hero h1{font-size:36px;font-weight:800;letter-spacing:-.03em;color:#fff;line-height:1.05}
+.login-hero p {font-size:13px;color:rgba(255,255,255,.45);margin-top:8px;font-weight:500}
 .login-card{
-  background:rgba(255,255,255,.08);backdrop-filter:blur(20px);
-  border:1px solid rgba(255,255,255,.15);border-radius:24px;
-  padding:28px 24px;display:flex;flex-direction:column;gap:14px;
+  background:rgba(255,255,255,.07);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border:1px solid rgba(255,255,255,.12);border-radius:24px;
+  padding:28px 24px;display:flex;flex-direction:column;gap:16px;
+  box-shadow:0 24px 48px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.1);
 }
 .login-field label{
-  display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.5);
-  letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;
+  display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,.45);
+  letter-spacing:.09em;text-transform:uppercase;margin-bottom:6px;
 }
 .login-field input{
-  width:100%;background:rgba(255,255,255,.1);
-  border:1px solid rgba(255,255,255,.18);border-radius:12px;
-  padding:12px 16px;font-size:15px;font-family:'Inter',sans-serif;
-  color:#fff;transition:border-color .15s,background .15s;
+  width:100%;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.14);border-radius:12px;
+  padding:13px 16px;font-size:15px;font-family:'Inter',sans-serif;
+  color:#fff;transition:border-color .2s,background .2s,box-shadow .2s;
 }
-.login-field input::placeholder{color:rgba(255,255,255,.3)}
-.login-field input:focus{outline:none;border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.15)}
+.login-field input::placeholder{color:rgba(255,255,255,.25)}
+.login-field input:focus{outline:none;border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.12);box-shadow:0 0 0 3px rgba(255,255,255,.06)}
 .btn-login{
-  width:100%;background:#fff;color:var(--stripe-d);border:none;
-  border-radius:14px;padding:14px;font-size:15px;font-weight:700;
-  font-family:'Inter',sans-serif;cursor:pointer;
-  box-shadow:0 4px 20px rgba(0,0,0,.2);
+  width:100%;background:#fff;color:#5b4de0;border:none;
+  border-radius:14px;padding:15px;font-size:15px;font-weight:800;
+  font-family:'Inter',sans-serif;cursor:pointer;letter-spacing:-.01em;
+  box-shadow:0 4px 24px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.9);
   display:flex;align-items:center;justify-content:center;gap:8px;
-  transition:transform .1s;
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s;
 }
-.btn-login:active{transform:scale(.98)}
+.btn-login:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(0,0,0,.3)}
+.btn-login:active{transform:scale(.97)}
 .btn-login:disabled{opacity:.6;cursor:not-allowed;transform:none}
 
 /* ══════════════════════════════════════════════════
    DASHBOARD
 ═══════════════════════════════════════════════════ */
-#screen-dashboard{background:var(--s50)}
+#screen-dashboard{background:#f4f6fb}
 .dash-header{
-  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
-  padding:16px 20px 36px;color:#fff;position:relative;overflow:hidden;flex-shrink:0;
+  background:linear-gradient(145deg,#6d28d9 0%,#7c3aed 45%,#4f46e5 100%);
+  padding:16px 20px 40px;color:#fff;position:relative;overflow:hidden;flex-shrink:0;
+}
+.dash-header::before{
+  content:'';position:absolute;top:-60px;right:-60px;
+  width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.05);
 }
 .dash-header::after{
-  content:'';position:absolute;bottom:-28px;left:-20px;right:-20px;
-  height:56px;background:var(--s50);border-radius:50% 50% 0 0;
+  content:'';position:absolute;bottom:-30px;left:-20px;right:-20px;
+  height:60px;background:#f4f6fb;border-radius:50% 50% 0 0;
 }
-.dash-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.dash-greeting{font-size:12px;color:rgba(255,255,255,.65)}
-.dash-name   {font-size:18px;font-weight:700}
+.dash-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.dash-greeting{font-size:12px;color:rgba(255,255,255,.6);font-weight:500}
+.dash-name{font-size:20px;font-weight:800;letter-spacing:-.02em;margin-top:1px}
 .dash-notif-btn{
-  width:34px;height:34px;border-radius:10px;
-  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+  width:36px;height:36px;border-radius:12px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);
   color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  position:relative;transition:background .12s;
+  position:relative;transition:background .15s,transform .1s;
 }
-.dash-notif-btn:hover{background:rgba(255,255,255,.25)}
+.dash-notif-btn:hover{background:rgba(255,255,255,.22)}
+.dash-notif-btn:active{transform:scale(.9)}
 .notif-dot{
-  position:absolute;top:5px;right:5px;
-  width:7px;height:7px;border-radius:50%;
-  background:var(--red);border:1.5px solid rgba(124,108,252,1);display:none;
+  position:absolute;top:4px;right:4px;
+  width:8px;height:8px;border-radius:50%;
+  background:#f87171;border:2px solid #7c3aed;display:none;
 }
 .notif-dot.show{display:block}
 
 /* Balance carousel */
 .balance-carousel{
-  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18);
-  border-radius:18px;padding:16px;backdrop-filter:blur(8px);
+  background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:20px;padding:18px;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 4px 16px rgba(0,0,0,.1);
 }
-.carousel-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.carousel-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .carousel-arrow{
-  width:28px;height:28px;border-radius:8px;
-  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+  width:30px;height:30px;border-radius:10px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);
   color:#fff;font-size:14px;cursor:pointer;font-family:inherit;
-  display:flex;align-items:center;justify-content:center;transition:background .12s;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s,transform .1s;
 }
-.carousel-arrow:hover{background:rgba(255,255,255,.25)}
-.carousel-label{font-size:12px;font-weight:700;color:#fff;letter-spacing:.04em}
-.balance-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.bal-block{display:flex;flex-direction:column;gap:2px}
-.bal-lbl{font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.08em;text-transform:uppercase}
-.bal-val{font-size:24px;font-weight:700;letter-spacing:-.02em}
-.bal-val.avail{color:#4ade80}
-.bal-val.pend {color:var(--amber)}
-.carousel-dots{display:flex;gap:5px;justify-content:center;margin-top:10px}
-.cdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.25);transition:background .2s}
-.cdot.active{background:#fff}
+.carousel-arrow:hover{background:rgba(255,255,255,.22)}
+.carousel-arrow:active{transform:scale(.88)}
+.carousel-label{font-size:12px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:.06em}
+.balance-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bal-block{display:flex;flex-direction:column;gap:4px}
+.bal-lbl{font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+.bal-val{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.bal-val.avail{color:#34d399}
+.bal-val.pend {color:#fbbf24}
+.carousel-dots{display:flex;gap:6px;justify-content:center;margin-top:12px}
+.cdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.2);transition:all .25s}
+.cdot.active{background:#fff;width:16px;border-radius:3px}
 
 /* Quick actions */
-.quick-actions{display:flex;justify-content:space-around;padding:26px 12px 14px}
+.quick-actions{display:flex;justify-content:space-around;padding:28px 12px 16px}
 .qa-btn{
-  display:flex;flex-direction:column;align-items:center;gap:6px;
+  display:flex;flex-direction:column;align-items:center;gap:7px;
   background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;
 }
 .qa-icon{
-  width:52px;height:52px;border-radius:16px;
-  display:flex;align-items:center;justify-content:center;transition:transform .1s;
+  width:54px;height:54px;border-radius:18px;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
 }
-.qa-btn:active .qa-icon{transform:scale(.9)}
-.qa-btn span{font-size:11px;font-weight:500;color:var(--s600)}
-.qa-icon.v {background:#ede9fe;color:var(--stripe)}
-.qa-icon.g {background:#d1fae5;color:#059669}
-.qa-icon.a {background:#fef3c7;color:#d97706}
-.qa-icon.b {background:#e0f2fe;color:#0284c7}
+.qa-btn:hover .qa-icon{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.12)}
+.qa-btn:active .qa-icon{transform:scale(.88)}
+.qa-btn span{font-size:11px;font-weight:600;color:var(--s500)}
+.qa-icon.v{background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#6d28d9}
+.qa-icon.g{background:linear-gradient(135deg,#d1fae5,#a7f3d0);color:#059669}
+.qa-icon.a{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#d97706}
+.qa-icon.b{background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1d4ed8}
 
 /* Transaction list */
 .tx-list{display:flex;flex-direction:column}
 .tx-item{
   display:flex;align-items:center;gap:12px;
-  padding:11px 14px;border-bottom:1px solid var(--s50);
+  padding:12px 14px;border-bottom:1px solid rgba(0,0,0,.04);
+  transition:background .12s;
 }
 .tx-item:last-child{border-bottom:none}
 .tx-icon-wrap{
-  width:38px;height:38px;border-radius:12px;flex-shrink:0;
+  width:40px;height:40px;border-radius:14px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;font-size:16px;
 }
-.tx-icon-wrap.credit{background:#d1fae5;color:#059669}
-.tx-icon-wrap.debit {background:#fee2e2;color:var(--red)}
+.tx-icon-wrap.credit{background:linear-gradient(135deg,#d1fae5,#a7f3d0);color:#059669}
+.tx-icon-wrap.debit{background:linear-gradient(135deg,#fee2e2,#fecaca);color:#dc2626}
 .tx-meta{flex:1;min-width:0}
 .tx-type{font-size:12px;font-weight:600;color:var(--s800);display:block;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tx-date{font-size:11px;color:var(--s400);display:block}
-.tx-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
-.tx-amount{font-size:13px;font-weight:700}
+.tx-date{font-size:11px;color:var(--s400);display:block;margin-top:2px}
+.tx-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.tx-amount{font-size:13px;font-weight:700;letter-spacing:-.01em}
 .tx-amount.credit{color:#059669}
-.tx-amount.debit {color:var(--red)}
+.tx-amount.debit{color:#dc2626}
 
 /* ══════════════════════════════════════════════════
    PAYMENT
 ═══════════════════════════════════════════════════ */
-#screen-payment{background:#fff}
-.pay-body{padding:16px 18px;flex:1;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
-.logged-as-bar{
-  font-size:12px;color:#059669;font-weight:600;
-  padding:8px 12px;background:#f0fdf4;border-radius:10px;border:1px solid #a7f3d0;
+#screen-payment{background:#f4f6fb}
+.pay-header{
+  background:linear-gradient(145deg,#6d28d9 0%,#7c3aed 45%,#4f46e5 100%);
+  padding:16px 20px 28px;color:#fff;position:relative;overflow:hidden;flex-shrink:0;
 }
-.pm-list{display:flex;flex-direction:column;gap:6px}
-.pm-option{
-  display:flex;align-items:center;gap:10px;
-  padding:9px 13px;border-radius:12px;border:1.5px solid var(--s200);
-  cursor:pointer;font-size:13px;color:var(--s700);transition:border-color .15s,background .12s;
+.pay-header::before{
+  content:'';position:absolute;top:-60px;right:-40px;
+  width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.05);pointer-events:none;
 }
-.pm-option:has(input:checked){border-color:var(--stripe);background:#f5f3ff;color:var(--s900)}
-.pm-option input[type=radio]{accent-color:var(--stripe)}
-.stripe-wrap{border:1.5px solid var(--s200);border-radius:12px;padding:12px;background:var(--s50)}
-.stripe-wrap:focus-within{border-color:var(--stripe);background:#fff}
+.pay-header::after{
+  content:'';position:absolute;bottom:-28px;left:-20px;right:-20px;
+  height:56px;background:#f4f6fb;border-radius:50% 50% 0 0;pointer-events:none;
+}
+.pay-header-nav{
+  display:flex;align-items:center;gap:10px;margin-bottom:10px;position:relative;z-index:1;
+}
+.pay-header-title{font-size:17px;font-weight:800;letter-spacing:-.02em}
+.back-btn-light{
+  width:32px;height:32px;border-radius:10px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);
+  color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:background .15s,transform .1s;
+}
+.back-btn-light:hover{background:rgba(255,255,255,.22)}
+.back-btn-light:active{transform:scale(.9)}
+.pay-header-user{
+  display:flex;align-items:center;gap:7px;
+  font-size:12px;color:rgba(255,255,255,.65);font-weight:500;
+  position:relative;z-index:1;
+}
+.pay-header-user-dot{
+  width:7px;height:7px;border-radius:50%;background:#34d399;
+  box-shadow:0 0 6px rgba(52,211,153,.7);flex-shrink:0;
+}
+.pay-body{padding:20px 18px 18px;flex:1;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.pay-body > *{flex-shrink:0}
+.pay-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stripe-wrap{
+  border:1.5px solid var(--s200);border-radius:16px;
+  padding:16px;background:#fff;
+  transition:border-color .2s,box-shadow .2s;
+  box-shadow:0 2px 8px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.03);
+}
+.stripe-wrap:focus-within{border-color:var(--stripe);box-shadow:0 0 0 3px rgba(124,108,252,.1),0 2px 8px rgba(0,0,0,.04)}
 .btn-pay{
-  width:100%;padding:14px;
-  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
-  color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;
-  font-family:'Inter',sans-serif;cursor:pointer;
-  box-shadow:0 4px 20px rgba(124,108,252,.3);
-  display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .1s;
+  width:100%;padding:16px;
+  background:linear-gradient(135deg,#7c6cfc 0%,#6d28d9 100%);
+  color:#fff;border:none;border-radius:16px;font-size:15px;font-weight:800;
+  font-family:'Inter',sans-serif;cursor:pointer;letter-spacing:-.01em;
+  box-shadow:0 4px 20px rgba(109,40,217,.4),inset 0 1px 0 rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s;
 }
-.btn-pay:active{transform:scale(.98)}
-.btn-pay:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-pay:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(109,40,217,.45)}
+.btn-pay:active{transform:scale(.97)}
+.btn-pay:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 .sec-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .btn-sec{
-  padding:10px;border-radius:12px;border:1.5px solid;cursor:pointer;
-  font-size:11px;font-weight:600;font-family:'Inter',sans-serif;background:#fff;
-  display:flex;align-items:center;justify-content:center;gap:5px;transition:background .12s;
+  padding:11px;border-radius:12px;border:1.5px solid;cursor:pointer;
+  font-size:11px;font-weight:700;font-family:'Inter',sans-serif;background:#fff;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  transition:background .15s,transform .1s;
 }
-.btn-sec:disabled{opacity:.5;cursor:not-allowed}
-.btn-sec.v {color:var(--stripe);border-color:var(--stripe)}
-.btn-sec.g {color:#059669;border-color:#a7f3d0}
-.btn-sec.a {color:#d97706;border-color:#fde68a}
-.btn-sec.r {color:var(--red);border-color:#fca5a5}
-.btn-sec.v:hover{background:#f5f3ff}
+.btn-sec:disabled{opacity:.4;cursor:not-allowed}
+.btn-sec.v{color:var(--stripe);border-color:rgba(124,108,252,.4)}
+.btn-sec.g{color:#059669;border-color:rgba(167,243,208,.8)}
+.btn-sec.a{color:#d97706;border-color:rgba(253,230,138,.8)}
+.btn-sec.r{color:#dc2626;border-color:rgba(252,165,165,.8)}
+.btn-sec.v:hover{background:#faf5ff}
 .btn-sec.g:hover{background:#f0fdf4}
 .btn-sec.a:hover{background:#fffbeb}
 .btn-sec.r:hover{background:#fef2f2}
+.btn-sec:active{transform:scale(.95)}
 .btn-sec.full{grid-column:1/-1}
+
+/* ── Fee hint panel ─────────────────────────────── */
+#fee-hint{
+  flex-shrink:0;
+  border-radius:14px;overflow:hidden;
+  border:1px solid #ddd6fe;background:#faf5ff;
+  box-shadow:0 2px 8px rgba(124,108,252,.08);
+}
+.fee-hint-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:linear-gradient(135deg,#ede9fe,#ddd6fe);font-size:11px;
+}
+.fee-hint-title{font-weight:800;color:#4c1d95;letter-spacing:.06em;text-transform:uppercase}
+.fee-hint-amount{font-weight:700;color:#6d28d9;font-family:'Fira Code',monospace}
+.fee-hint-row{
+  display:flex;align-items:center;padding:8px 14px;gap:10px;
+  border-top:1px solid #ede9fe;
+}
+.fee-hint-label{font-size:11px;color:#5b21b6;flex:1;min-width:0;font-weight:500}
+.fee-hint-breakdown{font-size:10px;color:#a78bfa;font-family:'Fira Code',monospace;white-space:nowrap}
+.fee-hint-net{font-size:12px;font-weight:700;color:#15803d;font-family:'Fira Code',monospace;white-space:nowrap}
+.fee-hint-footnote{
+  padding:6px 14px 8px;font-size:10px;color:#a78bfa;font-style:italic;
+  border-top:1px solid #ede9fe;
+}
+
 
 /* ══════════════════════════════════════════════════
    TOP-UP
 ═══════════════════════════════════════════════════ */
-#screen-topup{background:var(--s50)}
+#screen-topup{background:#f4f6fb}
 .topup-body{padding:16px;flex:1;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
 .vban-card{
-  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
-  border-radius:20px;padding:20px;color:#fff;position:relative;overflow:hidden;
+  background:linear-gradient(145deg,#6d28d9 0%,#7c3aed 50%,#4f46e5 100%);
+  border-radius:22px;padding:22px;color:#fff;position:relative;overflow:hidden;
+  box-shadow:0 8px 32px rgba(109,40,217,.4),inset 0 1px 0 rgba(255,255,255,.1);
 }
 .vban-card::before{
-  content:'';position:absolute;top:-40px;right:-40px;
-  width:120px;height:120px;border-radius:50%;
-  background:rgba(255,255,255,.06);
+  content:'';position:absolute;top:-50px;right:-50px;
+  width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.05);
 }
-.vban-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.vban-title{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+.vban-card::after{
+  content:'';position:absolute;bottom:-30px;left:-30px;
+  width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,.04);
+}
+.vban-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.vban-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.6)}
 .vban-type-badge{
-  font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;
-  background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.25);color:#fff;
+  font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px;
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);color:#fff;
 }
-.vban-field{margin-bottom:12px}
+.vban-field{margin-bottom:14px}
 .vban-field:last-child{margin-bottom:0}
-.vban-field-label{font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.vban-field-label{font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;font-weight:600}
 .vban-field-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .vban-field-value{font-size:13px;font-weight:600;font-family:'Fira Code',monospace;color:#fff;word-break:break-all}
 .copy-btn{
-  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
-  border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;
-  color:rgba(255,255,255,.8);font-family:'Inter',sans-serif;font-weight:600;
-  transition:background .12s;flex-shrink:0;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);
+  border-radius:8px;padding:4px 10px;cursor:pointer;font-size:11px;
+  color:rgba(255,255,255,.85);font-family:'Inter',sans-serif;font-weight:700;
+  transition:background .15s,transform .1s;flex-shrink:0;
 }
-.copy-btn:hover{background:rgba(255,255,255,.25)}
-.copy-btn:active{transform:scale(.95)}
+.copy-btn:hover{background:rgba(255,255,255,.22)}
+.copy-btn:active{transform:scale(.9)}
 .no-vban-card{
-  background:#fff;border-radius:16px;border:2px dashed var(--s200);
-  padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;
+  background:#fff;border-radius:18px;border:2px dashed var(--s200);
+  padding:32px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;
 }
-.no-vban-card p{font-size:13px;color:var(--s500)}
+.no-vban-card p{font-size:13px;color:var(--s400);font-weight:500;line-height:1.5}
 .btn-create{
-  width:100%;padding:13px;
-  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
-  color:#fff;border:none;border-radius:13px;font-size:14px;font-weight:700;
-  font-family:'Inter',sans-serif;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .1s;
+  width:100%;padding:15px;
+  background:linear-gradient(135deg,#7c6cfc 0%,#6d28d9 100%);
+  color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:800;
+  font-family:'Inter',sans-serif;cursor:pointer;letter-spacing:-.01em;
+  box-shadow:0 4px 20px rgba(109,40,217,.4);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s;
 }
-.btn-create:active{transform:scale(.98)}
-.btn-create:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-create:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(109,40,217,.45)}
+.btn-create:active{transform:scale(.97)}
+.btn-create:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 
 /* ══════════════════════════════════════════════════
    PROFILE
 ═══════════════════════════════════════════════════ */
-#screen-profile{background:var(--s50)}
+#screen-profile{background:#f4f6fb}
 .profile-header{
-  background:linear-gradient(135deg,var(--stripe) 0%,var(--violet) 100%);
-  padding:20px 20px 36px;color:#fff;position:relative;flex-shrink:0;
+  background:linear-gradient(145deg,#6d28d9 0%,#7c3aed 50%,#4f46e5 100%);
+  padding:20px 20px 40px;color:#fff;position:relative;flex-shrink:0;overflow:hidden;
+}
+.profile-header::before{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.05);
 }
 .profile-header::after{
-  content:'';position:absolute;bottom:-28px;left:-20px;right:-20px;
-  height:56px;background:var(--s50);border-radius:50% 50% 0 0;
+  content:'';position:absolute;bottom:-30px;left:-20px;right:-20px;
+  height:60px;background:#f4f6fb;border-radius:50% 50% 0 0;
+}
+.avatar-wrap{
+  position:relative;display:inline-block;margin-bottom:12px;cursor:pointer;
+}
+.avatar-wrap:hover .avatar-cam{opacity:1}
+.avatar-cam{
+  position:absolute;inset:0;border-radius:50%;
+  background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .2s;
 }
 .avatar{
-  width:64px;height:64px;border-radius:50%;
-  background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.4);
+  width:68px;height:68px;border-radius:50%;
+  background:rgba(255,255,255,.15);
+  border:2.5px solid rgba(255,255,255,.35);
+  box-shadow:0 4px 16px rgba(0,0,0,.2);
   display:flex;align-items:center;justify-content:center;
-  font-size:22px;font-weight:700;color:#fff;margin-bottom:10px;
+  font-size:24px;font-weight:800;color:#fff;overflow:hidden;
 }
-.profile-name {font-size:20px;font-weight:700;margin-bottom:2px}
-.profile-email{font-size:12px;color:rgba(255,255,255,.65);margin-bottom:8px}
-.profile-body {padding:28px 16px 16px;flex:1;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
+.profile-name{font-size:22px;font-weight:800;margin-bottom:2px;letter-spacing:-.02em}
+.profile-email{font-size:12px;color:rgba(255,255,255,.6);margin-bottom:10px;font-weight:500}
+.profile-body{padding:28px 16px 16px;flex:1;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
 .btn-logout{
-  margin-top:auto;width:100%;padding:13px;
-  background:#fff;border:1.5px solid #fca5a5;color:var(--red);
-  border-radius:14px;font-size:14px;font-weight:700;
-  font-family:'Inter',sans-serif;cursor:pointer;transition:background .12s;
+  margin-top:auto;width:100%;padding:14px;
+  background:#fff;border:1.5px solid rgba(239,68,68,.3);color:#dc2626;
+  border-radius:14px;font-size:14px;font-weight:700;letter-spacing:-.01em;
+  font-family:'Inter',sans-serif;cursor:pointer;transition:background .15s,border-color .15s;
 }
-.btn-logout:hover{background:#fef2f2}
+.btn-logout:hover{background:#fef2f2;border-color:rgba(239,68,68,.5)}
 
 /* ══════════════════════════════════════════════════
    NOTIFICATIONS
@@ -482,55 +616,217 @@ body{
    LOG PANEL
 ═══════════════════════════════════════════════════ */
 #log-panel{
-  width:380px;height:820px;background:var(--t-bg);
-  border-radius:24px;border:1px solid var(--t-bdr);
-  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  width:400px;height:820px;background:var(--t-bg);
+  border-radius:24px;
+  border:1px solid var(--t-bdr);
+  box-shadow:
+    0 32px 80px rgba(0,0,0,.7),
+    0 0 0 1px rgba(255,255,255,.04),
+    inset 0 1px 0 rgba(255,255,255,.04);
   display:flex;flex-direction:column;overflow:hidden;
 }
 #log-header{
-  padding:14px 18px;border-bottom:1px solid var(--t-bdr);
+  padding:14px 18px;
+  border-bottom:1px solid var(--t-bdr);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.04) 0%,transparent 100%);
 }
-.log-title{display:flex;align-items:center;gap:8px}
-.log-title span{font-size:11px;font-weight:700;color:var(--stripe);letter-spacing:.1em;text-transform:uppercase}
-.log-live-dot{width:7px;height:7px;border-radius:50%;background:var(--t-ok);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.log-title{display:flex;align-items:center;gap:9px}
+.log-title-text{display:flex;flex-direction:column;gap:1px}
+.log-title-label{font-size:12px;font-weight:700;color:var(--stripe-l);letter-spacing:.08em;text-transform:uppercase}
+.log-title-sub{font-size:10px;color:var(--t-mute);font-family:'Fira Code',monospace}
+.log-live-dot{
+  width:8px;height:8px;border-radius:50%;background:var(--t-ok);
+  animation:pulse 2.5s ease infinite;box-shadow:0 0 8px var(--t-ok);flex-shrink:0;
+}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--t-ok)}50%{opacity:.3;box-shadow:0 0 3px var(--t-ok)}}
 .log-toolbar{display:flex;align-items:center;gap:8px}
 .log-clear{
   font-size:10px;font-weight:600;color:var(--t-mute);background:none;
-  border:1px solid var(--t-bdr);border-radius:5px;padding:3px 9px;
-  cursor:pointer;font-family:'Inter',sans-serif;transition:color .12s,border-color .12s;
+  border:1px solid var(--t-bdr);border-radius:6px;padding:4px 11px;
+  cursor:pointer;font-family:'Inter',sans-serif;
+  transition:color .15s,border-color .15s,background .15s;
 }
-.log-clear:hover{color:var(--t-err);border-color:var(--t-err)}
-.log-count{font-size:10px;color:var(--t-mute);font-family:'Fira Code',monospace}
+.log-clear:hover{color:var(--t-err);border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.05)}
+.log-count{
+  font-size:10px;color:var(--t-mute);font-family:'Fira Code',monospace;
+  background:rgba(255,255,255,.04);border:1px solid var(--t-bdr);
+  padding:3px 9px;border-radius:5px;
+}
 #log-entries{
   flex:1;overflow-y:auto;display:flex;flex-direction:column;
   padding:4px 0;
 }
 #log-entries::-webkit-scrollbar{width:3px}
-#log-entries::-webkit-scrollbar-thumb{background:var(--t-bdr);border-radius:2px}
+#log-entries::-webkit-scrollbar-track{background:transparent}
+#log-entries::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px}
 .log-entry{
   display:grid;grid-template-columns:auto 1fr auto;
-  align-items:start;gap:8px;padding:5px 14px;
-  border-bottom:1px solid rgba(38,43,53,.4);
-  animation:fadeSlide .12s ease;
+  align-items:start;gap:8px;padding:7px 16px;
+  border-bottom:1px solid rgba(255,255,255,.025);
+  animation:fadeSlide .15s cubic-bezier(.4,0,.2,1);cursor:default;
 }
-@keyframes fadeSlide{from{opacity:0;transform:translateY(-3px)}to{opacity:1}}
+.log-entry:hover{background:rgba(255,255,255,.025)}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
 .log-badge{
-  font-size:9px;font-weight:700;letter-spacing:.06em;padding:2px 6px;
+  font-size:9px;font-weight:700;letter-spacing:.07em;padding:2px 7px;
   border-radius:4px;flex-shrink:0;margin-top:2px;
 }
-.log-badge.ok  {background:rgba(74,222,128,.12);color:var(--t-ok)}
-.log-badge.err {background:rgba(248,113,113,.12);color:var(--t-err)}
-.log-badge.info{background:rgba(96,165,250,.12); color:var(--t-info)}
-.log-badge.warn{background:rgba(251,191,36,.12); color:var(--t-warn)}
-.log-text{font-size:11px;color:#c9d1d9;line-height:1.5;font-family:'Fira Code',monospace;word-break:break-word}
-.log-ts  {font-size:10px;color:rgba(38,43,53,1.3);color:#3d4451;margin-top:3px;font-family:'Fira Code',monospace;flex-shrink:0}
+.log-badge.ok  {background:rgba(52,211,153,.1);color:var(--t-ok);border:1px solid rgba(52,211,153,.18)}
+.log-badge.err {background:rgba(248,113,113,.12);color:var(--t-err);border:1px solid rgba(248,113,113,.2)}
+.log-badge.info{background:rgba(96,165,250,.1);color:var(--t-info);border:1px solid rgba(96,165,250,.18)}
+.log-badge.warn{background:rgba(251,191,36,.1);color:var(--t-warn);border:1px solid rgba(251,191,36,.18)}
+.log-text{font-size:11px;color:#7d8fa8;line-height:1.6;font-family:'Fira Code',monospace;word-break:break-word}
+.log-ts{font-size:10px;color:#2a3547;margin-top:3px;font-family:'Fira Code',monospace;flex-shrink:0;white-space:nowrap}
 #log-empty{
   flex:1;display:flex;align-items:center;justify-content:center;
-  flex-direction:column;gap:10px;color:var(--t-mute);font-size:12px;
+  flex-direction:column;gap:14px;color:var(--t-mute);font-size:11px;font-family:'Fira Code',monospace;
 }
-#log-empty svg{width:28px;height:28px;opacity:.3}
+#log-empty svg{width:32px;height:32px;opacity:.15}
+#log-empty p{opacity:.5;letter-spacing:.04em}
+
+/* ══════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  body{
+    flex-direction:column;
+    align-items:center;
+    padding:20px 16px;
+    gap:20px;
+    min-height:100vh;
+    height:auto;
+  }
+  #phone{
+    width:100%;
+    max-width:390px;
+    min-width:unset;
+    height:calc(100svh - 40px);
+    max-height:820px;
+    border-radius:36px;
+  }
+  #log-panel{
+    width:100%;
+    max-width:390px;
+    height:380px;
+    border-radius:18px;
+  }
+}
+
+@media (max-width: 430px) {
+  body{ padding:0; gap:0; background:#080b12; }
+  #phone{
+    width:100%;
+    max-width:100%;
+    height:100svh;
+    max-height:none;
+    border-radius:0;
+    box-shadow:none;
+  }
+  #phone::before{ display:none; }
+  #phone::after{ display:none; }
+  #status-bar{ padding:0 20px 6px; }
+  #log-panel{ display:none; }
+  #log-toggle{ display:flex !important; }
+}
+
+/* botão flutuante para abrir o console em mobile */
+#log-toggle{
+  display:none;
+  position:fixed;
+  bottom:16px;
+  right:16px;
+  z-index:9999;
+  width:44px;height:44px;
+  border-radius:50%;
+  background:var(--t-bg);
+  border:1px solid var(--t-bdr);
+  color:#fff;
+  align-items:center;justify-content:center;
+  cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.5);
+}
+#log-toggle .log-badge-count{
+  position:absolute;top:-4px;right:-4px;
+  background:var(--stripe);color:#fff;
+  font-size:9px;font-weight:700;
+  width:16px;height:16px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  display:none;
+}
+#log-toggle .log-badge-count.show{ display:flex; }
+
+/* drawer do console em mobile */
+#log-drawer{
+  display:none;
+  position:fixed;inset:0;z-index:9998;
+  flex-direction:column;
+}
+#log-drawer.open{ display:flex; }
+#log-drawer-backdrop{
+  position:absolute;inset:0;background:rgba(0,0,0,.6);
+  backdrop-filter:blur(4px);
+}
+#log-drawer-panel{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  height:70vh;
+  background:var(--t-bg);
+  border-radius:24px 24px 0 0;
+  border:1px solid var(--t-bdr);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+#log-drawer-handle{
+  width:40px;height:4px;border-radius:2px;
+  background:var(--t-bdr);
+  margin:10px auto 0;flex-shrink:0;
+}
+
+/* ══════════════════════════════════════════════════
+   TRANSACTIONS LIST
+═══════════════════════════════════════════════════ */
+#screen-transactions{background:#f4f6fb}
+.tx-item{cursor:pointer;transition:background .12s}
+.tx-item:active{background:#f1f5f9}
+.btn-load-more{
+  width:100%;padding:12px;border-radius:14px;
+  border:1.5px solid rgba(124,108,252,.4);background:#fff;
+  color:var(--stripe);font-size:13px;font-weight:700;
+  font-family:'Inter',sans-serif;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:background .15s,box-shadow .15s;
+  box-shadow:0 2px 8px rgba(124,108,252,.1);
+}
+.btn-load-more:hover{background:#faf5ff;box-shadow:0 4px 16px rgba(124,108,252,.15)}
+.btn-load-more:disabled{opacity:.5;cursor:not-allowed}
+
+/* ══════════════════════════════════════════════════
+   TRANSACTION DETAIL
+═══════════════════════════════════════════════════ */
+#screen-tx-detail{background:#f4f6fb}
+.tx-detail-hero{
+  background:linear-gradient(145deg,#6d28d9 0%,#7c3aed 50%,#4f46e5 100%);
+  padding:24px 20px 40px;color:#fff;position:relative;flex-shrink:0;text-align:center;overflow:hidden;
+}
+.tx-detail-hero::before{
+  content:'';position:absolute;top:-30px;right:-30px;
+  width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.06);
+}
+.tx-detail-hero::after{
+  content:'';position:absolute;bottom:-30px;left:-20px;right:-20px;
+  height:60px;background:#f4f6fb;border-radius:50% 50% 0 0;
+}
+.tx-detail-icon{
+  width:56px;height:56px;border-radius:20px;margin:0 auto 14px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+}
+.tx-detail-amount{font-size:36px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.tx-detail-amount.credit{color:#34d399}
+.tx-detail-amount.debit{color:#fca5a5}
+.tx-detail-sub{font-size:13px;color:rgba(255,255,255,.6);margin-top:6px;font-weight:500}
+.tx-detail-body{padding:16px;display:flex;flex-direction:column;gap:16px}
 </style>
 </head>
 <body>
@@ -558,7 +854,7 @@ body{
       <div class="login-card">
         <div class="login-field">
           <label>E-mail</label>
-          <input type="email" id="login-email" value="corporate@example.com"/>
+          <input type="email" id="login-email" value="retail@example.com"/>
         </div>
         <div class="login-field">
           <label>Senha</label>
@@ -605,7 +901,7 @@ body{
       <div class="quick-actions">
         <button class="qa-btn" onclick="navigate('payment')">
           <div class="qa-icon v"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
-          <span>Pagar</span>
+          <span>Carregar</span>
         </button>
         <button class="qa-btn" onclick="navigate('topup')">
           <div class="qa-icon g"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>
@@ -625,7 +921,7 @@ body{
       <div class="section">
         <div class="section-header">
           <span class="section-title">Atividade recente</span>
-          <button class="section-action" onclick="loadDashboard()">Atualizar</button>
+          <button class="section-action" onclick="navigate('transactions')">Ver todas</button>
         </div>
         <div class="info-card">
           <div id="tx-list" class="tx-list">
@@ -651,52 +947,55 @@ body{
 
     <!-- ── Payment ───────────────────────────── -->
     <div id="screen-payment" class="screen">
-      <div class="screen-header">
-        <button class="back-btn" onclick="navigate('dashboard')">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-        </button>
-        <h2>Pagamento</h2>
+      <div class="pay-header">
+        <div class="pay-header-nav">
+          <button class="back-btn-light" onclick="navigate('dashboard')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          </button>
+          <span class="pay-header-title">Carregar saldo</span>
+        </div>
+        <div class="pay-header-user" id="logged-as">
+          <div class="pay-header-user-dot"></div>
+          <span>—</span>
+        </div>
       </div>
-      <div class="pay-body">
-        <div class="logged-as-bar" id="logged-as">—</div>
 
-        <div class="form-group">
-          <label class="form-label">Método de pagamento</label>
-          <div class="pm-list" id="methods-container">
-            <div style="padding:12px"><span class="skel" style="width:70%"></span></div>
+      <div class="pay-body">
+        <div id="methods-container" style="display:none"></div>
+
+        <div class="pay-row">
+          <div class="form-group">
+            <label class="form-label">Valor</label>
+            <input class="form-input" type="number" id="amount" value="10" min="1" style="font-weight:700;font-size:16px"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Moeda</label>
+            <select class="form-input form-select" id="currency-select" onchange="onCurrencyChange()">
+              <option value="eur">€ EUR</option>
+              <option value="gbp">£ GBP</option>
+              <option value="usd">$ USD</option>
+              <option value="brl">R$ BRL</option>
+              <option value="chf">Fr CHF</option>
+            </select>
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Moeda</label>
-          <select class="form-input form-select" id="currency-select" onchange="onCurrencyChange()">
-            <option value="eur">EUR — Euro (€)</option>
-            <option value="gbp">GBP — British Pound (£)</option>
-            <option value="usd">USD — US Dollar ($)</option>
-            <option value="brl">BRL — Brazilian Real (R$)</option>
-            <option value="chf">CHF — Swiss Franc (Fr)</option>
-          </select>
-        </div>
+        <div id="fee-hint" style="display:none"></div>
 
         <div class="form-group">
-          <label class="form-label">Valor</label>
-          <input class="form-input" type="number" id="amount" value="10" min="1"/>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Detalhes do cartão</label>
+          <label class="form-label">Método de pagamento</label>
           <div class="stripe-wrap"><div id="payment-element"></div></div>
         </div>
 
         <button class="btn-pay" id="btn-pay" onclick="run()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-          Pagar
+          Confirmar pagamento
         </button>
 
         <div class="sec-actions">
           <button class="btn-sec v" id="btn-funding"     onclick="createFunding()">+ Criar Funding</button>
-          <button class="btn-sec g" id="btn-account"     onclick="getAccount()">Ver Account</button>
-          <button class="btn-sec a full" id="btn-get-funding" onclick="getFundingInstructions()">Ver Funding Instructions</button>
+          <button class="btn-sec g" id="btn-account"     onclick="getAccount()">Ver Conta</button>
+          <button class="btn-sec a full" id="btn-get-funding" onclick="getFundingInstructions()">Instruções de Depósito</button>
         </div>
       </div>
     </div>
@@ -708,7 +1007,9 @@ body{
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
         </button>
         <h2>Adicionar Fundos</h2>
-        <button class="section-action" style="margin-left:auto" onclick="loadTopup()">Atualizar</button>
+        <div class="screen-header-actions">
+          <button class="section-action" onclick="loadTopup()">Atualizar</button>
+        </div>
       </div>
       <div class="topup-body" id="topup-body">
         <div class="empty-state"><div class="spin dark"></div><p>Carregando...</p></div>
@@ -718,7 +1019,13 @@ body{
     <!-- ── Profile ───────────────────────────── -->
     <div id="screen-profile" class="screen">
       <div class="profile-header">
+        <div class="avatar-wrap" onclick="triggerAvatarUpload()">
         <div class="avatar" id="profile-avatar">?</div>
+        <div class="avatar-cam">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="uploadAvatar(this)"/>
+      </div>
         <div class="profile-name"  id="profile-name">—</div>
         <div class="profile-email" id="profile-email">—</div>
         <span id="profile-badge"></span>
@@ -735,10 +1042,41 @@ body{
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
         </button>
         <h2>Notificações</h2>
-        <button class="section-action" style="margin-left:auto" onclick="markAllRead()">Marcar lidas</button>
+        <div class="screen-header-actions">
+          <button class="section-action" onclick="markAllRead()">Marcar lidas</button>
+        </div>
       </div>
       <div class="notif-list" id="notif-list">
         <div class="empty-state"><div class="spin dark"></div></div>
+      </div>
+    </div>
+
+    <!-- ── Transactions ─────────────────────────── -->
+    <div id="screen-transactions" class="screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="navigate('dashboard')">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <h2>Transações</h2>
+      </div>
+      <div id="tx-full-list" class="tx-list"></div>
+      <div id="tx-load-more-wrap" style="padding:12px 16px;display:none">
+        <button id="btn-load-more" class="btn-load-more" onclick="loadMoreTransactions()">
+          Carregar mais
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Transaction Detail ─────────────────────── -->
+    <div id="screen-tx-detail" class="screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="navigate(txDetailFrom)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <h2>Detalhes</h2>
+      </div>
+      <div id="tx-detail-body" class="tx-detail-body">
+        <div class="empty-state"><div class="spin dark"></div><p>Carregando...</p></div>
       </div>
     </div>
 
@@ -753,7 +1091,7 @@ body{
     </button>
     <button class="nav-item" id="nav-payment" onclick="navigate('payment')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-      <span>Pagar</span>
+      <span>Carregar</span>
     </button>
     <button class="nav-item" id="nav-topup" onclick="navigate('topup')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -768,22 +1106,55 @@ body{
 
 </div><!-- /phone -->
 
-<!-- ═══════════ LOG PANEL ═══════════ -->
+<!-- ═══════════ LOG PANEL (desktop) ═══════════ -->
 <div id="log-panel">
   <div id="log-header">
     <div class="log-title">
       <div class="log-live-dot"></div>
-      <span>Console</span>
+      <div class="log-title-text">
+        <span class="log-title-label">Console</span>
+        <span class="log-title-sub">stripe-sim · yoop</span>
+      </div>
     </div>
     <div class="log-toolbar">
-      <span class="log-count" id="log-count">0 entradas</span>
+      <span class="log-count" id="log-count">0</span>
       <button class="log-clear" onclick="clearLog()">Limpar</button>
     </div>
   </div>
   <div id="log-entries">
     <div id="log-empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-      <span>Aguardando atividade...</span>
+      <p>Aguardando atividade...</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ LOG DRAWER (mobile) ═══════════ -->
+<button id="log-toggle" onclick="openLogDrawer()">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+  <span class="log-badge-count" id="log-badge-count">0</span>
+</button>
+
+<div id="log-drawer">
+  <div id="log-drawer-backdrop" onclick="closeLogDrawer()"></div>
+  <div id="log-drawer-panel">
+    <div id="log-drawer-handle"></div>
+    <div id="log-header" style="padding:12px 18px 10px">
+      <div class="log-title">
+        <div class="log-live-dot"></div>
+        <span>Console</span>
+      </div>
+      <div class="log-toolbar">
+        <span class="log-count" id="log-count-drawer">0 entradas</span>
+        <button class="log-clear" onclick="clearLog()">Limpar</button>
+        <button class="log-clear" onclick="closeLogDrawer()" style="margin-left:4px">✕</button>
+      </div>
+    </div>
+    <div id="log-entries-drawer" style="flex:1;overflow-y:auto;padding:4px 0">
+      <div id="log-empty-drawer" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--t-mute);font-size:12px;padding:32px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;opacity:.3"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        <span>Aguardando atividade...</span>
+      </div>
     </div>
   </div>
 </div>
@@ -792,7 +1163,8 @@ body{
 // ── Config ─────────────────────────────────────────────
 const CONFIG = {
   pk:  'pk_test_51T2hGe2QaRyGWkxZfszIzoH8ptXpnvyZJKbSsxkooaxf8qLbhk1zbhr01eU7sutPuYVHS8WwS2sFRUvcAlWgZGdH00xWuRIIUp',
-  api: 'http://yoop.test/api',
+//   api: 'https://gerbil-overprice-savage.ngrok-free.dev/api',
+  api: 'https://yoop.test/api',
 };
 
 const CURRENCIES = [
@@ -805,14 +1177,19 @@ const CURRENCIES = [
 
 // ── State ──────────────────────────────────────────────
 let stripe, elements, selectedMethod;
-let apiToken    = null;
+let apiToken      = null;
 let currentScreen = 'login';
 let carouselIndex = 0;
-let balances    = [];
-let logCount    = 0;
-let unreadCount = 0;
+let balances      = [];
+let logCount      = 0;
+let unreadCount   = 0;
 let _toastTimer;
-let _swipeX     = 0;
+let _swipeX       = 0;
+let txPage        = 1;
+let txLastPage    = 1;
+let txDetailFrom  = 'transactions';
+let feeEstimatesCache = {}; // { 'EUR': [...], 'USD': [...] }
+let loadedMethods    = []; // métodos vindos do endpoint (raw)
 
 // ── Clock ──────────────────────────────────────────────
 function tick() {
@@ -839,13 +1216,14 @@ function navigate(screen) {
   }
 
   // status bar color — light on gradient screens
-  const lightScreens = ['login','dashboard','profile'];
+  const lightScreens = ['login','dashboard','profile','payment'];
   document.getElementById('status-bar').className = lightScreens.includes(screen) ? 'light' : '';
 
   // lazy-load screens
   if (screen === 'topup')         loadTopup();
   if (screen === 'profile')       loadProfile();
   if (screen === 'notifications') loadNotifications();
+  if (screen === 'transactions')  loadTransactions();
 }
 
 // swipe support on dashboard
@@ -872,34 +1250,67 @@ async function api(method, path, body) {
   return { res, data };
 }
 
+// ── API upload (multipart) ─────────────────────────────
+async function apiUpload(path, formData) {
+  const headers = { 'Accept': 'application/json' };
+  if (apiToken) headers['Authorization'] = apiToken;
+  const res  = await fetch(CONFIG.api + path, { method: 'POST', headers, body: formData });
+  const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
 // ── Log ────────────────────────────────────────────────
 function log(type, msg) {
-  const wrap  = document.getElementById('log-entries');
-  const empty = document.getElementById('log-empty');
-  if (empty) empty.remove();
-
   const n = new Date();
   const ts = String(n.getHours()).padStart(2,'0') + ':' +
              String(n.getMinutes()).padStart(2,'0') + ':' +
              String(n.getSeconds()).padStart(2,'0');
-
-  const el = document.createElement('div');
-  el.className = 'log-entry';
-  el.innerHTML = `<span class="log-badge ${type}">${type.toUpperCase()}</span>
+  const html = `<span class="log-badge ${type}">${type.toUpperCase()}</span>
     <span class="log-text">${msg}</span>
     <span class="log-ts">${ts}</span>`;
+
+  // desktop panel
+  const wrap  = document.getElementById('log-entries');
+  const empty = document.getElementById('log-empty');
+  if (empty) empty.remove();
+  const el = document.createElement('div');
+  el.className = 'log-entry'; el.innerHTML = html;
   wrap.prepend(el);
 
+  // mobile drawer
+  const dwrap  = document.getElementById('log-entries-drawer');
+  const dempty = document.getElementById('log-empty-drawer');
+  if (dempty) dempty.remove();
+  const del = document.createElement('div');
+  del.className = 'log-entry'; del.innerHTML = html;
+  dwrap.prepend(del);
+
   logCount++;
-  document.getElementById('log-count').textContent = logCount + (logCount === 1 ? ' entrada' : ' entradas');
+  document.getElementById('log-count').textContent         = logCount;
+  document.getElementById('log-count-drawer').textContent  = logCount + (logCount === 1 ? ' entrada' : ' entradas');
+
+  // badge no botão flutuante
+  const badge = document.getElementById('log-badge-count');
+  badge.textContent = logCount > 99 ? '99+' : logCount;
+  badge.classList.add('show');
 }
 
 function clearLog() {
-  document.getElementById('log-entries').innerHTML =
-    `<div id="log-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg><span>Aguardando atividade...</span></div>`;
+  const empty = `<div id="log-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg><span>Aguardando atividade...</span></div>`;
+  document.getElementById('log-entries').innerHTML = empty;
+  document.getElementById('log-entries-drawer').innerHTML =
+    `<div id="log-empty-drawer" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--t-mute);font-size:12px;padding:32px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;opacity:.3"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      <span>Aguardando atividade...</span>
+    </div>`;
   logCount = 0;
-  document.getElementById('log-count').textContent = '0 entradas';
+  document.getElementById('log-count').textContent        = '0';
+  document.getElementById('log-count-drawer').textContent = '0 entradas';
+  document.getElementById('log-badge-count').classList.remove('show');
 }
+
+function openLogDrawer()  { document.getElementById('log-drawer').classList.add('open'); }
+function closeLogDrawer() { document.getElementById('log-drawer').classList.remove('open'); }
 
 // ── Unread badge ───────────────────────────────────────
 function setUnreadBadge(count) {
@@ -921,9 +1332,12 @@ const stripeAppearance = {
 
 window.addEventListener('DOMContentLoaded', () => {
   stripe = Stripe(CONFIG.pk);
-  document.getElementById('amount').addEventListener('change', () => {
-    if (selectedMethod) mountElement(selectedMethod.payment_method);
+  const amountInput = document.getElementById('amount');
+  amountInput.addEventListener('change', () => {
+    if (elements) mountElement();
+    updateFeeHint();
   });
+  amountInput.addEventListener('blur', updateFeeHint);
 });
 
 // ═══════════════════════════════════════════════════════
@@ -947,7 +1361,7 @@ async function doLogin() {
     apiToken = 'Bearer ' + token;
     log('ok', 'login ok — token guardado');
 
-    document.getElementById('logged-as').textContent = 'Autenticado como ' + email;
+    document.getElementById('logged-as').querySelector('span').textContent = email;
     document.getElementById('bottom-nav').classList.remove('hidden');
 
     navigate('dashboard');
@@ -1031,27 +1445,7 @@ async function loadDashboard() {
     if (!d.transactions?.length) {
       txEl.innerHTML = `<div class="empty-state" style="padding:20px"><p>Sem transações ainda</p></div>`;
     } else {
-      txEl.innerHTML = d.transactions.map(t => {
-        const isCredit = t.direction === 'credit';
-        const sign     = isCredit ? '+' : '−';
-        const amt      = fmt(t.net_amount);
-        const cur      = (t.currency || '').toUpperCase();
-        const date     = t.created_at ? new Date(t.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '—';
-        const icon     = isCredit
-          ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`
-          : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
-        return `<div class="tx-item">
-          <div class="tx-icon-wrap ${isCredit?'credit':'debit'}">${icon}</div>
-          <div class="tx-meta">
-            <span class="tx-type">${t.type}</span>
-            <span class="tx-date">${date}</span>
-          </div>
-          <div class="tx-right">
-            <span class="tx-amount ${isCredit?'credit':'debit'}">${sign}${amt} ${cur}</span>
-            <span class="badge ${t.status}">${t.status}</span>
-          </div>
-        </div>`;
-      }).join('');
+      txEl.innerHTML = d.transactions.map(t => renderTxItem(t, 'dashboard')).join('');
     }
     log('ok', `dashboard ok — ${balances.length} balance(s), ${d.transactions?.length ?? 0} transação(ões)`);
   } catch (e) { log('err', 'dashboard: ' + e.message); }
@@ -1097,46 +1491,182 @@ async function loadNotifCount() {
 // PAYMENT (Stripe)
 // ═══════════════════════════════════════════════════════
 async function loadPaymentMethods() {
-  log('info', 'GET /stripe/payment-methods');
+  const currency = getCurrency();
+  log('info', `GET /stripe/payment-methods?currency=${currency.toUpperCase()}`);
+  document.getElementById('methods-container').innerHTML =
+    `<div style="padding:12px"><span class="skel" style="width:70%"></span></div>`;
+  selectedMethod = null;
+  loadedMethods  = [];
+  document.getElementById('payment-element').innerHTML = '';
+  document.getElementById('fee-hint').style.display = 'none';
   try {
-    const { res, data } = await api('GET', '/stripe/payment-methods');
-    if (!res.ok) throw new Error('API ' + res.status);
-    const methods = data.data;
-    if (!methods?.length) throw new Error('Nenhum método disponível.');
+    const [pmRes, feRes] = await Promise.all([
+      api('GET', `/stripe/payment-methods?currency=${currency.toUpperCase()}`),
+      loadFeeEstimates(currency),
+    ]);
+    if (!pmRes.res.ok) throw new Error('API ' + pmRes.res.status);
+    const methods = pmRes.data.data ?? [];
+    if (!methods.length) {
+      document.getElementById('methods-container').innerHTML =
+        `<p style="font-size:12px;color:var(--s400);padding:8px 4px">Nenhum método disponível para ${currency.toUpperCase()}.</p>`;
+      return;
+    }
     renderMethods(methods);
     selectMethod(methods[0]);
-    log('ok', `${methods.length} método(s) carregado(s)`);
+    mountElement();
+    log('ok', `${methods.length} método(s) carregado(s) para ${currency.toUpperCase()}`);
   } catch (e) { log('err', e.message); }
 }
 
+async function loadFeeEstimates(currency) {
+  const cur = currency.toUpperCase();
+  if (feeEstimatesCache[cur]) return;
+  try {
+    const { res, data } = await api('GET', `/stripe/fee-estimates?currency=${cur}`);
+    if (res.ok) {
+      feeEstimatesCache[cur] = data.data ?? [];
+      log('info', `fee-estimates ok — ${feeEstimatesCache[cur].length} config(s) para ${cur}`);
+    } else {
+      log('warn', `fee-estimates HTTP ${res.status} — plataforma sem config para ${cur}`);
+      feeEstimatesCache[cur] = [];
+    }
+  } catch (e) {
+    log('warn', `fee-estimates erro — ${e.message}`);
+    feeEstimatesCache[cur] = [];
+  }
+}
+
 function renderMethods(methods) {
-  document.getElementById('methods-container').innerHTML = methods.map((m, i) =>
-    `<label class="pm-option">
-       <input type="radio" name="pm" value="${m.id}" ${i===0?'checked':''}/>
-       ${m.label || m.payment_method}
-     </label>`
-  ).join('');
-  document.querySelectorAll('#methods-container input').forEach((inp, i) => {
-    inp.addEventListener('change', () => selectMethod(methods[i]));
-  });
+  loadedMethods = methods;
 }
 
 function selectMethod(method) {
   selectedMethod = method;
-  log('info', `método: ${method.label || method.payment_method}`);
-  mountElement(method.payment_method);
+  log('info', `método selecionado (fee tracking): ${method.label || method.payment_method}`);
+  updateFeeHint();
+}
+
+function isCardMethod(pm) {
+  return pm === 'card' || pm.startsWith('card_');
+}
+
+// Mapeia o tipo da plataforma para o tipo real do Stripe.
+// Qualquer variante que comece com "card_" (card_eea, card_uk, card_non_eea, …) é só "card".
+function toStripeType(pm) {
+  if (pm === 'card' || pm.startsWith('card_')) return 'card';
+  return pm; // sepa_debit, ideal, bancontact, p24, etc. passam direto
+}
+
+// Deriva os paymentMethodTypes para stripe.elements() a partir dos métodos do endpoint,
+// removendo duplicatas (ex: card_eea + card_uk → apenas "card").
+function resolveStripeMethodTypes(methods) {
+  const seen = new Set();
+  for (const m of methods) seen.add(toStripeType(m.payment_method));
+  return [...seen];
 }
 
 function getCurrency()     { return document.getElementById('currency-select').value; }
-function onCurrencyChange(){ if (selectedMethod) mountElement(selectedMethod.payment_method); }
+function onCurrencyChange(){ loadPaymentMethods(); }
 
-function mountElement(pmType) {
-  const amount   = (parseInt(document.getElementById('amount').value) || 10) * 100;
-  elements       = stripe.elements({ appearance: stripeAppearance, mode:'payment', amount, currency: getCurrency(), paymentMethodTypes:[pmType] });
-  const el       = elements.create('payment');
+function mountElement() {
+  const amount          = (parseInt(document.getElementById('amount').value) || 10) * 100;
+  const paymentMethodTypes = loadedMethods.length ? resolveStripeMethodTypes(loadedMethods) : undefined;
+
+  elements = stripe.elements({
+    appearance: stripeAppearance,
+    mode: 'payment',
+    amount,
+    currency: getCurrency(),
+    ...(paymentMethodTypes ? { paymentMethodTypes } : {}),
+  });
+
+  const el = elements.create('payment');
   document.getElementById('payment-element').innerHTML = '';
   el.mount('#payment-element');
-  log('info', `element montado: ${pmType} — teste: 4242 4242 4242 4242`);
+
+  el.on('change', (event) => {
+    const type = event.value?.type;
+    if (!type) return;
+    const match = loadedMethods.find(m => toStripeType(m.payment_method) === type);
+    if (match && match !== selectedMethod) selectMethod(match);
+  });
+
+  const typesStr = paymentMethodTypes ? paymentMethodTypes.join(', ') : 'dinâmico (todos)';
+  log('info', `element montado — ${getCurrency().toUpperCase()} ${(amount / 100).toFixed(2)} — métodos: [${typesStr}]`);
+}
+
+function updateFeeHint() {
+  const hint   = document.getElementById('fee-hint');
+  const amount = parseFloat(document.getElementById('amount').value) || 0;
+
+  if (!selectedMethod || amount <= 0) { hint.style.display = 'none'; return; }
+
+  const currency = getCurrency().toUpperCase();
+  const sym      = CURRENCIES.find(c => c.code === currency)?.sym ?? currency;
+  const pm       = selectedMethod.payment_method;
+  const fees     = feeEstimatesCache[currency] ?? [];
+  const fmt      = v => `${sym}${v.toFixed(2)}`;
+
+  log('info', `fee-hint — pm:"${pm}" isCard:${isCardMethod(pm)} cache:${fees.length} configs`);
+
+  const cardNotes = {
+    'card':               'AT, BE, DE, ES, FR, PT…',
+    'card_eea':           'AT, BE, DE, ES, FR, PT…',
+    'card_uk':            'Emitido no GB',
+    'card_non_eea':       'Fora da EEA',
+    'card_international': 'Fora EEA e UK',
+  };
+
+  const isCard    = isCardMethod(pm);
+  const scenarios = isCard
+    ? fees.filter(f => isCardMethod(f.payment_method))
+          .map(f => ({ pm: f.payment_method, label: f.label, note: cardNotes[f.payment_method] ?? '' }))
+    : [{ pm, label: selectedMethod.label || pm, note: '' }];
+
+  // Mirror PHP's (int) round($amountCents * $pct + $fixed * 100) / 100
+  const roundCents = v => Math.round(v * 100) / 100;
+
+  const rows = scenarios.map(s => {
+    const cfg          = fees.find(f => f.payment_method === s.pm);
+    const platFee      = cfg ? roundCents(amount * parseFloat(cfg.platform_fee_percentage) + parseFloat(cfg.platform_fee_fixed)) : 0;
+    const stripePct    = cfg ? parseFloat(cfg.stripe_fee_percentage)  : 0;
+    const stripeFixed  = cfg ? parseFloat(cfg.stripe_fee_fixed)       : 0;
+    const hasStripeRef = stripePct > 0 || stripeFixed > 0;
+
+    let stripeLabel, stripeFee, netVal;
+    if (hasStripeRef) {
+      stripeFee   = roundCents(amount * stripePct + stripeFixed);
+      netVal      = Math.max(0, amount - stripeFee - platFee);
+      stripeLabel = `Stripe ~${fmt(stripeFee)}`;
+    } else {
+      stripeFee   = 0;
+      netVal      = Math.max(0, amount - platFee);
+      stripeLabel = 'Stripe variável*';
+    }
+
+    const platLabel  = platFee > 0 ? `Plat. ${fmt(platFee)}` : null;
+    const breakdown  = [stripeLabel, platLabel].filter(Boolean).join(' + ');
+    const netDisplay = hasStripeRef ? fmt(netVal) : `~${fmt(netVal)}`;
+
+    return `<div class="fee-hint-row">
+      <span class="fee-hint-label">${s.label}${s.note ? `<br><span style="font-size:10px;color:#c4b5fd">${s.note}</span>` : ''}</span>
+      <span class="fee-hint-breakdown">${breakdown}</span>
+      <span class="fee-hint-net">${netDisplay}</span>
+    </div>`;
+  }).join('');
+
+  hint.innerHTML = `
+    <div class="fee-hint-header">
+      <span class="fee-hint-title">Você receberá</span>
+      <span class="fee-hint-amount">${fmt(amount)}</span>
+    </div>
+    ${rows}
+    <p class="fee-hint-footnote">${isCard
+      ? '* taxa Stripe de referência pelo país do cartão — valor real confirmado via webhook'
+      : '* taxa Stripe calculada após pagamento e confirmada via webhook'
+    }</p>`;
+
+  hint.style.display = 'block';
 }
 
 async function run() {
@@ -1164,7 +1694,7 @@ async function run() {
     log('info', 'confirmando pagamento...');
     const { error: confirmErr, paymentIntent } = await stripe.confirmPayment({
       elements, clientSecret,
-      confirmParams: { return_url:'https://localhost' },
+      confirmParams: { return_url:'https://yoop.test' },
       redirect: 'if_required',
     });
     if (confirmErr) throw confirmErr;
@@ -1177,7 +1707,7 @@ async function run() {
     toast('err', e.message || 'Erro desconhecido');
   }
   btn.disabled = false;
-  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> Pagar';
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> Carregar';
 }
 
 async function getFundingInstructions() {
@@ -1382,7 +1912,13 @@ async function loadProfile() {
     const initials = name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
     const status = c.status || 'unknown';
 
-    document.getElementById('profile-avatar').textContent = initials;
+    const avatarEl = document.getElementById('profile-avatar');
+    if (c.avatar) {
+      const baseUrl = CONFIG.api.replace('/api', '');
+      avatarEl.innerHTML = `<img src="${baseUrl}/storage/${c.avatar}" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+    } else {
+      avatarEl.textContent = initials;
+    }
     document.getElementById('profile-name').textContent   = name;
     document.getElementById('profile-email').textContent  = email;
     document.getElementById('profile-badge').innerHTML    = `<span class="badge ${status}">${status}</span>`;
@@ -1450,6 +1986,204 @@ async function loadProfile() {
       `<div class="empty-state"><p>Erro: ${e.message}</p></div><button class="btn-logout" onclick="doLogout()">Encerrar sessão</button>`;
     log('err', 'perfil: ' + e.message);
   }
+}
+
+function triggerAvatarUpload() {
+  document.getElementById('avatar-file-input').click();
+}
+
+async function uploadAvatar(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const avatarEl = document.getElementById('profile-avatar');
+  avatarEl.innerHTML = '<div class="spin" style="border-top-color:#fff;width:24px;height:24px"></div>';
+
+  log('info', `POST /customer/upload-avatar — ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+
+  const formData = new FormData();
+  formData.append('avatar', file);
+
+  try {
+    const { res, data } = await apiUpload('/customer/upload-avatar', formData);
+    if (!res.ok) throw new Error(data.message || 'HTTP ' + res.status);
+
+    avatarEl.innerHTML = `<img src="${data.avatar_url}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+    log('ok', `avatar atualizado — ${data.avatar_url}`);
+    toast('ok', 'Foto de perfil atualizada!');
+  } catch (e) {
+    avatarEl.textContent = '?';
+    log('err', 'upload avatar: ' + e.message);
+    toast('err', e.message);
+  }
+
+  input.value = '';
+}
+
+// ═══════════════════════════════════════════════════════
+// TRANSACTIONS
+// ═══════════════════════════════════════════════════════
+function renderTxItem(t, from = 'transactions') {
+  const isCredit = t.direction === 'credit';
+  const fmt      = v => (v / 100).toFixed(2);
+  const sign     = isCredit ? '+' : '−';
+  const amt      = fmt(t.net_amount);
+  const cur      = (t.currency || '').toUpperCase();
+  const date     = t.created_at
+    ? new Date(t.created_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })
+    : '—';
+  const icon = isCredit
+    ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`
+    : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
+  return `<div class="tx-item" onclick="showTransactionDetail(${t.id},'${from}')">
+    <div class="tx-icon-wrap ${isCredit?'credit':'debit'}">${icon}</div>
+    <div class="tx-meta">
+      <span class="tx-type">${t.type}</span>
+      <span class="tx-date">${date}</span>
+    </div>
+    <div class="tx-right">
+      <span class="tx-amount ${isCredit?'credit':'debit'}">${sign}${amt} ${cur}</span>
+      <span class="badge ${t.status}">${t.status}</span>
+    </div>
+  </div>`;
+}
+
+async function loadTransactions(reset = true) {
+  if (reset) {
+    txPage = 1;
+    document.getElementById('tx-full-list').innerHTML =
+      `<div style="padding:14px 16px"><span class="skel" style="width:80%"></span></div>
+       <div style="padding:14px 16px"><span class="skel" style="width:65%"></span></div>
+       <div style="padding:14px 16px"><span class="skel" style="width:75%"></span></div>`;
+    document.getElementById('tx-load-more-wrap').style.display = 'none';
+  }
+
+  const btn = document.getElementById('btn-load-more');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spin dark" style="width:16px;height:16px;border-width:2px"></div>'; }
+
+  log('info', `GET /transactions?page=${txPage}&per_page=15`);
+  try {
+    const { res, data } = await api('GET', `/transactions?page=${txPage}&per_page=15`);
+    if (!res.ok) throw new Error('API ' + res.status);
+    const items = data.data ?? [];
+    txLastPage  = data.meta?.last_page ?? 1;
+
+    const list = document.getElementById('tx-full-list');
+    if (reset) {
+      list.innerHTML = items.length
+        ? items.map(t => renderTxItem(t)).join('')
+        : `<div class="empty-state" style="padding:32px"><p>Sem transações ainda</p></div>`;
+    } else {
+      list.insertAdjacentHTML('beforeend', items.map(t => renderTxItem(t)).join(''));
+    }
+
+    const wrap = document.getElementById('tx-load-more-wrap');
+    wrap.style.display = txPage < txLastPage ? 'block' : 'none';
+    if (btn) { btn.disabled = false; btn.textContent = 'Carregar mais'; }
+    log('ok', `transações: página ${txPage}/${txLastPage} — ${items.length} item(s)`);
+  } catch (e) {
+    if (reset) document.getElementById('tx-full-list').innerHTML =
+      `<div class="empty-state"><p>Erro: ${e.message}</p></div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Tentar novamente'; }
+    log('err', 'transactions: ' + e.message);
+  }
+}
+
+async function loadMoreTransactions() {
+  txPage++;
+  await loadTransactions(false);
+}
+
+async function showTransactionDetail(id, from = 'transactions') {
+  txDetailFrom = from;
+  navigate('tx-detail');
+  document.getElementById('tx-detail-body').innerHTML =
+    `<div class="empty-state"><div class="spin dark"></div><p>Carregando...</p></div>`;
+
+  log('info', `GET /transactions/${id}`);
+  try {
+    const { res, data } = await api('GET', `/transactions/${id}`);
+    if (!res.ok) throw new Error('API ' + res.status);
+    const t = data.data ?? data;
+    renderTransactionDetail(t);
+    log('ok', `transação ${id} — ${t.type} | ${t.status} | ${t.direction}`);
+  } catch (e) {
+    document.getElementById('tx-detail-body').innerHTML =
+      `<div class="empty-state"><p>Erro: ${e.message}</p></div>`;
+    log('err', `transaction ${id}: ${e.message}`);
+  }
+}
+
+function renderTransactionDetail(t) {
+  const isCredit = t.direction === 'credit';
+  const fmt      = v => (v / 100).toFixed(2);
+  const cur      = (t.currency || '').toUpperCase();
+  const icon     = isCredit
+    ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`
+    : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
+
+  const date    = t.created_at ? new Date(t.created_at).toLocaleString('pt-BR') : '—';
+  const settles = t.settles_at ? new Date(t.settles_at).toLocaleDateString('pt-BR') : null;
+
+  const bankRows = t.bank_transfer ? `
+    <div class="section">
+      <div class="section-header"><span class="section-title">Transferência bancária</span></div>
+      <div class="info-card">
+        <div class="info-row"><span class="info-label">Tipo</span><span class="info-value">${t.bank_transfer.type||'—'}</span></div>
+        ${t.bank_transfer.sender_name ? `<div class="info-row"><span class="info-label">Remetente</span><span class="info-value">${t.bank_transfer.sender_name}</span></div>` : ''}
+        ${t.bank_transfer.iban_last4  ? `<div class="info-row"><span class="info-label">IBAN (últimos 4)</span><span class="info-value mono">••••${t.bank_transfer.iban_last4}</span></div>` : ''}
+        ${t.bank_transfer.bic         ? `<div class="info-row"><span class="info-label">BIC</span><span class="info-value mono">${t.bank_transfer.bic}</span></div>` : ''}
+        ${t.bank_transfer.reference   ? `<div class="info-row"><span class="info-label">Referência</span><span class="info-value mono">${t.bank_transfer.reference}</span></div>` : ''}
+      </div>
+    </div>` : '';
+
+  const stripeRows = (t.stripe_payment_intent_id || t.stripe_charge_id) ? `
+    <div class="section">
+      <div class="section-header"><span class="section-title">Stripe</span></div>
+      <div class="info-card">
+        ${t.stripe_payment_intent_id ? `<div class="info-row"><span class="info-label">Payment Intent</span><span class="info-value mono" style="font-size:10px">${t.stripe_payment_intent_id}</span></div>` : ''}
+        ${t.stripe_charge_id         ? `<div class="info-row"><span class="info-label">Charge ID</span><span class="info-value mono" style="font-size:10px">${t.stripe_charge_id}</span></div>` : ''}
+      </div>
+    </div>` : '';
+
+  document.getElementById('tx-detail-body').innerHTML = `
+    <div class="tx-detail-hero">
+      <div class="tx-detail-icon">${icon}</div>
+      <div class="tx-detail-amount ${isCredit?'credit':'debit'}">${isCredit?'+':'−'}${fmt(t.net_amount)} ${cur}</div>
+      <div class="tx-detail-sub">${t.description || t.type || '—'}</div>
+    </div>
+
+    <div style="height:28px;flex-shrink:0"></div>
+
+    <div class="section">
+      <div class="section-header"><span class="section-title">Resumo</span></div>
+      <div class="info-card">
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="badge ${t.status}">${t.status}</span></span></div>
+        <div class="info-row"><span class="info-label">Tipo</span><span class="info-value">${t.type}</span></div>
+        <div class="info-row"><span class="info-label">Direção</span><span class="info-value">${t.direction}</span></div>
+        <div class="info-row"><span class="info-label">Método</span><span class="info-value">${t.payment_method_type||'—'}</span></div>
+        <div class="info-row"><span class="info-label">Data</span><span class="info-value">${date}</span></div>
+        ${settles ? `<div class="info-row"><span class="info-label">Liquidação</span><span class="info-value">${settles}</span></div>` : ''}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="section-title">Valores</span></div>
+      <div class="info-card">
+        <div class="info-row"><span class="info-label">Bruto</span><span class="info-value">${fmt(t.amount)} ${cur}</span></div>
+        <div class="info-row"><span class="info-label">Taxas</span><span class="info-value">${fmt(t.fee ?? 0)} ${cur}</span></div>
+        <div class="info-row" style="border-top:1px solid var(--s100)">
+          <span class="info-label" style="font-weight:700">Líquido</span>
+          <span class="info-value" style="font-weight:700;color:${isCredit?'#059669':'var(--red)'}">
+            ${fmt(t.net_amount)} ${cur}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    ${bankRows}
+    ${stripeRows}
+  `;
 }
 
 // ═══════════════════════════════════════════════════════

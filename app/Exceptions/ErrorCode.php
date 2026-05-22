@@ -23,5 +23,10 @@ class ErrorCode
     const STRIPE_SUBSCRIPTION_CANCEL_FAILED = 'stripe_subscription_cancel_failed';
     const STRIPE_CASH_BALANCE_FAILED = 'stripe_cash_balance_failed';
     const STRIPE_FUNDING_INSTRUCTIONS_FAILED = 'stripe_funding_instructions_failed';
+    const STRIPE_CLIENT_ERROR                = 'stripe_client_error';
     const MAINTENANCE_MODE = 'maintenance_mode';
+    const CUSTOMER_NOT_FOUND = 'customer_not_found';
+    const INSUFFICIENT_BALANCE = 'insufficient_balance';
+    const P2P_SELF_TRANSFER = 'p2p_self_transfer';
+    const PIN_NOT_CONFIGURED = 'pin_not_configured';
 }
