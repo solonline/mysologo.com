@@ -11,6 +11,13 @@ class PinController extends Controller
 {
     public function __construct(private DeviceAuthService $deviceAuthService) {}
 
+    /**
+     * Create PIN
+     *
+     * Registers a 4-digit PIN for a device, enabling fast PIN-based login via `POST /login-pin`.
+     *
+     * @tags Authentication
+     */
     public function store(CreatePinRequest $request)
     {
         $dto = CreatePinDTO::fromArray($request->validated());

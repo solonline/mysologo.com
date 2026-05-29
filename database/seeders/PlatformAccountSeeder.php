@@ -18,7 +18,7 @@ class PlatformAccountSeeder extends Seeder
                 'name'              => 'Yoop Platform',
                 'username'          => 'platform',
                 'type'              => 'platform',
-                'currency'          => 'eur',
+                'currency'          => 'EUR',
                 'status'            => 'active',
                 'email_verified_at' => now(),
                 'created_at'        => now(),

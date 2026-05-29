@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Test Client</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      gap: 0;
+    }
+
+    /* ─── Sidebar ─── */
+    #sidebar {
+      width: 240px;
+      min-width: 240px;
+      background: #1e293b;
+      border-right: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+    }
+
+    #sidebar h2 {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #64748b;
+      padding: 0 20px 12px;
+    }
+
+    .nav-group { margin-bottom: 20px; }
+
+    .nav-group-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #475569;
+      padding: 8px 20px 4px;
+    }
+
+    .nav-btn {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 8px 20px;
+      font-size: 13px;
+      color: #94a3b8;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+
+    .nav-btn:hover { background: #263048; color: #e2e8f0; }
+    .nav-btn.active { background: #1d4ed8; color: #fff; font-weight: 600; }
+
+    #token-badge {
+      margin: auto 20px 0;
+      padding: 10px 12px;
+      background: #0f172a;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #64748b;
+      word-break: break-all;
+    }
+
+    #token-badge span {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+
+    #token-value { color: #38bdf8; }
+
+    /* ─── Main ─── */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #topbar {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #topbar h1 { font-size: 16px; font-weight: 700; flex: 1; }
+
+    #base-url-input {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      width: 280px;
+    }
+
+    #content {
+      flex: 1;
+      display: flex;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    /* ─── Request Panel ─── */
+    #request-panel {
+      width: 380px;
+      min-width: 380px;
+      border-right: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 20px;
+      gap: 16px;
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .field-group { display: flex; flex-direction: column; gap: 6px; }
+
+    label { font-size: 12px; color: #94a3b8; }
+
+    input, textarea, select {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      transition: border-color .15s;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    textarea { resize: vertical; min-height: 120px; font-family: 'Consolas', monospace; font-size: 12px; }
+
+    .method-url { display: flex; gap: 8px; }
+
+    .method-badge {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      min-width: 56px;
+      text-align: center;
+    }
+
+    .GET  { background: #14532d; color: #4ade80; }
+    .POST { background: #1e3a5f; color: #60a5fa; }
+
+    #send-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+
+    #send-btn:hover { background: #1d4ed8; }
+    #send-btn:disabled { background: #334155; cursor: not-allowed; }
+
+    /* ─── Response Panel ─── */
+    #response-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 20px;
+      gap: 12px;
+    }
+
+    #response-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    #status-badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .status-2xx { background: #14532d; color: #4ade80; }
+    .status-4xx { background: #7c2d12; color: #fca5a5; }
+    .status-5xx { background: #4c1d95; color: #c4b5fd; }
+    .status-idle { background: #1e293b; color: #64748b; }
+
+    #response-time { color: #64748b; }
+
+    #response-body {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 16px;
+      overflow-y: auto;
+      font-family: 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* JSON syntax highlight */
+    .json-key    { color: #93c5fd; }
+    .json-string { color: #86efac; }
+    .json-number { color: #fbbf24; }
+    .json-bool   { color: #f472b6; }
+    .json-null   { color: #94a3b8; }
+
+    .divider { border: none; border-top: 1px solid #334155; }
+
+    #loading {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid #334155;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- ─── Sidebar ─── -->
+<nav id="sidebar">
+  <h2>API Test Client</h2>
+
+  <div class="nav-group">
+    <div class="nav-group-title">Auth</div>
+    <button class="nav-btn active" data-endpoint="login">POST /login</button>
+    <button class="nav-btn" data-endpoint="logout">POST /logout</button>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-title">Customer</div>
+    <button class="nav-btn" data-endpoint="me">GET /customer/me</button>
+    <button class="nav-btn" data-endpoint="dashboard">GET /dashboard/summary</button>
+    <button class="nav-btn" data-endpoint="balance">GET /account/balance</button>
+    <button class="nav-btn" data-endpoint="account">GET /account</button>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-title">Stripe</div>
+    <button class="nav-btn" data-endpoint="payment-methods">GET /stripe/payment-methods</button>
+    <button class="nav-btn" data-endpoint="create-payment">POST /stripe/create-intent-payment</button>
+    <button class="nav-btn" data-endpoint="create-funding">POST /stripe/create-funding</button>
+    <button class="nav-btn" data-endpoint="funding-instructions">GET /stripe/get-funding-instructions</button>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-title">Notifications</div>
+    <button class="nav-btn" data-endpoint="notifications">GET /notifications</button>
+  </div>
+
+  <div id="token-badge">
+    <span>Bearer Token</span>
+    <span id="token-value">—</span>
+  </div>
+</nav>
+
+<!-- ─── Main ─── -->
+<div id="main">
+  <div id="topbar">
+    <h1 id="endpoint-title">POST /login</h1>
+    <input id="base-url-input" value="/api" placeholder="Base URL (e.g. /api or http://localhost/api)" />
+  </div>
+
+  <div id="content">
+    <!-- Request -->
+    <div id="request-panel">
+      <div>
+        <div class="panel-title">Endpoint</div>
+        <div class="method-url">
+          <span id="method-badge" class="method-badge POST">POST</span>
+          <input id="url-input" style="flex:1" readonly />
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <div id="body-section">
+        <div class="panel-title">Request Body (JSON)</div>
+        <div class="field-group">
+          <textarea id="body-input"></textarea>
+        </div>
+      </div>
+
+      <button id="send-btn">Send Request</button>
+      <div id="loading"><div class="spinner"></div> Sending…</div>
+    </div>
+
+    <!-- Response -->
+    <div id="response-panel">
+      <div class="panel-title">Response</div>
+      <div id="response-meta">
+        <span id="status-badge" class="status-idle">—</span>
+        <span id="response-time"></span>
+      </div>
+      <div id="response-body">Escolha um endpoint e clique em <strong>Send Request</strong>.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─── State ───────────────────────────────────────────────────────────
+  let token = localStorage.getItem('api_test_token') || null;
+  let currentMethod = 'POST';
+  let currentPath   = '/login';
+
+  const endpoints = {
+    'login': {
+      method: 'POST', path: '/login', title: 'POST /login',
+      body: JSON.stringify({ email: 'test@example.com', password: 'password' }, null, 2),
+    },
+    'logout': {
+      method: 'POST', path: '/logout', title: 'POST /logout',
+      body: null,
+    },
+    'me': {
+      method: 'GET', path: '/customer/me', title: 'GET /customer/me',
+      body: null,
+    },
+    'dashboard': {
+      method: 'GET', path: '/dashboard/summary', title: 'GET /dashboard/summary',
+      body: null,
+    },
+    'balance': {
+      method: 'GET', path: '/account/balance', title: 'GET /account/balance',
+      body: null,
+    },
+    'account': {
+      method: 'GET', path: '/account', title: 'GET /account',
+      body: null,
+    },
+    'payment-methods': {
+      method: 'GET', path: '/stripe/payment-methods', title: 'GET /stripe/payment-methods',
+      body: null,
+    },
+    'create-payment': {
+      method: 'POST', path: '/stripe/create-intent-payment', title: 'POST /stripe/create-intent-payment',
+      body: JSON.stringify({ amount: 1000, currency: 'usd' }, null, 2),
+    },
+    'create-funding': {
+      method: 'POST', path: '/stripe/create-funding', title: 'POST /stripe/create-funding',
+      body: JSON.stringify({ amount: 5000, currency: 'usd' }, null, 2),
+    },
+    'funding-instructions': {
+      method: 'GET', path: '/stripe/get-funding-instructions', title: 'GET /stripe/get-funding-instructions',
+      body: null,
+    },
+    'notifications': {
+      method: 'GET', path: '/notifications', title: 'GET /notifications',
+      body: null,
+    },
+  };
+
+  // ─── DOM refs ─────────────────────────────────────────────────────────
+  const $title     = document.getElementById('endpoint-title');
+  const $methodBadge = document.getElementById('method-badge');
+  const $urlInput  = document.getElementById('url-input');
+  const $bodySection = document.getElementById('body-section');
+  const $bodyInput = document.getElementById('body-input');
+  const $sendBtn   = document.getElementById('send-btn');
+  const $loading   = document.getElementById('loading');
+  const $statusBadge = document.getElementById('status-badge');
+  const $responseTime = document.getElementById('response-time');
+  const $responseBody = document.getElementById('response-body');
+  const $tokenValue = document.getElementById('token-value');
+  const $baseUrl   = document.getElementById('base-url-input');
+
+  // ─── Token UI ─────────────────────────────────────────────────────────
+  function refreshTokenUI() {
+    $tokenValue.textContent = token ? token.substring(0, 32) + '…' : '—';
+    $tokenValue.style.color = token ? '#38bdf8' : '#64748b';
+  }
+  refreshTokenUI();
+
+  // ─── Load endpoint ────────────────────────────────────────────────────
+  function loadEndpoint(key) {
+    const ep = endpoints[key];
+    currentMethod = ep.method;
+    currentPath   = ep.path;
+
+    $title.textContent = ep.title;
+    $methodBadge.textContent = ep.method;
+    $methodBadge.className = 'method-badge ' + ep.method;
+    $urlInput.value = ep.path;
+
+    if (ep.body) {
+      $bodySection.style.display = 'block';
+      $bodyInput.value = ep.body;
+    } else {
+      $bodySection.style.display = 'none';
+      $bodyInput.value = '';
+    }
+
+    // Active state
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-endpoint="${key}"]`).classList.add('active');
+  }
+
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => loadEndpoint(btn.dataset.endpoint));
+  });
+
+  // ─── Send ─────────────────────────────────────────────────────────────
+  $sendBtn.addEventListener('click', sendRequest);
+
+  async function sendRequest() {
+    const base = $baseUrl.value.replace(/\/$/, '');
+    const url  = base + $urlInput.value;
+
+    const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+
+    let body = undefined;
+    if (currentMethod !== 'GET' && $bodyInput.value.trim()) {
+      try {
+        JSON.parse($bodyInput.value); // validate
+        body = $bodyInput.value;
+      } catch {
+        showError('JSON inválido no body.');
+        return;
+      }
+    }
+
+    $sendBtn.disabled = true;
+    $loading.style.display = 'flex';
+    $statusBadge.className = 'status-idle';
+    $statusBadge.textContent = '—';
+    $responseTime.textContent = '';
+    $responseBody.innerHTML = '';
+
+    const t0 = Date.now();
+
+    try {
+      const res = await fetch(url, { method: currentMethod, headers, body });
+      const elapsed = Date.now() - t0;
+
+      let data;
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('json')) {
+        data = await res.json();
+      } else {
+        data = await res.text();
+      }
+
+      // Status badge
+      $statusBadge.textContent = res.status + ' ' + res.statusText;
+      if (res.status >= 200 && res.status < 300) {
+        $statusBadge.className = 'status-2xx';
+      } else if (res.status >= 400 && res.status < 500) {
+        $statusBadge.className = 'status-4xx';
+      } else {
+        $statusBadge.className = 'status-5xx';
+      }
+
+      $responseTime.textContent = elapsed + ' ms';
+
+      // Auto-save token on login
+      if (currentPath === '/login' && res.ok && data?.token) {
+        token = data.token;
+        localStorage.setItem('api_test_token', token);
+        refreshTokenUI();
+      }
+
+      // Clear token on logout
+      if (currentPath === '/logout' && res.ok) {
+        token = null;
+        localStorage.removeItem('api_test_token');
+        refreshTokenUI();
+      }
+
+      $responseBody.innerHTML = typeof data === 'string'
+        ? escapeHtml(data)
+        : syntaxHighlight(JSON.stringify(data, null, 2));
+
+    } catch (err) {
+      showError('Erro de rede: ' + err.message);
+    } finally {
+      $sendBtn.disabled = false;
+      $loading.style.display = 'none';
+    }
+  }
+
+  function showError(msg) {
+    $statusBadge.className = 'status-4xx';
+    $statusBadge.textContent = 'Error';
+    $responseBody.textContent = msg;
+    $sendBtn.disabled = false;
+    $loading.style.display = 'none';
+  }
+
+  // ─── JSON highlight ───────────────────────────────────────────────────
+  function syntaxHighlight(json) {
+    json = escapeHtml(json);
+    return json.replace(
+      /("(\\u[\dA-Fa-f]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+\.?\d*(?:[eE][+-]?\d+)?)/g,
+      match => {
+        if (/^"/.test(match)) {
+          return /:$/.test(match)
+            ? `<span class="json-key">${match}</span>`
+            : `<span class="json-string">${match}</span>`;
+        }
+        if (/true|false/.test(match)) return `<span class="json-bool">${match}</span>`;
+        if (/null/.test(match))       return `<span class="json-null">${match}</span>`;
+        return `<span class="json-number">${match}</span>`;
+      }
+    );
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ─── Keyboard shortcut: Ctrl+Enter ────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sendRequest();
+  });
+
+  // init
+  loadEndpoint('login');
+</script>
+</body>
+</html>

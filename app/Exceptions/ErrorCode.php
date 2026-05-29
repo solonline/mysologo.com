@@ -29,4 +29,7 @@ class ErrorCode
     const INSUFFICIENT_BALANCE = 'insufficient_balance';
     const P2P_SELF_TRANSFER = 'p2p_self_transfer';
     const PIN_NOT_CONFIGURED = 'pin_not_configured';
+    const TPA_NOT_FOUND = 'tpa_not_found';
+    const TPA_NOT_ACTIVE = 'tpa_not_active';
+    const TPA_ALREADY_LINKED = 'tpa_already_linked';
 }

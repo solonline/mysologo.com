@@ -7,6 +7,8 @@ use App\Enums\TransactionType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property int         $id
@@ -30,7 +32,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  */
 class Transaction extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logFillable()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('transactions');
+    }
+
+    protected $table = 'stripe_transactions';
 
     protected $fillable = [
         'customer_id',
@@ -48,6 +61,7 @@ class Transaction extends Model
         'platform_fee',
         'net_amount',
         'currency',
+        'stripe_account_currency',
         'status',
         'description',
         'stripe_metadata',
@@ -56,15 +70,23 @@ class Transaction extends Model
         'bank_transfer_sender_name',
         'bank_transfer_bic',
         'bank_transfer_iban_last4',
+        'bank_transfer_amount',
+        'bank_transfer_fee',
+        'balance_settled_at',
+        'ebury_transfer_id',
+        'ebury_settled_at',
         'stripe_created_at',
         'settles_at',
+        'available_on',
     ];
 
     protected $casts = [
         'direction'         => TransactionDirection::class,
         'stripe_metadata'   => 'array',
-        'stripe_created_at' => 'datetime',
-        'settles_at'        => 'datetime',
+        'stripe_created_at'  => 'datetime',
+        'settles_at'         => 'datetime',
+        'balance_settled_at' => 'datetime',
+        'ebury_settled_at'   => 'datetime',
     ];
 
     public function getTypeAttribute(mixed $value): ?TransactionType

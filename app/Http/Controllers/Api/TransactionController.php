@@ -15,6 +15,14 @@ class TransactionController extends Controller
 {
     public function __construct(protected TransactionService $transactionService) {}
 
+    /**
+     * List Transactions
+     *
+     * Returns a paginated list of the authenticated customer's transactions, ordered by most recent.
+     *
+     * @tags Transactions
+     * @queryParam per_page integer optional Results per page (max 100). Defaults to 15. Example: 20
+     */
     public function index(Request $request): AnonymousResourceCollection
     {
         $perPage      = min((int) $request->input('per_page', 15), 100);
@@ -23,6 +31,13 @@ class TransactionController extends Controller
         return TransactionResource::collection($transactions);
     }
 
+    /**
+     * Get Transaction
+     *
+     * Returns the details of a single transaction belonging to the authenticated customer.
+     *
+     * @tags Transactions
+     */
     public function show(Request $request, int $id): TransactionResource
     {
         $transaction = $this->transactionService->show($request->user(), $id);
@@ -30,6 +45,13 @@ class TransactionController extends Controller
         return TransactionResource::make($transaction);
     }
 
+    /**
+     * P2P Transfer
+     *
+     * Transfers balance to another customer. PIN and device token are required to confirm the operation. Amounts are in the smallest currency unit (e.g. cents for EUR).
+     *
+     * @tags Transactions
+     */
     public function p2p(P2PTransferRequest $request): JsonResponse
     {
         $data = $request->validated();

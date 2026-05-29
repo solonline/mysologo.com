@@ -49,11 +49,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Aplica o middleware de rate limit (ThrottleRequests) em todas as rotas API
         // $middleware->api(prepend:[ThrottleRequests::class]);
         $middleware->alias([
-            'idempotency' => IdempotencyRequiredMiddleware::class,
-            'customer.active' => EnsureCustomerIsActiveMiddleware::class,
-            'customer.email.verified' => EnsureCustomerEmailVerifiedMiddleware::class,
-            'customer.document.approved' => EnsureCustomerDocumentApprovedMiddleware::class,
-            'maintenance' => MaintenanceModeMiddleware::class,
+            'idempotency'               => IdempotencyRequiredMiddleware::class,
+            'customer.active'           => EnsureCustomerIsActiveMiddleware::class,
+            'customer.email.verified'   => EnsureCustomerEmailVerifiedMiddleware::class,
+            'customer.document.approved'=> EnsureCustomerDocumentApprovedMiddleware::class,
+            'maintenance'               => MaintenanceModeMiddleware::class,
+            'auth.merchant'             => \App\Http\Middleware\AuthMerchant::class,
         ]);
 
         $middleware->api(prepend: [

@@ -2,6 +2,7 @@
 namespace App\Providers;
 
 use App\Clients\StripeClient;
+use Illuminate\Support\Facades\Log;
 use Stripe\Exception\ApiConnectionException;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Exception\AuthenticationException;
@@ -29,7 +30,11 @@ class StripeProvider
 
     public function createPaymentIntent(array $data): array
     {
-        return $this->run('createPaymentIntent', fn () => $this->client->createPaymentIntent($data));
+        $currency = $data['currency'] ?? 'eur';
+
+        return $this->run('createPaymentIntent', fn () =>
+            $this->client->forCurrency($currency)->createPaymentIntent($data)
+        );
     }
 
     public function attachPaymentMethod(string $paymentMethodId, string $customerId): array
@@ -72,6 +77,29 @@ class StripeProvider
     {
         return $this->run('getBalanceTransaction', fn () =>
             $this->client->getBalanceTransaction($balanceTransactionId)
+        );
+    }
+
+    public function createPaymentIntentWithMode(array $data, string $mode): array
+    {
+        $currency = strtolower($data['currency'] ?? 'eur');
+
+        return $this->run('createPaymentIntent', fn () =>
+            $this->client->forMode($mode, $currency)->createPaymentIntent($data)
+        );
+    }
+
+    public function getPaymentIntentWithMode(string $paymentIntentId, string $mode, string $currency = 'eur'): array
+    {
+        return $this->run('getPaymentIntent', fn () =>
+            $this->client->forMode($mode, $currency)->getPaymentIntent($paymentIntentId)
+        );
+    }
+
+    public function capturePaymentIntent(string $paymentIntentId): array
+    {
+        return $this->run('capturePaymentIntent', fn () =>
+            $this->client->capturePaymentIntent($paymentIntentId)
         );
     }
 

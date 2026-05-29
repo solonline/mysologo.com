@@ -4,7 +4,10 @@ namespace App\Providers;
 
 use App\Events\CustomerApproved;
 use App\Listeners\CreateStripeCustomer;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -103,7 +106,10 @@ class AppServiceProvider extends ServiceProvider
             return new \App\Providers\StripeProvider($app->make(\App\Clients\StripeClient::class));
         });
         $this->app->bind(\App\Services\StripeService::class, function ($app) {
-            return new \App\Services\StripeService($app->make(\App\Providers\StripeProvider::class));
+            return new \App\Services\StripeService(
+                $app->make(\App\Providers\StripeProvider::class),
+                $app->make(\App\Contracts\MerchantPaymentRequestRepositoryInterface::class),
+            );
         });
 
         $this->app->bind(\App\Contracts\TransactionRepositoryInterface::class, function ($app) {
@@ -132,6 +138,21 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(\App\Contracts\PhoneVerificationRepositoryInterface::class, function ($app) {
             return new \App\Repositories\PhoneVerificationRepository();
         });
+
+        // Merchant
+        $this->app->bind(\App\Contracts\MerchantRepositoryInterface::class, function ($app) {
+            return new \App\Repositories\MerchantRepository();
+        });
+        $this->app->bind(\App\Contracts\MerchantPaymentRequestRepositoryInterface::class, function ($app) {
+            return new \App\Repositories\MerchantPaymentRequestRepository();
+        });
+        $this->app->bind(\App\Services\MerchantService::class, function ($app) {
+            return new \App\Services\MerchantService(
+                $app->make(\App\Contracts\MerchantRepositoryInterface::class),
+                $app->make(\App\Contracts\MerchantPaymentRequestRepositoryInterface::class),
+                $app->make(\App\Providers\StripeProvider::class),
+            );
+        });
     }
 
     /**
@@ -141,17 +162,21 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(CustomerApproved::class, CreateStripeCustomer::class);
 
-        // Define o rate limit para o grupo 'api'.
-        // Se o usuário estiver autenticado, limita por ID do usuário + IP.
-        // Se não estiver autenticado, limita apenas por IP.
-        // Isso evita que múltiplos usuários na mesma rede (mesmo IP) sejam bloqueados pelo limite global.
-        \Illuminate\Support\Facades\RateLimiter::for('api', function ($request) {
-            if ($request->user()) {
-                // Limite de 60 requisições por minuto por usuário + IP
-                return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->user()->id . '|' . $request->ip());
-            }
-            // Limite de 60 requisições por minuto por IP para não autenticados
-            return \Illuminate\Cache\RateLimiting\Limit::perMinute(60)->by($request->ip());
+        RateLimiter::for('api', function (Request $request) {
+            return $request->user()
+                ? Limit::perMinute(60)->by($request->user()->id . '|' . $request->ip())
+                : Limit::perMinute(60)->by($request->ip());
+        });
+
+        // Limite para criação de payment intents: 10 por minuto por utilizador.
+        // Protege contra abuso da API Stripe e escrita excessiva no DB.
+        // Retorna 429 com header Retry-After para o cliente saber quando tentar de novo.
+        RateLimiter::for('stripe-intent', function (Request $request) {
+            return Limit::perMinute(10)
+                ->by($request->user()?->id ?? $request->ip())
+                ->response(fn () => response()->json([
+                    'message' => 'Muitas tentativas. Tente novamente em breve.',
+                ], 429));
         });
 
         // Configura o header Bearer global para a documentação Scramble (OpenAPI)
@@ -170,7 +195,7 @@ class AppServiceProvider extends ServiceProvider
             if (!Str::startsWith($uri, 'api/')) {
                 return false;
             }
-            if (Str::startsWith($uri, 'api/admin') || $uri === 'api/webhooks/didit') {
+            if (Str::startsWith($uri, 'api/admin') || Str::startsWith($uri, 'api/webhooks/')) {
                 return false;
             }
             return true;

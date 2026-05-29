@@ -9,17 +9,6 @@ class SettingsSeeder extends Seeder
 {
     public function run(): void
     {
-        // Remove old flat keys if they exist (migration to namespaced keys)
-        $oldKeys = [
-            'company_name', 'email', 'phone', 'address', 'city', 'state',
-            'postal_code', 'country', 'fiscal_id', 'website', 'support_email',
-            'description', 'social_links', 'maintenance_mode', 'logo', 'favicon',
-            'timezone', 'time_expires_token',
-            'stripe_public_key', 'stripe_secret_key', 'stripe_webhook_secret', 'stripe_url',
-            'app360_base_url', 'app360_auth_token', 'app360_username', 'app360_password',
-        ];
-        DB::table('settings')->whereIn('key', $oldKeys)->delete();
-
         $settings = [
             // Company
             ['key' => 'company.name',          'label' => 'Nome da empresa',        'type' => 'text',     'value' => 'Yoop'],
@@ -42,11 +31,23 @@ class SettingsSeeder extends Seeder
             ['key' => 'system.timezone',            'label' => 'Timezone',                'type' => 'timezone', 'value' => 'Europe/Lisbon'],
             ['key' => 'system.time_expires_token',  'label' => 'Expiração token (horas)', 'type' => 'number',   'value' => '1'],
             ['key' => 'system.maintenance_mode',    'label' => 'Modo de manutenção',      'type' => 'toggle',   'value' => 'false'],
-            // Stripe
-            ['key' => 'stripe.public_key',      'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
-            ['key' => 'stripe.secret_key',      'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
-            ['key' => 'stripe.webhook_secret',  'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => 'whsec_1234567890abcdef'],
-            ['key' => 'stripe.url',             'label' => 'URL da API',              'type' => 'url',    'value' => 'https://api.stripe.com/v1'],
+            // Stripe — por moeda (cada moeda tem a sua conta Stripe separada)
+            // EUR
+            ['key' => 'stripe.eur.public_key',     'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.eur.secret_key',     'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.eur.webhook_secret', 'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => 'whsec_1234567890abcdef'],
+            // USD
+            ['key' => 'stripe.usd.public_key',     'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.usd.secret_key',     'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.usd.webhook_secret', 'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => ''],
+            // GBP
+            ['key' => 'stripe.gbp.public_key',     'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.gbp.secret_key',     'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.gbp.webhook_secret', 'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => ''],
+            // CHF
+            ['key' => 'stripe.chf.public_key',     'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.chf.secret_key',     'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.chf.webhook_secret', 'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => ''],
             // sms
             ['key' => 'sms.base_url',    'label' => 'URL Base',   'type' => 'url',    'value' => 'https://messaging.gatewayapi.com'],
             ['key' => 'sms.auth_token',  'label' => 'Auth Token', 'type' => 'secret', 'value' => ''],

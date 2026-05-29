@@ -11,7 +11,11 @@ use App\Http\Requests\SubmitCorporateDocumentRequest;
 use App\Http\Requests\Customer\UpdateCustomerRequest;
 use App\Http\Requests\Customer\FindByUsernameRequest;
 use App\Http\Requests\Customer\UploadAvatarRequest;
+use App\Http\Resources\CustomerProfileResource;
+use App\Http\Resources\CustomerResource;
+use App\Http\Resources\DocumentUploadResource;
 use App\Http\Resources\PublicCustomerResource;
+use App\Http\Resources\ResponsibleResource;
 use App\Services\CustomerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +27,14 @@ class CustomerController extends Controller
     {
     }
 
-    public function me(Request $request)
+    /**
+     * Get Authenticated Customer
+     *
+     * Returns the profile of the authenticated customer along with KYC and verification status.
+     *
+     * @tags Profile
+     */
+    public function me(Request $request): CustomerProfileResource
     {
         $user = $request->user();
         $requiresResponsible = false;
@@ -52,44 +63,72 @@ class CustomerController extends Controller
             $message = $kyc['message'] ?? null;
         }
 
-        $userArray = $user->toArray();
-        $response = array_merge($userArray, [
+        return CustomerProfileResource::make([
+            'customer'             => $user,
             'requires_responsible' => $requiresResponsible,
-            'kyc_status' => $kycStatus,
-            'email_verified' => $user->hasVerifiedEmail(),
-            'document_verified' => $user->doc_status,
-            'didit_session' => $diditSession,
-            'phone_verified' => $user->phoneVerifications()->where('verified_at', '!=', null)->exists(),
-            'message' => $message,
+            'kyc_status'           => $kycStatus,
+            'email_verified'       => $user->hasVerifiedEmail(),
+            'document_verified'    => $user->doc_status,
+            'didit_session'        => $diditSession,
+            'phone_verified'       => $user->phoneVerifications()->where('verified_at', '!=', null)->exists(),
+            'message'              => $message,
         ]);
-        return response()->json($response);
     }
 
-    public function update(UpdateCustomerRequest $request)
+    /**
+     * Update Profile
+     *
+     * Updates one or more fields of the authenticated customer's profile. All fields are optional.
+     *
+     * @tags Profile
+     */
+    public function update(UpdateCustomerRequest $request): CustomerResource
     {
         $dto = UpdateCustomerDTO::fromArray($request->validated());
-        return $this->customerService->update($request->user(), $dto);
+        $customer = $this->customerService->update($request->user(), $dto);
+        return CustomerResource::make($customer);
     }
 
-    public function createResponsible(CreateResponsibleRequest $request)
+    /**
+     * Create Corporate Responsible
+     *
+     * Creates or updates the legal representative linked to a corporate account. Required before KYC verification can proceed.
+     *
+     * @tags KYC
+     */
+    public function createResponsible(CreateResponsibleRequest $request): ResponsibleResource
     {
         $dto = CreateResponsibleDTO::fromArray($request->validated());
-        return $this->customerService->updateOrCreateResponsible($request->user(), $dto);
+        $result = $this->customerService->updateOrCreateResponsible($request->user(), $dto);
+        return ResponsibleResource::make($result);
     }
 
-    // public function submitCorporateDocuments(SubmitCorporateDocumentRequest $request)
-    public function submitCorporateDocuments(SubmitCorporateDocumentRequest $request)
+    /**
+     * Submit Corporate Document
+     *
+     * Uploads the company's identification document (PDF) for KYC review.
+     *
+     * @tags KYC
+     */
+    public function submitCorporateDocuments(SubmitCorporateDocumentRequest $request): \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
     {
         $result = $this->customerService->uploadDocument(
             $request->user(),
-            $request->file('document'),      // UploadedFile
-            'front_document',                // field
-            $request->input('country')     // country
+            $request->file('document'),
+            'front_document',
+            $request->input('country')
         );
-        return response()->json($result, 201);
+        return DocumentUploadResource::make($result)->response()->setStatusCode(201);
     }
 
-    public function uploadAvatar(UploadAvatarRequest $request)
+    /**
+     * Upload Avatar
+     *
+     * Replaces the customer's profile picture.
+     *
+     * @tags Profile
+     */
+    public function uploadAvatar(UploadAvatarRequest $request): JsonResponse
     {
         $customer = $this->customerService->uploadAvatar(
             $request->user(),
@@ -97,11 +136,18 @@ class CustomerController extends Controller
         );
 
         return response()->json([
-            'avatar' => $customer->avatar,
+            'avatar'     => $customer->avatar,
             'avatar_url' => asset('storage/' . $customer->avatar),
         ]);
     }
 
+    /**
+     * Find Customer by Username
+     *
+     * Looks up an active, KYC-approved customer by username. Used for P2P transfer recipient lookup. The authenticated customer is always excluded from results.
+     *
+     * @tags Profile
+     */
     public function findByUsername(FindByUsernameRequest $request): JsonResponse
     {
         $customer = $this->customerService->findByUsername(
@@ -116,7 +162,14 @@ class CustomerController extends Controller
         return response()->json(new PublicCustomerResource($customer));
     }
 
-    public function sendValidationEmail(Request $request)
+    /**
+     * Send Validation Email
+     *
+     * Sends (or resends) the email address verification link to the authenticated customer.
+     *
+     * @tags Profile
+     */
+    public function sendValidationEmail(Request $request): JsonResponse
     {
         $customer = $request->user();
         $validationUrl = $this->customerService->generateEmailValidationUrl($customer);

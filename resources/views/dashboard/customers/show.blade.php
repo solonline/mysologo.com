@@ -52,32 +52,52 @@
     <div class="xl:col-span-2 flex flex-col gap-6">
 
         {{-- Informações Gerais --}}
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+        <div x-data="{ editing: {{ $errors->any() ? 'true' : 'false' }} }"
+             class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+
             <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-slate-900">Informações Gerais</h2>
                 <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border {{ $custBadge['badge'] }}">
-                        <span class="w-1.5 h-1.5 rounded-full mr-1.5 {{ $custBadge['dot'] }}"></span>
-                        {{ $custBadge['label'] }}
-                    </span>
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border {{ $docBadge['badge'] }}">
-                        <span class="w-1.5 h-1.5 rounded-full mr-1.5 {{ $docBadge['dot'] }}"></span>
-                        Doc: {{ __($docBadge['label']) }}
-                    </span>
+                    {{-- Badges (view mode) --}}
+                    <template x-if="!editing">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border {{ $custBadge['badge'] }}">
+                                <span class="w-1.5 h-1.5 rounded-full mr-1.5 {{ $custBadge['dot'] }}"></span>
+                                {{ $custBadge['label'] }}
+                            </span>
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border {{ $docBadge['badge'] }}">
+                                <span class="w-1.5 h-1.5 rounded-full mr-1.5 {{ $docBadge['dot'] }}"></span>
+                                Doc: {{ $docBadge['label'] }}
+                            </span>
+                        </div>
+                    </template>
+
+                    @can('customers.edit')
+                    <button x-show="!editing" @click="editing = true"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                        Editar
+                    </button>
+                    @endcan
                 </div>
             </div>
-            <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+
+            {{-- VIEW MODE --}}
+            <div x-show="!editing" class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                 @php
                     $fields = [
-                        ['label' => 'Nome completo', 'value' => $customer->name],
-                        ['label' => 'Username',      'value' => $customer->username],
-                        ['label' => 'Email',         'value' => $customer->email],
-                        ['label' => 'Telefone',      'value' => $customer->phone],
-                        ['label' => 'Tipo',          'value' => ucfirst($customer->type ?? '—')],
-                        ['label' => 'Idioma',        'value' => strtoupper($customer->language ?? '—')],
-                        ['label' => 'Email verificado', 'value' => $customer->email_verified_at?->format('d/m/Y H:i') ?? 'Não verificado'],
-                        ['label' => 'Cadastro',      'value' => $customer->created_at?->format('d/m/Y H:i')],
+                        ['label' => 'Nome completo',       'value' => $customer->name],
+                        ['label' => 'Username',            'value' => $customer->username],
+                        ['label' => 'Email',               'value' => $customer->email],
+                        ['label' => 'Telefone',            'value' => $customer->phone],
+                        ['label' => 'Tipo',                'value' => ucfirst($customer->type ?? '—')],
+                        ['label' => 'Idioma',              'value' => strtoupper($customer->language ?? '—')],
+                        ['label' => 'Moeda',               'value' => strtoupper($customer->currency ?? '—')],
+                        ['label' => 'Email verificado',    'value' => $customer->email_verified_at?->format('d/m/Y H:i') ?? 'Não verificado'],
                         ['label' => 'Telefone verificado', 'value' => $customer->phoneVerifications->last()?->verified_at?->format('d/m/Y H:i') ?? 'Não verificado'],
+                        ['label' => 'Cadastro',            'value' => $customer->created_at?->format('d/m/Y H:i')],
                     ];
                 @endphp
                 @foreach ($fields as $f)
@@ -87,31 +107,140 @@
                 </div>
                 @endforeach
             </div>
-        </div>
+
+            {{-- EDIT MODE --}}
+            <div x-show="editing" x-cloak>
+                <form method="POST" action="{{ route('dashboard.customers.update', $customer) }}">
+                    @csrf
+                    @method('PUT')
+
+                    <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nome completo</label>
+                            <input type="text" name="name" value="{{ old('name', $customer->name) }}" required
+                                   class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('name') border-red-400 @enderror">
+                            @error('name')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Email</label>
+                            <input type="email" name="email" value="{{ old('email', $customer->email) }}" required
+                                   class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('email') border-red-400 @enderror">
+                            @error('email')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Telefone</label>
+                            <input type="text" name="phone" value="{{ old('phone', $customer->phone) }}"
+                                   class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('phone') border-red-400 @enderror">
+                            @error('phone')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moeda</label>
+                            <input type="text" name="currency" value="{{ old('currency', $customer->currency) }}" maxlength="3"
+                                   placeholder="EUR"
+                                   class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 uppercase @error('currency') border-red-400 @enderror">
+                            @error('currency')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Idioma</label>
+                            <input type="text" name="language" value="{{ old('language', $customer->language) }}" maxlength="5"
+                                   placeholder="pt"
+                                   class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('language') border-red-400 @enderror">
+                            @error('language')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
+                            <select name="status"
+                                    class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('status') border-red-400 @enderror">
+                                @foreach ($customerStatuses as $cs)
+                                <option value="{{ $cs->value }}" {{ old('status', $custVal) === $cs->value ? 'selected' : '' }}>
+                                    {{ $cs->value }}
+                                </option>
+                                @endforeach
+                            </select>
+                            @error('status')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Status do Documento</label>
+                            <select name="doc_status"
+                                    class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('doc_status') border-red-400 @enderror">
+                                <option value="">— Não definido —</option>
+                                @foreach ($documentStatuses as $ds)
+                                <option value="{{ $ds->value }}" {{ old('doc_status', $docVal) === $ds->value ? 'selected' : '' }}>
+                                    {{ $ds->value }}
+                                </option>
+                                @endforeach
+                            </select>
+                            @error('doc_status')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        </div>
+
+                        {{-- Read-only fields --}}
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Username</label>
+                            <p class="px-3 py-2 text-sm text-slate-500 bg-slate-100 border border-slate-200 rounded-xl">{{ $customer->username }}</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo</label>
+                            <p class="px-3 py-2 text-sm text-slate-500 bg-slate-100 border border-slate-200 rounded-xl">{{ ucfirst($customer->type ?? '—') }}</p>
+                        </div>
+
+                    </div>
+
+                    <div class="px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+                        <button type="button" @click="editing = false"
+                                class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-500/25">
+                            Guardar alterações
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+        </div>{{-- fim Informações Gerais --}}
 
         {{-- Documentos --}}
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
             <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-900">Documentos</h2>
+                <h2 class="text-sm font-semibold text-slate-900">Documentos KYC</h2>
                 <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->documents->count() }}</span>
             </div>
             @forelse ($customer->documents as $doc)
-            <div class="px-5 py-4 border-b border-slate-50 last:border-0">
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+            <div x-data="{ showJson: false }" class="px-5 py-4 border-b border-slate-50 last:border-0">
+
+                {{-- Campos de identidade --}}
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 mb-4">
                     @php
                         $docFields = [
-                            ['label' => 'Tipo', 'value' => $doc->document_type],
-                            ['label' => 'Número', 'value' => $doc->document_number],
-                            ['label' => 'Nome', 'value' => $doc->full_name],
-                            ['label' => 'Nascimento', 'value' => $doc->date_of_birth],
-                            ['label' => 'Validade', 'value' => $doc->expiration_date],
-                            ['label' => 'Emissão', 'value' => $doc->date_of_issue],
-                            ['label' => 'País Emissor', 'value' => $doc->issuing_state_name],
-                            ['label' => 'Nacionalidade', 'value' => $doc->nationality],
+                            ['label' => 'Tipo',            'value' => $doc->document_type],
+                            ['label' => 'Número',          'value' => $doc->document_number],
+                            ['label' => 'Número Pessoal',  'value' => $doc->personal_number],
+                            ['label' => 'Nome completo',   'value' => $doc->full_name],
+                            ['label' => 'Primeiro nome',   'value' => $doc->first_name],
+                            ['label' => 'Último nome',     'value' => $doc->last_name],
+                            ['label' => 'Nascimento',      'value' => $doc->date_of_birth],
+                            ['label' => 'Idade',           'value' => $doc->age],
+                            ['label' => 'Género',          'value' => $doc->gender],
+                            ['label' => 'Estado civil',    'value' => $doc->marital_status],
+                            ['label' => 'Naturalidade',    'value' => $doc->place_of_birth],
+                            ['label' => 'Nacionalidade',   'value' => $doc->nationality],
+                            ['label' => 'País Emissor',    'value' => $doc->issuing_state_name],
+                            ['label' => 'Emissão',         'value' => $doc->date_of_issue],
+                            ['label' => 'Validade',        'value' => $doc->expiration_date],
+                            ['label' => 'Morada',          'value' => $doc->formatted_address ?? $doc->address],
                         ];
                     @endphp
                     @foreach ($docFields as $f)
-                    @if ($f['value'])
+                    @if (!is_null($f['value']) && $f['value'] !== '')
                     <div>
                         <p class="text-xs text-slate-400 font-medium mb-0.5">{{ $f['label'] }}</p>
                         <p class="text-sm text-slate-800 font-medium">{{ $f['value'] }}</p>
@@ -120,23 +249,53 @@
                     @endforeach
                 </div>
 
-                {{-- Imagens do documento --}}
+                {{-- Scores --}}
+                @php
+                    $scores = array_filter([
+                        'Face Match'         => $doc->face_match_score,
+                        'Liveness'           => $doc->liveness_score,
+                        'Face Match (Frente)' => $doc->front_image_camera_front_face_match_score,
+                        'Face Match (Verso)'  => $doc->back_image_camera_front_face_match_score,
+                    ]);
+                @endphp
+                @if (!empty($scores))
+                <div class="flex flex-wrap gap-2 mb-4">
+                    @foreach ($scores as $label => $score)
+                    @php
+                        $pct = round($score * 100, 1);
+                        $color = $pct >= 80 ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                               : ($pct >= 60 ? 'text-amber-700 bg-amber-50 border-amber-200'
+                               : 'text-red-700 bg-red-50 border-red-200');
+                    @endphp
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs {{ $color }}">
+                        <span>{{ $label }}</span>
+                        <span class="font-bold">{{ $pct }}%</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                {{-- Imagens --}}
                 @php
                     $mediaFields = [
-                        ['label' => 'Frente',      'field' => 'front_image'],
-                        ['label' => 'Verso',       'field' => 'back_image'],
-                        ['label' => 'Retrato',     'field' => 'portrait_image'],
-                        ['label' => 'Frente (Full)','field' => 'full_front_image'],
-                        ['label' => 'Verso (Full)', 'field' => 'full_back_image'],
+                        ['label' => 'Frente',             'field' => 'front_image'],
+                        ['label' => 'Verso',              'field' => 'back_image'],
+                        ['label' => 'Retrato',            'field' => 'portrait_image'],
+                        ['label' => 'Frente (Full)',      'field' => 'full_front_image'],
+                        ['label' => 'Verso (Full)',       'field' => 'full_back_image'],
+                        ['label' => 'Frente (Câmera F)', 'field' => 'front_image_camera_front'],
+                        ['label' => 'Verso (Câmera F)',  'field' => 'back_image_camera_front'],
                     ];
+                    $hasMedia = collect($mediaFields)->some(fn($m) => !empty($doc->{$m['field']}));
                     $videoFields = [
                         ['label' => 'Vídeo Frente', 'field' => 'front_video'],
                         ['label' => 'Vídeo Verso',  'field' => 'back_video'],
                     ];
+                    $hasVideo = collect($videoFields)->some(fn($v) => !empty($doc->{$v['field']}));
                 @endphp
-                @php $hasMedia = collect($mediaFields)->some(fn($m) => !empty($doc->{$m['field']})); @endphp
+
                 @if ($hasMedia)
-                <div class="mt-3">
+                <div class="mb-3">
                     <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Imagens</p>
                     <div class="flex flex-wrap gap-3">
                         @foreach ($mediaFields as $m)
@@ -155,9 +314,8 @@
                 </div>
                 @endif
 
-                @php $hasVideo = collect($videoFields)->some(fn($v) => !empty($doc->{$v['field']})); @endphp
                 @if ($hasVideo)
-                <div class="mt-3">
+                <div class="mb-3">
                     <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Vídeos</p>
                     <div class="flex flex-wrap gap-3">
                         @foreach ($videoFields as $v)
@@ -174,23 +332,35 @@
                 </div>
                 @endif
 
-                {{-- Scores --}}
-                @if ($doc->face_match_score || $doc->liveness_score)
-                <div class="mt-3 flex flex-wrap gap-3">
-                    @if ($doc->face_match_score)
-                    <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                        <span class="text-slate-500">Face Match</span>
-                        <span class="font-semibold text-slate-900">{{ number_format($doc->face_match_score * 100, 1) }}%</span>
+                {{-- Análises JSON (collapsible) --}}
+                @php
+                    $jsonSections = array_filter([
+                        'Endereço Estruturado' => $doc->parsed_address,
+                        'Análise de IP'        => $doc->ip_analyses,
+                        'Verificações NFC'     => $doc->nfc_verifications,
+                        'Campos Extras'        => $doc->extra_fields,
+                    ]);
+                @endphp
+                @if (!empty($jsonSections))
+                <div class="mt-3">
+                    <button @click="showJson = !showJson"
+                            class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors">
+                        <svg class="w-3.5 h-3.5 transition-transform" :class="showJson ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        <span x-text="showJson ? 'Ocultar dados de análise' : 'Ver dados de análise'"></span>
+                    </button>
+                    <div x-show="showJson" x-cloak class="mt-3 space-y-3">
+                        @foreach ($jsonSections as $label => $data)
+                        <div>
+                            <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">{{ $label }}</p>
+                            <pre class="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-3 overflow-x-auto">{{ json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                        </div>
+                        @endforeach
                     </div>
-                    @endif
-                    @if ($doc->liveness_score)
-                    <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200 text-xs">
-                        <span class="text-slate-500">Liveness</span>
-                        <span class="font-semibold text-slate-900">{{ number_format($doc->liveness_score * 100, 1) }}%</span>
-                    </div>
-                    @endif
                 </div>
                 @endif
+
             </div>
             @empty
             <div class="px-5 py-10 text-center">
@@ -199,39 +369,225 @@
             @endforelse
         </div>
 
-        {{-- Transações --}}
-        @if ($customer->transactions->isNotEmpty())
+        {{-- TPAs --}}
+        <div x-data="{
+                 showFeeModal: false,
+                 activeTpaId: null,
+                 expandedTpa: null,
+             }">
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-900">Últimas Transações</h2>
-                <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->transactions->count() }}</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="bg-slate-50/60 border-b border-slate-100">
-                            <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3">ID</th>
-                            <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Valor</th>
-                            <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Status</th>
-                            <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Data</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach ($customer->transactions->take(10) as $tx)
-                        <tr class="hover:bg-slate-50/50 transition-colors">
-                            <td class="px-5 py-3 text-xs font-mono text-slate-500">{{ $tx->id }}</td>
-                            <td class="px-4 py-3 text-sm font-semibold text-slate-900">{{ $tx->amount ?? '—' }}</td>
-                            <td class="px-4 py-3 text-sm text-slate-600">{{ $tx->status ?? '—' }}</td>
-                            <td class="px-4 py-3 text-sm text-slate-500">{{ $tx->created_at?->format('d/m/Y H:i') }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        @endif
 
-    </div>
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    TPAs
+                </h2>
+                <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->tpas->count() }}</span>
+            </div>
+
+            @forelse ($customer->tpas as $tpa)
+            @php
+                $tpaBadge = match($tpa->status) {
+                    'active'   => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Ativo'],
+                    'inactive' => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200',      'dot' => 'bg-slate-400',   'label' => 'Inativo'],
+                    'blocked'  => ['badge' => 'bg-red-50 text-red-700 border-red-200',             'dot' => 'bg-red-500',     'label' => 'Bloqueado'],
+                    default    => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200',      'dot' => 'bg-slate-400',   'label' => $tpa->status],
+                };
+            @endphp
+            <div class="border-b border-slate-50 last:border-0">
+                <div class="px-5 py-3 flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-900 font-mono">{{ $tpa->serial }}</p>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border {{ $tpaBadge['badge'] }} mt-0.5">
+                            <span class="w-1.5 h-1.5 rounded-full mr-1 {{ $tpaBadge['dot'] }}"></span>
+                            {{ $tpaBadge['label'] }}
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button @click="expandedTpa = (expandedTpa === {{ $tpa->id }}) ? null : {{ $tpa->id }}"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            Taxas
+                            <span class="bg-indigo-200 text-indigo-700 rounded-full px-1.5 py-0.5 text-xs leading-none">{{ $tpa->paymentMethodFees->count() }}</span>
+                        </button>
+                        <form method="POST" action="{{ route('dashboard.customers.tpas.destroy', [$customer, $tpa]) }}"
+                              onsubmit="return confirm('Remover este TPA?')">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div x-show="expandedTpa === {{ $tpa->id }}" x-cloak class="px-5 pb-4 bg-slate-50/60 border-t border-slate-100">
+                    <div class="flex items-center justify-between pt-3 mb-3">
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Taxas do TPA</p>
+                        <button @click="activeTpaId = {{ $tpa->id }}; showFeeModal = true"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Adicionar Taxa
+                        </button>
+                    </div>
+
+                    @if ($tpa->paymentMethodFees->isEmpty())
+                    <p class="text-xs text-slate-400 py-2">Nenhuma taxa definida.</p>
+                    @else
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="bg-slate-100 border-b border-slate-200">
+                                    <th class="text-left font-semibold text-slate-500 px-3 py-2">Método</th>
+                                    <th class="text-left font-semibold text-slate-500 px-3 py-2">Label</th>
+                                    <th class="text-right font-semibold text-slate-500 px-3 py-2">%</th>
+                                    <th class="text-right font-semibold text-slate-500 px-3 py-2">Fixo</th>
+                                    <th class="text-left font-semibold text-slate-500 px-3 py-2">Moeda</th>
+                                    <th class="text-left font-semibold text-slate-500 px-3 py-2">Estado</th>
+                                    <th class="px-3 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                @foreach ($tpa->paymentMethodFees as $fee)
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-3 py-2 font-mono font-medium text-slate-700">{{ $fee->payment_method }}</td>
+                                    <td class="px-3 py-2 text-slate-600">{{ $fee->label }}</td>
+                                    <td class="px-3 py-2 text-right text-slate-700">{{ number_format($fee->fee_percentage * 100, 2) }}%</td>
+                                    <td class="px-3 py-2 text-right text-slate-700">{{ number_format($fee->fee_fixed, 2) }}</td>
+                                    <td class="px-3 py-2 text-slate-600">{{ $fee->currency }}</td>
+                                    <td class="px-3 py-2">
+                                        @if ($fee->is_active)
+                                        <span class="inline-flex items-center gap-1 text-emerald-700">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Ativo
+                                        </span>
+                                        @else
+                                        <span class="inline-flex items-center gap-1 text-slate-400">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>Inativo
+                                        </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <form method="POST" action="{{ route('dashboard.customers.tpas.fees.destroy', [$customer, $tpa, $fee]) }}"
+                                              onsubmit="return confirm('Remover esta taxa?')">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="text-slate-400 hover:text-red-500 transition-colors">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                </svg>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @endif
+                </div>
+            </div>
+            @empty
+            <div class="px-5 py-10 text-center">
+                <p class="text-sm text-slate-400">Nenhum TPA vinculado.</p>
+            </div>
+            @endforelse
+
+        </div>{{-- fim card --}}
+
+            {{-- Modal: Adicionar Taxa --}}
+            <div x-show="showFeeModal" x-cloak
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0">
+                <div class="fixed inset-0 bg-black/50 backdrop-blur-md" @click="showFeeModal = false"></div>
+                <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100">
+                    <div class="flex items-center justify-between mb-5">
+                        <h3 class="text-base font-semibold text-slate-900">Adicionar Taxa</h3>
+                        <button @click="showFeeModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    @foreach ($customer->tpas as $tpa)
+                    <form x-show="activeTpaId === {{ $tpa->id }}"
+                          method="POST"
+                          action="{{ route('dashboard.customers.tpas.fees.store', [$customer, $tpa]) }}">
+                        @csrf
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="col-span-2">
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Método de Pagamento</label>
+                                <input type="text" name="payment_method" required
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                       placeholder="Ex: visa, mastercard, mbway">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Label</label>
+                                <input type="text" name="label" required
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                       placeholder="Ex: Visa Crédito">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Taxa % <span class="normal-case text-slate-400">(ex: 0.015 = 1.5%)</span></label>
+                                <input type="number" name="fee_percentage" step="0.0001" min="0" max="1" required
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                       placeholder="0.0150">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Taxa Fixa</label>
+                                <input type="number" name="fee_fixed" step="0.0001" min="0" required
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                       placeholder="0.25">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moeda</label>
+                                <input type="text" name="currency" maxlength="3" required value="EUR"
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 uppercase">
+                            </div>
+                            <div class="flex items-end">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="is_active" value="1" checked
+                                           class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500/30">
+                                    <span class="text-sm text-slate-600 font-medium">Ativo</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 mt-6">
+                            <button type="button" @click="showFeeModal = false"
+                                    class="flex-1 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
+                                Cancelar
+                            </button>
+                            <button type="submit"
+                                    class="flex-1 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors">
+                                Guardar
+                            </button>
+                        </div>
+                    </form>
+                    @endforeach
+                </div>
+            </div>
+
+        </div>{{-- fim wrapper x-data TPAs --}}
+
+    </div>{{-- fim LEFT COLUMN --}}
 
     {{-- ==================== RIGHT COLUMN ==================== --}}
     <div class="flex flex-col gap-6">
@@ -276,6 +632,140 @@
         </div>
         @endif
 
+        {{-- Saldo --}}
+        @if ($customer->balances->isNotEmpty())
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                <h2 class="text-sm font-semibold text-slate-900">Saldo</h2>
+            </div>
+            <div class="divide-y divide-slate-50">
+                @foreach ($customer->balances as $balance)
+                <div class="px-5 py-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ $balance->currency }}</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                <span class="text-xs text-slate-500">Disponível</span>
+                            </div>
+                            <span class="text-sm font-bold text-emerald-600">
+                                {{ number_format($balance->available / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
+                            </span>
+                        </div>
+                        @if ($balance->pending > 0)
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                <span class="text-xs text-slate-500">Pendente</span>
+                            </div>
+                            <span class="text-sm font-semibold text-amber-600">
+                                {{ number_format($balance->pending / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
+                            </span>
+                        </div>
+                        @endif
+                        <div class="pt-1 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-xs text-slate-400">Total</span>
+                            <span class="text-sm font-bold text-slate-800">
+                                {{ number_format(($balance->available + $balance->pending) / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
+        {{-- Transações (timeline) --}}
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-slate-900">Transações</h2>
+                <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->transactions->count() }}</span>
+            </div>
+
+            @if ($customer->transactions->isEmpty())
+            <div class="px-5 py-10 text-center">
+                <div class="flex flex-col items-center gap-2">
+                    <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                    </div>
+                    <p class="text-sm text-slate-400">Nenhuma transação registada.</p>
+                </div>
+            </div>
+            @else
+            <div class="px-5 py-4">
+                <div class="relative">
+                    <div class="absolute left-[7px] top-2 bottom-2 w-px bg-slate-200"></div>
+                    <div class="space-y-0">
+                        @foreach ($customer->transactions as $tx)
+                        @php
+                            $isCredit    = $tx->direction?->value === 'credit' || $tx->direction === 'credit';
+                            $amount      = number_format(abs($tx->amount ?? 0) / 100, 2, ',', '.');
+                            $currency    = strtoupper($tx->currency ?? '');
+                            $status      = strtolower($tx->status ?? '');
+                            $statusBadge = match(true) {
+                                in_array($status, ['succeeded', 'paid', 'complete', 'completed', 'settled']) => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                in_array($status, ['pending', 'processing', 'requires_capture'])             => 'bg-amber-50 text-amber-700 border-amber-200',
+                                in_array($status, ['failed', 'canceled', 'cancelled', 'refunded', 'disputed']) => 'bg-red-50 text-red-700 border-red-200',
+                                default => 'bg-slate-100 text-slate-500 border-slate-200',
+                            };
+                            $typeLabel = $tx->type?->label() ?? ($tx->payment_method_type ?? '—');
+                            $txDate    = $tx->stripe_created_at ?? $tx->created_at;
+                        @endphp
+                        <div class="relative flex gap-3 {{ $loop->last ? 'pb-0' : 'pb-3' }}">
+                            <div class="relative flex-shrink-0 mt-1">
+                                <div class="w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm z-10 relative
+                                            {{ $isCredit ? 'bg-emerald-500' : 'bg-red-400' }}"></div>
+                            </div>
+                            <div class="flex-1 min-w-0 pb-3 {{ !$loop->last ? 'border-b border-slate-50' : '' }}">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-1 mb-0.5">
+                                            <span class="text-sm font-bold {{ $isCredit ? 'text-emerald-600' : 'text-red-500' }}">
+                                                {{ $isCredit ? '+' : '−' }} {{ $amount }} {{ $currency }}
+                                            </span>
+                                            @if ($tx->net_amount && $tx->net_amount !== $tx->amount)
+                                            <span class="text-xs text-slate-400">(líq. {{ number_format($tx->net_amount / 100, 2, ',', '.') }})</span>
+                                            @endif
+                                        </div>
+                                        <p class="text-xs text-slate-600 truncate">{{ $typeLabel }}</p>
+                                        @if ($tx->description)
+                                        <p class="text-xs text-slate-400 truncate mt-0.5">{{ $tx->description }}</p>
+                                        @endif
+                                        @if ($tx->bank_transfer_sender_name)
+                                        <p class="text-xs text-slate-400 mt-0.5">
+                                            De: {{ $tx->bank_transfer_sender_name }}
+                                            @if ($tx->bank_transfer_iban_last4)(···{{ $tx->bank_transfer_iban_last4 }})@endif
+                                        </p>
+                                        @endif
+                                    </div>
+                                    <div class="flex-shrink-0 text-right">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border {{ $statusBadge }}">
+                                            {{ $tx->status ?? '—' }}
+                                        </span>
+                                        <p class="text-[10px] text-slate-400 mt-1">{{ $txDate?->format('d/m/Y') }}</p>
+                                        <p class="text-[10px] text-slate-300">{{ $txDate?->format('H:i') }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+            @endif
+        </div>
+
         {{-- Responsáveis (corporate) --}}
         @if ($customer->responsibles->isNotEmpty())
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -302,7 +792,7 @@
         </div>
         @endif
 
-        {{-- Timestamps --}}
+        {{-- Histórico --}}
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
             <h2 class="text-sm font-semibold text-slate-900 mb-4">Histórico</h2>
             <div class="space-y-2 text-sm">
@@ -323,7 +813,51 @@
             </div>
         </div>
 
-    </div>
+        {{-- Logs de auditoria --}}
+        @can('audit_logs.view')
+        @php $recentLogs = $customer->activities()->with('causer')->latest()->limit(5)->get(); @endphp
+        @if ($recentLogs->isNotEmpty())
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-slate-900">Auditoria</h2>
+                <a href="{{ route('dashboard.audit-logs', ['log' => 'customers', 'search' => $customer->id]) }}"
+                   class="text-xs text-indigo-600 hover:underline">Ver tudo</a>
+            </div>
+            <div class="divide-y divide-slate-50">
+                @foreach ($recentLogs as $log)
+                @php
+                    $ev = $log->event ?? $log->description ?? 'updated';
+                    $evColor = match($ev) {
+                        'created' => 'bg-emerald-500',
+                        'updated' => 'bg-amber-500',
+                        'deleted' => 'bg-red-500',
+                        default   => 'bg-slate-400',
+                    };
+                    $evLabel = match($ev) {
+                        'created' => 'Criado',
+                        'updated' => 'Atualizado',
+                        'deleted' => 'Removido',
+                        default   => ucfirst($ev),
+                    };
+                @endphp
+                <div class="px-5 py-3 flex items-center gap-3">
+                    <span class="w-2 h-2 rounded-full flex-shrink-0 {{ $evColor }}"></span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-medium text-slate-700">{{ $evLabel }}
+                            <span class="text-slate-400 font-normal">por {{ $log->causer?->name ?? 'Sistema' }}</span>
+                        </p>
+                        <p class="text-xs text-slate-400">{{ $log->created_at?->format('d/m/Y H:i') }}</p>
+                    </div>
+                    <a href="{{ route('dashboard.audit-logs.show', $log) }}"
+                       class="text-xs text-slate-400 hover:text-indigo-600 transition-colors flex-shrink-0">Ver</a>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+        @endcan
+
+    </div>{{-- fim RIGHT COLUMN --}}
 </div>
 
 @endsection

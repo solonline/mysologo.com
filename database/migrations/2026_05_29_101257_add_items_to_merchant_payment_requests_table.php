@@ -11,15 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('customers', function (Blueprint $table) {
-            $table->string('currency', 3)->default('EUR')->after('language');
+        Schema::table('merchant_payment_requests', function (Blueprint $table) {
+            $table->json('items')->nullable()->after('metadata');
         });
     }
 
     public function down(): void
     {
-        Schema::table('customers', function (Blueprint $table) {
-            $table->dropColumn('currency');
+        Schema::table('merchant_payment_requests', function (Blueprint $table) {
+            $table->dropColumn('items');
         });
     }
 };

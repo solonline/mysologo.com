@@ -5,29 +5,27 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::create('customer_fee_configs', function (Blueprint $table) {
+        Schema::create('customer_payment_method_fees', function (Blueprint $table) {
             $table->id();
             $table->foreignId('customer_id')->constrained()->cascadeOnDelete();
             $table->foreignId('tpa_id')->nullable()->constrained()->nullOnDelete();
-            $table->boolean('is_tpa')->default(false);
-            $table->decimal('system_fee_rate', )->default(0.00)->comment('taxa aplicada na saída');
+            $table->string('payment_method');
+            $table->string('label');
+            $table->decimal('fee_percentage', 5, 4)->default(0);
+            $table->decimal('fee_fixed', 8, 4)->default(0);
+            $table->string('currency', 3)->default('EUR');
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            // um customer só tem uma config normal, mas N configs TPA (uma por TPA)
-            $table->unique(['customer_id', 'tpa_id']);
+            // null tpa_id = online (Stripe), non-null = TPA device
+            $table->unique(['customer_id', 'tpa_id', 'payment_method', 'currency'], 'cpmf_unique');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('customer_fee_configs');
+        Schema::dropIfExists('customer_payment_method_fees');
     }
 };

@@ -219,9 +219,6 @@ class DiditService
                             $stripeCustomer['id']
                         );
                         $this->stripeAccountRepository->create($createStripeAccountDTO);
-                        $data =
-
-                        $this->stripeService->createVban($customer);
 
                         // Create Wallester Account
                         $wallesterAccount = $this->walletService->createAccount([

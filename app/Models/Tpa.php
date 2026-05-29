@@ -16,4 +16,9 @@ class Tpa extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    public function paymentMethodFees()
+    {
+        return $this->hasMany(CustomerPaymentMethodFee::class);
+    }
 }

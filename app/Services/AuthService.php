@@ -9,9 +9,8 @@ use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Contracts\CustomerRepositoryInterface;
 use App\Contracts\DeviceRepositoryInterface;
-use App\Contracts\StripeAccountRepositoryInterface;
-use App\DTOs\CreateStripeAccountDTO;
 use App\DTOs\LoginWithPinDTO;
+use App\DTOs\LoginWithTpaDTO;
 use App\DTOs\RegisterCustomerDTO;
 use App\DTOs\LoginCustomerDTO;
 use App\Models\Customer;
@@ -177,6 +176,34 @@ class AuthService
             'user' => $customer,
             'token' => $token,
             'didit_session' => ['status' => $customer->diditSessions()->latest()->first()?->status],
+        ];
+    }
+
+    public function loginWithTpa(LoginWithTpaDTO $dto): array
+    {
+        $customer = $this->customerRepository->findByEmail($dto->email);
+
+        if (!$customer || !Hash::check($dto->password, $customer->password)) {
+            throw new ApiException(ErrorCode::INVALID_CREDENTIALS, 401, 'Invalid credentials.');
+        }
+
+        $tpa = $customer->tpas()->where('serial', $dto->tpaSerial)->first();
+
+        if (!$tpa) {
+            throw new ApiException(ErrorCode::TPA_NOT_FOUND, 404, 'TPA not found for this customer.');
+        }
+
+        if ($tpa->status !== 'active') {
+            throw new ApiException(ErrorCode::TPA_NOT_ACTIVE, 403, 'TPA is not active.');
+        }
+
+        $token = $customer->createToken('tpa_login_' . $tpa->serial)->plainTextToken;
+
+        return [
+            'user'    => $customer,
+            'token'   => $token,
+            'context' => 'tpa',
+            'tpa'     => $tpa,
         ];
     }
 

@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\PinController;
+use App\Http\Controllers\Api\CustomerMerchantController;
+use App\Http\Controllers\Api\MerchantController;
 use App\Http\Controllers\Webhooks\DiditWebhookController;
 use App\Http\Controllers\Webhooks\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -12,15 +14,25 @@ Route::post('/register-corporate', [AuthController::class, 'registerCorporate'])
 Route::post('/create-didit-session', [AuthController::class, 'createDiditSession']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/login-pin', [AuthController::class, 'loginWithPin']);
+Route::post('/login-tpa', [AuthController::class, 'loginWithTpa']);
+//primeiro login do tpa, para linkar a conta, depois disso o login é feito com pin ou email/senha, e o tpa fica como método de pagamento vinculado na conta do cliente
+Route::post('/tpa/link', [\App\Http\Controllers\Api\TpaController::class, 'link']);
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 Route::post('/webhooks/didit', [DiditWebhookController::class, 'handle'])->name('didit.webhook');
 Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])->name('stripe.webhook');
+
+// Merchant API — autenticação via X-Api-Key
+Route::middleware(['auth.merchant', 'throttle:stripe-intent'])->prefix('merchant')->group(function () {
+    Route::post('/payment-requests', [MerchantController::class, 'createPaymentRequest']);
+});
 Route::get('/basic-system-info', [\App\Http\Controllers\Api\BasicSystemInfo::class, 'get']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/merchants/register', [CustomerMerchantController::class, 'register']);
+
     $customerEligibilityMiddlewares = [
         'customer.active',
         'customer.email.verified',
@@ -44,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
          // Phone Verification
         Route::post('/phone/send', [\App\Http\Controllers\Api\Auth\PhoneVerificationController::class, 'send']);
         Route::post('/phone/validate', [\App\Http\Controllers\Api\Auth\PhoneVerificationController::class, 'validateCode']);
+
     });
 
     Route::middleware($customerEligibilityMiddlewares)->group(function () {
@@ -60,9 +73,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::group(['prefix' => 'stripe'], function () {
             Route::get('/payment-methods', [\App\Http\Controllers\Api\StripeController::class, 'paymentMethods']);
             Route::get('/fee-estimates', [\App\Http\Controllers\Api\StripeController::class, 'feeEstimates']);
-            Route::post('/create-intent-payment', [\App\Http\Controllers\Api\StripeController::class, 'create']);
-            Route::post('/create-funding', [\App\Http\Controllers\Api\StripeController::class, 'createFunding']);
+            Route::post('/create-intent-payment', [\App\Http\Controllers\Api\StripeController::class, 'create'])->middleware(['idempotency', 'throttle:stripe-intent']);
+            Route::post('/create-funding', [\App\Http\Controllers\Api\StripeController::class, 'createFunding'])->middleware('throttle:stripe-intent');
             Route::get('/get-funding-instructions', [\App\Http\Controllers\Api\StripeController::class, 'getFundingInstructions']);
+            Route::post('/terminal/create-intent', [\App\Http\Controllers\Api\StripeController::class, 'createTerminal'])->middleware(['idempotency', 'throttle:stripe-intent']);
+            Route::post('/terminal/{transaction}/capture', [\App\Http\Controllers\Api\StripeController::class, 'captureTerminal'])->where('transaction', '[0-9]+')->middleware('throttle:stripe-intent');
         });
 
         Route::group(['prefix' => 'account'], function () {

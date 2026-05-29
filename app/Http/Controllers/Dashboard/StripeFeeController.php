@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\StripePaymentMethodFee;
 use App\Services\SettingsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class StripeFeeController extends Controller
@@ -75,6 +76,9 @@ class StripeFeeController extends Controller
 
         StripePaymentMethodFee::create($data);
 
+        Cache::forget("payment_methods:{$data['currency']}");
+        Cache::forget("fee_estimates:{$data['currency']}");
+
         return redirect()->route('dashboard.stripe-fees')
             ->with('success', 'Taxa criada com sucesso.');
     }
@@ -111,13 +115,20 @@ class StripeFeeController extends Controller
 
         $stripeFee->update($data);
 
+        Cache::forget("payment_methods:{$data['currency']}");
+        Cache::forget("fee_estimates:{$data['currency']}");
+
         return redirect()->route('dashboard.stripe-fees')
             ->with('success', 'Taxa atualizada com sucesso.');
     }
 
     public function destroy(StripePaymentMethodFee $stripeFee)
     {
+        $currency = $stripeFee->currency;
         $stripeFee->delete();
+
+        Cache::forget("payment_methods:{$currency}");
+        Cache::forget("fee_estimates:{$currency}");
 
         return redirect()->route('dashboard.stripe-fees')
             ->with('success', 'Taxa removida com sucesso.');

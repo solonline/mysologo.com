@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Account\AccountDetailsResource;
+use App\Http\Resources\Account\BalanceResource;
 use App\Services\AccountService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class AccountController extends Controller
 {
@@ -13,17 +15,32 @@ class AccountController extends Controller
     {
     }
 
-    public function index(Request $request): JsonResponse
+    /**
+     * Get Account Details
+     *
+     * Returns the Stripe Connect account details linked to the authenticated customer.
+     *
+     * @tags Account
+     */
+    public function index(Request $request): AccountDetailsResource
     {
         $details = $this->accountService->getDetails($request->user());
 
-        return response()->json($details);
+        return AccountDetailsResource::make($details);
     }
 
-    public function balance(Request $request): JsonResponse
+    /**
+     * Get Balance
+     *
+     * Returns the customer's available and pending balance. Amounts are in the smallest currency unit (e.g. cents for EUR).
+     *
+     * @tags Account
+     * @queryParam currency string optional Filter by ISO 4217 currency code. Example: EUR
+     */
+    public function balance(Request $request): AnonymousResourceCollection
     {
         $balances = $this->accountService->getBalances($request->user(), $request->query('currency'));
 
-        return response()->json($balances);
+        return BalanceResource::collection($balances);
     }
 }

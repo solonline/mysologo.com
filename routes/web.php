@@ -10,7 +10,9 @@ use App\Http\Controllers\Dashboard\CustomerController;
 use App\Http\Controllers\Dashboard\RoleController;
 use App\Http\Controllers\Dashboard\SettingsController;
 use App\Http\Controllers\Dashboard\StripeFeeController;
+use App\Http\Controllers\Dashboard\CustomerTpaController;
 use App\Http\Controllers\Dashboard\UserController;
+use App\Http\Controllers\Dashboard\AuditLogController;
 
 // ==================== AUTH ====================
 Route::middleware('web')->group(function () {
@@ -26,6 +28,12 @@ Route::prefix('dashboard')->name('dashboard')->middleware(['web', 'auth'])->grou
     // Customers
     Route::get('/customers', [CustomerController::class, 'index'])->name('.customers')->middleware('can:customers.view');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('.customers.show')->middleware('can:customers.view');
+    Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('.customers.update')->middleware('can:customers.edit');
+    Route::middleware('can:customers.view')->group(function () {
+        Route::delete('/customers/{customer}/tpas/{tpa}', [CustomerTpaController::class, 'destroy'])->name('.customers.tpas.destroy');
+        Route::post('/customers/{customer}/tpas/{tpa}/fees', [CustomerTpaController::class, 'storeFee'])->name('.customers.tpas.fees.store');
+        Route::delete('/customers/{customer}/tpas/{tpa}/fees/{fee}', [CustomerTpaController::class, 'destroyFee'])->name('.customers.tpas.fees.destroy');
+    });
 
     // Users CRUD
     Route::middleware('can:users.view')->group(function () {
@@ -94,6 +102,12 @@ Route::prefix('dashboard')->name('dashboard')->middleware(['web', 'auth'])->grou
     Route::post('/accounts-payable/{accountPayable}/paid', [AccountPayableController::class, 'markPaid'])->name('.accounts-payable.paid')->middleware('can:accounts_payable.pay');
     Route::delete('/accounts-payable/{accountPayable}', [AccountPayableController::class, 'destroy'])->name('.accounts-payable.destroy')->middleware('can:accounts_payable.delete');
 
+    // Audit Logs
+    Route::middleware('can:audit_logs.view')->group(function () {
+        Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('.audit-logs');
+        Route::get('/audit-logs/{activity}', [AuditLogController::class, 'show'])->name('.audit-logs.show');
+    });
+
     // Notifications (JSON — chamados via fetch pelo navbar)
     Route::get('/notifications', [\App\Http\Controllers\Dashboard\NotificationController::class, 'index'])->name('.notifications');
     Route::post('/notifications/{notification}/read', [\App\Http\Controllers\Dashboard\NotificationController::class, 'markRead'])->name('.notifications.read');
@@ -113,6 +127,11 @@ Route::get('email/verify/{id}/{hash}', [EmailValidationController::class, 'verif
 
 
 Route::get('email/validated', [EmailValidationController::class, 'show'])->name('email.validated');
+
+// Página de pagamento para integrações (iframe / redirect)
+Route::get('/pay/{uuid}', [\App\Http\Controllers\Pay\PayController::class, 'show'])
+    ->where('uuid', '[0-9a-f\-]{36}')
+    ->name('pay.show');
 
 Route::post('email/verification-notification', function () {
     request()->user()->sendEmailVerificationNotification();

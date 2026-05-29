@@ -196,10 +196,16 @@ class CustomerService
 
     public function loadForDashboard(Customer $customer): Customer
     {
-        return $this->customerRepository->loadRelations(
-            $customer,
-            ['documents', 'responsibles', 'transactions', 'stripeAccount', 'phoneVerifications']
-        );
+        return $customer->load([
+            'documents',
+            'responsibles',
+            'balances',
+            'transactions' => fn($q) => $q->latest('stripe_created_at')->limit(50),
+            'stripeAccount',
+            'wallesterAccounts',
+            'phoneVerifications',
+            'tpas.paymentMethodFees',
+        ]);
     }
 
 }

@@ -5,9 +5,10 @@ namespace App\Enums;
 enum TransactionType: string
 {
     // ── Cards ──────────────────────────────────────────
-    case CARD        = 'card';
-    case CREDIT_CARD = 'credit_card';
-    case DEBIT_CARD  = 'debit_card';
+    case CARD         = 'card';
+    case CREDIT_CARD  = 'credit_card';
+    case DEBIT_CARD   = 'debit_card';
+    case CARD_PRESENT = 'card_present';
 
     // ── Bank transfers ─────────────────────────────────
     case BANK_TRANSFER   = 'bank_transfer';
@@ -55,6 +56,7 @@ enum TransactionType: string
             self::CARD             => 'Cartão',
             self::CREDIT_CARD      => 'Cartão de Crédito',
             self::DEBIT_CARD       => 'Cartão de Débito',
+            self::CARD_PRESENT     => 'Cartão Físico (Terminal)',
             self::BANK_TRANSFER    => 'Transferência Bancária',
             self::SEPA_DEBIT       => 'SEPA Direct Debit',
             self::US_BANK_ACCOUNT  => 'ACH Direct Debit',

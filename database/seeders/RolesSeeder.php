@@ -47,6 +47,8 @@ class RolesSeeder extends Seeder
             'accounts_payable.edit',
             'accounts_payable.delete',
             'accounts_payable.pay',
+            // Auditoria
+            'audit_logs.view',
         ];
 
         foreach ($permissions as $permission) {

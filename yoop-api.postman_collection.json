@@ -1,0 +1,910 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"name": "Yoop API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://yoop.test/api",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "merchant_api_key",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register Retail",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"name\": \"John Doe\",\n\t\"email\": \"john@example.com\",\n\t\"username\": \"johndoe\",\n\t\"password\": \"secret123\",\n\t\"phone\": \"351912345678\",\n\t\"currency\": \"EUR\",\n\t\"language\": \"en\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/register-retail",
+							"host": ["{{base_url}}"],
+							"path": ["register-retail"]
+						}
+					}
+				},
+				{
+					"name": "Register Corporate",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"name\": \"Acme Corp\",\n\t\"username\": \"acmecorp\",\n\t\"email\": \"admin@acme.com\",\n\t\"tax_id\": \"PT123456789\",\n\t\"password\": \"secret123\",\n\t\"country_code\": \"PT\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/register-corporate",
+							"host": ["{{base_url}}"],
+							"path": ["register-corporate"]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var json = pm.response.json();",
+									"if (json.data && json.data.token) {",
+									"    pm.collectionVariables.set('token', json.data.token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"password\": \"secret123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": ["{{base_url}}"],
+							"path": ["login"]
+						}
+					}
+				},
+				{
+					"name": "Login with PIN",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"device_token\": \"DEVICE_TOKEN_HERE\",\n\t\"pin\": \"1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/login-pin",
+							"host": ["{{base_url}}"],
+							"path": ["login-pin"]
+						}
+					}
+				},
+				{
+					"name": "Login via TPA",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"password\": \"secret123\",\n\t\"tpa_serial\": \"TPA_SERIAL_HERE\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/login-tpa",
+							"host": ["{{base_url}}"],
+							"path": ["login-tpa"]
+						}
+					}
+				},
+				{
+					"name": "Link TPA",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"tpa_serial\": \"TPA_SERIAL_HERE\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/tpa/link",
+							"host": ["{{base_url}}"],
+							"path": ["tpa", "link"]
+						}
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/logout",
+							"host": ["{{base_url}}"],
+							"path": ["logout"]
+						}
+					}
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"email\": \"john@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/forgot-password",
+							"host": ["{{base_url}}"],
+							"path": ["forgot-password"]
+						}
+					}
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"token\": \"RESET_TOKEN_HERE\",\n\t\"password\": \"newpassword123\",\n\t\"password_confirmation\": \"newpassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/reset-password",
+							"host": ["{{base_url}}"],
+							"path": ["reset-password"]
+						}
+					}
+				},
+				{
+					"name": "Create Didit Session",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"email\": \"john@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/create-didit-session",
+							"host": ["{{base_url}}"],
+							"path": ["create-didit-session"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "PIN",
+			"item": [
+				{
+					"name": "Create PIN",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"device_token\": \"UNIQUE_DEVICE_TOKEN\",\n\t\"device_name\": \"My iPhone 14\",\n\t\"pin\": \"1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/create-pin",
+							"host": ["{{base_url}}"],
+							"path": ["create-pin"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Profile",
+			"item": [
+				{
+					"name": "Get My Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/customer/me",
+							"host": ["{{base_url}}"],
+							"path": ["customer", "me"]
+						}
+					}
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"name\": \"John Updated\",\n\t\"username\": \"johndoe_new\",\n\t\"phone\": \"351987654321\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/customer/update",
+							"host": ["{{base_url}}"],
+							"path": ["customer", "update"]
+						}
+					}
+				},
+				{
+					"name": "Upload Avatar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "avatar",
+									"type": "file",
+									"description": "JPG, JPEG, PNG ou WEBP - max 2MB"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/customer/upload-avatar",
+							"host": ["{{base_url}}"],
+							"path": ["customer", "upload-avatar"]
+						}
+					}
+				},
+				{
+					"name": "Find Customer by Username",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/customer/find/johndoe",
+							"host": ["{{base_url}}"],
+							"path": ["customer", "find", "johndoe"]
+						}
+					}
+				},
+				{
+					"name": "Send Validation Email",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/customer/send-validation-email",
+							"host": ["{{base_url}}"],
+							"path": ["customer", "send-validation-email"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Phone Verification",
+			"item": [
+				{
+					"name": "Send Verification Code",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"phone\": \"351912345678\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/customer/phone/send",
+							"host": ["{{base_url}}"],
+							"path": ["customer", "phone", "send"]
+						}
+					}
+				},
+				{
+					"name": "Validate Phone Code",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"code\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/customer/phone/validate",
+							"host": ["{{base_url}}"],
+							"path": ["customer", "phone", "validate"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "KYC",
+			"item": [
+				{
+					"name": "Create Corporate Responsible",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"name\": \"Jane Smith\",\n\t\"username\": \"janesmith\",\n\t\"email\": \"jane@acme.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/customer/create-corporate-responsible",
+							"host": ["{{base_url}}"],
+							"path": ["customer", "create-corporate-responsible"]
+						}
+					}
+				},
+				{
+					"name": "Submit Corporate Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "document",
+									"type": "file",
+									"description": "PDF apenas"
+								},
+								{
+									"key": "country",
+									"value": "PT",
+									"type": "text",
+									"description": "Codigo de pais ISO 3166-1 alpha-2"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/customer/submit-corporate-documents",
+							"host": ["{{base_url}}"],
+							"path": ["customer", "submit-corporate-documents"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Dashboard",
+			"item": [
+				{
+					"name": "Get Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/dashboard/summary",
+							"host": ["{{base_url}}"],
+							"path": ["dashboard", "summary"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Account",
+			"item": [
+				{
+					"name": "Get Account",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/account",
+							"host": ["{{base_url}}"],
+							"path": ["account"]
+						}
+					}
+				},
+				{
+					"name": "Get Balance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/account/balance",
+							"host": ["{{base_url}}"],
+							"path": ["account", "balance"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Transactions",
+			"item": [
+				{
+					"name": "List Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions?per_page=15",
+							"host": ["{{base_url}}"],
+							"path": ["transactions"],
+							"query": [
+								{ "key": "per_page", "value": "15" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Transaction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions/1",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "1"]
+						}
+					}
+				},
+				{
+					"name": "P2P Transfer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"recipient_username\": \"janedoe\",\n\t\"amount\": 1000,\n\t\"currency\": \"EUR\",\n\t\"description\": \"Pagamento almoco\",\n\t\"device_token\": \"DEVICE_TOKEN_HERE\",\n\t\"pin\": \"1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/transactions/p2p",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "p2p"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Stripe",
+			"item": [
+				{
+					"name": "List Payment Methods",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/stripe/payment-methods?currency=EUR",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "payment-methods"],
+							"query": [
+								{ "key": "currency", "value": "EUR" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Fee Estimates",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/stripe/fee-estimates?currency=EUR",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "fee-estimates"],
+							"query": [
+								{ "key": "currency", "value": "EUR" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Payment Intent",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" },
+							{ "key": "Idempotency-Key", "value": "{{$guid}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"amount\": 1000,\n\t\"payment_method_id\": 1,\n\t\"currency\": \"EUR\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/create-intent-payment",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "create-intent-payment"]
+						}
+					}
+				},
+				{
+					"name": "Create Funding (Bank Transfer)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" },
+							{ "key": "Idempotency-Key", "value": "{{$guid}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"amount\": 5000,\n\t\"currency\": \"EUR\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/create-funding",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "create-funding"]
+						}
+					}
+				},
+				{
+					"name": "Get Funding Instructions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/stripe/get-funding-instructions",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "get-funding-instructions"]
+						}
+					}
+				},
+				{
+					"name": "Create Terminal Payment Intent",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" },
+							{ "key": "Idempotency-Key", "value": "{{$guid}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"tpa_serial_number\": \"TPA_SERIAL_HERE\",\n\t\"amount\": 2000,\n\t\"currency\": \"EUR\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/terminal/create-intent",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "terminal", "create-intent"]
+						}
+					}
+				},
+				{
+					"name": "Capture Terminal Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/stripe/terminal/1/capture",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "terminal", "1", "capture"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "List Notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications",
+							"host": ["{{base_url}}"],
+							"path": ["notifications"]
+						}
+					}
+				},
+				{
+					"name": "Mark Notification as Read",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications/NOTIFICATION_UUID/read",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "NOTIFICATION_UUID", "read"]
+						}
+					}
+				},
+				{
+					"name": "Mark All Notifications as Read",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications/read-all",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "read-all"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Settings",
+			"item": [
+				{
+					"name": "List Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/settings",
+							"host": ["{{base_url}}"],
+							"path": ["settings"]
+						}
+					}
+				},
+				{
+					"name": "Get Setting",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/settings/maintenance_mode",
+							"host": ["{{base_url}}"],
+							"path": ["settings", "maintenance_mode"]
+						}
+					}
+				},
+				{
+					"name": "Set Setting",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"value\": \"false\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/settings/maintenance_mode",
+							"host": ["{{base_url}}"],
+							"path": ["settings", "maintenance_mode"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Merchant",
+			"item": [
+				{
+					"name": "Create Payment Request",
+					"request": {
+						"auth": {
+							"type": "apikey",
+							"apikey": [
+								{ "key": "key", "value": "X-Merchant-Key", "type": "string" },
+								{ "key": "value", "value": "{{merchant_api_key}}", "type": "string" },
+								{ "key": "in", "value": "header", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"amount\": 5000,\n\t\"currency\": \"EUR\",\n\t\"description\": \"Order #123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/merchant/payment-requests",
+							"host": ["{{base_url}}"],
+							"path": ["merchant", "payment-requests"]
+						}
+					}
+				},
+				{
+					"name": "Register as Merchant",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"business_name\": \"My Shop\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/merchants/register",
+							"host": ["{{base_url}}"],
+							"path": ["merchants", "register"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Webhooks",
+			"item": [
+				{
+					"name": "Didit Webhook",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"session_id\": \"SESSION_ID\",\n\t\"status\": \"APPROVED\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/webhooks/didit",
+							"host": ["{{base_url}}"],
+							"path": ["webhooks", "didit"]
+						}
+					}
+				},
+				{
+					"name": "Stripe Webhook",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" },
+							{ "key": "Stripe-Signature", "value": "t=...,v1=...", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"type\": \"payment_intent.succeeded\",\n\t\"data\": {}\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/webhooks/stripe",
+							"host": ["{{base_url}}"],
+							"path": ["webhooks", "stripe"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "System",
+			"item": [
+				{
+					"name": "Basic System Info",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" }
+						],
+						"url": {
+							"raw": "{{base_url}}/basic-system-info",
+							"host": ["{{base_url}}"],
+							"path": ["basic-system-info"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

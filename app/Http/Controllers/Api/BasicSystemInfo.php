@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\DTOs\SettingDTO;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BasicSystemInfoResource;
 use App\Services\SettingsService;
@@ -14,8 +13,12 @@ class BasicSystemInfo extends Controller
     }
 
     /**
-     * @unauthenticated
+     * System Info
      *
+     * Returns public system settings such as app version, supported currencies, and feature flags. No authentication required.
+     *
+     * @tags System
+     * @unauthenticated
      */
     public function get()
     {

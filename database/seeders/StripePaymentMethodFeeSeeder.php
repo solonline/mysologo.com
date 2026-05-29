@@ -74,7 +74,7 @@ class StripePaymentMethodFeeSeeder extends Seeder
 
         foreach ($methods as $method) {
             StripePaymentMethodFee::updateOrCreate(
-                ['payment_method' => $method['payment_method']],
+                ['payment_method' => $method['payment_method'], 'currency' => $method['currency']],
                 $method
             );
         }

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\DTOs\SettingDTO;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\SetSettingRequest;
 use App\Http\Resources\SettingResource;
 use App\Services\SettingsService;
 
@@ -15,8 +14,11 @@ class SettingController extends Controller
     }
 
     /**
-     * Summary of index
-     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+     * List Settings
+     *
+     * Returns all public application settings as key-value pairs.
+     *
+     * @tags Settings
      */
     public function index()
     {
@@ -24,9 +26,11 @@ class SettingController extends Controller
     }
 
     /**
-     * Summary of get
-     * @param string $key
-     * @return \Illuminate\Http\JsonResponse|SettingResource
+     * Get Setting
+     *
+     * Returns a single setting by its key.
+     *
+     * @tags Settings
      */
     public function get(string $key)
     {

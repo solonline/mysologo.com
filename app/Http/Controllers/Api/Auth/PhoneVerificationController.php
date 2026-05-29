@@ -18,6 +18,13 @@ class PhoneVerificationController extends Controller
         $this->service = $service;
     }
 
+    /**
+     * Send Phone Verification Code
+     *
+     * Sends a one-time SMS code to the customer's registered phone number.
+     *
+     * @tags Phone Verification
+     */
     public function send(Request $request)
     {
         $request->validate([
@@ -35,6 +42,13 @@ class PhoneVerificationController extends Controller
         ]);
     }
 
+    /**
+     * Confirm Phone Verification Code
+     *
+     * Validates the SMS code and marks the phone number as verified.
+     *
+     * @tags Phone Verification
+     */
     public function validateCode(Request $request)
     {
         $request->validate([

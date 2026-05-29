@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property int    $id
@@ -24,7 +26,17 @@ use Laravel\Sanctum\HasApiTokens;
  */
 class Customer extends Model
 {
-    use HasApiTokens, HasFactory, Notifiable, MustVerifyEmail;
+    use HasApiTokens, HasFactory, Notifiable, MustVerifyEmail, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logFillable()
+            ->logExcept(['password'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('customers');
+    }
 
     protected $fillable = [
         'name',
@@ -38,6 +50,7 @@ class Customer extends Model
         'email_verified_at',
         'referal_email_code',
         'didit_user_id',
+        'status',
         'doc_status',
         'phone',
         'password',
@@ -113,5 +126,15 @@ class Customer extends Model
     public function balances()
     {
         return $this->hasMany(CustomerBalance::class);
+    }
+
+    public function paymentMethodFees()
+    {
+        return $this->hasMany(CustomerPaymentMethodFee::class);
+    }
+
+    public function merchants()
+    {
+        return $this->hasMany(Merchant::class);
     }
 }

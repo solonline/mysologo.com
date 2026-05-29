@@ -1,4 +1,4 @@
-﻿@extends('layouts.dashboard')
+@extends('layouts.dashboard')
 
 @section('title', 'Configurações')
 @section('breadcrumb', 'Configurações')
@@ -14,18 +14,39 @@
 
 @php
 $tabs = [
-    'company' => ['label' => 'Empresa',   'title' => 'Informações da Empresa'],
-    'address' => ['label' => 'Endereço',  'title' => 'Morada'],
-    'system'  => ['label' => 'Sistema',   'title' => 'Sistema'],
-    'stripe'  => ['label' => 'Stripe',    'title' => 'Stripe'],
-    'sms'       => ['label' => 'Sms',    'title' => 'Sms'],
-    'social'  => ['label' => 'Redes Sociais', 'title' => 'Redes Sociais'],
-    'currency' => ['label' => 'Moedas',    'title' => 'Configurações de Moedas'],
+    'company'  => ['label' => 'Empresa',       'title' => 'Informações da Empresa'],
+    'address'  => ['label' => 'Endereço',       'title' => 'Morada'],
+    'system'   => ['label' => 'Sistema',        'title' => 'Sistema'],
+    'stripe'   => ['label' => 'Stripe',         'title' => 'Stripe'],
+    'sms'      => ['label' => 'SMS',            'title' => 'SMS'],
+    'social'   => ['label' => 'Redes Sociais',  'title' => 'Redes Sociais'],
+    'currency' => ['label' => 'Moedas',         'title' => 'Configurações de Moedas'],
 ];
 
-$grouped  = $settings->groupBy(fn($s) => explode('.', $s->key)[0]);
+$grouped = $settings->groupBy(fn($s) => explode('.', $s->key)[0]);
+
+// Pré-processar painéis: stripe expande em sub-cards por moeda, os outros ficam com 1 card
+$panels = [];
+foreach ($tabs as $group => $meta) {
+    if ($group === 'stripe') {
+        $byCurrency = $grouped->get('stripe', collect())->groupBy(fn($s) => strtoupper(explode('.', $s->key)[1]));
+        foreach ($byCurrency as $currency => $currencySettings) {
+            $panels[$group][] = ['title' => $currency, 'badge' => $currency, 'settings' => $currencySettings];
+        }
+    } else {
+        $panels[$group][] = ['title' => $meta['title'], 'badge' => null, 'settings' => $grouped->get($group, collect())];
+    }
+}
+
 $ic = 'w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400';
 $lc = 'block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5';
+
+$currencyColors = [
+    'EUR' => 'bg-blue-50 text-blue-700 border-blue-200',
+    'USD' => 'bg-green-50 text-green-700 border-green-200',
+    'GBP' => 'bg-purple-50 text-purple-700 border-purple-200',
+    'CHF' => 'bg-red-50 text-red-700 border-red-200',
+];
 @endphp
 
 <form method="POST" action="{{ route('dashboard.settings.update') }}" x-data="{ tab: 'company' }">
@@ -45,18 +66,33 @@ $lc = 'block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.
     {{-- Panels --}}
     @foreach ($tabs as $group => $meta)
     <div x-show="tab === '{{ $group }}'" @if($group !== 'company') x-cloak @endif class="space-y-4">
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-6 py-5 border-b border-slate-100">
-                <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">{{ $meta['title'] }}</h2>
-            </div>
-            <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
 
-                @foreach ($grouped->get($group, collect()) as $setting)
+        @foreach ($panels[$group] as $panel)
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+
+            {{-- Card header --}}
+            <div class="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
+                @if ($panel['badge'])
+                <span class="px-2.5 py-1 text-xs font-bold rounded-lg border {{ $currencyColors[$panel['badge']] ?? 'bg-slate-50 text-slate-700 border-slate-200' }}">
+                    {{ $panel['badge'] }}
+                </span>
+                <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">
+                    Conta Stripe {{ $panel['badge'] }}
+                </h2>
+                @else
+                <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">
+                    {{ $panel['title'] }}
+                </h2>
+                @endif
+            </div>
+
+            {{-- Fields --}}
+            <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                @foreach ($panel['settings'] as $setting)
                 @php $isWide = in_array($setting->type, ['textarea', 'toggle', 'json']); @endphp
                 <div class="{{ $isWide ? 'sm:col-span-2' : '' }}">
 
                     @if ($setting->type === 'toggle')
-                    {{-- ... toggle unchanged ... --}}
                     <div class="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl"
                          x-data="{ on: {{ $setting->value === 'true' ? 'true' : 'false' }} }">
                         <div>
@@ -90,7 +126,6 @@ $lc = 'block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.
                             remove(i) { this.items.splice(i, 1); }
                          }"
                          class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                        {{-- Tags --}}
                         <div class="flex flex-wrap gap-2 min-h-[2rem]">
                             <template x-for="(item, i) in items" :key="i">
                                 <span class="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold rounded-full">
@@ -99,19 +134,17 @@ $lc = 'block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.
                                             class="ml-0.5 text-indigo-400 hover:text-indigo-700 leading-none">&times;</button>
                                 </span>
                             </template>
-                            <span x-show="items.length === 0" class="text-xs text-slate-400 italic">Nenhuma moeda adicionada.</span>
+                            <span x-show="items.length === 0" class="text-xs text-slate-400 italic">Nenhum item adicionado.</span>
                         </div>
-                        {{-- Add input --}}
                         <div class="flex gap-2">
                             <input type="text" x-model="input" @keydown.enter.prevent="add()"
-                                   placeholder="Ex: EUR, USD, GBP…"
+                                   placeholder="Ex: EUR, USD…"
                                    class="flex-1 px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 uppercase">
                             <button type="button" @click="add()"
                                     class="px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium">
                                 Adicionar
                             </button>
                         </div>
-                        {{-- Hidden field with JSON value --}}
                         <input type="hidden" name="settings[{{ $setting->key }}]" :value="JSON.stringify(items)">
                     </div>
 
@@ -155,9 +188,11 @@ $lc = 'block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.
 
                 </div>
                 @endforeach
-
             </div>
+
         </div>
+        @endforeach
+
     </div>
     @endforeach
 

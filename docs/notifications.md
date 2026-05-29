@@ -167,38 +167,36 @@ VITE_REVERB_SCHEME=https
 
 ---
 
-### 2. Supervisor — manter o Reverb e a Queue a correr
+### 2. systemd — manter o Reverb e o Horizon a correr
 
-Cria `/etc/supervisor/conf.d/yoop.conf`:
+Cria `/etc/systemd/system/yoop-reverb.service`:
 
 ```ini
-[program:yoop-reverb]
-process_name=%(program_name)s
-command=php /var/www/yoop/artisan reverb:start --host=0.0.0.0 --port=8080
-autostart=true
-autorestart=true
-user=www-data
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/yoop-reverb.log
-stopwaitsecs=3600
+[Unit]
+Description=Yoop Laravel Reverb
+After=network.target
 
-[program:yoop-queue]
-process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/yoop/artisan queue:work --sleep=3 --tries=3 --max-time=3600
-autostart=true
-autorestart=true
-user=www-data
-numprocs=2
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/yoop-queue.log
-stopwaitsecs=3600
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/yoop
+ExecStart=/usr/bin/php /var/www/yoop/artisan reverb:start --host=0.0.0.0 --port=8080
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
 ```
 
+> A queue é gerida pelo **Horizon** — ver `docs/performance.md`. Não criar um serviço separado para `queue:work`.
+
 ```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl start yoop-reverb
-sudo supervisorctl start yoop-queue:*
+sudo systemctl daemon-reload
+sudo systemctl enable yoop-reverb
+sudo systemctl start yoop-reverb
+sudo systemctl status yoop-reverb
 ```
 
 ---
@@ -262,9 +260,9 @@ php artisan config:cache
 php artisan route:cache
 php artisan event:cache
 
-# 5. Reiniciar workers
-sudo supervisorctl restart yoop-reverb
-sudo supervisorctl restart yoop-queue:*
+# 5. Reiniciar serviços
+sudo systemctl restart yoop-reverb
+sudo systemctl restart yoop-horizon
 ```
 
 ---
@@ -273,10 +271,10 @@ sudo supervisorctl restart yoop-queue:*
 
 ```bash
 # Estado do Reverb
-sudo supervisorctl status yoop-reverb
+sudo systemctl status yoop-reverb
 
 # Logs em tempo real
-sudo tail -f /var/log/supervisor/yoop-reverb.log
+sudo journalctl -u yoop-reverb -f
 
 # Testar conexão WebSocket (instala wscat se necessário)
 wscat -c ws://localhost:8080/app/yoop-key?protocol=7&client=js&version=8.0.0
@@ -288,8 +286,8 @@ wscat -c ws://localhost:8080/app/yoop-key?protocol=7&client=js&version=8.0.0
 
 | Problema | Causa provável | Solução |
 |---|---|---|
-| Badge não actualiza em tempo real | Reverb não está a correr | `supervisorctl status yoop-reverb` |
+| Badge não actualiza em tempo real | Reverb não está a correr | `systemctl status yoop-reverb` |
 | `Class Pusher not found` | Falta `pusher/pusher-php-server` | `composer require pusher/pusher-php-server` |
 | WebSocket recusado em produção | Nginx sem bloco `/app/` | Adiciona o bloco de proxy acima |
-| Notificações criadas mas não chegam | Queue não está a processar | `supervisorctl status yoop-queue` |
+| Notificações criadas mas não chegam | Queue não está a processar | `systemctl status yoop-horizon` |
 | `forceTLS` error em localhost | Scheme errado | `REVERB_SCHEME=http` em desenvolvimento |

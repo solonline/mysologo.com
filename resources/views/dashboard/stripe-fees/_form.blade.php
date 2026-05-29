@@ -222,6 +222,7 @@
                 ['grabpay',           'GrabPay',               'Sudeste Asiático',                     'regional'],
                 // Interno
                 ['customer_balance',  'Saldo do Cliente',      'Saldo em conta no Stripe',             'internal'],
+                ['twint',             'TWINT',                 'Carteira digital TWINT (Suíça)',       'internal'],
             ];
             @endphp
 

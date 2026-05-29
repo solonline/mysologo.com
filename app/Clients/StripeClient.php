@@ -8,84 +8,126 @@ use Stripe\Webhook;
 
 class StripeClient
 {
-    protected string $secretKey;
-    protected string $webhookSecret;
-    protected Stripe $stripe;
+    protected ?string $secretKey     = null;
+    protected ?string $webhookSecret = null;
+    protected ?Stripe $stripe        = null;
 
     public function __construct(protected SettingsService $settings)
     {
-        $this->secretKey     = $this->settings->getByKey('stripe.secret_key');
-        $this->webhookSecret = $this->settings->getByKey('stripe.webhook_secret');
-        $this->stripe        = new Stripe($this->secretKey);
+        $this->secretKey     = $this->settings->getByKey('stripe.eur.secret_key');
+        $this->webhookSecret = $this->settings->getByKey('stripe.eur.webhook_secret');
+    }
+
+    public function forCurrency(string $currency): static
+    {
+        $key = $this->settings->getByKey('stripe.' . strtolower($currency) . '.secret_key');
+        if (!empty($key) && $key !== $this->secretKey) {
+            $this->secretKey = $key;
+            $this->stripe    = null;
+        }
+
+        return $this;
+    }
+
+    public function forMode(string $mode, string $currency): static
+    {
+        $settingKey = $mode === 'test'
+            ? 'stripe.' . strtolower($currency) . '.test_secret_key'
+            : 'stripe.' . strtolower($currency) . '.secret_key';
+
+        $key = $this->settings->getByKey($settingKey);
+        if (!empty($key) && $key !== $this->secretKey) {
+            $this->secretKey = $key;
+            $this->stripe    = null;
+        }
+
+        return $this;
+    }
+
+    private function client(): Stripe
+    {
+        if ($this->stripe === null) {
+            if (empty($this->secretKey)) {
+                throw new \RuntimeException('Stripe is not configured: stripe_secret_key is missing.');
+            }
+            $this->stripe = new Stripe($this->secretKey);
+        }
+
+        return $this->stripe;
     }
 
     public function createCustomer(array $data): array
     {
-        return $this->stripe->customers->create($data)->toArray();
+        return $this->client()->customers->create($data)->toArray();
     }
 
     public function getCustomer(string $customerId): array
     {
-        return $this->stripe->customers->retrieve($customerId)->toArray();
+        return $this->client()->customers->retrieve($customerId)->toArray();
     }
 
     public function createPaymentIntent(array $data): array
     {
-        return $this->stripe->paymentIntents->create($data)->toArray();
+        return $this->client()->paymentIntents->create($data)->toArray();
     }
 
     public function getPaymentIntent(string $paymentIntentId): array
     {
-        return $this->stripe->paymentIntents->retrieve($paymentIntentId)->toArray();
+        return $this->client()->paymentIntents->retrieve($paymentIntentId)->toArray();
+    }
+
+    public function capturePaymentIntent(string $paymentIntentId): array
+    {
+        return $this->client()->paymentIntents->capture($paymentIntentId)->toArray();
     }
 
     public function attachPaymentMethod(string $paymentMethodId, string $customerId): array
     {
-        return $this->stripe->paymentMethods->attach($paymentMethodId, ['customer' => $customerId])->toArray();
+        return $this->client()->paymentMethods->attach($paymentMethodId, ['customer' => $customerId])->toArray();
     }
 
     public function createSubscription(array $data): array
     {
-        return $this->stripe->subscriptions->create($data)->toArray();
+        return $this->client()->subscriptions->create($data)->toArray();
     }
 
     public function cancelSubscription(string $subscriptionId): array
     {
-        return $this->stripe->subscriptions->cancel($subscriptionId)->toArray();
+        return $this->client()->subscriptions->cancel($subscriptionId)->toArray();
     }
 
     public function createCustomerFundingInstructions(string $customerId, array $data): array
     {
-        return $this->stripe->request('post', "/v1/customers/{$customerId}/funding_instructions", $data, [
+        return $this->client()->request('post', "/v1/customers/{$customerId}/funding_instructions", $data, [
             'headers' => ['Stripe-Version' => '2026-04-22.preview'],
         ])->toArray();
     }
 
     public function getCustomerFundingInstructions(string $customerId): array
     {
-        return $this->stripe->request('get', "/v1/customers/{$customerId}/funding_instructions", [], [
+        return $this->client()->request('get', "/v1/customers/{$customerId}/funding_instructions", [], [
             'headers' => ['Stripe-Version' => '2026-04-22.preview'],
         ])->toArray();
     }
 
     public function getCashBalance(string $customerId): array
     {
-        return $this->stripe->customers->retrieveCashBalance($customerId)->toArray();
+        return $this->client()->customers->retrieveCashBalance($customerId)->toArray();
     }
 
     public function getBalanceTransaction(string $balanceTransactionId): array
     {
-        return $this->stripe->balanceTransactions->retrieve($balanceTransactionId)->toArray();
+        return $this->client()->balanceTransactions->retrieve($balanceTransactionId)->toArray();
     }
 
     public function listPaymentMethods(string $type = 'card', ?string $customerId = null): array
     {
-        return $this->stripe->paymentMethods->all(['customer' => $customerId, 'type' => $type])->toArray();
+        return $this->client()->paymentMethods->all(['customer' => $customerId, 'type' => $type])->toArray();
     }
 
     public function getPaymentMethodAvailability(): array
     {
-        $configs = $this->stripe->paymentMethodConfigurations->all(['limit' => 1]);
+        $configs = $this->client()->paymentMethodConfigurations->all(['limit' => 1]);
 
         if (empty($configs->data)) {
             return [];
