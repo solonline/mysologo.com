@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\CustomerRepositoryInterface;
 use App\Contracts\TransactionRepositoryInterface;
+use App\Enums\LedgerEntryType;
 use App\Enums\TransactionDirection;
 use App\Enums\TransactionType;
 use App\Exceptions\ApiException;
@@ -11,6 +12,7 @@ use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\Transaction;
 use App\Services\DeviceAuthService;
+use App\Services\LedgerService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -21,6 +23,7 @@ class TransactionService
         protected TransactionRepositoryInterface $transactionRepository,
         protected CustomerRepositoryInterface $customerRepository,
         protected DeviceAuthService $deviceAuthService,
+        protected LedgerService $ledgerService,
     ) {}
 
     public function list(Customer $customer, int $perPage = 15): LengthAwarePaginator
@@ -101,8 +104,23 @@ class TransactionService
 
             $debit->update(['related_transaction_id' => $credit->id]);
 
-            $this->transactionRepository->adjustBalance($sender->id, $currency, -$amount);
-            $this->transactionRepository->adjustBalance($recipient->id, $currency, $amount);
+            $this->ledgerService->record(
+                customerId:  $sender->id,
+                currency:    $currency,
+                entryType:   LedgerEntryType::P2P_SEND,
+                amount:      $amount,
+                reference:   $debit,
+                description: $description,
+            );
+
+            $this->ledgerService->record(
+                customerId:  $recipient->id,
+                currency:    $currency,
+                entryType:   LedgerEntryType::P2P_RECEIVE,
+                amount:      $amount,
+                reference:   $credit,
+                description: $description,
+            );
 
             return [
                 'debit'  => $debit->fresh(),

@@ -90,7 +90,7 @@ class CustomerRepository implements CustomerRepositoryInterface
 
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
-        $query = Customer::query()->with('documents');
+        $query = Customer::query()->with('documents')->where('type', '!=', 'platform');
 
         if ($search = $filters['search'] ?? null) {
             $query->where(function ($q) use ($search) {
@@ -121,11 +121,13 @@ class CustomerRepository implements CustomerRepositoryInterface
 
     public function getStats(): array
     {
+        $base = Customer::where('type', '!=', 'platform');
+
         return [
-            'total'   => Customer::count(),
-            'active'  => Customer::where('status', CustomerStatus::ACTIVE)->count(),
-            'pending' => Customer::where('status', CustomerStatus::PENDING)->count(),
-            'blocked' => Customer::where('status', CustomerStatus::BLOCKED)->count(),
+            'total'   => (clone $base)->count(),
+            'active'  => (clone $base)->where('status', CustomerStatus::ACTIVE)->count(),
+            'pending' => (clone $base)->where('status', CustomerStatus::PENDING)->count(),
+            'blocked' => (clone $base)->where('status', CustomerStatus::BLOCKED)->count(),
         ];
     }
 

@@ -325,6 +325,50 @@
             </div>
         </div>
 
+        {{-- Platform Customers --}}
+        <div class="card p-5">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="section-title">Contas Platform</h2>
+                    <p class="section-sub">{{ $stats['platform_customers'] }} conta{{ $stats['platform_customers'] !== 1 ? 's' : '' }} registada{{ $stats['platform_customers'] !== 1 ? 's' : '' }}</p>
+                </div>
+                <span class="p-2 rounded-xl" style="background:#f5f3ff;">
+                    <svg class="w-4 h-4" style="color:#7c3aed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </span>
+            </div>
+            @if ($platformCustomers->isEmpty())
+                <p class="text-xs text-slate-400 text-center py-4">Nenhuma conta platform</p>
+            @else
+                <div class="space-y-2.5">
+                    @foreach ($platformCustomers as $p)
+                    @php
+                        $pStatus = strtoupper($p->status?->value ?? $p->status ?? '');
+                        $pColor  = match($pStatus) {
+                            'ACTIVE'   => '#10b981',
+                            'PENDING'  => '#f59e0b',
+                            'BLOCKED'  => '#ef4444',
+                            default    => '#94a3b8',
+                        };
+                    @endphp
+                    <a href="{{ route('dashboard.customers.show', $p) }}"
+                       class="flex items-center gap-3 rounded-xl px-2 py-1.5 -mx-2 transition-colors hover:bg-slate-50 group">
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                             style="background:linear-gradient(135deg,#7c3aed,#a855f7);">
+                            {{ strtoupper(substr($p->name ?? 'P', 0, 1)) }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs font-semibold text-slate-800 truncate group-hover:text-violet-700 transition-colors">{{ $p->name }}</p>
+                            <p class="text-xs text-slate-400 truncate">{{ $p->email }}</p>
+                        </div>
+                        <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:{{ $pColor }}"></span>
+                    </a>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
     </div>
 
 </div>

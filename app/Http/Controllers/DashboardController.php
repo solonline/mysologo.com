@@ -23,8 +23,11 @@ class DashboardController extends Controller
             'maintenance_mode'    => $this->settingsService->getByKey('system.maintenance_mode') === 'true',
         ];
 
-        $recentCustomers = Customer::latest()->limit(10)->get();
+        $recentCustomers   = Customer::where('type', '!=', 'platform')->latest()->limit(10)->get();
+        $platformCustomers = Customer::where('type', 'platform')->latest()->limit(5)->get();
 
-        return view('dashboard.index', compact('stats', 'recentCustomers'));
+        $stats['platform_customers'] = Customer::where('type', 'platform')->count();
+
+        return view('dashboard.index', compact('stats', 'recentCustomers', 'platformCustomers'));
     }
 }

@@ -4,41 +4,31 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\TransactionDirection;
-use App\Models\Transaction;
-use App\Services\StripeService;
+use App\Services\SettlementService;
 use Illuminate\Console\Command;
 
 class SettleStripeBalances extends Command
 {
-    protected $signature = 'stripe:settle-balances';
+    protected $signature = 'stripe:settle-balances {--date= : Data de liquidação (Y-m-d). Padrão: hoje}';
 
-    protected $description = 'Liberta saldos pendentes de transações Stripe cuja data de liquidação (available_on) já chegou.';
+    protected $description = 'Executa o pipeline de settlement: settle transações disponíveis, envia para conta master e distribui para IBANs individuais.';
 
-    public function __construct(private readonly StripeService $stripeService)
+    public function __construct(private readonly SettlementService $settlementService)
     {
         parent::__construct();
     }
 
     public function handle(): int
     {
-        $count = 0;
+        $date = $this->option('date')
+            ? now()->parse($this->option('date'))
+            : today();
 
-        Transaction::query()
-            ->where('status', 'succeeded')
-            ->where('direction', TransactionDirection::Credit->value)
-            ->whereNotNull('available_on')
-            ->whereDate('available_on', '<=', today())
-            ->whereNull('balance_settled_at')
-            ->whereNotIn('type', ['p2p'])
-            ->chunkById(100, function ($transactions) use (&$count): void {
-                foreach ($transactions as $transaction) {
-                    $this->stripeService->settleTransaction($transaction);
-                    $count++;
-                }
-            });
+        $this->info("stripe:settle-balances — a processar liquidações para {$date->toDateString()}...");
 
-        $this->info("stripe:settle-balances — {$count} transação(ões) liquidada(s).");
+        $result = $this->settlementService->runDailySettlement($date);
+
+        $this->info("Concluído — {$result['batches']} batch(es), {$result['transactions']} transação(ões).");
 
         return self::SUCCESS;
     }

@@ -171,8 +171,10 @@
                     <td class="px-4 py-3.5 hidden md:table-cell">
                         @if ($customer->type === 'corporate')
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200">Corporate</span>
-                        @else
+                        @elseif ($customer->type === 'retail')
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">Retail</span>
+                        @else
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-400 border border-slate-200">{{ ucfirst($customer->type) }}</span>
                         @endif
                     </td>
                     {{-- Status --}}

@@ -14,8 +14,7 @@ class StripeClient
 
     public function __construct(protected SettingsService $settings)
     {
-        $this->secretKey     = $this->settings->getByKey('stripe.eur.secret_key');
-        $this->webhookSecret = $this->settings->getByKey('stripe.eur.webhook_secret');
+        // Keys are resolved lazily to avoid DB queries during console bootstrap
     }
 
     public function forCurrency(string $currency): static
@@ -47,6 +46,9 @@ class StripeClient
     private function client(): Stripe
     {
         if ($this->stripe === null) {
+            if ($this->secretKey === null) {
+                $this->secretKey = $this->settings->getByKey('stripe.eur.secret_key');
+            }
             if (empty($this->secretKey)) {
                 throw new \RuntimeException('Stripe is not configured: stripe_secret_key is missing.');
             }
@@ -145,6 +147,9 @@ class StripeClient
 
     public function constructWebhookEvent(string $payload, string $sigHeader): Event
     {
+        if ($this->webhookSecret === null) {
+            $this->webhookSecret = $this->settings->getByKey('stripe.eur.webhook_secret');
+        }
         if (empty($this->webhookSecret)) {
             throw new \RuntimeException('Stripe is not configured: stripe_webhook_secret is missing.');
         }
