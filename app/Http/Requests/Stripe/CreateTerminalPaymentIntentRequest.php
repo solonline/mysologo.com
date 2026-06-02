@@ -19,7 +19,7 @@ class CreateTerminalPaymentIntentRequest extends FormRequest
                 'required',
                 'string',
                 Rule::exists('tpas', 'serial')
-                    ->where('customer_id', $this->user()->id)
+                    ->where('customer_id', $this->attributes->get('merchant')->customer_id)
                     ->where('status', 'active'),
             ],
             'amount'   => ['required', 'integer', 'min:1'],

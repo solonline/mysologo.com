@@ -26,6 +26,8 @@ Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])->nam
 // Merchant API — autenticação via X-Api-Key
 Route::middleware(['auth.merchant', 'throttle:stripe-intent'])->prefix('merchant')->group(function () {
     Route::post('/payment-requests', [MerchantController::class, 'createPaymentRequest']);
+    Route::post('/terminal/connection-token', [\App\Http\Controllers\Api\StripeController::class, 'terminalConnectionToken']);
+    Route::post('/terminal/create-intent', [\App\Http\Controllers\Api\StripeController::class, 'createTerminal'])->middleware('idempotency');
 });
 Route::get('/basic-system-info', [\App\Http\Controllers\Api\BasicSystemInfo::class, 'get']);
 
@@ -76,7 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/create-intent-payment', [\App\Http\Controllers\Api\StripeController::class, 'create'])->middleware(['idempotency', 'throttle:stripe-intent']);
             Route::post('/create-funding', [\App\Http\Controllers\Api\StripeController::class, 'createFunding'])->middleware('throttle:stripe-intent');
             Route::get('/get-funding-instructions', [\App\Http\Controllers\Api\StripeController::class, 'getFundingInstructions']);
-            Route::post('/terminal/create-intent', [\App\Http\Controllers\Api\StripeController::class, 'createTerminal'])->middleware(['idempotency', 'throttle:stripe-intent']);
+
             Route::post('/terminal/{transaction}/capture', [\App\Http\Controllers\Api\StripeController::class, 'captureTerminal'])->where('transaction', '[0-9]+')->middleware('throttle:stripe-intent');
         });
 

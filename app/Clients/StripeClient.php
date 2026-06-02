@@ -122,6 +122,11 @@ class StripeClient
         return $this->client()->balanceTransactions->retrieve($balanceTransactionId)->toArray();
     }
 
+    public function createTerminalConnectionToken(): array
+    {
+        return $this->client()->terminal->connectionTokens->create([])->toArray();
+    }
+
     public function listPaymentMethods(string $type = 'card', ?string $customerId = null): array
     {
         return $this->client()->paymentMethods->all(['customer' => $customerId, 'type' => $type])->toArray();

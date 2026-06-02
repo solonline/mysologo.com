@@ -103,6 +103,13 @@ class StripeProvider
         );
     }
 
+    public function createTerminalConnectionToken(string $currency = 'eur'): array
+    {
+        return $this->run('createTerminalConnectionToken', fn () =>
+            $this->client->forCurrency($currency)->createTerminalConnectionToken()
+        );
+    }
+
     // ── Private helpers ───────────────────────────────────
 
     private function run(string $operation, callable $fn): array

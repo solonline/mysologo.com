@@ -209,6 +209,21 @@ class StripeService
         ];
     }
 
+    public function createTerminalConnectionToken(string $currency = 'eur'): string
+    {
+        $result = $this->stripeProvider->createTerminalConnectionToken($currency);
+
+        if ($result['status'] !== 'success') {
+            throw new ApiException(
+                ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
+                502,
+                $result['message'] ?? 'Erro ao criar connection token.'
+            );
+        }
+
+        return $result['data']['secret'];
+    }
+
     public function createTerminalPaymentIntent(
         Customer $customer,
         int $amount,
@@ -236,8 +251,14 @@ class StripeService
             );
         }
 
-        $tpa = $customer->tpas()->where('serial_number', $tpaSerialNumber)->first();
+        $tpa = $customer->tpas()->where('serial', $tpaSerialNumber)->first();
 
+        \Log::info('Creating terminal payment intent', [
+            'customer_id' => $customer->id,
+            'amount' => $amount,
+            'currency' => $currency,
+            'tpa_serial_number' => $tpaSerialNumber,
+        ]);
         $currency = strtolower($currency);
 
         $result = $this->stripeProvider->createPaymentIntent([

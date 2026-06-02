@@ -81,9 +81,22 @@ class StripeController extends Controller
      *
      * @tags Stripe, Terminal
      */
+    public function terminalConnectionToken(Request $request): JsonResponse
+    {
+        $currency = strtolower($request->input('currency', 'eur'));
+
+        try {
+            $secret = $this->stripeService->createTerminalConnectionToken($currency);
+        } catch (ApiException $e) {
+            return response()->json($e->toArray(), $e->status);
+        }
+
+        return response()->json(['secret' => $secret]);
+    }
+
     public function createTerminal(CreateTerminalPaymentIntentRequest $request): JsonResponse
     {
-        $customer = $request->user();
+        $customer = $request->attributes->get('merchant')->customer;
         $data = $request->validated();
 
         try {

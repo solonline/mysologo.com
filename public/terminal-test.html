@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stripe Terminal — Test</title>
+  <script src="https://js.stripe.com/terminal/v1/"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; display: flex; justify-content: center; padding: 40px 16px; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.1); padding: 32px; width: 100%; max-width: 580px; }
+    h1 { font-size: 20px; margin-bottom: 24px; color: #1a1a1a; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; }
+    input, select { width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+    .toggle-row { display: flex; gap: 8px; margin-bottom: 16px; }
+    .toggle-btn { flex: 1; padding: 8px; border: 2px solid #ddd; border-radius: 8px; background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; color: #555; }
+    .toggle-btn.active { border-color: #635bff; color: #635bff; background: #f0effe; }
+    .btn { display: block; padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 10px; }
+    .btn-primary { background: #635bff; color: #fff; }
+    .btn-primary:disabled { background: #a9a3ff; cursor: not-allowed; }
+    .btn-success { background: #00b140; color: #fff; }
+    .btn-success:disabled { background: #7ddca6; cursor: not-allowed; }
+    .btn-ghost { background: #f5f5f5; color: #333; border: 1px solid #ddd; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+    .step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #888; margin-bottom: 6px; }
+    .step .dot { width: 10px; height: 10px; border-radius: 50%; background: #ddd; flex-shrink: 0; }
+    .step.done .dot { background: #4caf50; }
+    .step.active .dot { background: #635bff; animation: pulse 1s infinite; }
+    .step.error .dot { background: #f44336; }
+    .readers-list { margin-bottom: 16px; display: none; }
+    .reader-item { padding: 10px 12px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 8px; cursor: pointer; font-size: 13px; }
+    .reader-item:hover { border-color: #635bff; background: #f0effe; }
+    .reader-item .reader-name { font-weight: 600; }
+    .reader-item .reader-meta { color: #888; font-size: 12px; margin-top: 2px; }
+    .log { background: #1a1a2e; color: #e0e0e0; border-radius: 8px; padding: 16px; font-size: 13px; font-family: monospace; min-height: 120px; max-height: 300px; overflow-y: auto; margin-top: 16px; white-space: pre-wrap; word-break: break-all; }
+    .log .ok  { color: #4caf50; }
+    .log .err { color: #f44336; }
+    .log .inf { color: #90caf9; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+    #locationRow { display: none; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Stripe Terminal — Card Test</h1>
+
+  <label for="apiKey">X-Api-Key (merchant)</label>
+  <input id="apiKey" type="text" placeholder="yk_..." value="yoop_test_5dd1c4862027452579ffa4b45400c11656bc9727dc22ae6f29b56d63648af9bf" />
+
+  <label for="currency">Currency</label>
+  <select id="currency">
+    <option value="gbp">GBP</option>
+    <option value="eur">EUR</option>
+    <option value="chf">CHF</option>
+  </select>
+
+  <label>Reader mode</label>
+  <div class="toggle-row">
+    <button class="toggle-btn" id="modeSimulated" onclick="setMode('simulated')">Simulated</button>
+    <button class="toggle-btn active" id="modeReal" onclick="setMode('real')">Real (NFC)</button>
+  </div>
+
+  <div id="locationRow">
+    <label for="locationId">Location ID <span style="font-weight:400;color:#aaa">(optional — filtra readers por localização)</span></label>
+    <input id="locationId" type="text" placeholder="tml_..." />
+  </div>
+
+  <label for="amount">Amount <span style="font-weight:400;color:#aaa">(smallest unit, e.g. 1000 = €10.00)</span></label>
+  <input id="amount" type="number" min="1" placeholder="1000" />
+
+  <label for="tpaSerial">TPA Serial Number</label>
+  <input id="tpaSerial" type="text" placeholder="ABC123..." value="TPA0-01" />
+
+  <hr class="divider" />
+
+  <div class="step" id="step-discover"><span class="dot"></span> 1 — Discover readers</div>
+  <div class="step" id="step-connect"><span class="dot"></span> 2 — Connect to reader</div>
+  <div class="step" id="step-collect"><span class="dot"></span> 3 — Present card (NFC tap)</div>
+  <div class="step" id="step-confirm"><span class="dot"></span> 4 — Process payment</div>
+
+  <hr class="divider" />
+
+  <button class="btn btn-primary" id="btnDiscover" onclick="discoverReaders()">Discover Readers</button>
+
+  <div class="readers-list" id="readersList"></div>
+
+  <button class="btn btn-success" id="btnPay" onclick="collectAndPay()" disabled>Collect &amp; Process Payment</button>
+  <button class="btn btn-ghost" id="btnDisconnect" onclick="disconnectReader()" style="display:none">Disconnect Reader</button>
+
+  <div class="log" id="log">Ready. Fill in the fields above and click Discover Readers.
+</div>
+</div>
+
+<script>
+  const BASE_URL = 'https://5a79-89-114-205-202.ngrok-free.app';
+
+  let terminal = null;
+  let mode = 'real';
+
+  function setMode(m) {
+    mode = m;
+    document.getElementById('modeSimulated').classList.toggle('active', m === 'simulated');
+    document.getElementById('modeReal').classList.toggle('active', m === 'real');
+    document.getElementById('locationRow').style.display = m === 'real' ? 'block' : 'none';
+  }
+
+  setMode('real');
+
+  function log(msg, type = 'inf') {
+    const el = document.getElementById('log');
+    const line = document.createElement('span');
+    line.className = type;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function setStep(id, state) {
+    document.getElementById(id).className = `step ${state}`;
+  }
+
+  async function fetchConnectionToken() {
+    const apiKey   = document.getElementById('apiKey').value.trim();
+    const currency = document.getElementById('currency').value;
+    log(`Fetching connection token...`);
+
+    let res;
+    try {
+      res = await fetch(`${BASE_URL}/api/merchant/terminal/connection-token`, {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify({ currency }),
+      });
+    } catch (e) {
+      log(`Network error: ${e.message}`, 'err');
+      throw e;
+    }
+
+    const raw = await res.text();
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { msg = JSON.parse(raw).message || msg; } catch {}
+      log(`Connection token error: ${msg}`, 'err');
+      throw new Error(msg);
+    }
+
+    const data = JSON.parse(raw);
+    if (!data.secret) throw new Error('Response missing "secret" field.');
+    log('Connection token OK.', 'ok');
+    return data.secret;
+  }
+
+  async function discoverReaders() {
+    document.getElementById('btnDiscover').disabled = true;
+    document.getElementById('readersList').style.display = 'none';
+    setStep('step-discover', 'active');
+
+    if (!terminal) {
+      log('Initializing Terminal SDK...');
+      terminal = StripeTerminal.create({
+        onFetchConnectionToken: fetchConnectionToken,
+        onUnexpectedReaderDisconnect: () => {
+          log('Reader disconnected unexpectedly.', 'err');
+          document.getElementById('btnPay').disabled = true;
+          document.getElementById('btnDisconnect').style.display = 'none';
+          document.getElementById('btnDiscover').disabled = false;
+        },
+      });
+    }
+
+    const config = mode === 'simulated'
+      ? { simulated: true }
+      : { discoveryMethod: 'internet' };
+
+    const locationId = document.getElementById('locationId').value.trim();
+    if (locationId && mode === 'real') config.location = locationId;
+
+    log(`Discovering ${mode === 'simulated' ? 'simulated' : 'internet-connected'} readers...`);
+
+    const { discoveredReaders, error } = await terminal.discoverReaders(config);
+
+    if (error) {
+      log(`Discovery error: ${error.message}`, 'err');
+      setStep('step-discover', 'error');
+      document.getElementById('btnDiscover').disabled = false;
+      return;
+    }
+
+    if (!discoveredReaders.length) {
+      log('No readers found.', 'err');
+      if (mode === 'real') log('Make sure the reader is online and registered in the Stripe Dashboard.', 'err');
+      setStep('step-discover', 'error');
+      document.getElementById('btnDiscover').disabled = false;
+      return;
+    }
+
+    log(`Found ${discoveredReaders.length} reader(s).`, 'ok');
+    setStep('step-discover', 'done');
+
+    const list = document.getElementById('readersList');
+    list.innerHTML = '';
+    discoveredReaders.forEach((r, i) => {
+      const el = document.createElement('div');
+      el.className = 'reader-item';
+      el.innerHTML = `<div class="reader-name">${r.label || r.serial_number || 'Reader ' + i}</div>
+        <div class="reader-meta">${r.device_type || ''} · ${r.status || ''} · ${r.ip_address || ''}</div>`;
+      el.onclick = () => connectReader(r);
+      list.appendChild(el);
+    });
+    list.style.display = 'block';
+    document.getElementById('btnDiscover').disabled = false;
+  }
+
+  async function connectReader(reader) {
+    document.getElementById('readersList').style.display = 'none';
+    setStep('step-connect', 'active');
+    log(`Connecting to: ${reader.label || reader.serial_number}...`);
+
+    const { error } = await terminal.connectReader(reader);
+    if (error) {
+      log(`Connect error: ${error.message}`, 'err');
+      setStep('step-connect', 'error');
+      document.getElementById('readersList').style.display = 'block';
+      return;
+    }
+
+    log('Reader connected!', 'ok');
+    setStep('step-connect', 'done');
+    document.getElementById('btnPay').disabled = false;
+    document.getElementById('btnDisconnect').style.display = 'block';
+  }
+
+  async function disconnectReader() {
+    await terminal.disconnectReader();
+    log('Reader disconnected.');
+    document.getElementById('btnPay').disabled = true;
+    document.getElementById('btnDisconnect').style.display = 'none';
+    setStep('step-connect', '');
+    setStep('step-collect', '');
+    setStep('step-confirm', '');
+  }
+
+  async function fetchClientSecret() {
+    const apiKey    = document.getElementById('apiKey').value.trim();
+    const currency  = document.getElementById('currency').value;
+    const amount    = parseInt(document.getElementById('amount').value, 10);
+    const tpaSerial = document.getElementById('tpaSerial').value.trim();
+
+    if (!amount || amount < 1) throw new Error('Amount must be at least 1.');
+    if (!tpaSerial) throw new Error('TPA serial number is required.');
+
+    log('Creating terminal payment intent...');
+
+    const res = await fetch(`${BASE_URL}/api/merchant/terminal/create-intent`, {
+      method: 'POST',
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+      body: JSON.stringify({ amount, currency, tpa_serial_number: tpaSerial }),
+    });
+
+    const raw = await res.text();
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { msg = JSON.parse(raw).message || msg; } catch {}
+      throw new Error(`Payment intent error: ${msg}`);
+    }
+
+    const data = JSON.parse(raw);
+    if (!data.client_secret) throw new Error('Response missing "client_secret" field.');
+    log(`Payment intent created. Transaction ID: ${data.transaction?.id ?? '—'}`, 'ok');
+    return data.client_secret;
+  }
+
+  async function collectAndPay() {
+    document.getElementById('btnPay').disabled = true;
+    setStep('step-collect', 'active');
+
+    let clientSecret;
+    try {
+      clientSecret = await fetchClientSecret();
+    } catch (e) {
+      log(`Error: ${e.message}`, 'err');
+      setStep('step-collect', 'error');
+      document.getElementById('btnPay').disabled = false;
+      return;
+    }
+
+    log('Waiting for card... Present the card to the reader (NFC tap or insert).');
+
+    try {
+      const { paymentIntent, error: collectErr } = await terminal.collectPaymentMethod(clientSecret);
+      if (collectErr) throw new Error(collectErr.message);
+
+      log('Card read successfully!', 'ok');
+      setStep('step-collect', 'done');
+      setStep('step-confirm', 'active');
+      log('Processing payment...');
+
+      const { paymentIntent: confirmed, error: processErr } = await terminal.processPayment(paymentIntent);
+      if (processErr) throw new Error(processErr.message);
+
+      log(`Payment processed! Status: ${confirmed.status}`, 'ok');
+      log(`PaymentIntent ID: ${confirmed.id}`, 'ok');
+      if (confirmed.status === 'requires_capture') {
+        log('Payment requires capture — call the capture endpoint to finalise.', 'inf');
+      }
+      setStep('step-confirm', 'done');
+    } catch (e) {
+      log(`Error: ${e.message}`, 'err');
+      setStep('step-collect', 'error');
+      document.getElementById('btnPay').disabled = false;
+    }
+  }
+</script>
+</body>
+</html>

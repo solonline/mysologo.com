@@ -46,8 +46,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     // Configura os middlewares globais e de grupos
     ->withMiddleware(function (Middleware $middleware): void {
-        // Aplica o middleware de rate limit (ThrottleRequests) em todas as rotas API
-        // $middleware->api(prepend:[ThrottleRequests::class]);
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'idempotency'               => IdempotencyRequiredMiddleware::class,
             'customer.active'           => EnsureCustomerIsActiveMiddleware::class,
