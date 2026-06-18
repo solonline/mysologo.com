@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Auth\MustVerifyEmail;
@@ -51,6 +52,7 @@ class Customer extends Model
         'referal_email_code',
         'didit_user_id',
         'status',
+        'status_reason',
         'doc_status',
         'phone',
         'password',
@@ -63,6 +65,7 @@ class Customer extends Model
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'status' => CustomerLifecycleStatus::class,
     ];
     // Empresa à qual o responsável pertence
     public function corporate()
@@ -111,6 +114,16 @@ class Customer extends Model
     public function wallesterAccounts()
     {
         return $this->hasOne(CustomerWallesterAccount::class);
+    }
+
+    public function wallesterAccount()
+    {
+        return $this->wallesterAccounts();
+    }
+
+    public function eburyAccount()
+    {
+        return $this->hasOne(CustomerEburyAccount::class);
     }
 
     public function devices()

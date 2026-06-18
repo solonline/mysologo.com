@@ -91,12 +91,14 @@ class AccountsPayableDashboardTest extends TestCase
             );
         }
 
-        $this->assertDatabaseHas('account_payables', [
-            'description' => 'Recorrência monthly',
-            'due_date' => '2026-02-28',
-            'occurrence_index' => 2,
-            'occurrence_total' => 3,
-        ]);
+        $monthlySecond = AccountPayable::query()
+            ->where('description', 'Recorrência monthly')
+            ->where('occurrence_index', 2)
+            ->first();
+
+        $this->assertNotNull($monthlySecond);
+        $this->assertSame('2026-02-28', $monthlySecond->due_date->toDateString());
+        $this->assertSame(3, (int) $monthlySecond->occurrence_total);
     }
 
     public function test_creates_recurring_accounts_with_occurrence_limit(): void
@@ -164,21 +166,17 @@ class AccountsPayableDashboardTest extends TestCase
             ->post(route('dashboard.accounts-payable.paid', $account), ['paid_at' => '2026-02-01'])
             ->assertRedirect();
 
-        $this->assertDatabaseHas('account_payables', [
-            'id' => $account->id,
-            'status' => AccountPayable::STATUS_PAID,
-            'paid_at' => '2026-02-01',
-        ]);
+        $account->refresh();
+        $this->assertSame(AccountPayable::STATUS_PAID, $account->status);
+        $this->assertSame('2026-02-01', $account->paid_at->toDateString());
 
         $this->actingAs($user)
             ->post(route('dashboard.accounts-payable.cancel', $account))
             ->assertRedirect();
 
-        $this->assertDatabaseHas('account_payables', [
-            'id' => $account->id,
-            'status' => AccountPayable::STATUS_CANCELLED,
-            'paid_at' => null,
-        ]);
+        $account->refresh();
+        $this->assertSame(AccountPayable::STATUS_CANCELLED, $account->status);
+        $this->assertNull($account->paid_at);
     }
 
     public function test_can_upload_download_and_remove_attachments(): void

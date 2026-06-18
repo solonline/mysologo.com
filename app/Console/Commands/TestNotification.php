@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use App\Models\UserNotification;
-use App\Events\DashboardNotificationCreated;
+use App\Domains\Backoffice\Events\DashboardNotificationCreated;
 use Illuminate\Console\Command;
 
 class TestNotification extends Command

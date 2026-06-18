@@ -22,3 +22,9 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Android terminal build artifacts
+/android-terminal/.gradle/
+/android-terminal/.idea/
+/android-terminal/app/build/
+/android-terminal/local.properties

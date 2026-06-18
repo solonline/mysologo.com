@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\SettlementBatchStatus;
+use App\Domains\Wallet\Enums\SettlementBatchStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 

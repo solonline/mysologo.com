@@ -1,0 +1,12 @@
+<?php
+
+namespace App\Domains\Wallester\Contracts;
+
+use App\Models\CustomerWallesterAccount;
+
+interface WallesterAccountRepositoryInterface
+{
+    public function create(array $data): CustomerWallesterAccount;
+
+    public function findByCustomerId(int $customerId): ?CustomerWallesterAccount;
+}

@@ -49,4 +49,11 @@ return [
         'private_key' => env('WALLESTER_PRIVATE_KEY'), // Coloque a chave privada PEM aqui ou use variável de ambiente
     ],
 
+    'ebury' => [
+        'simulate' => env('EBURY_SIMULATE', true),
+        'simulate_auto_approve' => env('EBURY_SIMULATE_AUTO_APPROVE', true),
+        'simulate_auto_approve_delay' => env('EBURY_SIMULATE_AUTO_APPROVE_DELAY', 3),
+        'simulate_use_queue' => env('EBURY_SIMULATE_USE_QUEUE', false),
+    ],
+
 ];

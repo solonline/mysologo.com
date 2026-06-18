@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use Illuminate\Database\Eloquent\Model;
 
 class CustomerWallesterAccount extends Model
@@ -19,6 +20,9 @@ class CustomerWallesterAccount extends Model
         'blocked_amount',
         'blocked_credit_amount',
         'status',
+        'status_reason',
+        'status_source',
+        'status_changed_at',
         'daily_purchase',
         'daily_withdrawal',
         'daily_internet_purchase',
@@ -42,6 +46,11 @@ class CustomerWallesterAccount extends Model
         'registration_number',
         'reference_number',
         'viban'
+    ];
+
+    protected $casts = [
+        'status' => IntegrationAccountStatus::class,
+        'status_changed_at' => 'datetime',
     ];
 
     public function customer()

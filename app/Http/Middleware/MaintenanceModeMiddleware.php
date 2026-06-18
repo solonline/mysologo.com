@@ -4,7 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
-use App\Services\SettingsService;
+use App\Domains\Settings\Services\SettingsService;
 use Closure;
 use Illuminate\Http\Request;
 

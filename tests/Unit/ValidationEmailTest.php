@@ -5,7 +5,7 @@ namespace Tests\Unit;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Mail\ValidationEmail;
+use App\Domains\Auth\Mail\ValidationEmail;
 use App\Models\Customer;
 
 class ValidationEmailTest extends TestCase

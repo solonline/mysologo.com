@@ -25,7 +25,6 @@ class CustomerFactory extends Factory
             'email' => $this->faker->unique()->safeEmail(),
             'email_verified_at' => null,
             'referal_email_code' => $this->faker->unique()->uuid(),
-            'didit_user_id' => null,
             'doc_status' => 'pending',
             'phone' => $this->faker->phoneNumber(),
             'password' => bcrypt('password'),

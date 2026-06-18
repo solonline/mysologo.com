@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Enums\LedgerEntryType;
-use App\Enums\TransactionDirection;
+use App\Domains\Wallet\Enums\LedgerEntryType;
+use App\Domains\Wallet\Enums\TransactionDirection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;

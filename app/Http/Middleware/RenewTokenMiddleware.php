@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\SettingsService;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;

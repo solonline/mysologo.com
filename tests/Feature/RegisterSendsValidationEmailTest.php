@@ -2,15 +2,23 @@
 
 namespace Tests\Feature;
 
-use App\Mail\ValidationEmail;
+use App\Domains\Auth\Mail\ValidationEmail;
 use App\Models\Customer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
 
 class RegisterSendsValidationEmailTest extends TestCase
 {
+    use InteractsWithOnboarding;
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->prepareOnboardingFeatureTest();
+    }
 
     public function test_register_sends_validation_email()
     {
@@ -24,6 +32,7 @@ class RegisterSendsValidationEmailTest extends TestCase
             'password' => 'password',
             'password_confirmation' => 'password',
             'type' => 'retail',
+            'currency' => 'EUR',
         ];
 
         $response = $this->postJson('/api/register-retail', $data);

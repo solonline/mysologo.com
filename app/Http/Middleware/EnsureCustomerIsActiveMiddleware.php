@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domains\Onboarding\Services\IntegrationAccountService;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use Closure;
@@ -9,6 +10,10 @@ use Illuminate\Http\Request;
 
 class EnsureCustomerIsActiveMiddleware
 {
+    public function __construct(
+        protected IntegrationAccountService $integrations,
+    ) {}
+
     public function handle(Request $request, Closure $next)
     {
         $customer = $request->user();
@@ -21,9 +26,7 @@ class EnsureCustomerIsActiveMiddleware
             );
         }
 
-        $status = strtolower((string) $this->normalizeValue($customer->status));
-
-        if ($status !== 'active') {
+        if (! $this->integrations->canTransact($customer)) {
             throw new ApiException(
                 ErrorCode::ACCOUNT_NOT_ACTIVE,
                 403,
@@ -32,14 +35,5 @@ class EnsureCustomerIsActiveMiddleware
         }
 
         return $next($request);
-    }
-
-    private function normalizeValue(mixed $value): string
-    {
-        if ($value instanceof \BackedEnum) {
-            return (string) $value->value;
-        }
-
-        return (string) $value;
     }
 }

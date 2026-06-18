@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\CustomerPayoutStatus;
+use App\Domains\Wallet\Enums\CustomerPayoutStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
