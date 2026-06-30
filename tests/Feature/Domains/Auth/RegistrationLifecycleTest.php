@@ -21,7 +21,7 @@ class RegistrationLifecycleTest extends TestCase
 
     public function test_retail_registration_starts_with_pending_email_verification(): void
     {
-        $response = $this->postJson('/api/register-retail', [
+        $response = $this->postJson('/api/auth/register-retail', [
             'name' => 'Test User',
             'username' => 'testuser',
             'email' => 'testuser@example.com',

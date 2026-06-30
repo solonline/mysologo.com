@@ -35,12 +35,12 @@ class RegisterSendsValidationEmailTest extends TestCase
             'currency' => 'EUR',
         ];
 
-        $response = $this->postJson('/api/register-retail', $data);
+        $response = $this->postJson('/api/auth/register-retail', $data);
         $response->assertStatus(201);
 
         $customer = Customer::where('email', $data['email'])->first();
         Mail::assertSent(ValidationEmail::class, function ($mail) use ($customer) {
-            return $mail->hasTo($customer->email) && !empty($mail->validationUrl);
+            return $mail->hasTo($customer->email) && ! empty($mail->validationUrl);
         });
     }
 }
