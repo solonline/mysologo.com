@@ -18,6 +18,7 @@ $tabs = [
     'address'  => ['label' => 'Endereço',       'title' => 'Morada'],
     'system'   => ['label' => 'Sistema',        'title' => 'Sistema'],
     'stripe'   => ['label' => 'Stripe',         'title' => 'Stripe'],
+    'didit'    => ['label' => 'Didit',          'title' => 'Didit (KYC / KYB)'],
     'sms'      => ['label' => 'SMS',            'title' => 'SMS'],
     'social'   => ['label' => 'Redes Sociais',  'title' => 'Redes Sociais'],
     'currency' => ['label' => 'Moedas',         'title' => 'Configurações de Moedas'],
@@ -67,7 +68,7 @@ $currencyColors = [
     @foreach ($tabs as $group => $meta)
     <div x-show="tab === '{{ $group }}'" @if($group !== 'company') x-cloak @endif class="space-y-4">
 
-        @foreach ($panels[$group] as $panel)
+        @foreach ($panels[$group] ?? [] as $panel)
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
 
             {{-- Card header --}}

@@ -53,12 +53,19 @@ class SettingsSeeder extends Seeder
             ['key' => 'sms.auth_token',  'label' => 'Auth Token', 'type' => 'secret', 'value' => ''],
             ['key' => 'sms.key',    'label' => 'key',   'type' => 'text',   'value' => ''],
             ['key' => 'sms.secret',    'label' => 'Secret',   'type' => 'secret', 'value' => ''],
+            // Didit (KYC/KYB)
+            ['key' => 'didit.api_key',         'label' => 'API Key',              'type' => 'secret', 'value' => env('DIDIT_API_KEY', '')],
+            ['key' => 'didit.api_secret',      'label' => 'API Secret',           'type' => 'secret', 'value' => env('DIDIT_API_SECRET', '')],
+            ['key' => 'didit.base_url',        'label' => 'Base URL',             'type' => 'url',    'value' => env('DIDIT_BASE_URL', '')],
+            ['key' => 'didit.workflow_id',     'label' => 'Workflow KYC (retail/responsible)', 'type' => 'text', 'value' => env('DIDIT_WORKFLOW_ID', '')],
+            ['key' => 'didit.workflow_kyb_id', 'label' => 'Workflow KYB (corporate)',          'type' => 'text', 'value' => env('DIDIT_WORKFLOW_KYB_ID', '')],
+            ['key' => 'didit.webhook_secret',  'label' => 'Webhook Secret',       'type' => 'secret', 'value' => env('DIDIT_WEBHOOK_SECRET', '')],
             // Social links
             ['key' => 'social.facebook',   'label' => 'Facebook URL',  'type' => 'url',    'value' => 'https://facebook.com/yooppayments'],
             ['key' => 'social.instagram',  'label' => 'Instagram URL', 'type' => 'url',    'value' => 'https://instagram.com/yooppayments'],
-            //currencies
-            ['key' => 'currency.accepted',  'label' => 'Accepted Currencies', 'type' => 'json',   'value' => json_encode(['EUR', 'USD', 'GBP','CHF'])],
-            //Payment methods
+            // currencies
+            ['key' => 'currency.accepted',  'label' => 'Accepted Currencies', 'type' => 'json',   'value' => json_encode(['EUR', 'USD', 'GBP', 'CHF'])],
+            // Payment methods
             ['key' => 'payment_methods.enabled',  'label' => 'Enabled Payment Methods', 'type' => 'json',   'value' => json_encode(['card', 'card_non_eea', 'sepa_debit', 'mb_way', 'multibanco', 'bank_transfer'])],
         ];
 
@@ -70,4 +77,3 @@ class SettingsSeeder extends Seeder
         }
     }
 }
-

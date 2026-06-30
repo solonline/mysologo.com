@@ -2,21 +2,19 @@
 
 namespace App\Domains\Customer\Controllers;
 
-use App\Domains\Customer\Services\CustomerDocumentService;
-use App\Domains\Customer\Services\CustomerProfileService;
-use App\Domains\Kyc\Services\IdentityVerificationService;
 use App\Domains\Customer\DTOs\CreateResponsibleDTO;
 use App\Domains\Customer\DTOs\UpdateCustomerDTO;
-use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
+use App\Domains\Customer\Services\CustomerDocumentService;
+use App\Domains\Customer\Services\CustomerProfileService;
 use App\Domains\Kyc\Enums\DocumentStatus;
+use App\Domains\Kyc\Services\IdentityVerificationService;
+use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Http\Requests\CreateResponsibleRequest;
-use App\Http\Requests\SubmitCorporateDocumentRequest;
-use App\Http\Requests\Customer\UpdateCustomerRequest;
 use App\Http\Requests\Customer\FindByUsernameRequest;
+use App\Http\Requests\Customer\UpdateCustomerRequest;
 use App\Http\Requests\Customer\UploadAvatarRequest;
 use App\Http\Resources\CustomerProfileResource;
 use App\Http\Resources\CustomerResource;
-use App\Http\Resources\DocumentUploadResource;
 use App\Http\Resources\PublicCustomerResource;
 use App\Http\Resources\ResponsibleResource;
 use Illuminate\Http\JsonResponse;
@@ -48,16 +46,21 @@ class CustomerController extends Controller
 
         if ($user->type === 'corporate') {
             $responsible = $user->responsibles()->first();
-            if (is_null($responsible)) {
+
+            if ($responsible === null) {
                 $requiresResponsible = true;
-                $kycStatus = false;
-            } else {
-                $diditSession = $responsible->diditSessions()->latest()->first();
                 $kycStatus = $user->doc_status;
-                if (! $diditSession) {
-                    $message = 'No Didit session found for responsible. Please complete KYC.';
-                }
-                $diditSession = $diditSession ? $diditSession->toArray() : null;
+                $message = 'A legal representative must be registered before identity verification.';
+            } elseif (! in_array(strtolower((string) $responsible->doc_status), ['approved', strtolower(DocumentStatus::APPROVED->value)], true)) {
+                $kycStatus = $user->doc_status;
+                $diditSession = $responsible->diditSessions()->latest()->first();
+                $message = 'Legal representative must complete KYC before company verification.';
+                $diditSession = $diditSession?->toArray();
+            } else {
+                $kyb = $this->identityVerification->ensureValidCorporateKyB($user);
+                $diditSession = $kyb['session'] ?? null;
+                $kycStatus = $user->doc_status;
+                $message = $kyb['message'] ?? null;
             }
         } elseif ($user->type === 'retail') {
             $kyc = $this->identityVerification->ensureValidIndividualDocument($user);
@@ -109,25 +112,6 @@ class CustomerController extends Controller
     }
 
     /**
-     * Submit Corporate Document
-     *
-     * Uploads the company's identification document (PDF) for KYC review.
-     *
-     * @tags KYC
-     */
-    public function submitCorporateDocuments(SubmitCorporateDocumentRequest $request): \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
-    {
-        $result = $this->documents->uploadDocument(
-            $request->user(),
-            $request->file('document'),
-            'front_document',
-            $request->input('country'),
-        );
-
-        return DocumentUploadResource::make($result)->response()->setStatusCode(201);
-    }
-
-    /**
      * Upload Avatar
      *
      * Replaces the customer's profile picture.
@@ -143,7 +127,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'avatar' => $customer->avatar,
-            'avatar_url' => asset('storage/' . $customer->avatar),
+            'avatar_url' => asset('storage/'.$customer->avatar),
         ]);
     }
 

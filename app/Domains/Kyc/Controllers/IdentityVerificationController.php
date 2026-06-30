@@ -24,7 +24,11 @@ class IdentityVerificationController extends Controller
     {
         /** @var Customer $customer */
         $customer = Auth::user();
-        $result = $this->identityVerification->ensureValidIndividualDocument($customer);
+
+        $result = match ($customer->type) {
+            'corporate' => $this->identityVerification->ensureValidCorporateKyB($customer),
+            default => $this->identityVerification->ensureValidIndividualDocument($customer),
+        };
 
         return DiditSessionResource::make($result);
     }

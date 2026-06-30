@@ -17,6 +17,9 @@ class CustomerCorporateDocument extends Model
         'tax_id',
         'document_type',
         'doc_status',
+        'status',
+        'motive',
+        'file_path',
         'vat_number',
         'address_line_1',
         'address_line_2',
@@ -43,6 +46,4 @@ class CustomerCorporateDocument extends Model
     {
         return $this->hasMany(CustomerRetailDocument::class, 'company_id');
     }
-
-
 }

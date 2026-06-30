@@ -4,12 +4,14 @@ namespace App\Domains\Kyc\Gateways;
 
 use App\Domains\Kyc\Clients\DiditHttpClient;
 use App\Domains\Kyc\Contracts\KycGatewayInterface;
+use App\Domains\Settings\Services\DiditSettingsService;
 use Illuminate\Support\Facades\Log;
 
 class DiditKycGateway implements KycGatewayInterface
 {
     public function __construct(
         protected DiditHttpClient $client,
+        protected DiditSettingsService $diditSettings,
     ) {}
 
     public function createSession(array $data): array
@@ -66,7 +68,7 @@ class DiditKycGateway implements KycGatewayInterface
             return false;
         }
 
-        $expectedSignature = hash_hmac('sha256', $payload, config('services.didit.webhook_secret'));
+        $expectedSignature = hash_hmac('sha256', $payload, $this->diditSettings->webhookSecret());
 
         return hash_equals($expectedSignature, $signature);
     }

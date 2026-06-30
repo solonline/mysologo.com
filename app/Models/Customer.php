@@ -3,16 +3,17 @@
 namespace App\Models;
 
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
+use Carbon\Carbon;
+use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
- * @property int    $id
+ * @property int $id
  * @property string $name
  * @property string $email
  * @property string|null $phone
@@ -21,13 +22,13 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string $type
  * @property string $status
  * @property string|null $doc_status
- * @property \Carbon\Carbon|null $email_verified_at
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
+ * @property Carbon|null $email_verified_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class Customer extends Model
 {
-    use HasApiTokens, HasFactory, Notifiable, MustVerifyEmail, LogsActivity;
+    use HasApiTokens, HasFactory, LogsActivity, MustVerifyEmail, Notifiable;
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -67,6 +68,7 @@ class Customer extends Model
         'email_verified_at' => 'datetime',
         'status' => CustomerLifecycleStatus::class,
     ];
+
     // Empresa à qual o responsável pertence
     public function corporate()
     {
@@ -79,7 +81,6 @@ class Customer extends Model
         return $this->hasMany(Customer::class, 'corporate_id');
     }
 
-
     public function documents()
     {
         return $this->hasMany(CustomerRetailDocument::class);
@@ -88,7 +89,7 @@ class Customer extends Model
     // Se quiser acessar empresas (CustomerCorporateDocument) relacionadas a este cliente
     public function corporateDocuments()
     {
-        return $this->hasMany(CustomerCorporateDocument::class, 'id', 'customer_id');
+        return $this->hasMany(CustomerCorporateDocument::class, 'customer_id', 'id');
     }
 
     public function diditSessions()

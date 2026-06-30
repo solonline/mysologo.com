@@ -24,11 +24,13 @@ class UploadDocumentMediaJob implements ShouldQueue
     public function handle(): void
     {
         try {
-            $document = CustomerRetailDocument::findOrFail($this->documentId);
+            $document = CustomerRetailDocument::query()
+                ->with('customer')
+                ->findOrFail($this->documentId);
 
             $contents = @file_get_contents($this->mediaUrl);
             if ($contents === false) {
-                throw new \Exception('Não foi possível baixar o arquivo da URL: ' . $this->mediaUrl);
+                throw new \Exception('Não foi possível baixar o arquivo da URL: '.$this->mediaUrl);
             }
 
             $extension = pathinfo(parse_url($this->mediaUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
@@ -38,6 +40,11 @@ class UploadDocumentMediaJob implements ShouldQueue
 
             $document->{$this->field} = $filename;
             $document->save();
+
+            if ($this->field === 'portrait_image' && $document->customer) {
+                $document->customer->avatar = $filename;
+                $document->customer->save();
+            }
 
             Log::info('UploadDocumentMediaJob executado', [
                 'document_id' => $this->documentId,

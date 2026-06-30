@@ -10,41 +10,37 @@ use App\Models\CustomerCorporateDocument;
 
 class CorporateDocumentService
 {
-    public function submittedDocument(Customer $customer, string $filePath, string $country): CustomerCorporateDocument
+    public function initiateKyBReview(Customer $customer): CustomerCorporateDocument
     {
-        try {
-            $documentType = match ($country) {
-                'BR' => 'CNPJ',
-                'US' => 'EIN',
-                'PT' => 'NIF',
-                'EN' => 'Company Registration Number',
-                default => 'BUSINESS_ID',
-            };
-
-            $document = CustomerCorporateDocument::firstOrCreate([
-                'customer_id' => $customer->id,
-                'legal_name' => $customer->username,
-                'document_type' => $documentType,
-                'country_code' => $country,
-                'tax_id' => $customer->username . '_tax_' . uniqid(),
-                'doc_status' => DocumentStatus::ANALYSING,
-            ]);
-
-            $document->file_path = $filePath;
-            $document->save();
-
-            $customer->doc_status = 'analysing';
-            $customer->save();
-
-            return $document;
-        } catch (\Exception $e) {
+        if ($customer->type !== 'corporate') {
             throw new ApiException(
-                ErrorCode::FILE_UPLOAD_FAILED,
+                ErrorCode::CORPORATE_DOCUMENT_INVALID,
                 400,
-                'Failed to process corporate document.',
-                'corporateDocumentUpload',
-                $e
+                'KYB review can only be initiated for corporate customers.',
             );
         }
+
+        $document = CustomerCorporateDocument::query()->firstOrCreate(
+            ['customer_id' => $customer->id],
+            [
+                'legal_name' => $customer->name ?: $customer->username,
+                'country_code' => 'PT',
+                'tax_id' => 'kyb_'.$customer->id.'_'.uniqid(),
+                'document_type' => 'BUSINESS_ID',
+                'doc_status' => DocumentStatus::ANALYSING->value,
+                'status' => 'Pending',
+            ],
+        );
+
+        if ($document->doc_status !== DocumentStatus::APPROVED->value) {
+            $document->doc_status = DocumentStatus::ANALYSING->value;
+            $document->status = 'Pending';
+            $document->save();
+        }
+
+        $customer->doc_status = DocumentStatus::ANALYSING->value;
+        $customer->save();
+
+        return $document;
     }
 }

@@ -40,6 +40,7 @@ return [
         'api_secret' => env('DIDIT_API_SECRET'),
         'base_url' => env('DIDIT_BASE_URL'),
         'workflow_id' => env('DIDIT_WORKFLOW_ID'),
+        'workflow_kyb_id' => env('DIDIT_WORKFLOW_KYB_ID'),
         'webhook_secret' => env('DIDIT_WEBHOOK_SECRET'),
     ],
 

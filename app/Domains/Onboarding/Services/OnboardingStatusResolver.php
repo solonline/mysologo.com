@@ -2,9 +2,10 @@
 
 namespace App\Domains\Onboarding\Services;
 
+use App\Domains\Kyc\Enums\DocumentStatus;
+use App\Domains\Kyc\Services\IdentityVerificationService;
 use App\Domains\Onboarding\DTOs\OnboardingStatus;
 use App\Models\Customer;
-use App\Domains\Kyc\Services\IdentityVerificationService;
 
 /**
  * Resolve o estado de onboarding de um customer.
@@ -107,7 +108,17 @@ class OnboardingStatusResolver
             ];
         }
 
-        $result = $this->identityVerification->ensureValidIndividualDocument($responsible);
+        if (! $this->isDocumentApproved($responsible)) {
+            $result = $this->identityVerification->ensureValidIndividualDocument($responsible);
+
+            return [
+                'requires_responsible' => false,
+                'session' => $result['session'] ?? null,
+                'message' => $result['message'] ?? 'Legal representative must complete KYC before company verification.',
+            ];
+        }
+
+        $result = $this->identityVerification->ensureValidCorporateKyB($customer);
 
         return [
             'requires_responsible' => false,
@@ -129,7 +140,7 @@ class OnboardingStatusResolver
 
     private function isPhoneVerified(Customer $customer): bool
     {
-        if (!$customer->phone) {
+        if (! $customer->phone) {
             return false;
         }
 
@@ -143,5 +154,10 @@ class OnboardingStatusResolver
             'session' => null,
             'message' => null,
         ];
+    }
+
+    private function isDocumentApproved(Customer $customer): bool
+    {
+        return strtolower((string) $customer->doc_status) === strtolower(DocumentStatus::APPROVED->value);
     }
 }

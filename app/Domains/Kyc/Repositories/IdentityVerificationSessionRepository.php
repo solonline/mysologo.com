@@ -18,7 +18,20 @@ class IdentityVerificationSessionRepository implements IdentityVerificationSessi
 
     public function findBySessionId(string $sessionId): ?CustomerDiditSession
     {
-        return CustomerDiditSession::where('session_id', $sessionId)->first();
+        $session = CustomerDiditSession::query()
+            ->where('session_id', $sessionId)
+            ->first();
+
+        if ($session) {
+            return $session;
+        }
+
+        return CustomerDiditSession::query()
+            ->where(function ($query) use ($sessionId) {
+                $query->where('metadata->application_id', $sessionId)
+                    ->orWhere('metadata->session_id', $sessionId);
+            })
+            ->first();
     }
 
     public function latestByCustomer(Customer $customer): ?CustomerDiditSession

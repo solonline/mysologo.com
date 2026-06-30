@@ -18,6 +18,10 @@ class CustomerDiditSession extends Model
         'metadata',
     ];
 
+    protected $casts = [
+        'metadata' => 'array',
+    ];
+
     public function customer()
     {
         return $this->belongsTo(Customer::class);
