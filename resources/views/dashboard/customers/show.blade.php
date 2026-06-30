@@ -12,10 +12,22 @@
         </svg>
     </a>
     <div class="flex items-center gap-4">
+        @php
+            $avatarUrl = filled($customer->avatar)
+                ? (str_starts_with($customer->avatar, 'http://') || str_starts_with($customer->avatar, 'https://')
+                    ? $customer->avatar
+                    : Storage::url($customer->avatar))
+                : null;
+        @endphp
+        @if ($avatarUrl)
+        <img src="{{ $avatarUrl }}" alt="{{ $customer->name }}"
+             class="w-12 h-12 rounded-2xl object-cover border border-slate-200 shadow-md">
+        @else
         <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-400 to-violet-500
                     flex items-center justify-center text-white text-base font-bold shadow-md shadow-indigo-500/20">
             {{ strtoupper(substr($customer->name ?? 'C', 0, 2)) }}
         </div>
+        @endif
         <div>
             <h1 class="text-xl font-bold text-slate-900">{{ $customer->name }}</h1>
             <p class="text-sm text-slate-500">{{ $customer->email }}</p>
@@ -27,6 +39,32 @@
 @section('content')
 
 @php
+    $resolveMediaUrl = function (?string $path): ?string {
+        if ($path === null || $path === '') {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        return Storage::url($path);
+    };
+
+    $latestDiditSession = $customer->diditSessions->first();
+
+    $formatDateTime = function ($value, string $fallback = '—'): string {
+        if ($value === null || $value === '') {
+            return $fallback;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('d/m/Y H:i');
+        }
+
+        return \Illuminate\Support\Carbon::parse($value)->format('d/m/Y H:i');
+    };
+
     $custVal = $customer->status?->value ?? $customer->status ?? '';
     $custBadge = match($customer->status) {
         \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::ACTIVE => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Ativo'],
@@ -102,10 +140,14 @@
                         ['label' => 'Tipo',                'value' => ucfirst($customer->type ?? '—')],
                         ['label' => 'Idioma',              'value' => strtoupper($customer->language ?? '—')],
                         ['label' => 'Moeda',               'value' => strtoupper($customer->currency ?? '—')],
-                        ['label' => 'Email verificado',    'value' => $customer->email_verified_at?->format('d/m/Y H:i') ?? 'Não verificado'],
-                        ['label' => 'Telefone verificado', 'value' => $customer->phoneVerifications->last()?->verified_at?->format('d/m/Y H:i') ?? 'Não verificado'],
-                        ['label' => 'Cadastro',            'value' => $customer->created_at?->format('d/m/Y H:i')],
+                        ['label' => 'Email verificado',    'value' => $customer->email_verified_at ? $formatDateTime($customer->email_verified_at, 'Não verificado') : 'Não verificado'],
+                        ['label' => 'Telefone verificado', 'value' => ($phoneVerifiedAt = $customer->phoneVerifications->last()?->verified_at) ? $formatDateTime($phoneVerifiedAt, 'Não verificado') : 'Não verificado'],
+                        ['label' => 'Cadastro',            'value' => $formatDateTime($customer->created_at)],
                     ];
+
+                    if (filled($customer->status_reason)) {
+                        $fields[] = ['label' => 'Motivo do estado', 'value' => $customer->status_reason];
+                    }
                 @endphp
                 @foreach ($fields as $f)
                 <div>
@@ -215,6 +257,62 @@
 
         </div>{{-- fim Informações Gerais --}}
 
+        {{-- Sessão Didit --}}
+        @if ($latestDiditSession)
+        @php
+            $diditStatus = $latestDiditSession->status ?? '—';
+            $diditBadge = match (strtolower(str_replace(' ', '', $diditStatus))) {
+                'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Aprovado'],
+                'declined' => ['badge' => 'bg-red-50 text-red-700 border-red-200', 'dot' => 'bg-red-500', 'label' => 'Recusado'],
+                'inreview' => ['badge' => 'bg-sky-50 text-sky-700 border-sky-200', 'dot' => 'bg-sky-500', 'label' => 'Em análise'],
+                'inprogress', 'notfinished' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Em progresso'],
+                'notstarted' => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'dot' => 'bg-slate-400', 'label' => 'Não iniciado'],
+                default => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'dot' => 'bg-slate-400', 'label' => $diditStatus],
+            };
+            $diditMetadata = is_array($latestDiditSession->metadata) ? $latestDiditSession->metadata : [];
+        @endphp
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-slate-900">Verificação Didit</h2>
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border {{ $diditBadge['badge'] }}">
+                    <span class="w-1.5 h-1.5 rounded-full mr-1.5 {{ $diditBadge['dot'] }}"></span>
+                    {{ $diditBadge['label'] }}
+                </span>
+            </div>
+            <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium mb-0.5">Session ID</p>
+                    <p class="font-mono text-xs text-slate-700 break-all">{{ $latestDiditSession->session_id }}</p>
+                </div>
+                @if (!empty($diditMetadata['application_id']))
+                <div>
+                    <p class="text-xs text-slate-400 font-medium mb-0.5">Application ID</p>
+                    <p class="font-mono text-xs text-slate-700 break-all">{{ $diditMetadata['application_id'] }}</p>
+                </div>
+                @endif
+                <div>
+                    <p class="text-xs text-slate-400 font-medium mb-0.5">Workflow</p>
+                    <p class="text-slate-800 font-medium">{{ $latestDiditSession->workflow_id ?? '—' }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-medium mb-0.5">Última actualização</p>
+                    <p class="text-slate-800 font-medium">{{ $formatDateTime($latestDiditSession->updated_at) }}</p>
+                </div>
+                @if (filled($latestDiditSession->session_url))
+                <div class="sm:col-span-2">
+                    <a href="{{ $latestDiditSession->session_url }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                        Abrir sessão Didit
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                    </a>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
+
         {{-- Documentos --}}
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
             <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -222,7 +320,74 @@
                 <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->documents->count() }}</span>
             </div>
             @forelse ($customer->documents as $doc)
+            @php
+                $extraFields = is_array($doc->extra_fields) ? $doc->extra_fields : [];
+                $warnings = $extraFields['warnings'] ?? [];
+                $verificationStatus = $extraFields['status'] ?? null;
+                $documentSubtype = $extraFields['document_subtype'] ?? null;
+                $verificationBadge = match (strtolower(str_replace(' ', '', (string) $verificationStatus))) {
+                    'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'label' => 'Aprovado'],
+                    'declined' => ['badge' => 'bg-red-50 text-red-700 border-red-200', 'label' => 'Recusado'],
+                    'inreview' => ['badge' => 'bg-sky-50 text-sky-700 border-sky-200', 'label' => 'Em análise'],
+                    default => null,
+                };
+            @endphp
             <div x-data="{ showJson: false }" class="px-5 py-4 border-b border-slate-50 last:border-0">
+
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <p class="text-sm font-semibold text-slate-900 font-mono">{{ $doc->document_number }}</p>
+                    @if ($verificationBadge)
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border {{ $verificationBadge['badge'] }}">
+                        {{ $verificationBadge['label'] }}
+                    </span>
+                    @endif
+                    @if ($documentSubtype)
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                        {{ $documentSubtype }}
+                    </span>
+                    @endif
+                </div>
+
+                {{-- Motivos de recusa / avisos Didit --}}
+                @if (!empty($warnings))
+                <div class="mb-4 rounded-xl border border-red-200 bg-red-50/60 overflow-hidden">
+                    <div class="px-4 py-2.5 border-b border-red-100 bg-red-50">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-red-800">
+                            Motivos da verificação ({{ count($warnings) }})
+                        </p>
+                    </div>
+                    <div class="divide-y divide-red-100">
+                        @foreach ($warnings as $warning)
+                        @php
+                            $logType = strtolower($warning['log_type'] ?? 'warning');
+                            $warningStyle = match ($logType) {
+                                'error' => ['icon' => 'bg-red-500', 'title' => 'text-red-900', 'body' => 'text-red-700'],
+                                'information' => ['icon' => 'bg-slate-400', 'title' => 'text-slate-800', 'body' => 'text-slate-600'],
+                                default => ['icon' => 'bg-amber-500', 'title' => 'text-amber-900', 'body' => 'text-amber-800'],
+                            };
+                        @endphp
+                        <div class="px-4 py-3 flex gap-3">
+                            <span class="mt-1.5 w-2 h-2 rounded-full flex-shrink-0 {{ $warningStyle['icon'] }}"></span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2 mb-1">
+                                    <p class="text-sm font-semibold {{ $warningStyle['title'] }}">
+                                        {{ $warning['short_description'] ?? 'Aviso' }}
+                                    </p>
+                                    @if (!empty($warning['risk']))
+                                    <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/80 text-slate-600 border border-slate-200">
+                                        {{ $warning['risk'] }}
+                                    </span>
+                                    @endif
+                                </div>
+                                @if (!empty($warning['long_description']))
+                                <p class="text-xs leading-relaxed {{ $warningStyle['body'] }}">{{ $warning['long_description'] }}</p>
+                                @endif
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
 
                 {{-- Campos de identidade --}}
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 mb-4">
@@ -255,6 +420,30 @@
                     @endif
                     @endforeach
                 </div>
+
+                {{-- Quality scores OCR --}}
+                @php
+                    $qualityScores = array_filter([
+                        'Qualidade Frente' => $doc->front_image_quality_score['overall_score'] ?? null,
+                        'Qualidade Verso' => $doc->back_image_quality_score['overall_score'] ?? null,
+                    ], fn ($score) => $score !== null);
+                @endphp
+                @if (!empty($qualityScores))
+                <div class="flex flex-wrap gap-2 mb-4">
+                    @foreach ($qualityScores as $label => $score)
+                    @php
+                        $pct = round((float) $score, 1);
+                        $color = $pct >= 80 ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                               : ($pct >= 60 ? 'text-amber-700 bg-amber-50 border-amber-200'
+                               : 'text-red-700 bg-red-50 border-red-200');
+                    @endphp
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs {{ $color }}">
+                        <span>{{ $label }}</span>
+                        <span class="font-bold">{{ $pct }}%</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
 
                 {{-- Scores --}}
                 @php
@@ -306,10 +495,11 @@
                     <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Imagens</p>
                     <div class="flex flex-wrap gap-3">
                         @foreach ($mediaFields as $m)
-                        @if (!empty($doc->{$m['field']}))
+                        @php $mediaUrl = $resolveMediaUrl($doc->{$m['field']}); @endphp
+                        @if ($mediaUrl)
                         <div class="flex flex-col items-center gap-1">
-                            <a href="{{ Storage::url($doc->{$m['field']}) }}" target="_blank">
-                                <img src="{{ Storage::url($doc->{$m['field']}) }}"
+                            <a href="{{ $mediaUrl }}" target="_blank">
+                                <img src="{{ $mediaUrl }}"
                                      alt="{{ $m['label'] }}"
                                      class="w-24 h-16 object-cover rounded-lg border border-slate-200 shadow-sm hover:opacity-90 transition">
                             </a>
@@ -326,9 +516,10 @@
                     <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Vídeos</p>
                     <div class="flex flex-wrap gap-3">
                         @foreach ($videoFields as $v)
-                        @if (!empty($doc->{$v['field']}))
+                        @php $videoUrl = $resolveMediaUrl($doc->{$v['field']}); @endphp
+                        @if ($videoUrl)
                         <div class="flex flex-col items-center gap-1">
-                            <video src="{{ Storage::url($doc->{$v['field']}) }}"
+                            <video src="{{ $videoUrl }}"
                                    controls
                                    class="w-40 rounded-lg border border-slate-200 shadow-sm"></video>
                             <span class="text-xs text-slate-500">{{ $v['label'] }}</span>
@@ -341,11 +532,16 @@
 
                 {{-- Análises JSON (collapsible) --}}
                 @php
+                    $extraFieldsForJson = collect($extraFields)
+                        ->except(['warnings', 'status', 'document_subtype', 'node_id', 'matches', 'mrz'])
+                        ->filter(fn ($value) => $value !== null && $value !== [] && $value !== '')
+                        ->all();
+
                     $jsonSections = array_filter([
                         'Endereço Estruturado' => $doc->parsed_address,
                         'Análise de IP'        => $doc->ip_analyses,
                         'Verificações NFC'     => $doc->nfc_verifications,
-                        'Campos Extras'        => $doc->extra_fields,
+                        'Campos Extras'        => !empty($extraFieldsForJson) ? $extraFieldsForJson : null,
                     ]);
                 @endphp
                 @if (!empty($jsonSections))
@@ -805,16 +1001,16 @@
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
                     <span class="text-slate-500">Criado em</span>
-                    <span class="text-slate-700 font-medium">{{ $customer->created_at?->format('d/m/Y H:i') }}</span>
+                    <span class="text-slate-700 font-medium">{{ $formatDateTime($customer->created_at) }}</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-slate-500">Atualizado em</span>
-                    <span class="text-slate-700 font-medium">{{ $customer->updated_at?->format('d/m/Y H:i') }}</span>
+                    <span class="text-slate-700 font-medium">{{ $formatDateTime($customer->updated_at) }}</span>
                 </div>
                 @if ($customer->email_verified_at)
                 <div class="flex justify-between">
                     <span class="text-slate-500">Email verificado</span>
-                    <span class="text-emerald-600 font-medium">{{ $customer->email_verified_at->format('d/m/Y H:i') }}</span>
+                    <span class="text-emerald-600 font-medium">{{ $formatDateTime($customer->email_verified_at) }}</span>
                 </div>
                 @endif
             </div>

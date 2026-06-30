@@ -10,6 +10,7 @@ class GetCustomerDetailQuery
     {
         return $customer->load([
             'documents',
+            'diditSessions' => fn ($q) => $q->latest(),
             'responsibles',
             'balances',
             'transactions' => fn ($q) => $q->latest('stripe_created_at')->limit(50),
