@@ -35,7 +35,7 @@ class WalletServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Route::middleware('api')
-            ->prefix('api/v2/wallet')
-            ->group(__DIR__ . '/Routes/wallet.php');
+            ->prefix('api/wallet')
+            ->group(__DIR__.'/Routes/wallet.php');
     }
 }

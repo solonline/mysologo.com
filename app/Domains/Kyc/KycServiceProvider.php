@@ -26,7 +26,7 @@ class KycServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Route::middleware('api')
-            ->prefix('api/v2/kyc')
-            ->group(__DIR__ . '/Routes/kyc.php');
+            ->prefix('api/kyc')
+            ->group(__DIR__.'/Routes/kyc.php');
     }
 }

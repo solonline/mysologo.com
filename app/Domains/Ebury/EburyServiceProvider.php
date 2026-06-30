@@ -23,7 +23,7 @@ class EburyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Route::middleware('api')
-            ->prefix('api/v2/ebury')
-            ->group(__DIR__ . '/Routes/ebury.php');
+            ->prefix('api/ebury')
+            ->group(__DIR__.'/Routes/ebury.php');
     }
 }

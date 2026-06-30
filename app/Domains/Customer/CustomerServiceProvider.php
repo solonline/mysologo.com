@@ -2,6 +2,12 @@
 
 namespace App\Domains\Customer;
 
+use App\Domains\Customer\Contracts\CorporateDocumentRepositoryInterface;
+use App\Domains\Customer\Contracts\CustomerRepositoryInterface;
+use App\Domains\Customer\Contracts\RetailDocumentRepositoryInterface;
+use App\Domains\Customer\Repositories\CorporateDocumentRepository;
+use App\Domains\Customer\Repositories\CustomerRepository;
+use App\Domains\Customer\Repositories\RetailDocumentRepository;
 use App\Domains\Customer\Services\CorporateDocumentService;
 use App\Domains\Customer\Services\CustomerDocumentService;
 use App\Domains\Customer\Services\CustomerNotificationService;
@@ -24,16 +30,16 @@ class CustomerServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(
-            \App\Domains\Customer\Contracts\CustomerRepositoryInterface::class,
-            \App\Domains\Customer\Repositories\CustomerRepository::class,
+            CustomerRepositoryInterface::class,
+            CustomerRepository::class,
         );
         $this->app->bind(
-            \App\Domains\Customer\Contracts\RetailDocumentRepositoryInterface::class,
-            \App\Domains\Customer\Repositories\RetailDocumentRepository::class,
+            RetailDocumentRepositoryInterface::class,
+            RetailDocumentRepository::class,
         );
         $this->app->bind(
-            \App\Domains\Customer\Contracts\CorporateDocumentRepositoryInterface::class,
-            \App\Domains\Customer\Repositories\CorporateDocumentRepository::class,
+            CorporateDocumentRepositoryInterface::class,
+            CorporateDocumentRepository::class,
         );
 
         foreach ($this->containerSingletons as $class) {
@@ -44,7 +50,7 @@ class CustomerServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Route::middleware('api')
-            ->prefix('api/v2/customer')
-            ->group(__DIR__ . '/Routes/customer.php');
+            ->prefix('api/customer')
+            ->group(__DIR__.'/Routes/customer.php');
     }
 }

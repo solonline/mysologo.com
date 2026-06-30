@@ -30,7 +30,7 @@ class MerchantServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Route::middleware('api')
-            ->prefix('api/v2/merchant')
-            ->group(__DIR__ . '/Routes/merchant.php');
+            ->prefix('api/merchant')
+            ->group(__DIR__.'/Routes/merchant.php');
     }
 }

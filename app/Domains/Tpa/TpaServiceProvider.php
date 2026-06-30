@@ -16,7 +16,7 @@ class TpaServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Route::middleware('api')
-            ->prefix('api/v2/tpa')
-            ->group(__DIR__ . '/Routes/tpa.php');
+            ->prefix('api/tpa')
+            ->group(__DIR__.'/Routes/tpa.php');
     }
 }

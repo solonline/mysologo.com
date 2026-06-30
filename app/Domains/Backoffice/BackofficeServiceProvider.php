@@ -89,7 +89,7 @@ class BackofficeServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Route::middleware('api')
-            ->prefix('api/v2/backoffice')
-            ->group(__DIR__ . '/Routes/backoffice.php');
+            ->prefix('api/backoffice')
+            ->group(__DIR__.'/Routes/backoffice.php');
     }
 }

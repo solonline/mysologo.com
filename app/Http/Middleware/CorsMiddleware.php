@@ -4,27 +4,35 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class CorsMiddleware
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure  $next
-     * @return mixed
-     */
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
+        if ($request->isMethod('OPTIONS')) {
+            return $this->withCorsHeaders(response('', 204));
+        }
+
+        /** @var Response $response */
         $response = $next($request);
 
-        $response->headers->set('Access-Control-Allow-Origin', '*');
-        $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+        return $this->withCorsHeaders($response);
+    }
 
-        if ($request->getMethod() === 'OPTIONS') {
-            $response->setStatusCode(200);
-        }
+    private function withCorsHeaders(Response $response): Response
+    {
+        $response->headers->set('Access-Control-Allow-Origin', '*');
+        $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        $response->headers->set('Access-Control-Allow-Headers', implode(', ', [
+            'Content-Type',
+            'Accept',
+            'Authorization',
+            'X-Requested-With',
+            'Idempotency-Key',
+            'X-Merchant-Key',
+        ]));
+        $response->headers->set('Access-Control-Max-Age', '86400');
 
         return $response;
     }

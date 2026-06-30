@@ -24,7 +24,7 @@ class WallesterServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Route::middleware('api')
-            ->prefix('api/v2/wallester')
-            ->group(__DIR__ . '/Routes/wallester.php');
+            ->prefix('api/wallester')
+            ->group(__DIR__.'/Routes/wallester.php');
     }
 }

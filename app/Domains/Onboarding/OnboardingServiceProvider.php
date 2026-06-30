@@ -27,7 +27,7 @@ class OnboardingServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Route::middleware('api')
-            ->prefix('api/v2/onboarding')
-            ->group(__DIR__ . '/Routes/onboarding.php');
+            ->prefix('api/onboarding')
+            ->group(__DIR__.'/Routes/onboarding.php');
     }
 }
