@@ -32,6 +32,13 @@ class PhoneVerificationController extends Controller
 
         $msg = $sent ? 'Verification code sent.' : 'Phone already verified.';
 
+        \Log::info('Phone verification sent', [
+            'customer_id' => $customer->id,
+            'phone' => $customer->phone,
+            'sent' => $sent,
+            'msg' => $msg,
+        ]);
+
         return SmsValidationResource::make([
             'message' => $msg,
             'status' => $sent ? 'success' : 'failed',

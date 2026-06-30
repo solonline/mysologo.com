@@ -49,9 +49,9 @@
 							"raw": "{\n\t\"name\": \"John Doe\",\n\t\"email\": \"john@example.com\",\n\t\"username\": \"johndoe\",\n\t\"password\": \"secret123\",\n\t\"phone\": \"351912345678\",\n\t\"currency\": \"EUR\",\n\t\"language\": \"en\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/register-retail",
+							"raw": "{{base_url}}/auth/register-retail",
 							"host": ["{{base_url}}"],
-							"path": ["register-retail"]
+							"path": ["auth", "register-retail"]
 						}
 					}
 				},
@@ -69,9 +69,9 @@
 							"raw": "{\n\t\"name\": \"Acme Corp\",\n\t\"username\": \"acmecorp\",\n\t\"email\": \"admin@acme.com\",\n\t\"tax_id\": \"PT123456789\",\n\t\"password\": \"secret123\",\n\t\"country_code\": \"PT\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/register-corporate",
+							"raw": "{{base_url}}/auth/register-corporate",
 							"host": ["{{base_url}}"],
-							"path": ["register-corporate"]
+							"path": ["auth", "register-corporate"]
 						}
 					}
 				},
@@ -103,9 +103,9 @@
 							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"password\": \"secret123\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/login",
+							"raw": "{{base_url}}/auth/login",
 							"host": ["{{base_url}}"],
-							"path": ["login"]
+							"path": ["auth", "login"]
 						}
 					}
 				},
@@ -123,9 +123,9 @@
 							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"device_token\": \"DEVICE_TOKEN_HERE\",\n\t\"pin\": \"1234\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/login-pin",
+							"raw": "{{base_url}}/auth/login-pin",
 							"host": ["{{base_url}}"],
-							"path": ["login-pin"]
+							"path": ["auth", "login-pin"]
 						}
 					}
 				},
@@ -143,9 +143,9 @@
 							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"password\": \"secret123\",\n\t\"tpa_serial\": \"TPA_SERIAL_HERE\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/login-tpa",
+							"raw": "{{base_url}}/auth/login-tpa",
 							"host": ["{{base_url}}"],
-							"path": ["login-tpa"]
+							"path": ["auth", "login-tpa"]
 						}
 					}
 				},
@@ -177,9 +177,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/logout",
+							"raw": "{{base_url}}/auth/logout",
 							"host": ["{{base_url}}"],
-							"path": ["logout"]
+							"path": ["auth", "logout"]
 						}
 					}
 				},
@@ -197,9 +197,9 @@
 							"raw": "{\n\t\"email\": \"john@example.com\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/forgot-password",
+							"raw": "{{base_url}}/auth/forgot-password",
 							"host": ["{{base_url}}"],
-							"path": ["forgot-password"]
+							"path": ["auth", "forgot-password"]
 						}
 					}
 				},
@@ -217,29 +217,23 @@
 							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"token\": \"RESET_TOKEN_HERE\",\n\t\"password\": \"newpassword123\",\n\t\"password_confirmation\": \"newpassword123\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/reset-password",
+							"raw": "{{base_url}}/auth/reset-password",
 							"host": ["{{base_url}}"],
-							"path": ["reset-password"]
+							"path": ["auth", "reset-password"]
 						}
 					}
 				},
 				{
-					"name": "Create Didit Session",
+					"name": "Create Identity Session",
 					"request": {
-						"auth": { "type": "noauth" },
 						"method": "POST",
 						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
+							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"email\": \"john@example.com\"\n}"
-						},
 						"url": {
-							"raw": "{{base_url}}/create-didit-session",
+							"raw": "{{base_url}}/kyc/identity/session",
 							"host": ["{{base_url}}"],
-							"path": ["create-didit-session"]
+							"path": ["kyc", "identity", "session"]
 						}
 					}
 				}
@@ -261,9 +255,9 @@
 							"raw": "{\n\t\"device_token\": \"UNIQUE_DEVICE_TOKEN\",\n\t\"device_name\": \"My iPhone 14\",\n\t\"pin\": \"1234\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/create-pin",
+							"raw": "{{base_url}}/auth/create-pin",
 							"host": ["{{base_url}}"],
-							"path": ["create-pin"]
+							"path": ["auth", "create-pin"]
 						}
 					}
 				}
@@ -375,9 +369,9 @@
 							"raw": "{\n\t\"phone\": \"351912345678\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/customer/phone/send",
+							"raw": "{{base_url}}/onboarding/phone/send",
 							"host": ["{{base_url}}"],
-							"path": ["customer", "phone", "send"]
+							"path": ["onboarding", "phone", "send"]
 						}
 					}
 				},
@@ -394,9 +388,9 @@
 							"raw": "{\n\t\"code\": \"123456\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/customer/phone/validate",
+							"raw": "{{base_url}}/onboarding/phone/validate",
 							"host": ["{{base_url}}"],
-							"path": ["customer", "phone", "validate"]
+							"path": ["onboarding", "phone", "validate"]
 						}
 					}
 				}
@@ -457,7 +451,7 @@
 			]
 		},
 		{
-			"name": "Dashboard",
+			"name": "Wallet",
 			"item": [
 				{
 					"name": "Get Summary",
@@ -467,9 +461,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/dashboard/summary",
+							"raw": "{{base_url}}/wallet/dashboard/summary",
 							"host": ["{{base_url}}"],
-							"path": ["dashboard", "summary"]
+							"path": ["wallet", "dashboard", "summary"]
 						}
 					}
 				}
@@ -486,9 +480,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/account",
+							"raw": "{{base_url}}/wallet/account",
 							"host": ["{{base_url}}"],
-							"path": ["account"]
+							"path": ["wallet", "account"]
 						}
 					}
 				},
@@ -500,9 +494,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/account/balance",
+							"raw": "{{base_url}}/wallet/account/balance",
 							"host": ["{{base_url}}"],
-							"path": ["account", "balance"]
+							"path": ["wallet", "account", "balance"]
 						}
 					}
 				}
@@ -519,9 +513,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/transactions?per_page=15",
+							"raw": "{{base_url}}/wallet/transactions?per_page=15",
 							"host": ["{{base_url}}"],
-							"path": ["transactions"],
+							"path": ["wallet", "transactions"],
 							"query": [
 								{ "key": "per_page", "value": "15" }
 							]
@@ -536,9 +530,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/transactions/1",
+							"raw": "{{base_url}}/wallet/transactions/1",
 							"host": ["{{base_url}}"],
-							"path": ["transactions", "1"]
+							"path": ["wallet", "transactions", "1"]
 						}
 					}
 				},
@@ -555,9 +549,9 @@
 							"raw": "{\n\t\"recipient_username\": \"janedoe\",\n\t\"amount\": 1000,\n\t\"currency\": \"EUR\",\n\t\"description\": \"Pagamento almoco\",\n\t\"device_token\": \"DEVICE_TOKEN_HERE\",\n\t\"pin\": \"1234\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/transactions/p2p",
+							"raw": "{{base_url}}/wallet/transactions/p2p",
 							"host": ["{{base_url}}"],
-							"path": ["transactions", "p2p"]
+							"path": ["wallet", "transactions", "p2p"]
 						}
 					}
 				}
@@ -657,6 +651,14 @@
 				{
 					"name": "Create Terminal Payment Intent",
 					"request": {
+						"auth": {
+							"type": "apikey",
+							"apikey": [
+								{ "key": "key", "value": "X-Merchant-Key", "type": "string" },
+								{ "key": "value", "value": "{{merchant_api_key}}", "type": "string" },
+								{ "key": "in", "value": "header", "type": "string" }
+							]
+						},
 						"method": "POST",
 						"header": [
 							{ "key": "Accept", "value": "application/json", "type": "text" },
@@ -668,9 +670,9 @@
 							"raw": "{\n\t\"tpa_serial_number\": \"TPA_SERIAL_HERE\",\n\t\"amount\": 2000,\n\t\"currency\": \"EUR\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/stripe/terminal/create-intent",
+							"raw": "{{base_url}}/merchant/terminal/create-intent",
 							"host": ["{{base_url}}"],
-							"path": ["stripe", "terminal", "create-intent"]
+							"path": ["merchant", "terminal", "create-intent"]
 						}
 					}
 				},
@@ -701,9 +703,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/notifications",
+							"raw": "{{base_url}}/customer/notifications",
 							"host": ["{{base_url}}"],
-							"path": ["notifications"]
+							"path": ["customer", "notifications"]
 						}
 					}
 				},
@@ -715,9 +717,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/notifications/NOTIFICATION_UUID/read",
+							"raw": "{{base_url}}/customer/notifications/NOTIFICATION_UUID/read",
 							"host": ["{{base_url}}"],
-							"path": ["notifications", "NOTIFICATION_UUID", "read"]
+							"path": ["customer", "notifications", "NOTIFICATION_UUID", "read"]
 						}
 					}
 				},
@@ -729,9 +731,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/notifications/read-all",
+							"raw": "{{base_url}}/customer/notifications/read-all",
 							"host": ["{{base_url}}"],
-							"path": ["notifications", "read-all"]
+							"path": ["customer", "notifications", "read-all"]
 						}
 					}
 				}
@@ -832,9 +834,9 @@
 							"raw": "{\n\t\"business_name\": \"My Shop\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/merchants/register",
+							"raw": "{{base_url}}/merchant/register",
 							"host": ["{{base_url}}"],
-							"path": ["merchants", "register"]
+							"path": ["merchant", "register"]
 						}
 					}
 				}
@@ -898,9 +900,9 @@
 							{ "key": "Accept", "value": "application/json", "type": "text" }
 						],
 						"url": {
-							"raw": "{{base_url}}/basic-system-info",
+							"raw": "{{base_url}}/settings/system-info",
 							"host": ["{{base_url}}"],
-							"path": ["basic-system-info"]
+							"path": ["settings", "system-info"]
 						}
 					}
 				}

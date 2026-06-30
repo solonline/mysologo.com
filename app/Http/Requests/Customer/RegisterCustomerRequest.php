@@ -23,14 +23,14 @@ class RegisterCustomerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'      => ['required', 'string', 'max:200'],
-            'email'     => ['required', 'string', 'email', 'max:100', 'unique:customers'],
-            'username'  => ['sometimes', 'string', 'max:40', 'unique:customers', 'regex:/^[a-zA-Z0-9_]+$/'],
-            'password'  => ['required_with:username', 'string', 'min:6'],
-            'phone'     => ['required', 'string', 'max:20', 'regex:/^[0-9]+$/'],
-            'type'      => ['sometimes', 'string', 'in:retail,corporate,responsible'],
-            'language'  => ['sometimes', 'string', 'max:5'],
-            'currency'  => ['required', 'string', 'size:3'],
+            'name' => ['required', 'string', 'max:200'],
+            'email' => ['required', 'string', 'email', 'max:100', 'unique:customers'],
+            'username' => ['required', 'string', 'max:40', 'unique:customers', 'regex:/^[a-zA-Z0-9_]+$/'],
+            'password' => ['required', 'string', 'min:6'],
+            'phone' => ['required', 'string', 'max:20', 'regex:/^[0-9]+$/'],
+            'type' => ['sometimes', 'string', 'in:retail,corporate,responsible'],
+            'language' => ['sometimes', 'string', 'max:5'],
+            'currency' => ['required', 'string', 'size:3'],
         ];
     }
 }

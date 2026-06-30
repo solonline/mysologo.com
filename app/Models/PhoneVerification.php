@@ -16,9 +16,12 @@ class PhoneVerification extends Model
         'verified_at',
     ];
 
-    protected $dates = [
-        'verified_at',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'verified_at' => 'datetime',
+        ];
+    }
 
     public function customer()
     {

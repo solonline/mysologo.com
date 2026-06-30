@@ -83,7 +83,7 @@ class CustomerRepository implements CustomerRepositoryInterface
     public function createResponsible(Customer $corporate, CreateResponsibleDTO $dto): Customer
     {
         return Customer::create([
-            'username' => $corporate->username . '_responsible_' . uniqid(),
+            'username' => $corporate->username.'_responsible_'.uniqid(),
             'name' => $dto->name,
             'email' => $dto->email,
             'corporate_id' => $corporate->id,
