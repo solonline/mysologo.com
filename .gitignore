@@ -28,3 +28,14 @@ Thumbs.db
 /android-terminal/.idea/
 /android-terminal/app/build/
 /android-terminal/local.properties
+
+# AI agent skills & related docs (local editor config, not app source)
+/.cursor/skills/
+/.claude/skills/
+/.cursor/rules/
+**/*.mdc
+mcp.json
+.mcp.json
+AGENTS.md
+CLAUDE.md
+docs/CURSOR-WORKFLOW.md

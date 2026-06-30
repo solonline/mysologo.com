@@ -1,0 +1,38 @@
+﻿# Dependencies
+vendor/
+node_modules/
+
+# Laravel runtime & cache
+bootstrap/cache/
+storage/logs/
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/views/
+storage/pail/
+.phpunit.cache
+.phpunit.result.cache
+
+# Frontend build output
+public/build/
+public/hot/
+
+# Environment & secrets
+.env
+.env.*
+auth.json
+
+# IDE / OS noise
+.idea/
+.fleet/
+.nova/
+.vscode/
+.zed/
+.DS_Store
+Thumbs.db
+*.log
+
+# Android terminal (build artifacts only)
+android-terminal/.gradle/
+android-terminal/.idea/
+android-terminal/app/build/
+android-terminal/local.properties
