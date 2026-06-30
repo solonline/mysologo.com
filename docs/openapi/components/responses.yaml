@@ -1,0 +1,52 @@
+Unauthorized:
+  description: Não autenticado ou token inválido
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+      example:
+        message: Unauthenticated.
+        status: 401
+
+Forbidden:
+  description: Autenticado mas sem permissão (middleware de elegibilidade)
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+      example:
+        message: A sua conta ainda não está activa para esta operação.
+        status: 403
+        reason: CUSTOMER_NOT_ACTIVE
+
+ValidationError:
+  description: Erro de validação (Form Request)
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ValidationError'
+      example:
+        message: The email field is required.
+        errors:
+          email:
+            - The email field is required.
+
+RateLimited:
+  description: Rate limit excedido
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+      example:
+        message: Muitas tentativas. Tente novamente em breve.
+        status: 429
+
+NotFound:
+  description: Recurso não encontrado
+  content:
+    application/json:
+      schema:
+        $ref: './schemas.yaml#/ApiError'
+      example:
+        message: Recurso não encontrado.
+        status: 404

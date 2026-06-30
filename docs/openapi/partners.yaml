@@ -1,0 +1,83 @@
+openapi: 3.1.0
+
+info:
+  title: Yoop API — Parceiros
+  version: 1.0.0
+  description: |
+    # API para integradores externos
+
+    Documentação pública dos endpoints que merchants e parceiros podem consumir.
+
+    ## Autenticação
+
+    Todos os endpoints desta documentação usam:
+
+    ```
+    X-Merchant-Key: {sua_api_key}
+    ```
+
+    A API key é fornecida pela equipa Yoop após activação do merchant.
+
+    ## Base URL
+
+    ```
+    https://api.seudominio.com/api
+    ```
+
+    ## Suporte
+
+    Para novos endpoints ou ambientes de sandbox, contacte a equipa Yoop.
+
+    ## Fluxo Payment Request
+
+    1. `POST /merchant/payment-requests` → recebe `url`
+    2. Redireccione o pagador para `url`
+    3. Opcional: use `callback_url` para notificação
+
+    ## Fluxo Terminal (POS)
+
+    1. `POST /merchant/terminal/connection-token` → `secret` para SDK
+    2. `POST /merchant/terminal/create-intent` com `Idempotency-Key`
+    3. Passar `client_secret` ao Stripe Terminal reader
+
+servers:
+  - url: /api
+    description: API no host actual
+
+tags:
+  - name: Merchant
+    description: Pagamentos e terminal para merchants integrados.
+
+paths:
+  /merchant/payment-requests:
+    $ref: './paths/merchant.yaml#/merchant-payment-requests'
+  /merchant/terminal/connection-token:
+    $ref: './paths/merchant.yaml#/merchant-terminal-connection-token'
+  /merchant/terminal/create-intent:
+    $ref: './paths/merchant.yaml#/merchant-terminal-create-intent'
+
+components:
+  securitySchemes:
+    merchantKey:
+      $ref: './components/security.yaml#/merchantKey'
+  schemas:
+    ApiError:
+      $ref: './components/schemas.yaml#/ApiError'
+    ValidationError:
+      $ref: './components/schemas.yaml#/ValidationError'
+    MerchantPaymentRequest:
+      $ref: './components/schemas.yaml#/MerchantPaymentRequest'
+    TerminalConnectionToken:
+      $ref: './components/schemas.yaml#/TerminalConnectionToken'
+    TerminalPaymentIntent:
+      $ref: './components/schemas.yaml#/TerminalPaymentIntent'
+  responses:
+    Unauthorized:
+      $ref: './components/responses.yaml#/Unauthorized'
+    ValidationError:
+      $ref: './components/responses.yaml#/ValidationError'
+    RateLimited:
+      $ref: './components/responses.yaml#/RateLimited'
+
+security:
+  - merchantKey: []

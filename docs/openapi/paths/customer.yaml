@@ -1,0 +1,255 @@
+customer-health:
+  get:
+    tags: [Customer]
+    summary: Health check do domínio Customer
+    operationId: customerHealth
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/HealthCheck'
+
+customer-me:
+  get:
+    tags: [Customer]
+    summary: Perfil do customer autenticado
+    operationId: customerMe
+    description: |
+      Perfil completo com estado de verificação (email, telefone, KYC) e sessão Didit activa se existir.
+
+      Use após login para renderizar o ecrã inicial da app.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/CustomerProfile'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+customer-update:
+  post:
+    tags: [Customer]
+    summary: Actualizar perfil
+    operationId: customerUpdate
+    description: Actualização parcial — envie apenas os campos a alterar.
+    security:
+      - bearerAuth: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                maxLength: 200
+              username:
+                type: string
+                pattern: '^[a-zA-Z0-9_]+$'
+              email:
+                type: string
+                format: email
+              phone:
+                type: string
+              password:
+                type: string
+                minLength: 8
+    responses:
+      '200':
+        description: Perfil actualizado
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+customer-upload-avatar:
+  post:
+    tags: [Customer]
+    summary: Upload de avatar
+    operationId: customerUploadAvatar
+    description: 'Multipart: campo `avatar` (JPG, PNG, WEBP — máx. 2MB).'
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [avatar]
+            properties:
+              avatar:
+                type: string
+                format: binary
+    responses:
+      '200':
+        description: Avatar actualizado
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+customer-find-by-username:
+  get:
+    tags: [Customer]
+    summary: Procurar customer por username
+    operationId: customerFindByUsername
+    description: Dados públicos limitados — usado antes de P2P para confirmar destinatário.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: username
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^[a-zA-Z0-9_]+$'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/PublicCustomer'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+customer-send-validation-email:
+  post:
+    tags: [Customer]
+    summary: Reenviar email de validação
+    operationId: customerSendValidationEmail
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        description: Email enviado
+
+customer-create-responsible:
+  post:
+    tags: [Customer]
+    summary: Criar responsável (corporate)
+    operationId: customerCreateResponsible
+    description: |
+      Para contas **corporate**: regista o responsável legal que fará KYC individual.
+
+      Só aplicável quando `requires_responsible` é `true`.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name, username, email]
+            properties:
+              name:
+                type: string
+              username:
+                type: string
+              email:
+                type: string
+                format: email
+    responses:
+      '201':
+        description: Responsável criado
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+customer-submit-corporate-documents:
+  post:
+    tags: [Customer]
+    summary: Submeter documento corporate
+    operationId: customerSubmitCorporateDocuments
+    description: 'Upload PDF do documento da empresa. Campo `country`: código ISO 3166-1 alpha-2.'
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [document, country]
+            properties:
+              document:
+                type: string
+                format: binary
+              country:
+                type: string
+                minLength: 2
+                maxLength: 2
+                example: PT
+    responses:
+      '200':
+        description: Documento recebido
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+customer-notifications-list:
+  get:
+    tags: [Customer]
+    summary: Listar notificações
+    operationId: customerNotificationsList
+    description: Paginação Laravel padrão + `unread_count` no meta/additional.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/Notification'
+                unread_count:
+                  type: integer
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+customer-notifications-read:
+  post:
+    tags: [Customer]
+    summary: Marcar notificação como lida
+    operationId: customerNotificationsRead
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: notification
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: UUID da notificação
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ok:
+                  type: boolean
+      '403':
+        description: Notificação não pertence ao customer
+
+customer-notifications-read-all:
+  post:
+    tags: [Customer]
+    summary: Marcar todas como lidas
+    operationId: customerNotificationsReadAll
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ok:
+                  type: boolean

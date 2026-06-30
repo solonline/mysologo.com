@@ -1,0 +1,286 @@
+openapi: 3.1.0
+
+info:
+  title: Yoop API
+  version: 1.0.0
+  description: |
+    # Documentação interna Yoop
+
+    API REST modular — cada domínio vive em `/api/{dominio}/*`.
+
+    ## Autenticação
+
+    | Tipo | Header | Quando usar |
+    |------|--------|-------------|
+    | **Bearer (Sanctum)** | `Authorization: Bearer {token}` | App mobile, web app, customer API |
+    | **Merchant Key** | `X-Merchant-Key: {key}` | POS, e-commerce, integradores |
+
+    Token: `POST /auth/login` ou `POST /auth/register-retail`.
+
+    ## Middlewares de elegibilidade
+
+    Vários endpoints exigem **todos** estes middlewares:
+
+    - `customer.active` — lifecycle `ACTIVE`
+    - `customer.email.verified`
+    - `customer.document.approved` — KYC aprovado
+
+    Falha → `403` com `message` explicativa.
+
+    ## Erros
+
+    JSON com `message` + `status`. Fora de produção: `reason`, `channel`.
+
+    ## Rate limits
+
+    | Limite | Rotas | Máx. |
+    |--------|-------|------|
+    | `api` | Geral | 60/min |
+    | `stripe-intent` | Payment intents, terminal merchant | 10/min |
+
+    ## Idempotência
+
+    Operações de pagamento exigem header `Idempotency-Key` (UUID).
+
+    ## Fluxo de onboarding
+
+    ```
+    register → email → phone → KYC → provisioning → ACTIVE → wallet
+    ```
+
+    Login/registo devolvem `lifecycle`, `capabilities` e `integrations`.
+
+    ## Guias conceituais
+
+    Fluxos de negócio passo a passo: **[Guias](/docs/guides)** (onboarding, top-up, P2P, webhooks).
+
+    Parceiros: **[Guias parceiros](/docs/partners/guides)**.
+
+  contact:
+    name: Equipa Yoop
+    email: dev@yoop.test
+
+servers:
+  - url: /api
+    description: API no host actual (usa o mesmo protocolo da página de docs)
+
+x-tagGroups:
+  - name: Autenticação & Onboarding
+    tags: [Auth, Onboarding, Kyc, Tpa]
+  - name: Perfil & Notificações
+    tags: [Customer]
+  - name: Carteira & Pagamentos
+    tags: [Wallet, Stripe]
+  - name: Merchants
+    tags: [Merchant]
+  - name: Sistema
+    tags: [Settings]
+
+tags:
+  - name: Auth
+    description: Registo, login, PIN e recuperação de password. Respostas com **AuthSession**.
+  - name: Onboarding
+    description: Verificação de telefone por SMS.
+  - name: Kyc
+    description: Verificação de identidade (Didit).
+  - name: Tpa
+    description: Terminais físicos — associação e login.
+  - name: Customer
+    description: Perfil, documentos corporate, notificações.
+  - name: Wallet
+    description: Dashboard, conta, transacções e P2P.
+  - name: Stripe
+    description: Top-up via Stripe (cliente autenticado).
+  - name: Merchant
+    description: Payment requests e terminal. [Doc parceiros](/docs/partners).
+  - name: Settings
+    description: Configuração e informação do sistema.
+
+paths:
+  # Auth
+  /auth/health:
+    $ref: './paths/auth.yaml#/auth-health'
+  /auth/register-retail:
+    $ref: './paths/auth.yaml#/auth-register-retail'
+  /auth/register-corporate:
+    $ref: './paths/auth.yaml#/auth-register-corporate'
+  /auth/login:
+    $ref: './paths/auth.yaml#/auth-login'
+  /auth/login-pin:
+    $ref: './paths/auth.yaml#/auth-login-pin'
+  /auth/login-tpa:
+    $ref: './paths/auth.yaml#/auth-login-tpa'
+  /auth/logout:
+    $ref: './paths/auth.yaml#/auth-logout'
+  /auth/forgot-password:
+    $ref: './paths/auth.yaml#/auth-forgot-password'
+  /auth/reset-password:
+    $ref: './paths/auth.yaml#/auth-reset-password'
+  /auth/create-pin:
+    $ref: './paths/auth.yaml#/auth-create-pin'
+
+  # Onboarding
+  /onboarding/health:
+    $ref: './paths/onboarding.yaml#/onboarding-health'
+  /onboarding/phone/send:
+    $ref: './paths/onboarding.yaml#/onboarding-phone-send'
+  /onboarding/phone/validate:
+    $ref: './paths/onboarding.yaml#/onboarding-phone-validate'
+
+  # Kyc
+  /kyc/health:
+    $ref: './paths/kyc.yaml#/kyc-health'
+  /kyc/identity/session:
+    $ref: './paths/kyc.yaml#/kyc-identity-session'
+
+  # Tpa
+  /tpa/health:
+    $ref: './paths/tpa.yaml#/tpa-health'
+  /tpa/link:
+    $ref: './paths/tpa.yaml#/tpa-link'
+
+  # Customer
+  /customer/health:
+    $ref: './paths/customer.yaml#/customer-health'
+  /customer/me:
+    $ref: './paths/customer.yaml#/customer-me'
+  /customer/update:
+    $ref: './paths/customer.yaml#/customer-update'
+  /customer/upload-avatar:
+    $ref: './paths/customer.yaml#/customer-upload-avatar'
+  /customer/find/{username}:
+    $ref: './paths/customer.yaml#/customer-find-by-username'
+  /customer/send-validation-email:
+    $ref: './paths/customer.yaml#/customer-send-validation-email'
+  /customer/create-corporate-responsible:
+    $ref: './paths/customer.yaml#/customer-create-responsible'
+  /customer/submit-corporate-documents:
+    $ref: './paths/customer.yaml#/customer-submit-corporate-documents'
+  /customer/notifications:
+    $ref: './paths/customer.yaml#/customer-notifications-list'
+  /customer/notifications/read-all:
+    $ref: './paths/customer.yaml#/customer-notifications-read-all'
+  /customer/notifications/{notification}/read:
+    $ref: './paths/customer.yaml#/customer-notifications-read'
+
+  # Wallet
+  /wallet/health:
+    $ref: './paths/wallet.yaml#/wallet-health'
+  /wallet/dashboard:
+    $ref: './paths/wallet.yaml#/wallet-dashboard'
+  /wallet/dashboard/summary:
+    $ref: './paths/wallet.yaml#/wallet-dashboard-summary'
+  /wallet/account:
+    $ref: './paths/wallet.yaml#/wallet-account'
+  /wallet/account/balance:
+    $ref: './paths/wallet.yaml#/wallet-account-balance'
+  /wallet/transactions:
+    $ref: './paths/wallet.yaml#/wallet-transactions-list'
+  /wallet/transactions/p2p:
+    $ref: './paths/wallet.yaml#/wallet-transactions-p2p'
+  /wallet/transactions/{id}:
+    $ref: './paths/wallet.yaml#/wallet-transactions-show'
+
+  # Stripe
+  /stripe/health:
+    $ref: './paths/stripe.yaml#/stripe-health'
+  /stripe/payment-methods:
+    $ref: './paths/stripe.yaml#/stripe-payment-methods'
+  /stripe/fee-estimates:
+    $ref: './paths/stripe.yaml#/stripe-fee-estimates'
+  /stripe/create-intent-payment:
+    $ref: './paths/stripe.yaml#/stripe-create-intent-payment'
+  /stripe/terminal/{transaction}/capture:
+    $ref: './paths/stripe.yaml#/stripe-terminal-capture'
+
+  # Merchant
+  /merchant/health:
+    $ref: './paths/merchant.yaml#/merchant-health'
+  /merchant/register:
+    $ref: './paths/merchant.yaml#/merchant-register'
+  /merchant/payment-requests:
+    $ref: './paths/merchant.yaml#/merchant-payment-requests'
+  /merchant/terminal/connection-token:
+    $ref: './paths/merchant.yaml#/merchant-terminal-connection-token'
+  /merchant/terminal/create-intent:
+    $ref: './paths/merchant.yaml#/merchant-terminal-create-intent'
+
+  # Settings
+  /settings/health:
+    $ref: './paths/settings.yaml#/settings-health'
+  /settings/system-info:
+    $ref: './paths/settings.yaml#/settings-system-info'
+  /settings:
+    $ref: './paths/settings.yaml#/settings-index'
+  /settings/{key}:
+    $ref: './paths/settings.yaml#/settings-key'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: './components/security.yaml#/bearerAuth'
+    merchantKey:
+      $ref: './components/security.yaml#/merchantKey'
+  parameters:
+    IdempotencyKey:
+      $ref: './components/parameters.yaml#/IdempotencyKey'
+  schemas:
+    ApiError:
+      $ref: './components/schemas.yaml#/ApiError'
+    ValidationError:
+      $ref: './components/schemas.yaml#/ValidationError'
+    Customer:
+      $ref: './components/schemas.yaml#/Customer'
+    CustomerProfile:
+      $ref: './components/schemas.yaml#/CustomerProfile'
+    PublicCustomer:
+      $ref: './components/schemas.yaml#/PublicCustomer'
+    LifecycleStatus:
+      $ref: './components/schemas.yaml#/LifecycleStatus'
+    AuthSession:
+      $ref: './components/schemas.yaml#/AuthSession'
+    MessageResponse:
+      $ref: './components/schemas.yaml#/MessageResponse'
+    IdentitySession:
+      $ref: './components/schemas.yaml#/IdentitySession'
+    SmsValidationResult:
+      $ref: './components/schemas.yaml#/SmsValidationResult'
+    WalletDashboard:
+      $ref: './components/schemas.yaml#/WalletDashboard'
+    AccountDetails:
+      $ref: './components/schemas.yaml#/AccountDetails'
+    Transaction:
+      $ref: './components/schemas.yaml#/Transaction'
+    P2PTransferResult:
+      $ref: './components/schemas.yaml#/P2PTransferResult'
+    PaymentMethod:
+      $ref: './components/schemas.yaml#/PaymentMethod'
+    FeeEstimate:
+      $ref: './components/schemas.yaml#/FeeEstimate'
+    PaymentIntentResult:
+      $ref: './components/schemas.yaml#/PaymentIntentResult'
+    Notification:
+      $ref: './components/schemas.yaml#/Notification'
+    MerchantPaymentRequest:
+      $ref: './components/schemas.yaml#/MerchantPaymentRequest'
+    TerminalConnectionToken:
+      $ref: './components/schemas.yaml#/TerminalConnectionToken'
+    TerminalPaymentIntent:
+      $ref: './components/schemas.yaml#/TerminalPaymentIntent'
+    SystemInfo:
+      $ref: './components/schemas.yaml#/SystemInfo'
+    Setting:
+      $ref: './components/schemas.yaml#/Setting'
+    HealthCheck:
+      $ref: './components/schemas.yaml#/HealthCheck'
+  responses:
+    Unauthorized:
+      $ref: './components/responses.yaml#/Unauthorized'
+    Forbidden:
+      $ref: './components/responses.yaml#/Forbidden'
+    NotFound:
+      $ref: './components/responses.yaml#/NotFound'
+    ValidationError:
+      $ref: './components/responses.yaml#/ValidationError'
+    RateLimited:
+      $ref: './components/responses.yaml#/RateLimited'

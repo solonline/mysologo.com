@@ -1,4 +1,7 @@
 # Como funciona o dinheiro na Yoop
+
+> **Documentação interactiva:** [Guia Top-up com cartão](/docs/guides/topup-card) · [API Stripe](/docs)
+
 ### Guia para quem está a começar
 
 > Este documento explica passo a passo o que acontece desde que um cliente paga

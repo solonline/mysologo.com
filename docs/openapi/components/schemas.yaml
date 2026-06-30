@@ -1,0 +1,426 @@
+ApiError:
+  type: object
+  required: [message, status]
+  properties:
+    message:
+      type: string
+      description: Mensagem legível para o utilizador ou cliente
+    status:
+      type: integer
+      description: Código HTTP
+    reason:
+      type: string
+      description: Código interno (apenas fora de produção)
+    channel:
+      type: string
+      nullable: true
+      description: Canal de log associado
+
+ValidationError:
+  type: object
+  properties:
+    message:
+      type: string
+    errors:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+
+Customer:
+  type: object
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+    username:
+      type: string
+      nullable: true
+    type:
+      type: string
+      enum: [retail, corporate, responsible]
+    email:
+      type: string
+      format: email
+    language:
+      type: string
+      example: pt
+    currency:
+      type: string
+      example: EUR
+    avatar:
+      type: string
+      nullable: true
+    email_verified_at:
+      type: string
+      format: date-time
+      nullable: true
+    phone:
+      type: string
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+LifecycleStatus:
+  type: object
+  properties:
+    status:
+      type: string
+      enum:
+        - PENDING_EMAIL_VERIFICATION
+        - PENDING_PHONE_VERIFICATION
+        - PENDING_IDENTITY_VERIFICATION
+        - IDENTITY_UNDER_REVIEW
+        - IDENTITY_REJECTED
+        - PROVISIONING
+        - PENDING_EBURY_ONBOARDING
+        - EBURY_UNDER_REVIEW
+        - EBURY_REJECTED
+        - ACTIVE
+        - SUSPENDED
+        - BLOCKED
+    label:
+      type: string
+    is_negative:
+      type: boolean
+    reason:
+      type: string
+      nullable: true
+
+AuthSession:
+  type: object
+  description: Resposta padrão de login, registo e login-pin
+  properties:
+    token:
+      type: string
+      description: Token Sanctum para requests autenticados
+    user:
+      $ref: '#/Customer'
+    lifecycle:
+      $ref: '#/LifecycleStatus'
+    capabilities:
+      type: object
+      additionalProperties:
+        type: boolean
+      description: O que o utilizador pode fazer neste momento
+    integrations:
+      type: object
+      description: Estado dos parceiros (Ebury, Wallester, Stripe)
+    onboarding:
+      type: object
+      properties:
+        requires_responsible:
+          type: boolean
+        message:
+          type: string
+          nullable: true
+    verification:
+      type: object
+      properties:
+        email:
+          type: boolean
+        phone:
+          type: boolean
+        identity:
+          type: string
+    identity_verification:
+      type: object
+      properties:
+        status:
+          type: string
+        session:
+          type: object
+          nullable: true
+
+MessageResponse:
+  type: object
+  properties:
+    message:
+      type: string
+
+MerchantPaymentRequest:
+  type: object
+  properties:
+    uuid:
+      type: string
+      format: uuid
+    amount:
+      type: integer
+      description: Valor na menor unidade (cêntimos)
+    currency:
+      type: string
+      example: EUR
+    description:
+      type: string
+      nullable: true
+    external_reference:
+      type: string
+      nullable: true
+    status:
+      type: string
+    url:
+      type: string
+      format: uri
+      description: URL pública de pagamento (`/pay/{uuid}`)
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+
+TerminalConnectionToken:
+  type: object
+  properties:
+    secret:
+      type: string
+      description: Secret para o Stripe Terminal SDK
+
+TerminalPaymentIntent:
+  type: object
+  properties:
+    client_secret:
+      type: string
+      description: Client secret do PaymentIntent para o reader
+    transaction:
+      type: object
+      description: Transação criada na plataforma
+
+HealthCheck:
+  type: object
+  properties:
+    domain:
+      type: string
+    status:
+      type: string
+      example: ok
+
+CustomerProfile:
+  type: object
+  description: Perfil completo com flags de verificação
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+    username:
+      type: string
+    type:
+      type: string
+    email:
+      type: string
+    language:
+      type: string
+    currency:
+      type: string
+    phone:
+      type: string
+    status:
+      type: string
+    email_verified_at:
+      type: string
+      format: date-time
+      nullable: true
+    requires_responsible:
+      type: boolean
+    kyc_status:
+      type: string
+    email_verified:
+      type: boolean
+    document_verified:
+      type: boolean
+    phone_verified:
+      type: boolean
+    didit_session:
+      $ref: '#/IdentitySession'
+      nullable: true
+    message:
+      type: string
+      nullable: true
+
+PublicCustomer:
+  type: object
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+    username:
+      type: string
+    avatar_url:
+      type: string
+      format: uri
+      nullable: true
+
+IdentitySession:
+  type: object
+  properties:
+    session_id:
+      type: string
+    session_url:
+      type: string
+      format: uri
+    status:
+      type: string
+    workflow_id:
+      type: string
+
+SmsValidationResult:
+  type: object
+  properties:
+    message:
+      type: string
+    status:
+      type: string
+      enum: [success, failed]
+
+WalletDashboard:
+  type: object
+  properties:
+    balances:
+      type: array
+      items:
+        type: object
+    transactions:
+      type: array
+      items:
+        $ref: '#/Transaction'
+
+AccountDetails:
+  type: object
+  properties:
+    stripe:
+      type: object
+      nullable: true
+      description: Conta Stripe / funding instructions
+    wallester:
+      type: object
+      nullable: true
+      description: Conta Wallester / IBAN
+
+Transaction:
+  type: object
+  properties:
+    id:
+      type: integer
+    type:
+      type: string
+    direction:
+      type: string
+    amount:
+      type: integer
+    fee:
+      type: integer
+    net_amount:
+      type: integer
+    currency:
+      type: string
+    status:
+      type: string
+    payment_method_type:
+      type: string
+      nullable: true
+    description:
+      type: string
+      nullable: true
+    settles_at:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+
+P2PTransferResult:
+  type: object
+  properties:
+    debit:
+      $ref: '#/Transaction'
+    credit:
+      $ref: '#/Transaction'
+
+PaymentMethod:
+  type: object
+  properties:
+    id:
+      type: integer
+    payment_method:
+      type: string
+    label:
+      type: string
+    currency:
+      type: string
+    stripe_fee_percentage:
+      type: number
+    stripe_fee_fixed:
+      type: integer
+    platform_fee_percentage:
+      type: number
+    platform_fee_fixed:
+      type: integer
+
+FeeEstimate:
+  type: object
+  properties:
+    payment_method:
+      type: string
+    label:
+      type: string
+    platform_fee_percentage:
+      type: number
+    platform_fee_fixed:
+      type: integer
+    stripe_fee_percentage:
+      type: number
+    stripe_fee_fixed:
+      type: integer
+
+PaymentIntentResult:
+  type: object
+  properties:
+    transaction:
+      $ref: '#/Transaction'
+    client_secret:
+      type: string
+
+Notification:
+  type: object
+  properties:
+    id:
+      type: string
+      format: uuid
+    type:
+      type: string
+    title:
+      type: string
+    body:
+      type: string
+    data:
+      type: object
+    read_at:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+
+SystemInfo:
+  type: object
+  properties:
+    key:
+      type: string
+    value:
+      type: string
+
+Setting:
+  type: object
+  properties:
+    key:
+      type: string
+    value:
+      type: string

@@ -1,0 +1,146 @@
+stripe-health:
+  get:
+    tags: [Stripe]
+    summary: Health check do domínio Stripe
+    operationId: stripeHealth
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/HealthCheck'
+
+stripe-payment-methods:
+  get:
+    tags: [Stripe]
+    summary: Métodos de pagamento activos
+    operationId: stripePaymentMethods
+    description: |
+      Lista métodos disponíveis para top-up (cartão, etc.) com estrutura de fees por moeda.
+
+      Resultado em cache **5 minutos** por moeda.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: currency
+        in: query
+        schema:
+          type: string
+          default: EUR
+          example: EUR
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '../components/schemas.yaml#/PaymentMethod'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+stripe-fee-estimates:
+  get:
+    tags: [Stripe]
+    summary: Estimativa de comissões
+    operationId: stripeFeeEstimates
+    description: Breakdown platform + Stripe por método — útil antes de mostrar total ao utilizador.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: currency
+        in: query
+        schema:
+          type: string
+          default: EUR
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/FeeEstimate'
+                currency:
+                  type: string
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+stripe-create-intent-payment:
+  post:
+    tags: [Stripe]
+    summary: Criar PaymentIntent (top-up)
+    operationId: stripeCreateIntentPayment
+    description: |
+      Cria PaymentIntent Stripe para carregar saldo. Confirme no cliente com `client_secret` (Stripe.js / mobile SDK).
+
+      **Headers obrigatórios:**
+      - `Authorization: Bearer {token}`
+      - `Idempotency-Key: {uuid}`
+
+      **Rate limit:** 10/min (`stripe-intent`).
+
+      **Valores:** `amount` em cêntimos; `payment_method_id` de `GET /stripe/payment-methods`.
+    security:
+      - bearerAuth: []
+    parameters:
+      - $ref: '../components/parameters.yaml#/IdempotencyKey'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [amount, payment_method_id]
+            properties:
+              amount:
+                type: integer
+                minimum: 1
+              payment_method_id:
+                type: integer
+              currency:
+                type: string
+                minLength: 3
+                maxLength: 3
+                default: eur
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/PaymentIntentResult'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+stripe-terminal-capture:
+  post:
+    tags: [Stripe]
+    summary: Capturar pagamento terminal
+    operationId: stripeTerminalCapture
+    description: |
+      Captura PaymentIntent após leitura do cartão no terminal.
+
+      A transacção deve pertencer ao customer autenticado e estar em estado capturável.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: transaction
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/MessageResponse'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'

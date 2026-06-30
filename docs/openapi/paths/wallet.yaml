@@ -1,0 +1,222 @@
+wallet-health:
+  get:
+    tags: [Wallet]
+    summary: Health check do domínio Wallet
+    operationId: walletHealth
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/HealthCheck'
+
+wallet-dashboard:
+  get:
+    tags: [Wallet]
+    summary: Resumo do dashboard
+    operationId: walletDashboard
+    description: |
+      Retorna saldos actuais e transacções recentes do customer.
+
+      **Pré-requisitos:** conta `ACTIVE`, email e documento verificados.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        description: Saldos e movimentos recentes
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/WalletDashboard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+wallet-dashboard-summary:
+  get:
+    tags: [Wallet]
+    summary: Resumo do dashboard (alias)
+    operationId: walletDashboardSummary
+    description: Alias de `GET /wallet/dashboard` — mesma resposta.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/WalletDashboard'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+wallet-account:
+  get:
+    tags: [Wallet]
+    summary: Detalhes da conta (Stripe + Wallester)
+    operationId: walletAccount
+    description: |
+      Dados de integração financeira: vIBAN, IBAN, status Stripe/Wallester, instruções de funding.
+
+      Útil para ecrã "A minha conta" e transferências bancárias.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/AccountDetails'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+wallet-account-balance:
+  get:
+    tags: [Wallet]
+    summary: Saldos por moeda
+    operationId: walletAccountBalance
+    description: Lista simplificada de saldos disponíveis.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                balances:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      currency:
+                        type: string
+                      available:
+                        type: integer
+                      pending:
+                        type: integer
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+wallet-transactions-list:
+  get:
+    tags: [Wallet]
+    summary: Listar transacções
+    operationId: walletTransactionsList
+    description: |
+      Histórico paginado do customer, ordenado do mais recente.
+
+      **Query:** `per_page` (default 15, máx. 100).
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: per_page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 15
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/Transaction'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+wallet-transactions-show:
+  get:
+    tags: [Wallet]
+    summary: Detalhe de uma transacção
+    operationId: walletTransactionsShow
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/Transaction'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+wallet-transactions-p2p:
+  post:
+    tags: [Wallet]
+    summary: Transferência P2P
+    operationId: walletTransactionsP2p
+    description: |
+      Envia valor para outro utilizador pelo `username`.
+
+      **Segurança:** exige `device_token` + PIN de 4 dígitos (mesmo dispositivo do `create-pin`).
+
+      **Regras:**
+      - Não pode transferir para si mesmo
+      - Destinatário deve existir
+      - Saldo suficiente na moeda indicada
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [recipient_username, amount, currency, device_token, pin]
+            properties:
+              recipient_username:
+                type: string
+                pattern: '^[a-zA-Z0-9_]+$'
+              amount:
+                type: integer
+                minimum: 1
+                description: Cêntimos
+              currency:
+                type: string
+                minLength: 3
+                maxLength: 3
+              description:
+                type: string
+                maxLength: 255
+              device_token:
+                type: string
+              pin:
+                type: string
+                minLength: 4
+                maxLength: 4
+          example:
+            recipient_username: janedoe
+            amount: 1000
+            currency: EUR
+            description: Pagamento almoço
+            device_token: DEVICE_TOKEN
+            pin: '1234'
+    responses:
+      '201':
+        description: Débito e crédito criados
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/P2PTransferResult'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        description: Destinatário não encontrado
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'

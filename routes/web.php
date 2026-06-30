@@ -1,8 +1,9 @@
 <?php
 
-use App\Domains\Wallester\Services\WallesterService;
 use App\Domains\Auth\Controllers\EmailValidationController;
 use App\Domains\Merchant\Controllers\PayController;
+use App\Domains\Stripe\Clients\StripeHttpClient;
+use App\Domains\Wallester\Services\WallesterService;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,8 +22,6 @@ Route::get('email/verify/{id}/{hash}', [EmailValidationController::class, 'verif
     ->middleware(['signed'])
     ->name('verification.verify');
 
-Route::get('email/validated', [EmailValidationController::class, 'show'])->name('email.validated');
-
 Route::get('/pay/{uuid}', [PayController::class, 'show'])
     ->where('uuid', '[0-9a-f\-]{36}')
     ->name('pay.show');
@@ -33,13 +32,15 @@ Route::post('email/verification-notification', function () {
     return back()->with('message', 'Verification link sent!');
 })->middleware(['auth', 'throttle:6,1'])->name('verification.send');
 
+Route::middleware('web')->group(base_path('routes/docs.php'));
+
 // Rotas de desenvolvimento / testes manuais
 Route::get('/test-wallester-account', function (WallesterService $wallesterService) {
     $data = ['name' => 'Daniel Silva'];
 
     try {
         return response()->json($wallesterService->createAccount($data));
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return response()->json([
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
@@ -47,7 +48,7 @@ Route::get('/test-wallester-account', function (WallesterService $wallesterServi
     }
 });
 
-Route::get('/test/stripe-funding-instructions', function (\App\Domains\Stripe\Clients\StripeHttpClient $stripeClient) {
+Route::get('/test/stripe-funding-instructions', function (StripeHttpClient $stripeClient) {
     $data = [
         'funding_type' => 'bank_transfer',
         'bank_transfer' => ['type' => 'us_bank_transfer'],
@@ -56,7 +57,7 @@ Route::get('/test/stripe-funding-instructions', function (\App\Domains\Stripe\Cl
 
     try {
         return response()->json($stripeClient->createCustomerFundingInstructions('cus_USJQLXo86JyvnJ', $data));
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return response()->json([
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),

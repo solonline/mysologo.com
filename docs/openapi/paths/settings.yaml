@@ -1,0 +1,93 @@
+settings-health:
+  get:
+    tags: [Settings]
+    summary: Health check do domínio Settings
+    operationId: settingsHealth
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/HealthCheck'
+
+settings-system-info:
+  get:
+    tags: [Settings]
+    summary: Informação pública do sistema
+    operationId: settingsSystemInfo
+    description: |
+      Endpoint público (sem auth) — versão da app, maintenance mode, etc.
+
+      Chave/valor definidos em `settings` na base de dados.
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/SystemInfo'
+
+settings-index:
+  get:
+    tags: [Settings]
+    summary: Listar todas as settings
+    operationId: settingsIndex
+    description: Requer autenticação — uso interno/admin app.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '../components/schemas.yaml#/Setting'
+
+settings-key:
+  get:
+    tags: [Settings]
+    summary: Obter setting por chave
+    operationId: settingsGet
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^[a-z_.]+$'
+        example: maintenance_mode
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/Setting'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  post:
+    tags: [Settings]
+    summary: Definir valor de uma setting
+    operationId: settingsSet
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [value]
+            properties:
+              value:
+                type: string
+    responses:
+      '200':
+        description: Setting actualizada

@@ -1,0 +1,37 @@
+kyc-health:
+  get:
+    tags: [Kyc]
+    summary: Health check do domínio Kyc
+    operationId: kycHealth
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/HealthCheck'
+
+kyc-identity-session:
+  post:
+    tags: [Kyc]
+    summary: Criar sessão de verificação de identidade
+    operationId: kycIdentitySession
+    description: |
+      Cria ou reutiliza sessão Didit para KYC individual.
+
+      **Quando usar:** após email e telefone verificados, quando `identity_verification.status` não está aprovado.
+
+      **Resposta:** inclui `session_url` para redireccionar o utilizador ao fluxo Didit.
+
+      O webhook `/api/webhooks/didit` actualiza o estado quando o utilizador conclui.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/IdentitySession'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        description: KYC já aprovado ou conta não elegível

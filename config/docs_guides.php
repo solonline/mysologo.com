@@ -1,0 +1,64 @@
+<?php
+
+return [
+
+    /*
+    | Guias conceituais — ficheiros em docs/guides/
+    | audience: internal | partners
+    */
+
+    'internal' => [
+        [
+            'slug' => 'getting-started',
+            'title' => 'Primeiros passos',
+            'description' => 'Autenticação, token e primeira chamada à API.',
+            'file' => 'getting-started.md',
+        ],
+        [
+            'slug' => 'onboarding-lifecycle',
+            'title' => 'Ciclo de vida da conta',
+            'description' => 'Estados desde o registo até ACTIVE e integrações.',
+            'file' => 'onboarding-lifecycle.md',
+        ],
+        [
+            'slug' => 'account-ready',
+            'title' => 'Conta pronta a usar',
+            'description' => 'Checklist: quando o customer pode transaccionar.',
+            'file' => 'account-ready.md',
+        ],
+        [
+            'slug' => 'topup-card',
+            'title' => 'Top-up com cartão',
+            'description' => 'PaymentIntent, client_secret, webhook e saldo.',
+            'file' => 'topup-card.md',
+        ],
+        [
+            'slug' => 'p2p-transfer',
+            'title' => 'Transferência P2P',
+            'description' => 'Enviar dinheiro entre utilizadores com PIN.',
+            'file' => 'p2p-transfer.md',
+        ],
+        [
+            'slug' => 'webhooks',
+            'title' => 'Webhooks (inbound)',
+            'description' => 'Didit, Stripe, Ebury e Wallester — o que cada um altera.',
+            'file' => 'webhooks.md',
+        ],
+    ],
+
+    'partners' => [
+        [
+            'slug' => 'payment-requests',
+            'title' => 'Payment requests',
+            'description' => 'Criar links de pagamento para clientes finais.',
+            'file' => 'partners/payment-requests.md',
+        ],
+        [
+            'slug' => 'terminal-topup',
+            'title' => 'Terminal (POS)',
+            'description' => 'Connection token, intent e captura no TPA.',
+            'file' => 'partners/terminal-topup.md',
+        ],
+    ],
+
+];

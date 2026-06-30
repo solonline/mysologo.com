@@ -1,0 +1,328 @@
+auth-health:
+  get:
+    tags: [Auth]
+    summary: Health check do domínio Auth
+    operationId: authHealth
+    responses:
+      '200':
+        description: Serviço disponível
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/HealthCheck'
+
+auth-register-retail:
+  post:
+    tags: [Auth]
+    summary: Registo de cliente retail
+    operationId: authRegisterRetail
+    description: |
+      Cria uma conta **retail** e devolve sessão autenticada (`AuthSession`).
+
+      **Pós-registo:** o lifecycle inicia em `PENDING_EMAIL_VERIFICATION`.
+      Um email de validação é enviado automaticamente.
+
+      **Campos obrigatórios:** `name`, `email`, `username`, `password`, `phone`, `currency`.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name, email, username, password, phone, currency]
+            properties:
+              name:
+                type: string
+                maxLength: 200
+              email:
+                type: string
+                format: email
+              username:
+                type: string
+                pattern: '^[a-zA-Z0-9_]+$'
+              password:
+                type: string
+                minLength: 6
+              phone:
+                type: string
+                description: Apenas dígitos, sem espaços
+              currency:
+                type: string
+                minLength: 3
+                maxLength: 3
+                example: EUR
+              language:
+                type: string
+                maxLength: 5
+                example: pt
+          example:
+            name: John Doe
+            email: john@example.com
+            username: johndoe
+            password: secret123
+            phone: '351912345678'
+            currency: EUR
+            language: pt
+    responses:
+      '201':
+        description: Conta criada
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/AuthSession'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+auth-register-corporate:
+  post:
+    tags: [Auth]
+    summary: Registo de cliente corporate
+    operationId: authRegisterCorporate
+    description: |
+      Cria conta **corporate** (empresa). Após registo, pode ser necessário
+      criar responsável e submeter documentos em `/customer/*`.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name, username, email, tax_id, password, country_code]
+            properties:
+              name:
+                type: string
+              username:
+                type: string
+              email:
+                type: string
+                format: email
+              tax_id:
+                type: string
+              password:
+                type: string
+                minLength: 6
+              country_code:
+                type: string
+                example: PT
+    responses:
+      '201':
+        description: Conta corporate criada
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/AuthSession'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+auth-login:
+  post:
+    tags: [Auth]
+    summary: Login com email e password
+    operationId: authLogin
+    description: |
+      Autentica um cliente e devolve `AuthSession` com token Sanctum.
+
+      Use o token em todos os endpoints protegidos:
+      `Authorization: Bearer {token}`
+
+      O objeto `capabilities` indica o que o utilizador pode fazer
+      (ex.: transaccionar, verificar identidade).
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password]
+            properties:
+              email:
+                type: string
+                format: email
+              password:
+                type: string
+          example:
+            email: john@example.com
+            password: secret123
+    responses:
+      '200':
+        description: Login bem-sucedido
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/AuthSession'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+auth-login-pin:
+  post:
+    tags: [Auth]
+    summary: Login com PIN do dispositivo
+    operationId: authLoginPin
+    description: |
+      Login rápido para mobile usando `device_token` + PIN de 4 dígitos.
+      O PIN deve ter sido criado previamente em `POST /auth/create-pin`.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, device_token, pin]
+            properties:
+              email:
+                type: string
+                format: email
+              device_token:
+                type: string
+              pin:
+                type: string
+                minLength: 4
+                maxLength: 4
+    responses:
+      '200':
+        description: Sessão autenticada
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/AuthSession'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+auth-login-tpa:
+  post:
+    tags: [Auth]
+    summary: Login via terminal (TPA)
+    operationId: authLoginTpa
+    description: |
+      Autenticação para operadores de terminal físico (TPA).
+      Combina credenciais do cliente com `tpa_serial` do equipamento.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password, tpa_serial]
+            properties:
+              email:
+                type: string
+                format: email
+              password:
+                type: string
+              tpa_serial:
+                type: string
+    responses:
+      '200':
+        description: Sessão TPA
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+auth-logout:
+  post:
+    tags: [Auth]
+    summary: Terminar sessão
+    operationId: authLogout
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        description: Token revogado
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/MessageResponse'
+            example:
+              message: Logged out successfully
+
+auth-forgot-password:
+  post:
+    tags: [Auth]
+    summary: Pedir reset de password
+    operationId: authForgotPassword
+    description: Envia email com link/token de recuperação.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email]
+            properties:
+              email:
+                type: string
+                format: email
+    responses:
+      '200':
+        description: Email enviado (se a conta existir)
+
+auth-reset-password:
+  post:
+    tags: [Auth]
+    summary: Definir nova password
+    operationId: authResetPassword
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, token, password, password_confirmation]
+            properties:
+              email:
+                type: string
+                format: email
+              token:
+                type: string
+              password:
+                type: string
+              password_confirmation:
+                type: string
+    responses:
+      '200':
+        description: Password actualizada
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+auth-create-pin:
+  post:
+    tags: [Auth]
+    summary: Criar PIN do dispositivo
+    operationId: authCreatePin
+    description: |
+      Regista um dispositivo móvel com PIN para login rápido.
+
+      **Pré-requisitos (middleware):**
+      - Conta activa
+      - Email verificado
+      - Documento/KYC aprovado
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [device_token, device_name, pin]
+            properties:
+              device_token:
+                type: string
+                description: Identificador único do dispositivo
+              device_name:
+                type: string
+                example: iPhone 15
+              pin:
+                type: string
+                minLength: 4
+                maxLength: 4
+    responses:
+      '201':
+        description: PIN criado
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'

@@ -1,0 +1,75 @@
+onboarding-health:
+  get:
+    tags: [Onboarding]
+    summary: Health check do domínio Onboarding
+    operationId: onboardingHealth
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/HealthCheck'
+
+onboarding-phone-send:
+  post:
+    tags: [Onboarding]
+    summary: Enviar código SMS de verificação
+    operationId: onboardingPhoneSend
+    description: |
+      Envia OTP para o telefone do customer autenticado.
+
+      **Nota:** o número é o registado no perfil; o body confirma/recebe `phone` mas o envio usa o telefone da conta.
+
+      Se o telefone já estiver verificado, retorna `status: failed` com mensagem informativa.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [phone]
+            properties:
+              phone:
+                type: string
+                example: '351912345678'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/SmsValidationResult'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+onboarding-phone-validate:
+  post:
+    tags: [Onboarding]
+    summary: Validar código SMS
+    operationId: onboardingPhoneValidate
+    description: |
+      Confirma o código recebido por SMS. Em sucesso, `phone_verified` passa a `true` no perfil.
+
+      Código inválido → `422` com `status: failed`.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code]
+            properties:
+              code:
+                type: string
+                example: '123456'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/SmsValidationResult'
+      '422':
+        description: Código inválido

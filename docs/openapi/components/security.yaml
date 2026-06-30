@@ -1,0 +1,15 @@
+bearerAuth:
+  type: http
+  scheme: bearer
+  bearerFormat: Sanctum
+  description: |
+    Token obtido em `POST /auth/login` ou registo.
+    Enviar como `Authorization: Bearer {token}`.
+
+merchantKey:
+  type: apiKey
+  in: header
+  name: X-Merchant-Key
+  description: |
+    API key do merchant, gerada no backoffice após registo como merchant.
+    Usada em payment requests e terminal.

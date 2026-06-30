@@ -1,0 +1,231 @@
+merchant-health:
+  get:
+    tags: [Merchant]
+    summary: Health check do domínio Merchant
+    operationId: merchantHealth
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/HealthCheck'
+
+merchant-register:
+  post:
+    tags: [Merchant]
+    summary: Registar customer como merchant
+    operationId: merchantRegister
+    description: |
+      Converte o customer autenticado em merchant (uso interno / app).
+      Após registo, a API key é gerida no backoffice.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+                maxLength: 150
+                description: Nome comercial do merchant
+              mode:
+                type: string
+                enum: [test, live]
+                default: test
+              webhook_url:
+                type: string
+                format: uri
+              allowed_currencies:
+                type: array
+                items:
+                  type: string
+                  minLength: 3
+                  maxLength: 3
+          example:
+            name: My Shop
+            mode: test
+    responses:
+      '201':
+        description: Merchant criado
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+merchant-payment-requests:
+  post:
+    tags: [Merchant]
+    x-partners: true
+    summary: Criar pedido de pagamento
+    operationId: merchantCreatePaymentRequest
+    description: |
+      Cria um link de pagamento público (`/pay/{uuid}`) para o merchant autenticado.
+
+      **Autenticação:** `X-Merchant-Key` (não usar Bearer neste endpoint).
+
+      **Rate limit:** 10 pedidos/minuto.
+
+      **Fluxo típico:**
+      1. Criar payment request → receber `url`
+      2. Redirecionar cliente para `url`
+      3. Cliente paga na página Yoop
+    security:
+      - merchantKey: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [amount]
+            properties:
+              amount:
+                type: integer
+                minimum: 1
+                description: Valor em cêntimos
+              description:
+                type: string
+                maxLength: 500
+              external_reference:
+                type: string
+                maxLength: 255
+                description: ID no sistema do parceiro
+              payer_name:
+                type: string
+              payer_email:
+                type: string
+                format: email
+              payer_phone:
+                type: string
+              callback_url:
+                type: string
+                format: uri
+              metadata:
+                type: object
+                additionalProperties: true
+              items:
+                type: array
+                items:
+                  type: object
+              expires_in:
+                type: integer
+                minimum: 5
+                maximum: 1440
+                description: Minutos até expirar
+              language:
+                type: string
+                maxLength: 5
+          example:
+            amount: 5000
+            currency: EUR
+            description: 'Order #123'
+            external_reference: ORD-123
+    responses:
+      '201':
+        description: Payment request criado
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/MerchantPaymentRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+merchant-terminal-connection-token:
+  post:
+    tags: [Merchant]
+    x-partners: true
+    summary: Token de ligação Stripe Terminal
+    operationId: merchantTerminalConnectionToken
+    description: |
+      Obtém `secret` para inicializar o Stripe Terminal SDK no POS.
+
+      Enviar `currency` opcional (default `eur`).
+    security:
+      - merchantKey: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              currency:
+                type: string
+                example: eur
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/TerminalConnectionToken'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
+
+merchant-terminal-create-intent:
+  post:
+    tags: [Merchant]
+    x-partners: true
+    summary: Criar PaymentIntent para terminal
+    operationId: merchantTerminalCreateIntent
+    description: |
+      Cria PaymentIntent card-present para top-up via TPA.
+
+      **Headers obrigatórios:**
+      - `X-Merchant-Key`
+      - `Idempotency-Key` (UUID único por tentativa)
+
+      **Valores:** `amount` em menor unidade monetária (cêntimos).
+    security:
+      - merchantKey: []
+    parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Evita duplicação em retries
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [tpa_serial_number, amount]
+            properties:
+              tpa_serial_number:
+                type: string
+                description: Serial do TPA activo do merchant
+              amount:
+                type: integer
+                minimum: 1
+              currency:
+                type: string
+                minLength: 3
+                maxLength: 3
+                default: eur
+          example:
+            tpa_serial_number: TPA-001
+            amount: 2000
+            currency: EUR
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/TerminalPaymentIntent'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+      '429':
+        $ref: '../components/responses.yaml#/RateLimited'
