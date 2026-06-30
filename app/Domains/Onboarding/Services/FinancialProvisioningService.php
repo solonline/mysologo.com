@@ -3,14 +3,16 @@
 namespace App\Domains\Onboarding\Services;
 
 use App\Domains\Ebury\Contracts\EburyGatewayInterface;
-use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
-use App\Domains\Wallester\Services\WallesterService;
 use App\Domains\Ebury\Jobs\SimulateEburyDecisionJob;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Onboarding\Jobs\ProvisionFundingPartnersJob;
 use App\Domains\Stripe\Contracts\StripeAccountRepositoryInterface;
 use App\Domains\Stripe\DTOs\CreateStripeAccountDTO;
 use App\Domains\Stripe\Services\StripeService;
+use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
+use App\Domains\Wallester\Services\WallesterService;
 use App\Models\Customer;
+use App\Models\CustomerWallesterAccount;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -27,10 +29,38 @@ class FinancialProvisioningService
         protected IntegrationAccountService $integrationAccounts,
     ) {}
 
+    public function dispatchPostKycPartners(Customer $customer): void
+    {
+        ProvisionFundingPartnersJob::dispatch($customer->id)->afterCommit();
+    }
+
     public function provisionPostKycPartners(Customer $customer): void
     {
-        $this->provisionWallester($customer);
-        $this->provisionEbury($customer);
+        if (! $this->provisionWallester($customer)) {
+            throw new \RuntimeException('Wallester provisioning failed.');
+        }
+
+        // $this->provisionEbury($customer); disabled until Ebury is ready
+    }
+
+    public function handleProvisioningExhausted(Customer $customer, string $reason): void
+    {
+        $customer = $customer->fresh('wallesterAccounts');
+        $account = $customer->wallesterAccounts;
+
+        if ($account !== null && $this->normalizeStatus($account->status) !== IntegrationAccountStatus::ACTIVE) {
+            $this->integrationAccounts->updateWallester(
+                $account,
+                IntegrationAccountStatus::FAILED,
+                $reason,
+                'onboarding.provisioning',
+            );
+        }
+
+        Log::channel('wallester')->error('Funding partner provisioning exhausted retries', [
+            'customer_id' => $customer->id,
+            'error' => $reason,
+        ]);
     }
 
     public function provisionEbury(Customer $customer): bool
@@ -132,8 +162,26 @@ class FinancialProvisioningService
 
     private function provisionWallesterAccount(Customer $customer): bool
     {
-        if ($customer->wallesterAccounts) {
-            return $this->normalizeStatus($customer->wallesterAccounts->status) === IntegrationAccountStatus::ACTIVE;
+        $customer = $customer->fresh('wallesterAccounts');
+        $account = $customer->wallesterAccounts;
+
+        if ($account !== null && $this->normalizeStatus($account->status) === IntegrationAccountStatus::ACTIVE) {
+            return true;
+        }
+
+        if ($account !== null && ! $this->isWallesterPendingSubmission($account)) {
+            return $this->normalizeStatus($account->status) !== IntegrationAccountStatus::FAILED;
+        }
+
+        $account = $this->integrationAccounts->ensureWallesterAccount($customer);
+
+        if ($this->normalizeStatus($account->status) === IntegrationAccountStatus::FAILED) {
+            $this->integrationAccounts->updateWallester(
+                $account,
+                IntegrationAccountStatus::PENDING,
+                'A tentar criar conta Wallester novamente.',
+                'onboarding.retry',
+            );
         }
 
         try {
@@ -147,34 +195,30 @@ class FinancialProvisioningService
 
             $suffix = (string) $customer->id;
 
-            $account = $this->wallesterAccountRepository->create([
-                'customer_id' => $customer->id,
-                'wallester_account_id' => $wallesterAccount['id'],
-                'currency_code' => $wallesterAccount['currency_code'] ?? 'EUR_' . $suffix,
-                'product_id' => $wallesterAccount['product_id'] ?? 'prod_' . $suffix,
-                'company_id' => $wallesterAccount['company_id'] ?? 'comp_' . $suffix,
-                'status' => IntegrationAccountStatus::ACTIVE->value,
-            ]);
+            $account->wallester_account_id = $wallesterAccount['id'];
+            $account->currency_code = $wallesterAccount['currency_code'] ?? 'EUR_'.$suffix;
+            $account->product_id = $wallesterAccount['product_id'] ?? 'prod_'.$suffix;
+            $account->company_id = $wallesterAccount['company_id'] ?? 'comp_'.$suffix;
+            $account->save();
+
             $this->integrationAccounts->updateWallester($account, IntegrationAccountStatus::ACTIVE, null, 'onboarding.provisioning');
 
             return true;
         } catch (\Throwable $e) {
-            Log::error('Wallester provisioning failed', [
-                'customer_id' => $customer->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            if ($customer->wallesterAccounts) {
-                $this->integrationAccounts->updateWallester(
-                    $customer->wallesterAccounts,
-                    IntegrationAccountStatus::FAILED,
-                    $e->getMessage(),
-                    'wallester.api',
-                );
-            }
+            $this->integrationAccounts->updateWallester(
+                $account->fresh(),
+                IntegrationAccountStatus::FAILED,
+                $e->getMessage(),
+                'wallester.api',
+            );
 
             return false;
         }
+    }
+
+    private function isWallesterPendingSubmission(CustomerWallesterAccount $account): bool
+    {
+        return str_starts_with((string) $account->wallester_account_id, 'pending:');
     }
 
     private function isEburyAlreadySubmitted(Customer $customer): bool

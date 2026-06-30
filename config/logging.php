@@ -177,6 +177,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'wallester' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/wallester.log'),
+            'level' => 'debug',
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

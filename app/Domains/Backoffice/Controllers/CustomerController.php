@@ -2,13 +2,14 @@
 
 namespace App\Domains\Backoffice\Controllers;
 
+use App\Domains\Backoffice\Actions\RetryCustomerProvisioningAction;
 use App\Domains\Backoffice\Actions\UpdateCustomerFromBackofficeAction;
 use App\Domains\Backoffice\DTOs\UpdateCustomerFromBackofficeData;
 use App\Domains\Backoffice\Queries\GetCustomerDetailQuery;
 use App\Domains\Backoffice\Queries\ListCustomersQuery;
 use App\Domains\Backoffice\Requests\UpdateCustomerRequest;
-use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Kyc\Enums\DocumentStatus;
+use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class CustomerController extends Controller
         protected ListCustomersQuery $listCustomers,
         protected GetCustomerDetailQuery $customerDetail,
         protected UpdateCustomerFromBackofficeAction $updateCustomer,
+        protected RetryCustomerProvisioningAction $retryProvisioning,
     ) {}
 
     public function index(Request $request)
@@ -51,5 +53,12 @@ class CustomerController extends Controller
         );
 
         return back()->with('success', 'Cliente atualizado com sucesso.');
+    }
+
+    public function retryProvisioning(Customer $customer)
+    {
+        $this->retryProvisioning->execute($customer);
+
+        return back()->with('success', 'Provisioning reenviado para a fila.');
     }
 }

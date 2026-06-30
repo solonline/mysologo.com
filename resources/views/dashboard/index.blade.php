@@ -61,6 +61,21 @@
 </div>
 @endif
 
+@if (($stats['provisioning_failures'] ?? 0) > 0)
+<div class="mb-7 flex items-start gap-4 px-5 py-4 rounded-2xl"
+     style="background:#fef2f2;border:1px solid #fecaca;">
+    <div class="flex-shrink-0 w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center mt-0.5">
+        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+    </div>
+    <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-red-800">{{ $stats['provisioning_failures'] }} falha(s) de provisioning Wallester</p>
+        <p class="text-xs text-red-700 mt-0.5">Clientes em provisioning com conta Wallester em estado FAILED. Revise em <a href="{{ route('dashboard.customers', ['status' => 'PROVISIONING']) }}" class="underline font-semibold hover:text-red-900">Clientes</a>.</p>
+    </div>
+</div>
+@endif
+
 {{-- ══════════════════════════ STAT CARDS ══════════════════════════ --}}
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
 

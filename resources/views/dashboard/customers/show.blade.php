@@ -66,6 +66,12 @@
     };
 
     $custVal = $customer->status?->value ?? $customer->status ?? '';
+    $wallesterStatus = $customer->wallesterAccounts?->status;
+    $wallesterFailed = $wallesterStatus instanceof \App\Domains\Onboarding\Enums\IntegrationAccountStatus
+        ? $wallesterStatus === \App\Domains\Onboarding\Enums\IntegrationAccountStatus::FAILED
+        : strtoupper((string) $wallesterStatus) === 'FAILED';
+    $canRetryProvisioning = ($customer->status === \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::PROVISIONING)
+        && ($wallesterFailed || $customer->wallesterAccounts === null);
     $custBadge = match($customer->status) {
         \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::ACTIVE => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Ativo'],
         \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::PENDING_EMAIL_VERIFICATION,
@@ -90,6 +96,23 @@
         default     => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200',      'dot' => 'bg-slate-400',   'label' => $docVal ?: '—'],
     };
 @endphp
+
+@if ($wallesterFailed)
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4 rounded-2xl border border-red-200 bg-red-50">
+    <div>
+        <p class="text-sm font-semibold text-red-800">Falha ao provisionar Wallester</p>
+        <p class="text-xs text-red-700 mt-1">{{ $customer->wallesterAccounts->status_reason ?? $customer->status_reason ?? 'Erro desconhecido.' }}</p>
+    </div>
+    @can('customers.edit')
+    @if ($canRetryProvisioning)
+    <form method="POST" action="{{ route('dashboard.customers.retry-provisioning', $customer) }}">
+        @csrf
+        <button type="submit" class="btn-secondary btn-sm whitespace-nowrap">Repetir provisioning</button>
+    </form>
+    @endif
+    @endcan
+</div>
+@endif
 
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
@@ -819,18 +842,27 @@
 
         {{-- Conta Wallester --}}
         @if ($customer->wallesterAccounts)
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5">
             <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 Conta Wallester
+                @if ($wallesterFailed)
+                <span class="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">FAILED</span>
+                @endif
             </h2>
             <div class="space-y-3 text-sm">
                 <div class="flex justify-between">
                     <span class="text-slate-500">Account ID</span>
                     <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->wallesterAccounts->wallester_account_id ?? '—' }}</span>
                 </div>
+                @if ($customer->wallesterAccounts->status_reason)
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500 flex-shrink-0">Motivo</span>
+                    <span class="text-xs text-red-700 text-right">{{ $customer->wallesterAccounts->status_reason }}</span>
+                </div>
+                @endif
             </div>
         </div>
         @endif

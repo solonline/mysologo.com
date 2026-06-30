@@ -7,7 +7,6 @@ use App\Domains\Kyc\Jobs\UploadDocumentMediaJob;
 use App\Domains\Kyc\Services\IdentityVerificationWebhookService;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Models\CustomerDiditSession;
-use App\Models\CustomerEburyAccount;
 use App\Models\CustomerWallesterAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -28,7 +27,7 @@ class IdentityVerificationWebhookTest extends TestCase
         Queue::fake([UploadDocumentMediaJob::class]);
     }
 
-    public function test_approved_decision_submits_ebury_and_provisions_wallester(): void
+    public function test_approved_decision_dispatches_provisioning_and_creates_wallester(): void
     {
         $customer = $this->createRetailCustomer([
             'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
@@ -42,7 +41,7 @@ class IdentityVerificationWebhookTest extends TestCase
         $customer->refresh();
 
         $this->assertSame(DocumentStatus::APPROVED->value, $customer->doc_status);
-        $this->assertTrue(CustomerEburyAccount::query()->where('customer_id', $customer->id)->exists());
+        $this->assertSame(CustomerLifecycleStatus::ACTIVE, $customer->status);
         $this->assertTrue(CustomerWallesterAccount::query()->where('customer_id', $customer->id)->exists());
     }
 
@@ -75,7 +74,7 @@ class IdentityVerificationWebhookTest extends TestCase
         ]);
         $session = $this->createDiditSession($customer, 'sess_kyc_3');
 
-        $response = $this->postJson('/api/webhooks/didit', $this->diditApprovedPayload(
+        $response = $this->postDiditWebhook($this->diditApprovedPayload(
             $customer->id,
             $session->session_id,
             'DOC777',
@@ -174,7 +173,6 @@ class IdentityVerificationWebhookTest extends TestCase
         $customer->refresh();
 
         $this->assertSame(DocumentStatus::APPROVED->value, $customer->doc_status);
-        $this->assertTrue(CustomerEburyAccount::query()->where('customer_id', $customer->id)->exists());
         $this->assertTrue(CustomerWallesterAccount::query()->where('customer_id', $customer->id)->exists());
     }
 
@@ -188,8 +186,7 @@ class IdentityVerificationWebhookTest extends TestCase
         ]);
         $this->createDiditSession($customer, $applicationId);
 
-        $response = $this->postJson(
-            '/api/webhooks/didit',
+        $response = $this->postDiditWebhook(
             $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Declined'),
         );
 

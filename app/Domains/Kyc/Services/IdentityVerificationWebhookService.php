@@ -446,8 +446,7 @@ class IdentityVerificationWebhookService
         };
 
         if ($customer->doc_status === DocumentStatus::APPROVED) {
-            $this->financialProvisioning->provisionPostKycPartners($customer);
-            $this->lifecycleService->evaluateActivation($customer->fresh());
+            $this->financialProvisioning->dispatchPostKycPartners($customer);
         }
 
         $this->customerRepository->save($customer);

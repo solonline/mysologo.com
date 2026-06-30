@@ -13,6 +13,7 @@ use App\Models\CustomerEburyAccount;
 use App\Models\CustomerStripeAccount;
 use App\Models\CustomerWallesterAccount;
 use App\Models\Setting;
+use Illuminate\Testing\TestResponse;
 
 trait InteractsWithOnboarding
 {
@@ -239,5 +240,16 @@ trait InteractsWithOnboarding
                 ],
             ],
         ];
+    }
+
+    /** @param array<string, mixed> $payload */
+    protected function postDiditWebhook(array $payload): TestResponse
+    {
+        $json = json_encode($payload, JSON_THROW_ON_ERROR);
+        $signature = hash_hmac('sha256', $json, 'didit-webhook-secret');
+
+        return $this->postJson('/api/webhooks/didit', $payload, [
+            'X-Signature-V2' => $signature,
+        ]);
     }
 }

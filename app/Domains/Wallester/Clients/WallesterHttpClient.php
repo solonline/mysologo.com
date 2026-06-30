@@ -17,7 +17,8 @@ class WallesterHttpClient
 
     public function __construct()
     {
-        $this->baseUrl = config('services.wallester.base_url', 'https://api-frontend.wallester.com/v1/');
+        $configuredBaseUrl = config('services.wallester.base_url', 'https://api-frontend.wallester.com/v1/');
+        $this->baseUrl = rtrim((string) $configuredBaseUrl, '/').'/';
         $this->apiKey = config('services.wallester.api_key');
         $this->privateKey = config('services.wallester.private_key');
         $this->httpClient = new Client([
@@ -42,7 +43,7 @@ class WallesterHttpClient
     protected function getAuthHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer ' . $this->authenticate(),
+            'Authorization' => 'Bearer '.$this->authenticate(),
             'Accept' => 'application/json',
         ];
     }

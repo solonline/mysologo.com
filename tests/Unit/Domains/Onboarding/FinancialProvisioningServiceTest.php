@@ -2,8 +2,11 @@
 
 namespace Tests\Unit\Domains\Onboarding;
 
+use App\Domains\Ebury\Contracts\EburyGatewayInterface;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Onboarding\Services\FinancialProvisioningService;
+use App\Domains\Wallester\Services\WallesterService;
+use App\Models\CustomerStripeAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
@@ -25,7 +28,7 @@ class FinancialProvisioningServiceTest extends TestCase
         $customer->refresh();
 
         $this->assertNotNull($customer->eburyAccount);
-        $this->assertSame('sim:' . $customer->id, $customer->eburyAccount->ebury_account_id);
+        $this->assertSame('sim:'.$customer->id, $customer->eburyAccount->ebury_account_id);
         $this->assertSame(IntegrationAccountStatus::PENDING, $customer->eburyAccount->status);
     }
 
@@ -47,7 +50,7 @@ class FinancialProvisioningServiceTest extends TestCase
 
         $this->assertSame(IntegrationAccountStatus::ACTIVE, $customer->eburyAccount->status);
         $this->assertTrue(
-            \App\Models\CustomerStripeAccount::query()->where('customer_id', $customer->id)->exists(),
+            CustomerStripeAccount::query()->where('customer_id', $customer->id)->exists(),
         );
     }
 
@@ -56,12 +59,46 @@ class FinancialProvisioningServiceTest extends TestCase
         config(['services.ebury.simulate_auto_approve' => false]);
 
         $customer = $this->createRetailCustomer();
-        $this->createEburyAccount($customer, IntegrationAccountStatus::PENDING, 'sim:' . $customer->id);
+        $this->createEburyAccount($customer, IntegrationAccountStatus::PENDING, 'sim:'.$customer->id);
 
-        $this->mock(\App\Domains\Ebury\Contracts\EburyGatewayInterface::class, function ($mock) {
+        $this->mock(EburyGatewayInterface::class, function ($mock) {
             $mock->shouldReceive('submitCustomer')->never();
         });
 
         $this->assertTrue(app(FinancialProvisioningService::class)->provisionEbury($customer));
+    }
+
+    public function test_provision_wallester_creates_pending_row_before_api_call(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $this->mock(WallesterService::class, function ($mock) {
+            $mock->shouldReceive('createAccount')
+                ->once()
+                ->andReturn(['id' => 'wal_api_test']);
+        });
+
+        $this->assertTrue(app(FinancialProvisioningService::class)->provisionWallester($customer));
+
+        $account = $customer->fresh()->wallesterAccounts;
+        $this->assertNotNull($account);
+        $this->assertSame('wal_api_test', $account->wallester_account_id);
+        $this->assertSame(IntegrationAccountStatus::ACTIVE, $account->status);
+    }
+
+    public function test_provision_wallester_marks_failed_when_api_errors(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $this->mock(WallesterService::class, function ($mock) {
+            $mock->shouldReceive('createAccount')
+                ->once()
+                ->andThrow(new \RuntimeException('Wallester API unavailable'));
+        });
+
+        $this->assertFalse(app(FinancialProvisioningService::class)->provisionWallester($customer));
+
+        $account = $customer->fresh()->wallesterAccounts;
+        $this->assertNotNull($account);
+        $this->assertSame(IntegrationAccountStatus::FAILED, $account->status);
+        $this->assertSame('Wallester API unavailable', $account->status_reason);
     }
 }

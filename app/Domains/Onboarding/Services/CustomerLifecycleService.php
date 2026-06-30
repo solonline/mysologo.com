@@ -181,12 +181,16 @@ class CustomerLifecycleService
         $eburyRejected = $this->isFundingPartnerRejected($customer->eburyAccount?->status);
         $wallesterRejected = $this->isFundingPartnerRejected($customer->wallesterAccounts?->status);
 
+        if ($wallesterRejected && ! $eburyRejected) {
+            return 'Falha Wallester. A aguardar intervenção.';
+        }
+
         if ($eburyRejected && ! $wallesterRejected) {
             return 'Ebury recusou. Aguardando decisão Wallester.';
         }
 
-        if ($wallesterRejected && ! $eburyRejected) {
-            return 'Wallester recusou. Aguardando decisão Ebury.';
+        if ($wallesterRejected && $eburyRejected) {
+            return 'Ebury e Wallester recusaram. A aguardar intervenção.';
         }
 
         return 'Aguardando aprovação Ebury ou Wallester.';

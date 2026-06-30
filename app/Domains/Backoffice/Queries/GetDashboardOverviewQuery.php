@@ -4,8 +4,9 @@ namespace App\Domains\Backoffice\Queries;
 
 use App\Domains\Backoffice\DTOs\DashboardOverview;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
-use App\Models\Customer;
+use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Settings\Services\SettingsService;
+use App\Models\Customer;
 
 class GetDashboardOverviewQuery
 {
@@ -27,6 +28,10 @@ class GetDashboardOverviewQuery
                 CustomerLifecycleStatus::PROVISIONING->value,
                 CustomerLifecycleStatus::EBURY_UNDER_REVIEW->value,
             ])->count(),
+            'provisioning_failures' => Customer::query()
+                ->where('status', CustomerLifecycleStatus::PROVISIONING)
+                ->whereHas('wallesterAccounts', fn ($query) => $query->where('status', IntegrationAccountStatus::FAILED))
+                ->count(),
             'blocked_customers' => Customer::whereIn('status', [
                 CustomerLifecycleStatus::BLOCKED->value,
                 CustomerLifecycleStatus::IDENTITY_REJECTED->value,

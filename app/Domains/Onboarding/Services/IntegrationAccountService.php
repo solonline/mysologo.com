@@ -111,10 +111,29 @@ class IntegrationAccountService
         return CustomerEburyAccount::firstOrCreate(
             ['customer_id' => $customer->id],
             [
-                'ebury_account_id' => 'pending:' . $customer->id,
+                'ebury_account_id' => 'pending:'.$customer->id,
                 'currency' => strtoupper($customer->currency ?? 'EUR'),
                 'status' => IntegrationAccountStatus::PENDING,
                 'status_reason' => 'Aguardando submissão dos documentos Ebury.',
+                'status_source' => 'yoop.onboarding',
+                'status_changed_at' => now(),
+            ],
+        );
+    }
+
+    public function ensureWallesterAccount(Customer $customer): CustomerWallesterAccount
+    {
+        $suffix = (string) $customer->id;
+
+        return CustomerWallesterAccount::firstOrCreate(
+            ['customer_id' => $customer->id],
+            [
+                'wallester_account_id' => 'pending:'.$customer->id,
+                'currency_code' => 'EUR_'.$suffix,
+                'product_id' => 'prod_'.$suffix,
+                'company_id' => 'comp_'.$suffix,
+                'status' => IntegrationAccountStatus::PENDING,
+                'status_reason' => 'Aguardando criação da conta Wallester.',
                 'status_source' => 'yoop.onboarding',
                 'status_changed_at' => now(),
             ],

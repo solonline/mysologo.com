@@ -21,9 +21,9 @@ class DiditWebhookController extends Controller
     public function handle(Request $request): JsonResponse
     {
         $signature = $request->header('X-Signature-V2');
-        // if (! $this->identityVerification->verifyWebhookSignature($request->getContent(), $signature)) {
-        //     return response()->json(['error' => 'Invalid signature'], 401);
-        // }
+        if (! $this->identityVerification->verifyWebhookSignature($request->getContent(), $signature)) {
+            return response()->json(['error' => 'Invalid signature'], 401);
+        }
 
         Log::info('Received Didit webhook', ['payload' => $request->all()]);
 
