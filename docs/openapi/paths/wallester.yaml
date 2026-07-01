@@ -1,0 +1,489 @@
+wallester-health:
+  get:
+    tags: [Wallester]
+    summary: Health check do domínio Wallester
+    operationId: wallesterHealth
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '../components/schemas.yaml#/HealthCheck'
+                - type: object
+                  properties:
+                    domain:
+                      type: string
+                      example: wallester
+
+wallester-accounts-index:
+  get:
+    tags: [Wallester]
+    summary: Listar contas Wallester
+    operationId: wallesterAccountsIndex
+    description: |
+      Pesquisa contas na API Wallester (passthrough `SearchAccounts`).
+
+      O backend percorre todas as páginas automaticamente e devolve **todas** as contas correspondentes aos filtros.
+
+      **Filtros opcionais:** `name`, `external_id`, `is_main`, `company_id`, `person_id`, `order_field`, `order_direction`.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: name
+        in: query
+        schema:
+          type: string
+      - name: external_id
+        in: query
+        schema:
+          type: string
+      - name: is_main
+        in: query
+        schema:
+          type: boolean
+      - name: exceeding_credit_limit
+        in: query
+        schema:
+          type: boolean
+      - name: order_field
+        in: query
+        schema:
+          type: string
+          enum: [created_at, updated_at, balance, blocked_amount, available_amount, name, status]
+      - name: order_direction
+        in: query
+        schema:
+          type: string
+          enum: [asc, desc]
+      - name: company_id
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: person_id
+        in: query
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/WallesterAccountList'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+wallester-accounts-show:
+  get:
+    tags: [Wallester]
+    summary: Detalhe de conta Wallester
+    operationId: wallesterAccountsShow
+    description: |
+      Retorna uma conta da API Wallester por UUID (passthrough).
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: account
+        in: path
+        required: true
+        description: UUID da conta na Wallester
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterAccount'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+wallester-cards-store:
+  post:
+    tags: [Wallester]
+    summary: Criar cartão
+    operationId: wallesterCardsStore
+    description: |
+      Cria um cartão Wallester (Virtual ou Physical) na conta activa do customer.
+
+      **Comportamento:**
+      - Cartões **Virtual** em estado `Created` são **activados automaticamente** após criação
+      - OOB 3DS é configurado com o `wallester_oob_user_id` do customer
+      - `internet_purchase_enabled` fica activo por defeito
+
+      **Pré-requisitos:** conta Wallester `ACTIVE`, lifecycle `ACTIVE`, email e documento verificados.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [type, name]
+            properties:
+              type:
+                type: string
+                enum: [Virtual, Physical]
+              name:
+                type: string
+                maxLength: 255
+              limits:
+                type: object
+                additionalProperties: true
+              security:
+                type: object
+                additionalProperties: true
+          example:
+            type: Virtual
+            name: Travel Card
+    responses:
+      '201':
+        description: Cartão criado (e activado se Virtual)
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+wallester-cards-show:
+  get:
+    tags: [Wallester]
+    summary: Detalhe de cartão Wallester
+    operationId: wallesterCardsShow
+    description: |
+      Retorna os dados completos de um cartão na API Wallester (passthrough `GET /v1/cards/{card_id}`).
+
+      O `{card}` no path é o ID local (`customer_wallester_cards.id`). O cartão deve pertencer ao customer autenticado.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: card
+        in: path
+        required: true
+        description: ID local do cartão (`customer_wallester_cards.id`)
+        schema:
+          type: integer
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCardApi'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
+wallester-cards-sensitive:
+  post:
+    tags: [Wallester]
+    summary: Revelar dados sensíveis do cartão
+    operationId: wallesterCardsSensitive
+    description: |
+      Obtém PAN, CVV e validade do cartão via endpoints encriptados da Wallester.
+
+      Requer confirmação de identidade com **password da conta** ou **PIN do dispositivo** (`pin` + `device_token`).
+
+      Requer `WALLESTER_CARD_RSA_PRIVATE_KEY` configurada no servidor. O backend desencripta e devolve os dados em plain text sobre HTTPS.
+
+      **Pré-requisitos:** cartão `Active` e pertencente ao customer autenticado.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: card
+        in: path
+        required: true
+        description: ID local do cartão (`customer_wallester_cards.id`)
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - type: object
+                required: [password]
+                properties:
+                  password:
+                    type: string
+                    format: password
+                    description: Password da conta Yoop
+              - type: object
+                required: [pin, device_token]
+                properties:
+                  pin:
+                    type: string
+                    pattern: '^[0-9]{4}$'
+                    description: PIN de 4 dígitos do dispositivo
+                  device_token:
+                    type: string
+                    description: Token do dispositivo registado com PIN
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCardSensitive'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        description: Cartão inactivo ou indisponível
+
+wallester-cards-activate:
+  post:
+    tags: [Wallester]
+    summary: Activar cartão virtual
+    operationId: wallesterCardsActivate
+    description: |
+      Activa manualmente um cartão **Virtual** em estado `Created`.
+
+      Idempotente se o cartão já estiver `Active`. Cartões **Physical** não são suportados neste endpoint.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: card
+        in: path
+        required: true
+        description: ID local do cartão (`customer_wallester_cards.id`)
+        schema:
+          type: integer
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        description: Cartão não activável (tipo ou estado inválido)
+
+wallester-3ds-challenges-pending:
+  get:
+    tags: [Wallester]
+    summary: Listar desafios 3DS pendentes
+    operationId: wallester3dsChallengesPending
+    description: |
+      Lista desafios 3DS Out-of-Band pendentes do customer autenticado.
+
+      O cliente deve aprovar ou rejeitar cada desafio antes de `expires_at`.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/Wallester3dsChallenge'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+wallester-3ds-challenges-approve:
+  post:
+    tags: [Wallester]
+    summary: Aprovar desafio 3DS
+    operationId: wallester3dsChallengesApprove
+    description: Aprova um desafio 3DS OOB pendente. O desafio deve pertencer ao customer autenticado.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: challenge
+        in: path
+        required: true
+        description: ID local do desafio (`wallester_3ds_challenges.id`)
+        schema:
+          type: integer
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Wallester3dsChallenge'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        description: Desafio expirado, já resolvido ou não pertence ao customer
+
+wallester-3ds-challenges-reject:
+  post:
+    tags: [Wallester]
+    summary: Rejeitar desafio 3DS
+    operationId: wallester3dsChallengesReject
+    description: Rejeita um desafio 3DS OOB pendente. O desafio deve pertencer ao customer autenticado.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: challenge
+        in: path
+        required: true
+        description: ID local do desafio (`wallester_3ds_challenges.id`)
+        schema:
+          type: integer
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Wallester3dsChallenge'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        description: Desafio expirado, já resolvido ou não pertence ao customer
+
+wallester-transactions-index:
+  get:
+    tags: [Wallester]
+    summary: Listar transacções do cartão (Wallester)
+    operationId: wallesterTransactionsIndex
+    description: |
+      Lista transacções da API Wallester (passthrough). **Não confundir** com `GET /wallet/transactions` (ledger interno).
+
+      **Paginação Wallester:** `from_record` + `records_count` (default 0 e 15, máx. 100).
+
+      **Filtro opcional:** `card_id` (ID local) para listar só transacções de um cartão.
+
+      **Datas:** formato `YYYY-MM-DDThh:mm:ssZ` (`from_date`, `to_date`).
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: from_record
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: records_count
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 15
+      - name: from_date
+        in: query
+        schema:
+          type: string
+          format: date-time
+          example: '2026-01-01T00:00:00Z'
+      - name: to_date
+        in: query
+        schema:
+          type: string
+          format: date-time
+          example: '2026-12-31T23:59:59Z'
+      - name: card_id
+        in: query
+        description: ID local do cartão para filtrar transacções
+        schema:
+          type: integer
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/WallesterTransactionList'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+wallester-transactions-show:
+  get:
+    tags: [Wallester]
+    summary: Detalhe de transacção Wallester
+    operationId: wallesterTransactionsShow
+    description: |
+      Retorna uma transacção da API Wallester por UUID.
+
+      Só é devolvida se pertencer à conta ou a um cartão do customer autenticado.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: transaction
+        in: path
+        required: true
+        description: UUID da transacção na Wallester
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCardTransaction'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        description: Transacção não pertence ao customer
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'

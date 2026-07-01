@@ -9,4 +9,6 @@ interface WallesterAccountRepositoryInterface
     public function create(array $data): CustomerWallesterAccount;
 
     public function findByCustomerId(int $customerId): ?CustomerWallesterAccount;
+
+    public function findByWallesterAccountId(string $wallesterAccountId): ?CustomerWallesterAccount;
 }

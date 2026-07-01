@@ -23,6 +23,9 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 
+# Postman local env (credenciais + JWT)
+/postman/wallester-sandbox.local.postman_environment.json
+
 # Android terminal build artifacts
 /android-terminal/.gradle/
 /android-terminal/.idea/

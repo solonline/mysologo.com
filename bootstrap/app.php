@@ -1,5 +1,6 @@
 <?php
 
+use App\Domains\Wallester\Http\Middleware\VerifyWallester3dsWebhook;
 use App\Exceptions\ApiException;
 // Middleware customizado para idempotência de requisições
 use App\Http\Middleware\AuthMerchant;
@@ -59,6 +60,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'maintenance' => MaintenanceModeMiddleware::class,
             'auth.merchant' => AuthMerchant::class,
             'docs.internal' => EnsureInternalDocsAccess::class,
+            'wallester.3ds.webhook' => VerifyWallester3dsWebhook::class,
         ]);
 
         $middleware->api(prepend: [

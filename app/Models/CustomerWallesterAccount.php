@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CustomerWallesterAccount extends Model
 {
@@ -45,7 +47,7 @@ class CustomerWallesterAccount extends Model
         'bank_address',
         'registration_number',
         'reference_number',
-        'viban'
+        'viban',
     ];
 
     protected $casts = [
@@ -53,8 +55,13 @@ class CustomerWallesterAccount extends Model
         'status_changed_at' => 'datetime',
     ];
 
-    public function customer()
+    public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function cards(): HasMany
+    {
+        return $this->hasMany(CustomerWallesterCard::class);
     }
 }

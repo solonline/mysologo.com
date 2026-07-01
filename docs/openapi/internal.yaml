@@ -70,7 +70,7 @@ x-tagGroups:
   - name: Perfil & Notificações
     tags: [Customer]
   - name: Carteira & Pagamentos
-    tags: [Wallet, Stripe]
+    tags: [Wallet, Stripe, Wallester]
   - name: Merchants
     tags: [Merchant]
   - name: Sistema
@@ -91,6 +91,8 @@ tags:
     description: Dashboard, conta, transacções e P2P.
   - name: Stripe
     description: Top-up via Stripe (cliente autenticado).
+  - name: Wallester
+    description: Cartões, transacções e 3DS Out-of-Band (cliente autenticado).
   - name: Merchant
     description: Payment requests e terminal. [Doc parceiros](/docs/partners).
   - name: Settings
@@ -193,6 +195,32 @@ paths:
   /stripe/terminal/{transaction}/capture:
     $ref: './paths/stripe.yaml#/stripe-terminal-capture'
 
+  # Wallester
+  /wallester/health:
+    $ref: './paths/wallester.yaml#/wallester-health'
+  /wallester/accounts:
+    $ref: './paths/wallester.yaml#/wallester-accounts-index'
+  /wallester/accounts/{account}:
+    $ref: './paths/wallester.yaml#/wallester-accounts-show'
+  /wallester/cards:
+    $ref: './paths/wallester.yaml#/wallester-cards-store'
+  /wallester/cards/{card}:
+    $ref: './paths/wallester.yaml#/wallester-cards-show'
+  /wallester/cards/{card}/sensitive:
+    $ref: './paths/wallester.yaml#/wallester-cards-sensitive'
+  /wallester/cards/{card}/activate:
+    $ref: './paths/wallester.yaml#/wallester-cards-activate'
+  /wallester/3ds-challenges/pending:
+    $ref: './paths/wallester.yaml#/wallester-3ds-challenges-pending'
+  /wallester/3ds-challenges/{challenge}/approve:
+    $ref: './paths/wallester.yaml#/wallester-3ds-challenges-approve'
+  /wallester/3ds-challenges/{challenge}/reject:
+    $ref: './paths/wallester.yaml#/wallester-3ds-challenges-reject'
+  /wallester/transactions:
+    $ref: './paths/wallester.yaml#/wallester-transactions-index'
+  /wallester/transactions/{transaction}:
+    $ref: './paths/wallester.yaml#/wallester-transactions-show'
+
   # Merchant
   /merchant/health:
     $ref: './paths/merchant.yaml#/merchant-health'
@@ -273,6 +301,14 @@ components:
       $ref: './components/schemas.yaml#/Setting'
     HealthCheck:
       $ref: './components/schemas.yaml#/HealthCheck'
+    WallesterCard:
+      $ref: './components/schemas.yaml#/WallesterCard'
+    Wallester3dsChallenge:
+      $ref: './components/schemas.yaml#/Wallester3dsChallenge'
+    WallesterCardTransaction:
+      $ref: './components/schemas.yaml#/WallesterCardTransaction'
+    WallesterTransactionList:
+      $ref: './components/schemas.yaml#/WallesterTransactionList'
   responses:
     Unauthorized:
       $ref: './components/responses.yaml#/Unauthorized'

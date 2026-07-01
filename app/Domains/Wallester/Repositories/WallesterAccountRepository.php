@@ -16,4 +16,9 @@ class WallesterAccountRepository implements WallesterAccountRepositoryInterface
     {
         return CustomerWallesterAccount::where('customer_id', $customerId)->first();
     }
+
+    public function findByWallesterAccountId(string $wallesterAccountId): ?CustomerWallesterAccount
+    {
+        return CustomerWallesterAccount::where('wallester_account_id', $wallesterAccountId)->first();
+    }
 }

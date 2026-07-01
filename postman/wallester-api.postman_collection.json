@@ -1,0 +1,265 @@
+{
+	"info": {
+		"_postman_id": "f1e2d3c4-b5a6-4789-abcd-ef0123456789",
+		"name": "Wallester API Direct",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "wallester_base_url",
+			"value": "https://api-frontend.wallester.com/v1",
+			"type": "string"
+		},
+		{
+			"key": "wallester_jwt",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "wallester_product_code",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "wallester_audit_source_type",
+			"value": "Backend",
+			"type": "string"
+		},
+		{
+			"key": "wallester_audit_user_id",
+			"value": "postman-test-user",
+			"type": "string"
+		},
+		{
+			"key": "wallester_account_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "wallester_card_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "wallester_transaction_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "wallester_oob_user_id",
+			"value": "00000000-0000-4000-8000-000000000001",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{wallester_jwt}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Accounts",
+			"item": [
+				{
+					"name": "Create Account",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var json = pm.response.json();",
+									"var account = json.account || json;",
+									"if (account.id) {",
+									"    pm.environment.set('wallester_account_id', account.id);",
+									"    pm.collectionVariables.set('wallester_account_id', account.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" },
+							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
+							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
+							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"name\": \"Postman Test Account\"\n}"
+						},
+						"url": {
+							"raw": "{{wallester_base_url}}/accounts",
+							"host": ["{{wallester_base_url}}"],
+							"path": ["accounts"]
+						}
+					}
+				},
+				{
+					"name": "List Account Transactions",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var json = pm.response.json();",
+									"var txs = json.transactions || [];",
+									"if (txs[0] && txs[0].id) {",
+									"    pm.environment.set('wallester_transaction_id', txs[0].id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
+							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
+							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
+						],
+						"url": {
+							"raw": "{{wallester_base_url}}/accounts/{{wallester_account_id}}/transactions?from_record=0&records_count=15",
+							"host": ["{{wallester_base_url}}"],
+							"path": ["accounts", "{{wallester_account_id}}", "transactions"],
+							"query": [
+								{ "key": "from_record", "value": "0" },
+								{ "key": "records_count", "value": "15" }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Cards",
+			"item": [
+				{
+					"name": "Get Card",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
+							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
+							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
+						],
+						"url": {
+							"raw": "{{wallester_base_url}}/cards/{{wallester_card_id}}",
+							"host": ["{{wallester_base_url}}"],
+							"path": ["cards", "{{wallester_card_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Create Card Virtual",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var json = pm.response.json();",
+									"var card = json.card || json;",
+									"if (card.id) {",
+									"    pm.environment.set('wallester_card_id', card.id);",
+									"    pm.collectionVariables.set('wallester_card_id', card.id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "Content-Type", "value": "application/json", "type": "text" },
+							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
+							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
+							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"account_id\": \"{{wallester_account_id}}\",\n\t\"type\": \"Virtual\",\n\t\"name\": \"Postman Virtual Card\",\n\t\"3d_secure_settings\": {\n\t\t\"out_of_band_enabled\": true,\n\t\t\"out_of_band_id\": \"{{wallester_oob_user_id}}\"\n\t},\n\t\"security\": {\n\t\t\"contactless_enabled\": true,\n\t\t\"withdrawal_enabled\": false,\n\t\t\"internet_purchase_enabled\": true\n\t}\n}"
+						},
+						"url": {
+							"raw": "{{wallester_base_url}}/cards",
+							"host": ["{{wallester_base_url}}"],
+							"path": ["cards"]
+						}
+					}
+				},
+				{
+					"name": "Activate Card",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
+							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
+							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
+						],
+						"url": {
+							"raw": "{{wallester_base_url}}/cards/{{wallester_card_id}}/activate",
+							"host": ["{{wallester_base_url}}"],
+							"path": ["cards", "{{wallester_card_id}}", "activate"]
+						}
+					}
+				},
+				{
+					"name": "List Card Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
+							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
+							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
+						],
+						"url": {
+							"raw": "{{wallester_base_url}}/cards/{{wallester_card_id}}/transactions?from_record=0&records_count=15",
+							"host": ["{{wallester_base_url}}"],
+							"path": ["cards", "{{wallester_card_id}}", "transactions"],
+							"query": [
+								{ "key": "from_record", "value": "0" },
+								{ "key": "records_count", "value": "15" }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Transactions",
+			"item": [
+				{
+					"name": "Get Transaction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json", "type": "text" },
+							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
+							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
+							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
+						],
+						"url": {
+							"raw": "{{wallester_base_url}}/transactions/{{wallester_transaction_id}}",
+							"host": ["{{wallester_base_url}}"],
+							"path": ["transactions", "{{wallester_transaction_id}}"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

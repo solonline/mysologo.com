@@ -117,4 +117,179 @@ class WallesterGatewayTest extends TestCase
         $this->assertSame('8951efcc-91a7-4f59-977f-c9ad186bfa98', $result['id']);
         $this->assertSame('EUR', $result['currency_code']);
     }
+
+    public function test_list_accounts_normalizes_response(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('listAccounts')
+            ->once()
+            ->with(['from_record' => 0, 'records_count' => 15], '42')
+            ->andReturn([
+                'total_records_number' => 2,
+                'accounts' => [
+                    ['id' => 'wal_acc_1'],
+                    ['id' => 'wal_acc_2'],
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->listAccounts(['from_record' => 0, 'records_count' => 15], '42');
+
+        $this->assertSame(2, $result['total_records_number']);
+        $this->assertCount(2, $result['accounts']);
+    }
+
+    public function test_get_account_unwraps_nested_account_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('getAccount')
+            ->once()
+            ->with('27c0b35d-6746-4528-b91c-11e10d851f29', '42')
+            ->andReturn([
+                'account' => [
+                    'id' => '27c0b35d-6746-4528-b91c-11e10d851f29',
+                    'currency_code' => 'EUR',
+                    'balance' => 99.5,
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->getAccount('27c0b35d-6746-4528-b91c-11e10d851f29', '42');
+
+        $this->assertSame('27c0b35d-6746-4528-b91c-11e10d851f29', $result['id']);
+        $this->assertSame('EUR', $result['currency_code']);
+        $this->assertSame(99.5, $result['balance']);
+    }
+
+    public function test_create_card_unwraps_nested_card_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('createCard')
+            ->once()
+            ->with(['account_id' => 'wal_123', 'type' => 'Virtual'], null)
+            ->andReturn([
+                'card' => [
+                    'id' => 'card_123',
+                    'account_id' => 'wal_123',
+                    'type' => 'Virtual',
+                    'status' => 'Active',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->createCard(['account_id' => 'wal_123', 'type' => 'Virtual']);
+
+        $this->assertSame('card_123', $result['id']);
+        $this->assertSame('Active', $result['status']);
+    }
+
+    public function test_get_card_unwraps_nested_card_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('getCard')
+            ->once()
+            ->with('card_123', '42')
+            ->andReturn([
+                'card' => [
+                    'id' => 'card_123',
+                    'type' => 'Virtual',
+                    'status' => 'Active',
+                    'currency_code' => 'EUR',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->getCard('card_123', '42');
+
+        $this->assertSame('card_123', $result['id']);
+        $this->assertSame('EUR', $result['currency_code']);
+    }
+
+    public function test_get_encrypted_card_number_returns_payload_field(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('getEncryptedCardNumber')
+            ->once()
+            ->with('card_123', 'public-key', '42')
+            ->andReturn([
+                'encrypted_card_number' => '-----BEGIN CardNumber MESSAGE-----',
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->getEncryptedCardNumber('card_123', 'public-key', '42');
+
+        $this->assertSame('-----BEGIN CardNumber MESSAGE-----', $result);
+    }
+
+    public function test_activate_card_unwraps_nested_card_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('activateCard')
+            ->once()
+            ->with('card_123', '42')
+            ->andReturn([
+                'card' => [
+                    'id' => 'card_123',
+                    'type' => 'Virtual',
+                    'status' => 'Active',
+                    'activated_at' => '2026-07-01T12:00:00Z',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->activateCard('card_123', '42');
+
+        $this->assertSame('card_123', $result['id']);
+        $this->assertSame('Active', $result['status']);
+    }
+
+    public function test_list_account_transactions_normalizes_response(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('listAccountTransactions')
+            ->once()
+            ->with('wal_acc_1', ['from_record' => 0, 'records_count' => 15], '42')
+            ->andReturn([
+                'total_records_number' => 2,
+                'transactions' => [
+                    ['id' => 'tx_1'],
+                    ['id' => 'tx_2'],
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->listAccountTransactions('wal_acc_1', ['from_record' => 0, 'records_count' => 15], '42');
+
+        $this->assertSame(2, $result['total_records_number']);
+        $this->assertCount(2, $result['transactions']);
+    }
+
+    public function test_get_transaction_unwraps_nested_transaction_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('getTransaction')
+            ->once()
+            ->with('tx_123', '42', [])
+            ->andReturn([
+                'transaction' => [
+                    'id' => 'tx_123',
+                    'account_id' => 'wal_acc_1',
+                    'amount' => -9.99,
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->getTransaction('tx_123', '42');
+
+        $this->assertSame('tx_123', $result['id']);
+        $this->assertSame(-9.99, $result['amount']);
+    }
 }

@@ -424,3 +424,236 @@ Setting:
       type: string
     value:
       type: string
+
+WallesterAccount:
+  type: object
+  description: Conta devolvida pela API Wallester (passthrough)
+  additionalProperties: true
+  properties:
+    id:
+      type: string
+      format: uuid
+    currency_code:
+      type: string
+      example: EUR
+    balance:
+      type: number
+      format: float
+      nullable: true
+    available_amount:
+      type: number
+      format: float
+      nullable: true
+    blocked_amount:
+      type: number
+      format: float
+      nullable: true
+    status:
+      type: string
+      nullable: true
+    iban:
+      type: string
+      nullable: true
+
+WallesterAccountList:
+  type: object
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/WallesterAccount'
+    meta:
+      type: object
+      properties:
+        total_records_number:
+          type: integer
+
+WallesterCardSensitive:
+  type: object
+  properties:
+    card_number:
+      type: string
+      example: '4302631234561795'
+    cvv:
+      type: string
+      example: '123'
+    expiry_date:
+      type: string
+      format: date-time
+      nullable: true
+
+WallesterCardApi:
+  type: object
+  description: Cartão devolvido pela API Wallester (passthrough)
+  additionalProperties: true
+  properties:
+    id:
+      type: string
+      format: uuid
+    account_id:
+      type: string
+      format: uuid
+    type:
+      type: string
+      example: Virtual
+    status:
+      type: string
+      example: Active
+    name:
+      type: string
+    masked_card_number:
+      type: string
+      nullable: true
+    expiry_date:
+      type: string
+      format: date-time
+      nullable: true
+    currency_code:
+      type: string
+      nullable: true
+    security:
+      type: object
+      additionalProperties: true
+      nullable: true
+    limits:
+      type: object
+      additionalProperties: true
+      nullable: true
+    three_d_secure_settings:
+      type: object
+      additionalProperties: true
+      nullable: true
+    activated_at:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+      nullable: true
+
+WallesterCard:
+  type: object
+  description: Cartão Wallester persistido localmente
+  properties:
+    id:
+      type: integer
+    wallester_card_id:
+      type: string
+      format: uuid
+    type:
+      type: string
+      enum: [Virtual, Physical]
+    status:
+      type: string
+      example: Active
+    name:
+      type: string
+    masked_card_number:
+      type: string
+      nullable: true
+      example: '****5678'
+    expiry_date:
+      type: string
+      format: date-time
+      nullable: true
+    security:
+      type: object
+      additionalProperties: true
+      nullable: true
+    limits:
+      type: object
+      additionalProperties: true
+      nullable: true
+    three_d_secure_settings:
+      type: object
+      additionalProperties: true
+      nullable: true
+    activated_at:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+      nullable: true
+
+Wallester3dsChallenge:
+  type: object
+  description: Desafio 3DS Out-of-Band pendente ou resolvido
+  properties:
+    id:
+      type: integer
+    wallester_request_id:
+      type: string
+    status:
+      type: string
+      enum: [pending, approved, rejected, expired]
+    merchant:
+      type: object
+      additionalProperties: true
+      nullable: true
+    transaction:
+      type: object
+      additionalProperties: true
+      nullable: true
+    card:
+      type: object
+      additionalProperties: true
+      nullable: true
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+    resolved_at:
+      type: string
+      format: date-time
+      nullable: true
+
+WallesterCardTransaction:
+  type: object
+  description: Transacção devolvida pela API Wallester (passthrough)
+  additionalProperties: true
+  properties:
+    id:
+      type: string
+      format: uuid
+    account_id:
+      type: string
+      format: uuid
+      nullable: true
+    card_id:
+      type: string
+      format: uuid
+      nullable: true
+    amount:
+      type: number
+      nullable: true
+    currency_code:
+      type: string
+      nullable: true
+    merchant:
+      type: object
+      additionalProperties: true
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+      nullable: true
+
+WallesterTransactionList:
+  type: object
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/WallesterCardTransaction'
+    meta:
+      type: object
+      properties:
+        total_records_number:
+          type: integer
+        from_record:
+          type: integer
+        records_count:
+          type: integer
