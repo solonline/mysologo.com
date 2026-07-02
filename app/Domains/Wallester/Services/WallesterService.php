@@ -134,7 +134,7 @@ class WallesterService
 
         return array_merge($data, [
             'account_id' => $account->wallester_account_id,
-            '3d_secure_settings' => $this->threeDsService->outOfBandSettingsFor($customer),
+            '3d_secure_settings' => $this->threeDsService->outOfBandSettingsFor($account),
             'security' => array_merge([
                 'contactless_enabled' => true,
                 'withdrawal_enabled' => false,

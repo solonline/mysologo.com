@@ -101,13 +101,13 @@ class WallesterServiceTest extends TestCase
         $gateway = Mockery::mock(WallesterGatewayInterface::class);
         $gateway->shouldReceive('createCard')
             ->once()
-            ->with(Mockery::on(function (array $payload) use ($customer, $account): bool {
+            ->with(Mockery::on(function (array $payload) use ($account): bool {
                 return $payload['account_id'] === $account->wallester_account_id
                     && $payload['type'] === 'Virtual'
                     && $payload['name'] === 'Main Card'
                     && $payload['3d_secure_settings'] === [
                         'out_of_band_enabled' => true,
-                        'out_of_band_id' => (string) $customer->wallester_oob_user_id,
+                        'out_of_band_id' => (string) $account->wallester_oob_id,
                     ]
                     && $payload['security']['internet_purchase_enabled'] === true
                     && $payload['security']['contactless_enabled'] === true

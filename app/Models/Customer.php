@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -25,7 +24,6 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string $status
  * @property string|null $doc_status
  * @property Carbon|null $email_verified_at
- * @property string|null $wallester_oob_user_id
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
@@ -44,7 +42,6 @@ class Customer extends Model
     }
 
     protected $fillable = [
-        'wallester_oob_user_id',
         'name',
         'username',
         'type',
@@ -72,15 +69,6 @@ class Customer extends Model
         'email_verified_at' => 'datetime',
         'status' => CustomerLifecycleStatus::class,
     ];
-
-    protected static function booted(): void
-    {
-        static::creating(function (Customer $customer): void {
-            if ($customer->wallester_oob_user_id === null) {
-                $customer->wallester_oob_user_id = (string) Str::uuid();
-            }
-        });
-    }
 
     // Empresa à qual o responsável pertence
     public function corporate()

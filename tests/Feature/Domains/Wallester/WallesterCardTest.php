@@ -33,12 +33,12 @@ class WallesterCardTest extends TestCase
         $gateway = Mockery::mock(WallesterGatewayInterface::class);
         $gateway->shouldReceive('createCard')
             ->once()
-            ->with(Mockery::on(function (array $payload) use ($customer, $account): bool {
+            ->with(Mockery::on(function (array $payload) use ($account): bool {
                 return $payload['account_id'] === $account->wallester_account_id
                     && $payload['type'] === 'Virtual'
                     && $payload['name'] === 'Travel Card'
                     && $payload['3d_secure_settings']['out_of_band_enabled'] === true
-                    && $payload['3d_secure_settings']['out_of_band_id'] === (string) $customer->wallester_oob_user_id
+                    && $payload['3d_secure_settings']['out_of_band_id'] === (string) $account->wallester_oob_id
                     && $payload['security']['internet_purchase_enabled'] === true;
             }), (string) $customer->id)
             ->andReturn([
@@ -49,7 +49,7 @@ class WallesterCardTest extends TestCase
                 'masked_card_number' => '****5678',
                 '3d_secure_settings' => [
                     'out_of_band_enabled' => true,
-                    'out_of_band_id' => (string) $customer->wallester_oob_user_id,
+                    'out_of_band_id' => (string) $account->wallester_oob_id,
                 ],
                 'security' => [
                     'internet_purchase_enabled' => true,

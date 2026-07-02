@@ -6,6 +6,7 @@ use App\Domains\Customer\Services\CustomerNotificationService;
 use App\Domains\Wallester\Enums\Wallester3dsChallengeStatus;
 use App\Domains\Wallester\Enums\Wallester3dsValidationStatus;
 use App\Models\Customer;
+use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
 use App\Models\Wallester3dsChallenge;
 use Illuminate\Database\Eloquent\Collection;
@@ -125,11 +126,11 @@ class Wallester3dsService
     /**
      * @return array{out_of_band_enabled: true, out_of_band_id: string}
      */
-    public function outOfBandSettingsFor(Customer $customer): array
+    public function outOfBandSettingsFor(CustomerWallesterAccount $account): array
     {
         return [
             'out_of_band_enabled' => true,
-            'out_of_band_id' => (string) $customer->wallester_oob_user_id,
+            'out_of_band_id' => (string) $account->wallester_oob_id,
         ];
     }
 

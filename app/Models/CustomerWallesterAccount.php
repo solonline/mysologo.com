@@ -6,12 +6,17 @@ use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
+/**
+ * @property string|null $wallester_oob_id
+ */
 class CustomerWallesterAccount extends Model
 {
     protected $fillable = [
         'customer_id',
         'wallester_account_id',
+        'wallester_oob_id',
         'currency_code',
         'product_id',
         'company_id',
@@ -54,6 +59,15 @@ class CustomerWallesterAccount extends Model
         'status' => IntegrationAccountStatus::class,
         'status_changed_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (CustomerWallesterAccount $account): void {
+            if ($account->wallester_oob_id === null) {
+                $account->wallester_oob_id = (string) Str::uuid();
+            }
+        });
+    }
 
     public function customer(): BelongsTo
     {

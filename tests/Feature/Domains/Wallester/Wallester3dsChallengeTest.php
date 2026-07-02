@@ -43,17 +43,18 @@ class Wallester3dsChallengeTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_out_of_band_settings_use_customer_uuid(): void
+    public function test_out_of_band_settings_use_wallester_account_uuid(): void
     {
         $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer);
 
-        $settings = app(Wallester3dsService::class)->outOfBandSettingsFor($customer);
+        $settings = app(Wallester3dsService::class)->outOfBandSettingsFor($account);
 
         $this->assertTrue($settings['out_of_band_enabled']);
-        $this->assertSame($customer->wallester_oob_user_id, $settings['out_of_band_id']);
+        $this->assertSame($account->wallester_oob_id, $settings['out_of_band_id']);
         $this->assertMatchesRegularExpression(
             '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
-            (string) $customer->wallester_oob_user_id,
+            (string) $account->wallester_oob_id,
         );
     }
 

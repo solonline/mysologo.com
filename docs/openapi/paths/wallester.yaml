@@ -122,7 +122,7 @@ wallester-cards-store:
 
       **Comportamento:**
       - Cartões **Virtual** em estado `Created` são **activados automaticamente** após criação
-      - OOB 3DS é configurado com o `wallester_oob_user_id` do customer
+      - OOB 3DS é configurado com o `wallester_oob_id` da conta Wallester do customer
       - `internet_purchase_enabled` fica activo por defeito
 
       **Pré-requisitos:** conta Wallester `ACTIVE`, lifecycle `ACTIVE`, email e documento verificados.

@@ -46,7 +46,7 @@
 			"type": "string"
 		},
 		{
-			"key": "wallester_oob_user_id",
+			"key": "wallester_oob_id",
 			"value": "00000000-0000-4000-8000-000000000001",
 			"type": "string"
 		}
@@ -190,7 +190,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n\t\"account_id\": \"{{wallester_account_id}}\",\n\t\"type\": \"Virtual\",\n\t\"name\": \"Postman Virtual Card\",\n\t\"3d_secure_settings\": {\n\t\t\"out_of_band_enabled\": true,\n\t\t\"out_of_band_id\": \"{{wallester_oob_user_id}}\"\n\t},\n\t\"security\": {\n\t\t\"contactless_enabled\": true,\n\t\t\"withdrawal_enabled\": false,\n\t\t\"internet_purchase_enabled\": true\n\t}\n}"
+							"raw": "{\n\t\"account_id\": \"{{wallester_account_id}}\",\n\t\"type\": \"Virtual\",\n\t\"name\": \"Postman Virtual Card\",\n\t\"3d_secure_settings\": {\n\t\t\"out_of_band_enabled\": true,\n\t\t\"out_of_band_id\": \"{{wallester_oob_id}}\"\n\t},\n\t\"security\": {\n\t\t\"contactless_enabled\": true,\n\t\t\"withdrawal_enabled\": false,\n\t\t\"internet_purchase_enabled\": true\n\t}\n}"
 						},
 						"url": {
 							"raw": "{{wallester_base_url}}/cards",

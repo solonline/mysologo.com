@@ -51,7 +51,7 @@ $environment = [
         ['key' => 'wallester_account_id', 'value' => '', 'type' => 'default', 'enabled' => true],
         ['key' => 'wallester_card_id', 'value' => '', 'type' => 'default', 'enabled' => true],
         ['key' => 'wallester_transaction_id', 'value' => '', 'type' => 'default', 'enabled' => true],
-        ['key' => 'wallester_oob_user_id', 'value' => '00000000-0000-4000-8000-000000000001', 'type' => 'default', 'enabled' => true],
+        ['key' => 'wallester_oob_id', 'value' => '00000000-0000-4000-8000-000000000001', 'type' => 'default', 'enabled' => true],
     ],
     '_postman_variable_scope' => 'environment',
     '_postman_exported_at' => gmdate('Y-m-d\TH:i:s.v\Z'),
