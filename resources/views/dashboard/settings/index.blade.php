@@ -19,6 +19,7 @@ $tabs = [
     'system'   => ['label' => 'Sistema',        'title' => 'Sistema'],
     'stripe'   => ['label' => 'Stripe',         'title' => 'Stripe'],
     'didit'    => ['label' => 'Didit',          'title' => 'Didit (KYC / KYB)'],
+    'wallester'=> ['label' => 'Wallester',      'title' => 'Wallester'],
     'sms'      => ['label' => 'SMS',            'title' => 'SMS'],
     'social'   => ['label' => 'Redes Sociais',  'title' => 'Redes Sociais'],
     'currency' => ['label' => 'Moedas',         'title' => 'Configurações de Moedas'],
@@ -33,6 +34,19 @@ foreach ($tabs as $group => $meta) {
         $byCurrency = $grouped->get('stripe', collect())->groupBy(fn($s) => strtoupper(explode('.', $s->key)[1]));
         foreach ($byCurrency as $currency => $currencySettings) {
             $panels[$group][] = ['title' => $currency, 'badge' => $currency, 'settings' => $currencySettings];
+        }
+    } elseif ($group === 'wallester') {
+        $wallesterSettings = $grouped->get('wallester', collect());
+        $byCurrency = $wallesterSettings
+            ->filter(fn ($s) => in_array(strtolower(explode('.', $s->key)[1] ?? ''), ['eur', 'usd'], true))
+            ->groupBy(fn ($s) => strtoupper(explode('.', $s->key)[1]));
+        foreach ($byCurrency as $currency => $currencySettings) {
+            $panels[$group][] = ['title' => "Wallester {$currency}", 'badge' => $currency, 'settings' => $currencySettings];
+        }
+        $globalSettings = $wallesterSettings
+            ->reject(fn ($s) => in_array(strtolower(explode('.', $s->key)[1] ?? ''), ['eur', 'usd'], true));
+        if ($globalSettings->isNotEmpty()) {
+            $panels[$group][] = ['title' => 'Wallester Global', 'badge' => null, 'settings' => $globalSettings];
         }
     } else {
         $panels[$group][] = ['title' => $meta['title'], 'badge' => null, 'settings' => $grouped->get($group, collect())];
@@ -78,7 +92,11 @@ $currencyColors = [
                     {{ $panel['badge'] }}
                 </span>
                 <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">
+                    @if ($group === 'stripe')
                     Conta Stripe {{ $panel['badge'] }}
+                    @else
+                    {{ $panel['title'] }}
+                    @endif
                 </h2>
                 @else
                 <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">
@@ -193,6 +211,63 @@ $currencyColors = [
 
         </div>
         @endforeach
+
+        @if ($group === 'wallester')
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100">
+                <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">Funding Wallester</h2>
+                <p class="text-xs text-slate-500 mt-1">Saldo da main e reprocessamento de top-ups bloqueados.</p>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+                @forelse ($wallesterMainAccounts ?? [] as $mainAccount)
+                <div class="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-800">
+                            Main {{ strtoupper($mainAccount->funding_currency ?: $mainAccount->currency_code) }}
+                        </p>
+                        <p class="text-xs text-slate-500 mt-0.5 font-mono">{{ $mainAccount->wallester_account_id }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-slate-500 uppercase tracking-wider">Disponível</p>
+                        <p class="text-lg font-bold text-slate-900">
+                            {{ number_format(((int) $mainAccount->available_amount) / 100, 2, ',', '.') }}
+                            {{ strtoupper($mainAccount->funding_currency ?: $mainAccount->currency_code) }}
+                        </p>
+                    </div>
+                </div>
+                @empty
+                <p class="text-sm text-slate-500">Nenhuma conta main configurada.</p>
+                @endforelse
+
+                @php $counts = $wallesterTopupFundingCounts ?? ['awaiting_liquidity' => 0, 'failed' => 0, 'pending' => 0]; @endphp
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                        <p class="text-xs font-semibold text-amber-700 uppercase">À espera de liquidez</p>
+                        <p class="text-2xl font-bold text-amber-900">{{ $counts['awaiting_liquidity'] }}</p>
+                    </div>
+                    <div class="p-3 rounded-xl bg-red-50 border border-red-200 text-center">
+                        <p class="text-xs font-semibold text-red-700 uppercase">Falhados</p>
+                        <p class="text-2xl font-bold text-red-900">{{ $counts['failed'] }}</p>
+                    </div>
+                    <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 text-center">
+                        <p class="text-xs font-semibold text-blue-700 uppercase">Pendentes</p>
+                        <p class="text-2xl font-bold text-blue-900">{{ $counts['pending'] }}</p>
+                    </div>
+                </div>
+
+                @can('settings.edit')
+                <form method="POST" action="{{ route('dashboard.operations.retry-wallester-topups') }}"
+                      onsubmit="return confirm('Sincronizar main e reprocessar top-ups elegíveis?');">
+                    @csrf
+                    <button type="submit"
+                            class="w-full px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition shadow-sm shadow-indigo-500/25">
+                        Actualizar main e reprocessar top-ups
+                    </button>
+                </form>
+                @endcan
+            </div>
+        </div>
+        @endif
 
     </div>
     @endforeach

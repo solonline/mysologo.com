@@ -7,6 +7,7 @@ use App\Domains\Backoffice\Controllers\CustomerController;
 use App\Domains\Backoffice\Controllers\CustomerTpaController;
 use App\Domains\Backoffice\Controllers\DashboardController;
 use App\Domains\Backoffice\Controllers\NotificationController;
+use App\Domains\Backoffice\Controllers\OperationsController;
 use App\Domains\Backoffice\Controllers\RoleController;
 use App\Domains\Backoffice\Controllers\SettingsController;
 use App\Domains\Backoffice\Controllers\StripeFeeController;
@@ -70,6 +71,9 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth')->group(functio
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('.settings')->middleware('can:settings.view');
     Route::post('/settings', [SettingsController::class, 'update'])->name('.settings.update')->middleware('can:settings.edit');
+    Route::post('/operations/retry-wallester-topups', [OperationsController::class, 'retryWallesterTopups'])
+        ->name('.operations.retry-wallester-topups')
+        ->middleware('can:settings.edit');
 
     Route::middleware('can:stripe_fees.view')->group(function () {
         Route::get('/stripe-fees', [StripeFeeController::class, 'index'])->name('.stripe-fees');

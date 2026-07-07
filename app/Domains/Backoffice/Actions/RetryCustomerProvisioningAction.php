@@ -27,7 +27,7 @@ class RetryCustomerProvisioningAction
             ]);
         }
 
-        $wallester = $customer->wallesterAccounts;
+        $wallester = $customer->wallesterAccount;
 
         if ($wallester !== null) {
             $status = $wallester->status instanceof IntegrationAccountStatus

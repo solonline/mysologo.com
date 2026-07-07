@@ -66,12 +66,12 @@
     };
 
     $custVal = $customer->status?->value ?? $customer->status ?? '';
-    $wallesterStatus = $customer->wallesterAccounts?->status;
+    $wallesterStatus = $customer->wallesterAccount?->status;
     $wallesterFailed = $wallesterStatus instanceof \App\Domains\Onboarding\Enums\IntegrationAccountStatus
         ? $wallesterStatus === \App\Domains\Onboarding\Enums\IntegrationAccountStatus::FAILED
         : strtoupper((string) $wallesterStatus) === 'FAILED';
     $canRetryProvisioning = ($customer->status === \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::PROVISIONING)
-        && ($wallesterFailed || $customer->wallesterAccounts === null);
+        && ($wallesterFailed || $customer->wallesterAccount === null);
     $custBadge = match($customer->status) {
         \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::ACTIVE => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Ativo'],
         \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::PENDING_EMAIL_VERIFICATION,
@@ -101,7 +101,7 @@
 <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4 rounded-2xl border border-red-200 bg-red-50">
     <div>
         <p class="text-sm font-semibold text-red-800">Falha ao provisionar Wallester</p>
-        <p class="text-xs text-red-700 mt-1">{{ $customer->wallesterAccounts->status_reason ?? $customer->status_reason ?? 'Erro desconhecido.' }}</p>
+        <p class="text-xs text-red-700 mt-1">{{ $customer->wallesterAccount->status_reason ?? $customer->status_reason ?? 'Erro desconhecido.' }}</p>
     </div>
     @can('customers.edit')
     @if ($canRetryProvisioning)
@@ -841,7 +841,7 @@
         @endif
 
         {{-- Conta Wallester --}}
-        @if ($customer->wallesterAccounts)
+        @if ($customer->wallesterAccount)
         <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5">
             <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -855,12 +855,12 @@
             <div class="space-y-3 text-sm">
                 <div class="flex justify-between">
                     <span class="text-slate-500">Account ID</span>
-                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->wallesterAccounts->wallester_account_id ?? '—' }}</span>
+                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->wallesterAccount->wallester_account_id ?? '—' }}</span>
                 </div>
-                @if ($customer->wallesterAccounts->status_reason)
+                @if ($customer->wallesterAccount->status_reason)
                 <div class="flex justify-between gap-4">
                     <span class="text-slate-500 flex-shrink-0">Motivo</span>
-                    <span class="text-xs text-red-700 text-right">{{ $customer->wallesterAccounts->status_reason }}</span>
+                    <span class="text-xs text-red-700 text-right">{{ $customer->wallesterAccount->status_reason }}</span>
                 </div>
                 @endif
             </div>
