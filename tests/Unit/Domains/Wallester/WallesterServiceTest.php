@@ -4,7 +4,6 @@ namespace Tests\Unit\Domains\Wallester;
 
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
-use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Services\Wallester3dsService;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Exceptions\ApiException;
@@ -13,11 +12,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use RuntimeException;
 use Tests\Concerns\InteractsWithOnboarding;
+use Tests\Concerns\InteractsWithWallesterSettings;
 use Tests\TestCase;
 
 class WallesterServiceTest extends TestCase
 {
     use InteractsWithOnboarding;
+    use InteractsWithWallesterSettings;
     use RefreshDatabase;
 
     protected function tearDown(): void
@@ -32,7 +33,7 @@ class WallesterServiceTest extends TestCase
         $customer = $this->createRetailCustomer();
         $account = $this->createWallesterAccount($customer, externalId: 'wal_acc_123');
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('createCard')
             ->once()
             ->with(Mockery::on(fn (array $payload) => $payload['account_id'] === 'wal_acc_123'), null)
@@ -98,7 +99,7 @@ class WallesterServiceTest extends TestCase
         $customer = $this->createRetailCustomer();
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_acc_oob');
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('createCard')
             ->once()
             ->with(Mockery::on(function (array $payload) use ($account): bool {
@@ -160,7 +161,7 @@ class WallesterServiceTest extends TestCase
             'name' => 'Main Card',
         ]);
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('activateCard')
             ->once()
             ->with('card_activate_1', (string) $customer->id)
@@ -200,7 +201,7 @@ class WallesterServiceTest extends TestCase
             'activated_at' => now(),
         ]);
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldNotReceive('activateCard');
 
         $service = new WallesterService(
@@ -214,12 +215,79 @@ class WallesterServiceTest extends TestCase
         $this->assertSame('Active', $card->status);
     }
 
+    public function test_create_card_for_customer_rejects_existing_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_existing');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_existing',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('createCard');
+
+        $service = new WallesterService(
+            $gateway,
+            app(WallesterAccountRepositoryInterface::class),
+            app(Wallester3dsService::class),
+        );
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('Customer already has an active Wallester card.');
+
+        $service->createCardForCustomer($customer, [
+            'type' => 'Virtual',
+            'name' => 'Second Card',
+        ]);
+    }
+
+    public function test_create_card_for_customer_allows_new_card_when_existing_is_closed(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_closed');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_closed',
+            'type' => 'Virtual',
+            'status' => 'Closed',
+            'name' => 'Old Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('createCard')->once()->andReturn([
+            'id' => 'card_new',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'New Card',
+        ]);
+        $gateway->shouldNotReceive('activateCard');
+
+        $service = new WallesterService(
+            $gateway,
+            app(WallesterAccountRepositoryInterface::class),
+            app(Wallester3dsService::class),
+        );
+
+        $card = $service->createCardForCustomer($customer, [
+            'type' => 'Virtual',
+            'name' => 'New Card',
+        ]);
+
+        $this->assertSame('card_new', $card->wallester_card_id);
+    }
+
     public function test_create_card_for_customer_requires_active_wallester_account(): void
     {
         $customer = $this->createRetailCustomer();
         $this->createWallesterAccount($customer, IntegrationAccountStatus::PENDING, 'wal_pending');
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldNotReceive('createCard');
 
         $service = new WallesterService(
@@ -239,7 +307,7 @@ class WallesterServiceTest extends TestCase
 
     public function test_create_card_requires_known_wallester_account(): void
     {
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldNotReceive('createCard');
 
         $service = new WallesterService(

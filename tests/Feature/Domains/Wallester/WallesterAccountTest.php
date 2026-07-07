@@ -7,11 +7,13 @@ use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\Concerns\InteractsWithOnboarding;
+use Tests\Concerns\InteractsWithWallesterSettings;
 use Tests\TestCase;
 
 class WallesterAccountTest extends TestCase
 {
     use InteractsWithOnboarding;
+    use InteractsWithWallesterSettings;
     use RefreshDatabase;
 
     protected function tearDown(): void
@@ -25,7 +27,7 @@ class WallesterAccountTest extends TestCase
     {
         $customer = $this->createActiveCustomer();
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('listAccounts')
             ->once()
             ->with(['from_record' => 0, 'records_count' => 1000], (string) $customer->id)
@@ -62,7 +64,7 @@ class WallesterAccountTest extends TestCase
     {
         $customer = $this->createActiveCustomer();
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('listAccounts')
             ->once()
             ->with(['from_record' => 0, 'records_count' => 1000], (string) $customer->id)
@@ -99,7 +101,7 @@ class WallesterAccountTest extends TestCase
     {
         $customer = $this->createActiveCustomer();
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('listAccounts')
             ->once()
             ->with([
@@ -147,7 +149,7 @@ class WallesterAccountTest extends TestCase
         $customer = $this->createActiveCustomer();
         $accountId = '27c0b35d-6746-4528-b91c-11e10d851f29';
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('getAccount')
             ->once()
             ->with($accountId, (string) $customer->id)

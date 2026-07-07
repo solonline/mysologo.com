@@ -109,6 +109,7 @@ body {
   opacity: 1;
   transform: translateX(0);
   pointer-events: all;
+  z-index: 2;
 }
 
 .screen.exit {
@@ -223,14 +224,19 @@ body {
 .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 
 /* ── Home screen ──────────────────────────────────── */
-#screen-home { background: var(--slate-50); }
+#screen-home {
+  background: var(--slate-50);
+  overflow: hidden;
+}
 
 .home-header {
   background: linear-gradient(135deg, var(--indigo) 0%, var(--violet) 100%);
-  padding: 20px 24px 32px;
+  padding: 20px 24px 40px;
   color: #fff;
   position: relative;
-  overflow: hidden;
+  flex-shrink: 0;
+  z-index: 2;
+  isolation: isolate;
 }
 
 .home-header::after {
@@ -240,6 +246,22 @@ body {
   height: 60px;
   background: var(--slate-50);
   border-radius: 50% 50% 0 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.home-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.home-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .home-greeting { font-size: 13px; color: rgba(255,255,255,.7); margin-bottom: 2px; }
@@ -254,9 +276,31 @@ body {
   backdrop-filter: blur(8px);
 }
 
-.balance-label { font-size: 11px; color: rgba(255,255,255,.65); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
-.balance-value { font-size: 34px; font-weight: 700; letter-spacing: -.03em; margin: 4px 0 8px; }
-.balance-account { font-size: 12px; color: rgba(255,255,255,.55); }
+.balance-label { font-size: 11px; color: rgba(255,255,255,.75); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+.balance-value { font-size: 34px; font-weight: 700; letter-spacing: -.03em; margin: 4px 0 8px; color: #fff; text-shadow: 0 1px 8px rgba(0,0,0,.15); }
+.balance-account { font-size: 12px; color: rgba(255,255,255,.7); }
+.balance-pending { font-size: 13px; color: rgba(255,255,255,.85); margin-top: 4px; font-weight: 500; }
+
+/* Transaction list */
+.tx-list { display: flex; flex-direction: column; }
+.tx-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-bottom: 1px solid var(--slate-50);
+}
+.tx-item:last-child { border-bottom: none; }
+.tx-icon-wrap {
+  width: 40px; height: 40px; border-radius: 14px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.tx-icon-wrap.credit { background: #d1fae5; color: #059669; }
+.tx-icon-wrap.debit  { background: #fee2e2; color: #dc2626; }
+.tx-meta { flex: 1; min-width: 0; }
+.tx-type { font-size: 13px; font-weight: 600; color: var(--slate-800); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-date { font-size: 11px; color: var(--slate-400); display: block; margin-top: 2px; }
+.tx-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.tx-amount { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+.tx-amount.credit { color: #059669; }
+.tx-amount.debit  { color: #dc2626; }
 
 /* Quick actions */
 .quick-actions {
@@ -564,9 +608,11 @@ body {
   background: currentColor;
 }
 
-.badge.active   { background: #d1fae5; color: #065f46; }
-.badge.pending  { background: #fef3c7; color: #92400e; }
-.badge.inactive { background: var(--slate-100); color: var(--slate-500); }
+.badge.active     { background: #d1fae5; color: #065f46; }
+.badge.succeeded  { background: #d1fae5; color: #065f46; }
+.badge.pending    { background: #fef3c7; color: #92400e; }
+.badge.inactive   { background: var(--slate-100); color: var(--slate-500); }
+.badge.failed     { background: #fee2e2; color: #991b1b; }
 
 /* ── Empty state ──────────────────────────────────── */
 .empty-state {
@@ -582,6 +628,62 @@ body {
 
 .empty-state svg { width: 48px; height: 48px; opacity: .4; }
 .empty-state p   { font-size: 14px; }
+
+/* ── Virtual card ─────────────────────────────────── */
+.card-preview {
+  background: linear-gradient(135deg, #1e1b4b 0%, #4f46e5 55%, #7c3aed 100%);
+  border-radius: 20px;
+  padding: 24px 22px;
+  color: #fff;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 12px 32px rgba(79,70,229,.28);
+}
+
+.card-preview-chip {
+  width: 38px; height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  opacity: .9;
+}
+
+.card-preview-number {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  font-family: 'Consolas', monospace;
+}
+
+.card-preview-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: rgba(255,255,255,.72);
+}
+
+.card-preview-meta strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #fff;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.hint-box {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #5b21b6;
+  line-height: 1.45;
+}
 </style>
 </head>
 <body>
@@ -628,11 +730,11 @@ body {
       <div class="login-card">
         <div class="field">
           <label>E-mail</label>
-          <input id="login-email" type="email" placeholder="seu@email.com" autocomplete="off" value="user@example.com"/>
+          <input id="login-email" type="email" placeholder="seu@email.com" autocomplete="off" value=""/>
         </div>
         <div class="field">
           <label>Senha</label>
-          <input id="login-password" type="password" placeholder="••••••••"  value="string"/>
+          <input id="login-password" type="password" placeholder="••••••••" value=""/>
         </div>
         <button class="btn-primary" id="login-btn" onclick="doLogin()">
           Entrar
@@ -649,10 +751,13 @@ body {
         <div class="balance-card">
           <div class="balance-label">Saldo disponível</div>
           <div class="balance-value" id="home-balance">—</div>
+          <div class="balance-pending" id="home-balance-pending"></div>
           <div class="balance-account" id="home-account">Carregando...</div>
+          <div class="balance-account" id="home-wallester-balance" style="margin-top:6px;opacity:.85"></div>
         </div>
       </div>
 
+      <div class="home-body">
       <!-- Quick actions -->
       <div class="quick-actions">
         <button class="action-btn" onclick="navigate('deposit')">
@@ -663,25 +768,14 @@ body {
           </div>
           <span>Depositar</span>
         </button>
-        <button class="action-btn" onclick="navigate('payment')">
+        <button class="action-btn" onclick="openCardFlow()">
           <div class="action-icon indigo">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="5" width="20" height="14" rx="2"/>
               <line x1="2" y1="10" x2="22" y2="10"/>
             </svg>
           </div>
-          <span>Pagar</span>
-        </button>
-        <button class="action-btn" onclick="navigate('funding-instructions')">
-          <div class="action-icon amber">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
-              <rect x="9" y="3" width="6" height="4" rx="1"/>
-              <line x1="9" y1="12" x2="15" y2="12"/>
-              <line x1="9" y1="16" x2="13" y2="16"/>
-            </svg>
-          </div>
-          <span>Extrato</span>
+          <span>Cartão</span>
         </button>
         <button class="action-btn" onclick="navigate('notifications')">
           <div class="action-icon sky">
@@ -692,6 +786,17 @@ body {
           </div>
           <span>Notif.</span>
         </button>
+      </div>
+
+      <!-- Recent transactions -->
+      <div class="section">
+        <div class="section-title">Atividade recente</div>
+        <div class="info-card">
+          <div id="home-tx-list" class="tx-list">
+            <div style="padding:14px 16px"><span class="skeleton" style="width:80%;display:inline-block">&nbsp;</span></div>
+            <div style="padding:14px 16px"><span class="skeleton" style="width:65%;display:inline-block">&nbsp;</span></div>
+          </div>
+        </div>
       </div>
 
       <!-- Customer info -->
@@ -714,6 +819,10 @@ body {
             <span class="info-row-label">E-mail verificado</span>
             <span class="info-row-value" id="info-email">—</span>
           </div>
+          <div class="info-row">
+            <span class="info-row-label">Wallester</span>
+            <span class="info-row-value" id="info-wallester">—</span>
+          </div>
         </div>
       </div>
 
@@ -726,6 +835,7 @@ body {
           </div>
         </div>
       </div>
+      </div><!-- /.home-body -->
     </div>
 
     <!-- ── Deposit ── -->
@@ -742,8 +852,8 @@ body {
         <div class="amount-field">
           <div class="balance-label" style="color:var(--slate-400);font-size:11px;letter-spacing:.08em;text-align:center;margin-bottom:8px">VALOR</div>
           <div class="amount-input-wrap">
-            <span class="amount-prefix">$</span>
-            <input class="amount-big" id="deposit-amount" type="number" min="1" placeholder="0.00" />
+            <span class="amount-prefix" id="deposit-prefix">€</span>
+            <input class="amount-big" id="deposit-amount" type="number" min="1" step="0.01" placeholder="0.00" />
           </div>
         </div>
 
@@ -751,17 +861,32 @@ body {
 
         <div class="form-field">
           <label class="form-label">Moeda</label>
-          <select class="form-input form-select" id="deposit-currency">
+          <select class="form-input form-select" id="deposit-currency" onchange="onDepositCurrencyChange()">
+            <option value="eur" selected>EUR — Euro</option>
             <option value="usd">USD — Dólar americano</option>
-            <option value="eur">EUR — Euro</option>
-            <option value="brl">BRL — Real</option>
+            <option value="gbp">GBP — Libra</option>
           </select>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label">Método de pagamento</label>
+          <select class="form-input form-select" id="deposit-method-select">
+            <option value="">Carregando...</option>
+          </select>
+        </div>
+
+        <div id="deposit-stripe-wrap" style="display:none;border:1.5px solid var(--slate-200);border-radius:14px;padding:16px;background:#fff">
+          <div id="deposit-stripe-element"></div>
         </div>
 
         <div id="deposit-result" class="result-card"></div>
 
         <button class="btn-action" id="deposit-btn" onclick="doDeposit()">
-          Confirmar depósito
+          Carregar saldo
+        </button>
+
+        <button class="btn-action" id="deposit-confirm-btn" onclick="doConfirmDeposit()" style="display:none;background:linear-gradient(135deg,#10b981,#059669)">
+          Confirmar top-up
         </button>
       </div>
     </div>
@@ -819,23 +944,86 @@ body {
       </div>
     </div>
 
-    <!-- ── Funding instructions ── -->
-    <div id="screen-funding-instructions" class="screen tx-screen">
+    <!-- ── Card create ── -->
+    <div id="screen-card-create" class="screen tx-screen">
       <div class="screen-header">
         <button class="back-btn" onclick="goBack()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 12H5M12 5l-7 7 7 7"/>
           </svg>
         </button>
-        <h2>Instruções bancárias</h2>
+        <h2>Novo cartão</h2>
       </div>
       <div class="tx-body">
-        <div id="fi-content">
-          <div class="empty-state">
-            <div class="spin" style="border-color:var(--slate-200);border-top-color:var(--indigo);width:32px;height:32px"></div>
-            <p>Carregando instruções...</p>
+        <div class="hint-box" id="card-create-hint">
+          Disponível apenas para customers com conta Wallester activa.
+        </div>
+
+        <div class="form-field">
+          <label class="form-label">Nome no cartão</label>
+          <input class="form-input" id="card-name" type="text" placeholder="Ex: Cartão principal" maxlength="255" />
+        </div>
+
+        <div class="form-field">
+          <label class="form-label">Tipo</label>
+          <select class="form-input form-select" id="card-type">
+            <option value="Virtual" selected>Virtual</option>
+            <option value="Physical">Physical</option>
+          </select>
+        </div>
+
+        <div id="card-create-result" class="result-card"></div>
+
+        <button class="btn-action" id="card-create-btn" onclick="doCreateCard()">
+          Criar cartão
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Card detail ── -->
+    <div id="screen-card-detail" class="screen tx-screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="goBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+        </button>
+        <h2>Detalhes do cartão</h2>
+      </div>
+      <div class="tx-body">
+        <div class="card-preview" id="card-preview">
+          <div class="card-preview-chip"></div>
+          <div class="card-preview-number" id="card-preview-number">•••• •••• •••• ••••</div>
+          <div class="card-preview-meta">
+            <div>Titular<strong id="card-preview-name">—</strong></div>
+            <div>Validade<strong id="card-preview-expiry">—</strong></div>
+            <div>Status<strong id="card-preview-status">—</strong></div>
           </div>
         </div>
+
+        <div class="info-card" id="card-detail-info">
+          <div class="info-row">
+            <span class="info-row-label">Tipo</span>
+            <span class="info-row-value" id="card-detail-type">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-row-label">ID Wallester</span>
+            <span class="info-row-value" id="card-detail-wid" style="font-size:11px;word-break:break-all">—</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="form-field">
+          <label class="form-label">Senha da conta (para revelar dados)</label>
+          <input class="form-input" id="card-reveal-password" type="password" placeholder="Sua senha de login" />
+        </div>
+
+        <div id="card-sensitive-result" class="result-card"></div>
+
+        <button class="btn-action" id="card-reveal-btn" onclick="doRevealCard()">
+          Revelar número e CVV
+        </button>
       </div>
     </div>
 
@@ -891,13 +1079,19 @@ body {
 
 <script>
 // ── Config ──────────────────────────────────────────
-const BASE       = 'https://yoop.test/api';
+const BASE       = window.location.origin + '/api';
 const STRIPE_PK  = 'pk_test_51T2hGe2QaRyGWkxZfszIzoH8ptXpnvyZJKbSsxkooaxf8qLbhk1zbhr01eU7sutPuYVHS8WwS2sFRUvcAlWgZGdH00xWuRIIUp';
 let token         = localStorage.getItem('yoop_sim_token') || null;
 let currentScreen = 'login';
 let prevScreen    = null;
 let stripeClient  = null;
 let stripeElements = null;
+let depositStripeElements = null;
+let authSession   = null;
+let wallesterReady = false;
+let currentCard   = null;
+
+const CURRENCY_SYMBOLS = { eur: '€', usd: '$', gbp: '£', brl: 'R$' };
 
 window.addEventListener('DOMContentLoaded', () => { stripeClient = Stripe(STRIPE_PK); });
 
@@ -950,8 +1144,12 @@ function navigate(screen) {
   setStatusBarColor(screen === 'home');
 
   // load data for screens
+  if (screen === 'home') loadHomeData();
   if (screen === 'notifications') loadNotifications();
-  if (screen === 'funding-instructions') loadFundingInstructions();
+  if (screen === 'deposit') {
+    resetDepositScreen();
+    loadDepositMethods();
+  }
   if (screen === 'payment') {
     loadPaymentMethods();
   } else if (prevScreen === 'payment') {
@@ -962,10 +1160,13 @@ function navigate(screen) {
     document.getElementById('payment-btn').textContent = 'Criar intenção de pagamento';
     document.getElementById('payment-result').className = 'result-card';
     stripeElements = null;
+  } else if (prevScreen === 'deposit') {
+    resetDepositScreen();
   }
+  if (screen === 'card-detail' && currentCard) renderCardDetail(currentCard);
 
   // hide nav on sub-screens without tab
-  const noNav = ['deposit','payment','funding-instructions','notifications'];
+  const noNav = ['deposit','payment','notifications','card-create','card-detail'];
   document.getElementById('bottom-nav').className = noNav.includes(screen) ? 'hidden' : '';
   if (noNav.includes(screen)) document.getElementById('bottom-nav').classList.add('hidden');
   else document.getElementById('bottom-nav').classList.remove('hidden');
@@ -985,6 +1186,179 @@ async function api(method, path, body, extraHeaders) {
   return { ok: res.ok, status: res.status, data };
 }
 
+// ── Helpers ───────────────────────────────────────────
+function unwrap(data) {
+  return data?.data ?? data;
+}
+
+function sanitizeCurrency(code) {
+  const raw = String(code || 'EUR').toUpperCase();
+  return /^[A-Z]{3}$/.test(raw) ? raw : 'EUR';
+}
+
+function extractBalanceList(payload) {
+  if (!payload) return [];
+  const unwrapped = unwrap(payload);
+  if (Array.isArray(unwrapped)) return unwrapped;
+  if (Array.isArray(unwrapped?.balances)) return unwrapped.balances;
+  if (Array.isArray(payload?.balances)) return payload.balances;
+  return [];
+}
+
+function extractTransactionList(payload) {
+  if (!payload) return [];
+  const unwrapped = unwrap(payload);
+  const tx = unwrapped?.transactions ?? payload?.transactions;
+  if (Array.isArray(tx)) return tx;
+  if (Array.isArray(tx?.data)) return tx.data;
+  return [];
+}
+
+function integrationStatusValue(status) {
+  if (!status) return '';
+  if (typeof status === 'string') return status.toUpperCase();
+  if (typeof status === 'object' && status.value) return String(status.value).toUpperCase();
+  return String(status).toUpperCase();
+}
+
+function formatMoney(amountMinor, currency) {
+  const code = sanitizeCurrency(currency);
+  try {
+    return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: code })
+      .format((Number(amountMinor) || 0) / 100);
+  } catch {
+    return ((Number(amountMinor) || 0) / 100).toFixed(2) + ' ' + code;
+  }
+}
+
+function formatMajorMoney(amount, currency) {
+  const code = sanitizeCurrency(currency);
+  try {
+    return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: code })
+      .format(Number(amount) || 0);
+  } catch {
+    return (Number(amount) || 0).toFixed(2) + ' ' + code;
+  }
+}
+
+function renderHomeBalances(walletBalances, wallester) {
+  const primary = walletBalances[0];
+  const walletAvailableMinor = Number(primary?.available) || 0;
+  const walletPendingMinor = Number(primary?.pending) || 0;
+  const walletCurrency = sanitizeCurrency(primary?.currency);
+
+  const wallesterAmount = wallester
+    ? Number(wallester.available_amount ?? wallester.balance ?? 0)
+    : null;
+  const wallesterCurrency = sanitizeCurrency(
+    String(wallester?.currency_code || '').replace(/^([A-Z]{3}).*/, '$1') || walletCurrency,
+  );
+
+  const labelEl = document.querySelector('#screen-home .balance-label');
+  const balanceEl = document.getElementById('home-balance');
+  const accountEl = document.getElementById('home-account');
+  const pendingEl = document.getElementById('home-balance-pending');
+  if (!balanceEl || !accountEl) return;
+
+  const hasWalletFunds = walletAvailableMinor > 0 || walletPendingMinor > 0;
+  const hasWallesterFunds = wallesterAmount !== null && wallesterAmount > 0;
+  const showWalletAsPrimary = hasWalletFunds || !hasWallesterFunds;
+
+  if (showWalletAsPrimary) {
+    const mainMinor = walletAvailableMinor > 0 ? walletAvailableMinor : walletPendingMinor;
+    if (labelEl) {
+      labelEl.textContent = walletAvailableMinor > 0
+        ? 'Saldo disponível'
+        : (walletPendingMinor > 0 ? 'Saldo pendente' : 'Saldo disponível');
+    }
+    balanceEl.textContent = formatMoney(mainMinor, walletCurrency);
+    accountEl.textContent = `Wallet • ${walletCurrency}`;
+    if (pendingEl) {
+      if (walletAvailableMinor > 0 && walletPendingMinor > 0) {
+        pendingEl.textContent = `Pendente: ${formatMoney(walletPendingMinor, walletCurrency)}`;
+      } else {
+        pendingEl.textContent = '';
+      }
+    }
+  } else {
+    if (labelEl) labelEl.textContent = 'Saldo disponível';
+    balanceEl.textContent = formatMajorMoney(wallesterAmount, wallesterCurrency);
+    accountEl.textContent = `Wallester • ${wallesterCurrency}`;
+    if (pendingEl) pendingEl.textContent = '';
+  }
+
+  const wallesterEl = document.getElementById('home-wallester-balance');
+  if (!wallesterEl) return;
+
+  if (wallester && wallesterAmount !== null && showWalletAsPrimary && hasWallesterFunds) {
+    wallesterEl.textContent = `Wallester: ${formatMajorMoney(wallesterAmount, wallesterCurrency)}`;
+  } else {
+    wallesterEl.textContent = '';
+  }
+}
+
+function renderHomeTransactions(transactions) {
+  const list = document.getElementById('home-tx-list');
+  if (!list) return;
+
+  if (!transactions.length) {
+    list.innerHTML = `<div class="empty-state" style="padding:24px"><p>Sem transações ainda</p></div>`;
+    return;
+  }
+
+  list.innerHTML = transactions.map(t => renderTxItem(t)).join('');
+}
+
+function renderTxItem(t) {
+  const isCredit = t.direction === 'credit';
+  const sign = isCredit ? '+' : '−';
+  const amt = ((Number(t.net_amount ?? t.amount) || 0) / 100).toFixed(2);
+  const cur = sanitizeCurrency(t.currency);
+  const date = t.created_at
+    ? new Date(t.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
+    : '—';
+  const icon = isCredit
+    ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`
+    : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
+  const status = String(t.status || 'pending').toLowerCase();
+  const typeLabel = String(t.type || 'transação').replace(/_/g, ' ');
+
+  return `<div class="tx-item">
+    <div class="tx-icon-wrap ${isCredit ? 'credit' : 'debit'}">${icon}</div>
+    <div class="tx-meta">
+      <span class="tx-type">${typeLabel}</span>
+      <span class="tx-date">${date}</span>
+    </div>
+    <div class="tx-right">
+      <span class="tx-amount ${isCredit ? 'credit' : 'debit'}">${sign}${amt} ${cur}</span>
+      <span class="badge ${status}">${status}</span>
+    </div>
+  </div>`;
+}
+
+function currencySymbol(code) {
+  return CURRENCY_SYMBOLS[String(code || 'eur').toLowerCase()] || sanitizeCurrency(code);
+}
+
+function integrationStatus(key) {
+  const integrations = authSession?.integrations ?? {};
+  const entry = integrations[key] ?? integrations?.find?.(i => i.provider === key);
+  return entry?.status ?? null;
+}
+
+function setWallesterReadyFromSession(session) {
+  const status = integrationStatus('wallester');
+  wallesterReady = status === 'ACTIVE';
+  const el = document.getElementById('info-wallester');
+  if (!el) return;
+  if (!status) {
+    el.innerHTML = '<span class="badge inactive">Sem conta</span>';
+    return;
+  }
+  const badge = status === 'ACTIVE' ? 'active' : (status === 'PENDING' ? 'pending' : 'inactive');
+  el.innerHTML = `<span class="badge ${badge}">${status}</span>`;
+}
+
 // ── Login ─────────────────────────────────────────────
 async function doLogin() {
   const email    = document.getElementById('login-email').value.trim();
@@ -997,17 +1371,19 @@ async function doLogin() {
   btn.innerHTML = '<div class="spin" style="border-top-color:var(--indigo)"></div>';
 
   try {
-    const { ok, data } = await api('POST', '/login', { email, password });
+    const { ok, data } = await api('POST', '/auth/login', { email, password });
 
     if (ok) {
-        console.log('Login successful:', data);
-      token = data.data.token;
+      const session = unwrap(data);
+      token = session.token;
+      authSession = session;
       localStorage.setItem('yoop_sim_token', token);
+      setWallesterReadyFromSession(session);
       showToast('Login realizado!', 'success');
       navigate('home');
       document.getElementById('bottom-nav').classList.remove('hidden');
       setStatusBarColor(true);
-      loadHomeData();
+      await loadHomeData();
     } else {
       const msg = data?.message || data?.errors?.email?.[0] || 'Credenciais inválidas';
       showToast(msg, 'error');
@@ -1022,101 +1398,223 @@ async function doLogin() {
 
 // ── Home data ─────────────────────────────────────────
 async function loadHomeData() {
-  const [meRes, balRes, pmRes] = await Promise.all([
-    api('GET', '/customer/me'),
-    api('GET', '/account/balance'),
-    api('GET', '/stripe/payment-methods'),
-  ]);
+  try {
+    const [meRes, dashRes, balRes, accountRes] = await Promise.all([
+      api('GET', '/customer/me'),
+      api('GET', '/wallet/dashboard'),
+      api('GET', '/wallet/account/balance'),
+      api('GET', '/wallet/account'),
+    ]);
 
-  // Name
-  if (meRes.ok) {
-    const c = meRes.data?.customer ?? meRes.data;
-    const name = c?.name || c?.full_name || c?.first_name || 'Usuário';
-    document.getElementById('home-name').textContent = name.split(' ')[0];
+    if (meRes.ok) {
+      const c = unwrap(meRes.data);
+      const name = c?.name || 'Usuário';
+      document.getElementById('home-name').textContent = name.split(' ')[0];
 
-    // Status
-    const statusMap = { active: 'active', pending: 'pending', inactive: 'inactive', blocked: 'inactive' };
-    const st = c?.status || 'unknown';
-    document.getElementById('info-status').innerHTML =
-      `<span class="badge ${statusMap[st] || 'inactive'}">${st}</span>`;
+      const st = String(c?.status || 'unknown').toLowerCase();
+      const statusMap = { active: 'active', pending: 'pending', inactive: 'inactive', blocked: 'inactive' };
+      document.getElementById('info-status').innerHTML =
+        `<span class="badge ${statusMap[st] || 'inactive'}">${st}</span>`;
 
-    document.getElementById('info-type').textContent =
-      c?.type === 'corporate' ? 'Pessoa Jurídica' : 'Pessoa Física';
+      document.getElementById('info-type').textContent =
+        c?.type === 'corporate' ? 'Pessoa Jurídica' : 'Pessoa Física';
 
-    const docStatus = c?.document_status || '—';
-    document.getElementById('info-doc').textContent = docStatus;
+      document.getElementById('info-doc').textContent =
+        c?.document_verified ? 'Aprovado' : (c?.kyc_status ? 'Em análise' : 'Pendente');
 
-    const emailV = c?.email_verified_at ? '✓ Verificado' : '✗ Pendente';
-    document.getElementById('info-email').innerHTML =
-      `<span style="color:${c?.email_verified_at ? 'var(--emerald)' : 'var(--amber)'}">${emailV}</span>`;
+      const emailV = c?.email_verified_at || c?.email_verified ? '✓ Verificado' : '✗ Pendente';
+      document.getElementById('info-email').innerHTML =
+        `<span style="color:${(c?.email_verified_at || c?.email_verified) ? 'var(--emerald)' : 'var(--amber)'}">${emailV}</span>`;
+    }
+
+    let walletBalances = [];
+    if (dashRes.ok) walletBalances = extractBalanceList(dashRes.data);
+    if (!walletBalances.length && balRes.ok) walletBalances = extractBalanceList(balRes.data);
+
+    let transactions = [];
+    if (dashRes.ok) transactions = extractTransactionList(dashRes.data);
+
+    let wallester = null;
+    if (accountRes.ok) {
+      const account = unwrap(accountRes.data);
+      wallester = account?.wallester ?? null;
+      const wallesterStatus = integrationStatusValue(wallester?.status);
+      wallesterReady = !!(wallester?.wallester_account_id && wallesterStatus === 'ACTIVE');
+      const el = document.getElementById('info-wallester');
+      if (wallester?.wallester_account_id) {
+        const badge = wallesterStatus === 'ACTIVE' ? 'active' : (wallesterStatus === 'PENDING' ? 'pending' : 'inactive');
+        el.innerHTML = `<span class="badge ${badge}">${wallesterStatus}</span>`;
+      } else {
+        el.innerHTML = '<span class="badge inactive">Sem conta</span>';
+      }
+    } else if (authSession) {
+      setWallesterReadyFromSession(authSession);
+    }
+
+    renderHomeBalances(walletBalances, wallester);
+    renderHomeTransactions(transactions);
+
+    if (!dashRes.ok && !balRes.ok) {
+      document.getElementById('home-account').textContent = 'Erro ao carregar saldo';
+      showToast('Não foi possível carregar o saldo', 'error');
+    }
+
+    if (!dashRes.ok) {
+      const txList = document.getElementById('home-tx-list');
+      if (txList) {
+        txList.innerHTML = `<div class="empty-state" style="padding:24px"><p>Erro ao carregar transações</p></div>`;
+      }
+    }
+
+    loadHomeExtras();
+  } catch (e) {
+    document.getElementById('home-account').textContent = 'Erro ao carregar';
+    showToast(e.message || 'Erro ao carregar dados', 'error');
   }
+}
 
-  // Balance
-  if (balRes.ok) {
-    const b = balRes.data;
-    const amount = b?.available?.[0]?.amount ?? b?.balance ?? b?.amount ?? 0;
-    const currency = (b?.available?.[0]?.currency ?? b?.currency ?? 'usd').toUpperCase();
-    document.getElementById('home-balance').textContent =
-      new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount / 100);
-    document.getElementById('home-account').textContent = 'Conta principal • ' + currency;
-  }
+async function loadHomeExtras() {
+  const pmRes = await api('GET', '/stripe/payment-methods?currency=EUR');
 
-  // Payment methods
   if (pmRes.ok) {
-    const methods = pmRes.data?.data ?? pmRes.data?.payment_methods ?? pmRes.data ?? [];
+    const methods = pmRes.data?.data ?? pmRes.data ?? [];
     const list = document.getElementById('pm-list');
     if (Array.isArray(methods) && methods.length > 0) {
-      list.innerHTML = methods.map(pm => {
-        const brand = pm?.card?.brand || pm?.type || 'card';
-        const last4 = pm?.card?.last4 ? '•••• ' + pm.card.last4 : '';
-        const expiry = pm?.card ? pm.card.exp_month + '/' + pm.card.exp_year : '';
-        return `
-          <div class="info-row">
-            <span class="info-row-label">${brand.toUpperCase()} ${last4}</span>
-            <span class="info-row-value">${expiry}</span>
-          </div>`;
-      }).join('');
+      list.innerHTML = methods.map(pm => `
+        <div class="info-row">
+          <span class="info-row-label">${pm.label || pm.payment_method}</span>
+          <span class="info-row-value">${String(pm.currency || 'EUR').toUpperCase()}</span>
+        </div>`).join('');
     } else {
       list.innerHTML = `<div class="info-row"><span class="info-row-label" style="color:var(--slate-400)">Nenhum método cadastrado</span></div>`;
     }
   }
+
+  await loadCustomerCard();
 }
 
-// ── Deposit ────────────────────────────────────────────
+// ── Deposit (Stripe top-up) ───────────────────────────
+function onDepositCurrencyChange() {
+  const currency = document.getElementById('deposit-currency').value;
+  document.getElementById('deposit-prefix').textContent = currencySymbol(currency);
+  resetDepositScreen();
+  loadDepositMethods();
+}
+
+function resetDepositScreen() {
+  document.getElementById('deposit-stripe-wrap').style.display = 'none';
+  document.getElementById('deposit-confirm-btn').style.display = 'none';
+  document.getElementById('deposit-btn').style.display = 'block';
+  document.getElementById('deposit-btn').disabled = false;
+  document.getElementById('deposit-btn').textContent = 'Carregar saldo';
+  document.getElementById('deposit-result').className = 'result-card';
+  document.getElementById('deposit-stripe-element').innerHTML = '';
+  depositStripeElements = null;
+}
+
+async function loadDepositMethods() {
+  const currency = document.getElementById('deposit-currency').value.toUpperCase();
+  const sel = document.getElementById('deposit-method-select');
+  sel.innerHTML = '<option value="">Carregando...</option>';
+  sel.disabled = true;
+
+  const { ok, data } = await api('GET', `/stripe/payment-methods?currency=${currency}`);
+  if (!ok) {
+    sel.innerHTML = '<option value="">Erro ao carregar</option>';
+    sel.disabled = false;
+    return;
+  }
+
+  const methods = data?.data ?? [];
+  if (!methods.length) {
+    sel.innerHTML = `<option value="">Nenhum método para ${currency}</option>`;
+  } else {
+    sel.innerHTML = methods.map(m => `<option value="${m.id}">${m.label} (${m.payment_method})</option>`).join('');
+  }
+  sel.disabled = false;
+}
+
 async function doDeposit() {
   const amount   = parseFloat(document.getElementById('deposit-amount').value);
   const currency = document.getElementById('deposit-currency').value;
+  const paymentMethodId = parseInt(document.getElementById('deposit-method-select').value, 10);
   const btn      = document.getElementById('deposit-btn');
   const result   = document.getElementById('deposit-result');
 
   if (!amount || amount <= 0) { showToast('Informe um valor válido', 'error'); return; }
+  if (!paymentMethodId) { showToast('Selecione um método de pagamento', 'error'); return; }
 
   btn.disabled = true;
-  btn.innerHTML = '<div class="spin"></div> Processando...';
+  btn.innerHTML = '<div class="spin"></div> Preparando...';
   result.className = 'result-card';
 
   try {
-    const { ok, data } = await api('POST', '/stripe/create-funding', {
+    const { ok, data } = await api('POST', '/stripe/create-intent-payment', {
       amount: Math.round(amount * 100),
       currency,
+      payment_method_id: paymentMethodId,
+    }, { 'Idempotency-Key': crypto.randomUUID() });
+
+    if (!ok) {
+      result.classList.add('show', 'error');
+      result.textContent = JSON.stringify(data, null, 2);
+      showToast(data?.message || 'Erro ao criar top-up', 'error');
+      return;
+    }
+
+    const clientSecret = data.client_secret;
+    if (!clientSecret) throw new Error('client_secret não retornado');
+
+    depositStripeElements = stripeClient.elements({
+      appearance: { theme: 'stripe', variables: { colorPrimary: '#4f46e5', borderRadius: '8px' } },
+      clientSecret,
     });
 
-    result.classList.add('show');
-    result.textContent = JSON.stringify(data, null, 2);
+    const paymentEl = depositStripeElements.create('payment');
+    document.getElementById('deposit-stripe-element').innerHTML = '';
+    paymentEl.mount('#deposit-stripe-element');
 
-    if (ok) {
-      result.classList.add('success');
-      showToast('Depósito criado com sucesso!', 'success');
-    } else {
-      result.classList.add('error');
-      showToast(data?.message || 'Erro ao criar depósito', 'error');
-    }
-  } catch(e) {
-    showToast(e.message || 'Erro de conexão!', 'error');
+    document.getElementById('deposit-stripe-wrap').style.display = 'block';
+    document.getElementById('deposit-confirm-btn').style.display = 'block';
+    document.getElementById('deposit-btn').style.display = 'none';
+    result.classList.add('show', 'success');
+    result.textContent = `Intent criada.\nTransaction: ${data.transaction?.id ?? '—'}`;
+    showToast('Preencha o cartão e confirme', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro de conexão', 'error');
   }
 
   btn.disabled = false;
-  btn.textContent = 'Confirmar depósito';
+  btn.textContent = 'Carregar saldo';
+}
+
+async function doConfirmDeposit() {
+  if (!depositStripeElements) return;
+  const btn = document.getElementById('deposit-confirm-btn');
+  const result = document.getElementById('deposit-result');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Confirmando...';
+
+  const { error, paymentIntent } = await stripeClient.confirmPayment({
+    elements: depositStripeElements,
+    confirmParams: { return_url: window.location.href },
+    redirect: 'if_required',
+  });
+
+  if (error) {
+    showToast(error.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Confirmar top-up';
+    return;
+  }
+
+  showToast(`Top-up ${paymentIntent.status}!`, 'success');
+  result.classList.add('show', 'success');
+  result.textContent = `Status: ${paymentIntent.status}\nID: ${paymentIntent.id}`;
+  resetDepositScreen();
+  setTimeout(loadHomeData, 2000);
+  btn.disabled = false;
+  btn.textContent = 'Confirmar top-up';
 }
 
 // ── Payment methods ────────────────────────────────────
@@ -1226,43 +1724,166 @@ async function doConfirmPayment() {
   stripeElements = null;
 }
 
-// ── Funding instructions ───────────────────────────────
-async function loadFundingInstructions() {
-  const el = document.getElementById('fi-content');
-  el.innerHTML = `<div class="empty-state"><div class="spin" style="border-color:var(--slate-200);border-top-color:var(--indigo);width:32px;height:32px"></div><p>Carregando...</p></div>`;
+// ── Wallester cards ───────────────────────────────────
+async function loadCustomerCard() {
+  const { ok, data } = await api('GET', '/wallester/cards');
+  if (!ok) {
+    currentCard = null;
+    return;
+  }
 
-  try {
-    const { ok, data } = await api('GET', '/stripe/get-funding-instructions');
+  const cards = Array.isArray(data?.data) ? data.data : (Array.isArray(unwrap(data)) ? unwrap(data) : []);
+  if (!cards.length) {
+    currentCard = null;
+    return;
+  }
 
-    if (ok) {
-      const bank = data?.funding_instructions?.bank_transfer ?? data?.bank_transfer ?? data;
-      el.innerHTML = `
-        <div class="info-card" style="margin:0">
-          ${renderFundingInfo(bank)}
-        </div>`;
-    } else {
-      el.innerHTML = `<div class="result-card show error" style="margin:16px">${JSON.stringify(data,null,2)}</div>`;
-    }
-  } catch {
-    el.innerHTML = `<div class="empty-state"><p>Erro ao carregar</p></div>`;
+  const card = cards[0];
+  currentCard = { local: card, api: card };
+
+  const detail = await api('GET', `/wallester/cards/${card.id}`);
+  if (detail.ok) {
+    currentCard = { local: card, api: unwrap(detail.data) };
   }
 }
 
-function renderFundingInfo(data) {
-  if (!data) return `<div class="info-row"><span class="info-row-label">Sem dados</span></div>`;
-  const rows = [];
-  function flatten(obj, prefix = '') {
-    for (const [k, v] of Object.entries(obj)) {
-      if (v && typeof v === 'object' && !Array.isArray(v)) flatten(v, prefix + k + '.');
-      else if (!Array.isArray(v)) rows.push([prefix + k, String(v)]);
-    }
+async function openCardFlow() {
+  if (!wallesterReady) {
+    showToast('Customer sem conta Wallester activa', 'error');
+    return;
   }
-  flatten(data);
-  return rows.slice(0,12).map(([k,v]) => `
-    <div class="info-row">
-      <span class="info-row-label">${k}</span>
-      <span class="info-row-value" style="font-size:12px;max-width:60%;text-align:right">${v}</span>
-    </div>`).join('');
+
+  await loadCustomerCard();
+
+  if (currentCard?.local?.id) {
+    renderCardDetail(currentCard);
+    navigate('card-detail');
+    return;
+  }
+
+  document.getElementById('card-create-hint').textContent =
+    'A conta Wallester está activa. Crie um cartão virtual para testar.';
+  document.getElementById('card-create-result').className = 'result-card';
+  navigate('card-create');
+}
+
+function formatCardNumber(masked, full) {
+  const raw = full || masked || '';
+  if (!raw) return '•••• •••• •••• ••••';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 4) return masked || raw;
+  if (full) return digits.replace(/(.{4})/g, '$1 ').trim();
+  return masked || ('•••• •••• •••• ' + digits.slice(-4));
+}
+
+function formatExpiry(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getFullYear()).slice(-2);
+}
+
+function renderCardDetail(card) {
+  const data = card?.api ?? card;
+  document.getElementById('card-preview-number').textContent =
+    formatCardNumber(data.masked_card_number);
+  document.getElementById('card-preview-name').textContent = data.name || '—';
+  document.getElementById('card-preview-expiry').textContent = formatExpiry(data.expiry_date);
+  document.getElementById('card-preview-status').textContent = data.status || '—';
+  document.getElementById('card-detail-type').textContent = data.type || '—';
+  document.getElementById('card-detail-wid').textContent = data.wallester_card_id || data.id || '—';
+  document.getElementById('card-sensitive-result').className = 'result-card';
+  document.getElementById('card-reveal-password').value = '';
+}
+
+async function doCreateCard() {
+  const name = document.getElementById('card-name').value.trim();
+  const type = document.getElementById('card-type').value;
+  const btn = document.getElementById('card-create-btn');
+  const result = document.getElementById('card-create-result');
+
+  if (!name) { showToast('Informe o nome do cartão', 'error'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Criando...';
+  result.className = 'result-card';
+
+  try {
+    const { ok, data, status } = await api('POST', '/wallester/cards', { type, name });
+    const card = unwrap(data);
+
+    if (!ok) {
+      result.classList.add('show', 'error');
+      result.textContent = JSON.stringify(data, null, 2);
+      if (data?.reason === 'card_already_exists') {
+        await loadCustomerCard();
+        if (currentCard?.local?.id) {
+          renderCardDetail(currentCard);
+          navigate('card-detail');
+        }
+      }
+      showToast(data?.message || `Erro ${status}`, 'error');
+      return;
+    }
+
+    currentCard = { local: card, api: card };
+    result.classList.add('show', 'success');
+    result.textContent = JSON.stringify(card, null, 2);
+    showToast('Cartão criado!', 'success');
+
+    const detail = await api('GET', `/wallester/cards/${card.id}`);
+    if (detail.ok) {
+      currentCard = { local: card, api: unwrap(detail.data) };
+    }
+
+    renderCardDetail(currentCard);
+    navigate('card-detail');
+  } catch (e) {
+    showToast(e.message || 'Erro de conexão', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Criar cartão';
+}
+
+async function doRevealCard() {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+
+  const password = document.getElementById('card-reveal-password').value;
+  const btn = document.getElementById('card-reveal-btn');
+  const result = document.getElementById('card-sensitive-result');
+
+  if (!password) { showToast('Informe a senha da conta', 'error'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Revelando...';
+  result.className = 'result-card';
+
+  try {
+    const { ok, data } = await api('POST', `/wallester/cards/${currentCard.local.id}/sensitive`, { password });
+    const sensitive = unwrap(data);
+
+    if (!ok) {
+      result.classList.add('show', 'error');
+      result.textContent = JSON.stringify(data, null, 2);
+      showToast(data?.message || 'Não foi possível revelar', 'error');
+      return;
+    }
+
+    document.getElementById('card-preview-number').textContent =
+      formatCardNumber(null, sensitive.card_number);
+    document.getElementById('card-preview-expiry').textContent = formatExpiry(sensitive.expiry_date);
+
+    result.classList.add('show', 'success');
+    result.textContent =
+      `Número: ${sensitive.card_number}\nCVV: ${sensitive.cvv}\nValidade: ${formatExpiry(sensitive.expiry_date)}`;
+    showToast('Dados revelados', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro de conexão', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Revelar número e CVV';
 }
 
 // ── Notifications ──────────────────────────────────────
@@ -1271,7 +1892,7 @@ async function loadNotifications() {
   list.innerHTML = `<div class="empty-state"><div class="spin" style="border-color:var(--slate-200);border-top-color:var(--indigo);width:32px;height:32px"></div></div>`;
 
   try {
-    const { ok, data } = await api('GET', '/notifications');
+    const { ok, data } = await api('GET', '/customer/notifications');
     const items = data?.data ?? data?.notifications ?? (Array.isArray(data) ? data : []);
 
     if (!ok || !items.length) {
@@ -1311,11 +1932,11 @@ async function loadNotifications() {
 async function readNotif(id, el) {
   el.classList.remove('unread');
   el.querySelector('.notif-dot')?.remove();
-  await api('POST', '/notifications/' + id + '/read');
+  await api('POST', '/customer/notifications/' + id + '/read');
 }
 
 async function markAllRead() {
-  await api('POST', '/notifications/read-all');
+  await api('POST', '/customer/notifications/read-all');
   document.querySelectorAll('.notif-item').forEach(el => {
     el.classList.remove('unread');
     el.querySelector('.notif-dot')?.remove();
@@ -1334,6 +1955,19 @@ if (token) {
   document.getElementById('bottom-nav').classList.remove('hidden');
   setStatusBarColor(true);
   loadHomeData();
+  api('GET', '/wallet/account').then(async ({ ok, data }) => {
+    if (!ok) return;
+    const w = unwrap(data)?.wallester;
+    wallesterReady = !!(w?.wallester_account_id && integrationStatusValue(w?.status) === 'ACTIVE');
+    if (w?.wallester_account_id) {
+      const st = integrationStatusValue(w.status || 'UNKNOWN');
+      const badge = st === 'ACTIVE' ? 'active' : (st === 'PENDING' ? 'pending' : 'inactive');
+      document.getElementById('info-wallester').innerHTML = `<span class="badge ${badge}">${st}</span>`;
+    }
+    if (wallesterReady) {
+      await loadCustomerCard();
+    }
+  });
 }
 </script>
 </body>

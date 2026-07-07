@@ -52,7 +52,7 @@ class RetryCustomerProvisioningTest extends TestCase
 
         $this->assertSame(
             IntegrationAccountStatus::PENDING,
-            $customer->fresh()->wallesterAccounts->status,
+            $customer->fresh()->wallesterAccount->status,
         );
     }
 }

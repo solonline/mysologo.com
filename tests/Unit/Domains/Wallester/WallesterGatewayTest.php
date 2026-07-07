@@ -36,6 +36,7 @@ class WallesterGatewayTest extends TestCase
         });
 
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('createAccount')
             ->once()
             ->with(['name' => 'Mario Rossi'])
@@ -73,6 +74,7 @@ class WallesterGatewayTest extends TestCase
         );
 
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('createAccount')
             ->once()
             ->andThrow($exception);
@@ -99,6 +101,7 @@ class WallesterGatewayTest extends TestCase
     public function test_create_account_unwraps_nested_account_payload(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('createAccount')
             ->once()
             ->with(['name' => 'Mario Rossi'])
@@ -121,6 +124,7 @@ class WallesterGatewayTest extends TestCase
     public function test_list_accounts_normalizes_response(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('listAccounts')
             ->once()
             ->with(['from_record' => 0, 'records_count' => 15], '42')
@@ -143,6 +147,7 @@ class WallesterGatewayTest extends TestCase
     public function test_get_account_unwraps_nested_account_payload(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('getAccount')
             ->once()
             ->with('27c0b35d-6746-4528-b91c-11e10d851f29', '42')
@@ -166,6 +171,7 @@ class WallesterGatewayTest extends TestCase
     public function test_create_card_unwraps_nested_card_payload(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('createCard')
             ->once()
             ->with(['account_id' => 'wal_123', 'type' => 'Virtual'], null)
@@ -189,6 +195,7 @@ class WallesterGatewayTest extends TestCase
     public function test_get_card_unwraps_nested_card_payload(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('getCard')
             ->once()
             ->with('card_123', '42')
@@ -212,6 +219,7 @@ class WallesterGatewayTest extends TestCase
     public function test_get_encrypted_card_number_returns_payload_field(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('getEncryptedCardNumber')
             ->once()
             ->with('card_123', 'public-key', '42')
@@ -229,6 +237,7 @@ class WallesterGatewayTest extends TestCase
     public function test_activate_card_unwraps_nested_card_payload(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('activateCard')
             ->once()
             ->with('card_123', '42')
@@ -252,6 +261,7 @@ class WallesterGatewayTest extends TestCase
     public function test_list_account_transactions_normalizes_response(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('listAccountTransactions')
             ->once()
             ->with('wal_acc_1', ['from_record' => 0, 'records_count' => 15], '42')
@@ -274,6 +284,7 @@ class WallesterGatewayTest extends TestCase
     public function test_get_transaction_unwraps_nested_transaction_payload(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
         $client->shouldReceive('getTransaction')
             ->once()
             ->with('tx_123', '42', [])
@@ -291,5 +302,37 @@ class WallesterGatewayTest extends TestCase
 
         $this->assertSame('tx_123', $result['id']);
         $this->assertSame(-9.99, $result['amount']);
+    }
+
+    public function test_account_transfer_unwraps_nested_payment_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('accountTransfer')
+            ->once()
+            ->with([
+                'from_account_id' => 'wal_from',
+                'to_account_id' => 'wal_to',
+                'amount' => 10.5,
+                'description' => 'Transfer',
+            ], '42')
+            ->andReturn([
+                'payment' => [
+                    'id' => 'pay_123',
+                    'status' => 'completed',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->accountTransfer([
+            'from_account_id' => 'wal_from',
+            'to_account_id' => 'wal_to',
+            'amount' => 10.5,
+            'description' => 'Transfer',
+        ], '42');
+
+        $this->assertSame('pay_123', $result['id']);
+        $this->assertSame('completed', $result['status']);
     }
 }

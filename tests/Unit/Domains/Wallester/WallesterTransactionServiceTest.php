@@ -10,11 +10,13 @@ use App\Models\CustomerWallesterCard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\Concerns\InteractsWithOnboarding;
+use Tests\Concerns\InteractsWithWallesterSettings;
 use Tests\TestCase;
 
 class WallesterTransactionServiceTest extends TestCase
 {
     use InteractsWithOnboarding;
+    use InteractsWithWallesterSettings;
     use RefreshDatabase;
 
     protected function tearDown(): void
@@ -29,7 +31,7 @@ class WallesterTransactionServiceTest extends TestCase
         $customer = $this->createRetailCustomer();
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_tx_acc');
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('listAccountTransactions')
             ->once()
             ->with('wal_tx_acc', ['from_record' => 0, 'records_count' => 15], (string) $customer->id)
@@ -63,7 +65,7 @@ class WallesterTransactionServiceTest extends TestCase
             'name' => 'Travel Card',
         ]);
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('listCardTransactions')
             ->once()
             ->with('wal_card_tx_1', ['from_record' => 5, 'records_count' => 20], (string) $customer->id)
@@ -91,7 +93,7 @@ class WallesterTransactionServiceTest extends TestCase
         $customer = $this->createRetailCustomer();
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_tx_show_acc');
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('getTransaction')
             ->once()
             ->with('tx_foreign', (string) $customer->id)
@@ -114,7 +116,7 @@ class WallesterTransactionServiceTest extends TestCase
         $customer = $this->createRetailCustomer();
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_tx_owned_acc');
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('getTransaction')
             ->once()
             ->with('tx_owned', (string) $customer->id)

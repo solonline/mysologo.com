@@ -5,17 +5,23 @@ namespace Tests\Unit\Domains\Wallester;
 use App\Domains\Wallester\Services\WallesterCardRsaKeyService;
 use App\Domains\Wallester\Services\WallesterRsaOaep;
 use App\Domains\Wallester\Services\WallesterSensitiveDataDecryptor;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
+use Tests\Concerns\InteractsWithWallesterSettings;
 use Tests\TestCase;
 
 class WallesterSensitiveDataDecryptorTest extends TestCase
 {
+    use InteractsWithWallesterSettings;
+    use RefreshDatabase;
+
     public function test_throws_for_invalid_payload_encoding(): void
     {
-        Config::set('services.wallester.card_rsa_private_key', $this->fixturePrivateKeyPem());
+        $this->seedWallesterSettings([
+            'wallester.card_rsa_private_key' => $this->fixturePrivateKeyPem(),
+        ]);
 
-        $decryptor = new WallesterSensitiveDataDecryptor(new WallesterCardRsaKeyService);
+        $decryptor = new WallesterSensitiveDataDecryptor(app(WallesterCardRsaKeyService::class));
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Invalid Wallester CardNumber payload encoding.');
@@ -32,10 +38,12 @@ class WallesterSensitiveDataDecryptorTest extends TestCase
         }
 
         [$privateKeyPem, $publicKeyPem] = $keyPair;
-        Config::set('services.wallester.card_rsa_private_key', $privateKeyPem);
+        $this->seedWallesterSettings([
+            'wallester.card_rsa_private_key' => $privateKeyPem,
+        ]);
 
         $payload = $this->wrapEncryptedPayload($publicKeyPem, '4302631234561795', 'CardNumber');
-        $decryptor = new WallesterSensitiveDataDecryptor(new WallesterCardRsaKeyService);
+        $decryptor = new WallesterSensitiveDataDecryptor(app(WallesterCardRsaKeyService::class));
 
         $this->assertSame('4302631234561795', $decryptor->decryptCardNumber($payload));
     }

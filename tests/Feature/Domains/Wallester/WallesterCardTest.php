@@ -11,11 +11,13 @@ use App\Models\CustomerWallesterCard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\Concerns\InteractsWithOnboarding;
+use Tests\Concerns\InteractsWithWallesterSettings;
 use Tests\TestCase;
 
 class WallesterCardTest extends TestCase
 {
     use InteractsWithOnboarding;
+    use InteractsWithWallesterSettings;
     use RefreshDatabase;
 
     protected function tearDown(): void
@@ -30,7 +32,7 @@ class WallesterCardTest extends TestCase
         $customer = $this->createActiveCustomer();
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_card_api');
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('createCard')
             ->once()
             ->with(Mockery::on(function (array $payload) use ($account): bool {
@@ -109,7 +111,7 @@ class WallesterCardTest extends TestCase
             'name' => 'Travel Card',
         ]);
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('getCard')
             ->once()
             ->with('card_show_api_1', (string) $customer->id)
@@ -288,7 +290,7 @@ class WallesterCardTest extends TestCase
             'name' => 'Owner Card',
         ]);
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldNotReceive('getCard');
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
 
@@ -312,7 +314,7 @@ class WallesterCardTest extends TestCase
             'name' => 'Travel Card',
         ]);
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('activateCard')
             ->once()
             ->with('card_manual_activate', (string) $customer->id)
@@ -349,7 +351,7 @@ class WallesterCardTest extends TestCase
             'name' => 'Owner Card',
         ]);
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldNotReceive('activateCard');
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
 
@@ -358,6 +360,105 @@ class WallesterCardTest extends TestCase
         $this->withToken($token)
             ->postJson("/api/wallester/cards/{$card->id}/activate")
             ->assertForbidden();
+    }
+
+    public function test_create_card_rejects_when_customer_already_has_card(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_card_dup');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_existing_1',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Existing Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('createCard');
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson('/api/wallester/cards', [
+                'type' => 'Virtual',
+                'name' => 'Another Card',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('reason', 'card_already_exists')
+            ->assertJsonPath('message', 'Customer already has an active Wallester card.');
+    }
+
+    public function test_create_card_allows_replacement_when_existing_card_is_closed(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_card_closed');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_closed_1',
+            'type' => 'Virtual',
+            'status' => 'Closed',
+            'name' => 'Old Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('createCard')
+            ->once()
+            ->andReturn([
+                'id' => 'card_replacement_1',
+                'type' => 'Virtual',
+                'status' => 'Created',
+                'name' => 'New Card',
+                'masked_card_number' => '****1234',
+            ]);
+        $gateway->shouldReceive('activateCard')
+            ->once()
+            ->andReturn([
+                'id' => 'card_replacement_1',
+                'type' => 'Virtual',
+                'status' => 'Active',
+                'name' => 'New Card',
+                'masked_card_number' => '****1234',
+                'activated_at' => '2026-07-01T12:00:00Z',
+            ]);
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson('/api/wallester/cards', [
+                'type' => 'Virtual',
+                'name' => 'New Card',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.wallester_card_id', 'card_replacement_1');
+    }
+
+    public function test_customer_can_list_wallester_cards(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_card_list');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_list_1',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Travel Card',
+            'masked_card_number' => '****5678',
+        ]);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->getJson('/api/wallester/cards')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $localCard->id)
+            ->assertJsonPath('data.0.name', 'Travel Card')
+            ->assertJsonPath('data.0.masked_card_number', '****5678');
     }
 
     public function test_create_card_validates_required_fields(): void

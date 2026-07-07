@@ -4,21 +4,30 @@ namespace Tests\Unit\Domains\Wallester;
 
 use App\Domains\Auth\Services\DeviceAuthService;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
-use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Services\WallesterCardRsaKeyService;
 use App\Domains\Wallester\Services\WallesterCardSensitiveService;
 use App\Domains\Wallester\Services\WallesterSensitiveDataDecryptor;
 use App\Models\CustomerWallesterCard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
 use Mockery;
 use Tests\Concerns\InteractsWithOnboarding;
+use Tests\Concerns\InteractsWithWallesterSettings;
 use Tests\TestCase;
 
 class WallesterCardSensitiveServiceTest extends TestCase
 {
     use InteractsWithOnboarding;
+    use InteractsWithWallesterSettings;
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seedWallesterSettings([
+            'wallester.card_rsa_private_key' => 'configured',
+        ]);
+    }
 
     protected function tearDown(): void
     {
@@ -29,8 +38,6 @@ class WallesterCardSensitiveServiceTest extends TestCase
 
     public function test_reveal_for_customer_returns_decrypted_card_data(): void
     {
-        Config::set('services.wallester.card_rsa_private_key', 'configured');
-
         $customer = $this->createRetailCustomer();
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_sensitive');
 
@@ -42,7 +49,7 @@ class WallesterCardSensitiveServiceTest extends TestCase
             'name' => 'Travel Card',
         ]);
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('getCard')
             ->once()
             ->with('card_sensitive_1', (string) $customer->id)
@@ -60,16 +67,16 @@ class WallesterCardSensitiveServiceTest extends TestCase
             ->andReturn('encrypted-cvv');
 
         $rsaKeys = Mockery::mock(WallesterCardRsaKeyService::class);
-        $rsaKeys->shouldReceive('publicKeyBase64')->once()->andReturn('public-key-base64');
+        $rsaKeys->shouldReceive('publicKeyBase64')->once()->with('EUR')->andReturn('public-key-base64');
 
         $decryptor = Mockery::mock(WallesterSensitiveDataDecryptor::class);
         $decryptor->shouldReceive('decryptCardNumber')
             ->once()
-            ->with('encrypted-card-number')
+            ->with('encrypted-card-number', 'EUR')
             ->andReturn('4302631234561795');
         $decryptor->shouldReceive('decryptCvv2')
             ->once()
-            ->with('encrypted-cvv')
+            ->with('encrypted-cvv', 'EUR')
             ->andReturn('987');
 
         $deviceAuth = Mockery::mock(DeviceAuthService::class);

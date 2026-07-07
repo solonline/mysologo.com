@@ -995,7 +995,6 @@ body{
         <div class="sec-actions">
           <button class="btn-sec v" id="btn-funding"     onclick="createFunding()">+ Criar Funding</button>
           <button class="btn-sec g" id="btn-account"     onclick="getAccount()">Ver Conta</button>
-          <button class="btn-sec a full" id="btn-get-funding" onclick="getFundingInstructions()">Instruções de Depósito</button>
         </div>
       </div>
     </div>
@@ -1708,22 +1707,6 @@ async function run() {
   }
   btn.disabled = false;
   btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> Carregar';
-}
-
-async function getFundingInstructions() {
-  const btn = document.getElementById('btn-get-funding');
-  btn.disabled = true;
-  log('info', 'GET /stripe/get-funding-instructions');
-  try {
-    const { res, data } = await api('GET', '/stripe/get-funding-instructions');
-    if (!res.ok) throw new Error(data.message || 'HTTP ' + res.status);
-    const d = data.data;
-    if (!d?.funding_type) { log('warn', 'funding não criado para esta conta'); toast('err', 'Funding não encontrado.'); btn.disabled = false; return; }
-    log('ok', `tipo:${d.bank_transfer_type||'—'} | iban:${d.funding_iban||'—'} | bic:${d.funding_bic||'—'} | titular:${d.funding_account_holder_name||'—'}`);
-    (d.funding_financial_addresses||[]).forEach(a => log('info', `address[${a.type}]: ${JSON.stringify(a[a.type]??a)}`));
-    toast('ok', 'Funding instructions carregadas.');
-  } catch (e) { log('err', e.message); toast('err', e.message); }
-  btn.disabled = false;
 }
 
 async function getAccount() {

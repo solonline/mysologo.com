@@ -9,11 +9,13 @@ use App\Models\CustomerWallesterCard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\Concerns\InteractsWithOnboarding;
+use Tests\Concerns\InteractsWithWallesterSettings;
 use Tests\TestCase;
 
 class WallesterTransactionTest extends TestCase
 {
     use InteractsWithOnboarding;
+    use InteractsWithWallesterSettings;
     use RefreshDatabase;
 
     protected function tearDown(): void
@@ -28,7 +30,7 @@ class WallesterTransactionTest extends TestCase
         $customer = $this->createActiveCustomer();
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_tx_api_acc');
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('listAccountTransactions')
             ->once()
             ->with('wal_tx_api_acc', ['from_record' => 0, 'records_count' => 15], (string) $customer->id)
@@ -69,7 +71,7 @@ class WallesterTransactionTest extends TestCase
             'name' => 'Travel Card',
         ]);
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('listCardTransactions')
             ->once()
             ->with('wal_card_filter_1', ['from_record' => 0, 'records_count' => 10], (string) $customer->id)
@@ -97,7 +99,7 @@ class WallesterTransactionTest extends TestCase
 
         $transactionId = '8951efcc-91a7-4f59-977f-c9ad186bfa98';
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('getTransaction')
             ->once()
             ->with($transactionId, (string) $customer->id)
@@ -125,7 +127,7 @@ class WallesterTransactionTest extends TestCase
 
         $transactionId = '8951efcc-91a7-4f59-977f-c9ad186bfa99';
 
-        $gateway = Mockery::mock(WallesterGatewayInterface::class);
+        $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('getTransaction')
             ->once()
             ->with($transactionId, (string) $customer->id)
