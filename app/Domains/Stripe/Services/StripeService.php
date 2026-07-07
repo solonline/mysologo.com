@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace App\Domains\Stripe\Services;
 
-use App\Domains\Onboarding\Services\IntegrationAccountService;
-use App\Domains\Stripe\Contracts\StripeGatewayInterface;
-use App\Domains\Wallet\Enums\TransactionDirection;
-use App\Domains\Wallet\Enums\TransactionType;
-use App\Exceptions\ApiException;
-use App\Exceptions\ErrorCode;
 use App\Domains\Merchant\Contracts\MerchantPaymentRequestRepositoryInterface;
 use App\Domains\Merchant\Jobs\DispatchMerchantCallback;
+use App\Domains\Onboarding\Services\IntegrationAccountService;
+use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
+use App\Domains\Wallet\Enums\TransactionDirection;
+use App\Domains\Wallet\Enums\TransactionType;
+use App\Domains\Wallet\Services\StripePaymentWalletService;
+use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
+use App\Exceptions\ApiException;
+use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
-use App\Models\CustomerPaymentMethodFee;
 use App\Models\CustomerStripeAccount;
-use App\Models\MerchantPaymentRequest;
 use App\Models\StripePaymentMethodFee;
 use App\Models\Transaction;
 use Carbon\Carbon;
@@ -26,36 +27,40 @@ use Illuminate\Support\Facades\Log;
 
 class StripeService
 {
+    private const DAILY_TOPUP_LIMIT_CENTS = 10_000;
+
     private const PAYMENT_METHOD_CURRENCIES = [
-        'mbway'  => ['eur'],
-        'twint'  => ['chf'],
-        'blik'   => ['pln'],
+        'mbway' => ['eur'],
+        'twint' => ['chf'],
+        'blik' => ['pln'],
         'bancontact' => ['eur'],
-        'ideal'  => ['eur'],
+        'ideal' => ['eur'],
         'sofort' => ['eur'],
-        'eps'    => ['eur'],
+        'eps' => ['eur'],
         'giropay' => ['eur'],
-        'p24'    => ['eur', 'pln'],
+        'p24' => ['eur', 'pln'],
     ];
 
     public function __construct(
         protected StripeGatewayInterface $stripeGateway,
         protected MerchantPaymentRequestRepositoryInterface $merchantPaymentRequestRepository,
         protected IntegrationAccountService $integrationAccounts,
+        protected StripePaymentWalletService $stripePaymentWallet,
+        protected TopupWallesterFundingPolicy $topupFundingPolicy,
     ) {}
 
     public function validatePaymentMethodCurrency(string $paymentMethod, string $currency): void
     {
         $method = strtolower($paymentMethod);
-        $cur    = strtolower($currency);
+        $cur = strtolower($currency);
 
-        if (!isset(self::PAYMENT_METHOD_CURRENCIES[$method])) {
+        if (! isset(self::PAYMENT_METHOD_CURRENCIES[$method])) {
             return;
         }
 
         $allowed = self::PAYMENT_METHOD_CURRENCIES[$method];
 
-        if (!in_array($cur, $allowed, strict: true)) {
+        if (! in_array($cur, $allowed, strict: true)) {
             $allowedList = implode(', ', array_map(strtoupper(...), $allowed));
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
@@ -80,7 +85,7 @@ class StripeService
         if ($result['status'] !== 'success') {
             Log::channel('stripe')->warning('stripe_service: createCustomer', [
                 'customer_id' => $customer->id,
-                'message'     => $result['message'],
+                'message' => $result['message'],
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_CUSTOMER_CREATION_FAILED,
@@ -98,10 +103,11 @@ class StripeService
         int $paymentMethodFeeId,
         string $currency = 'eur',
         ?string $description = null,
+        bool $isTopup = false,
     ): array {
         $stripeAccount = $customer->stripeAccount;
 
-        if (!$stripeAccount) {
+        if (! $stripeAccount) {
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 422,
@@ -113,12 +119,16 @@ class StripeService
             ->where('is_active', true)
             ->first();
 
-        if (!$feeConfig) {
+        if (! $feeConfig) {
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 422,
                 'Método de pagamento não suportado ou inativo.'
             );
+        }
+
+        if ($isTopup) {
+            $this->assertDailyTopupLimitNotExceeded($customer, $amount);
         }
 
         $this->validatePaymentMethodCurrency($feeConfig->payment_method, $currency);
@@ -144,24 +154,25 @@ class StripeService
             ->toArray();
 
         $result = $this->stripeGateway->createPaymentIntent([
-            'amount'               => $amount,
-            'currency'             => $currency,
-            'customer'             => $stripeAccount->stripe_customer_id,
-            'description'          => $description,
+            'amount' => $amount,
+            'currency' => $currency,
+            'customer' => $stripeAccount->stripe_customer_id,
+            'description' => $description,
             'payment_method_types' => $paymentMethodTypes,
-            'metadata'             => [
-                'customer_id'        => $customer->id,
+            'metadata' => array_filter([
+                'customer_id' => $customer->id,
                 'payment_method_fee' => $feeConfig->payment_method,
-            ],
+                'purpose' => $isTopup ? 'topup' : null,
+            ]),
         ]);
 
         if ($result['status'] !== 'success') {
             Log::channel('stripe')->warning('stripe_service: createPaymentIntent', [
-                'customer_id'    => $customer->id,
-                'amount'         => $amount,
-                'currency'       => $currency,
+                'customer_id' => $customer->id,
+                'amount' => $amount,
+                'currency' => $currency,
                 'payment_method' => $feeConfig->payment_method,
-                'message'        => $result['message'],
+                'message' => $result['message'],
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
@@ -176,7 +187,7 @@ class StripeService
             $transaction = Transaction::create([
                 'customer_id' => $customer->id,
                 'stripe_payment_method_fee_id' => $feeConfig->id,
-                'type' => TransactionType::from($feeConfig->payment_method),
+                'type' => $isTopup ? TransactionType::TOPUP : TransactionType::from($feeConfig->payment_method),
                 'direction' => TransactionDirection::Credit,
                 'stripe_payment_intent_id' => $intent['id'],
                 'payment_method_type' => $feeConfig->payment_method,
@@ -192,16 +203,19 @@ class StripeService
                     ? Carbon::createFromTimestamp($intent['created'])
                     : now(),
             ]);
+
+            if ($isTopup) {
+            }
         } catch (\Throwable $e) {
             Log::channel('stripe')->error('stripe_service: transaction_create_failed', [
-                'customer_id'              => $customer->id,
+                'customer_id' => $customer->id,
                 'stripe_payment_intent_id' => $intent['id'],
-                'exception'                => $e->getMessage(),
+                'exception' => $e->getMessage(),
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 502,
-                'Erro ao registrar a transação. Payment intent criado no Stripe: ' . $intent['id']
+                'Erro ao registrar a transação. Payment intent criado no Stripe: '.$intent['id']
             );
         }
 
@@ -235,7 +249,7 @@ class StripeService
     ): array {
         $stripeAccount = $customer->stripeAccount;
 
-        if (!$stripeAccount) {
+        if (! $stripeAccount) {
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 422,
@@ -243,7 +257,7 @@ class StripeService
             );
         }
 
-        if($customer->tpas->contains(function ($tpa) use ($tpaSerialNumber) {
+        if ($customer->tpas->contains(function ($tpa) use ($tpaSerialNumber) {
             return $tpa->serial_number === $tpaSerialNumber;
         })) {
             throw new ApiException(
@@ -264,14 +278,14 @@ class StripeService
         $currency = strtolower($currency);
 
         $result = $this->stripeGateway->createPaymentIntent([
-            'amount'               => $amount,
-            'currency'             => $currency,
-            'customer'             => $stripeAccount->stripe_customer_id,
-            'description'          => $description,
+            'amount' => $amount,
+            'currency' => $currency,
+            'customer' => $stripeAccount->stripe_customer_id,
+            'description' => $description,
             'payment_method_types' => ['card_present'],
-            'capture_method'       => 'automatic',
-            'metadata'             => [
-                'customer_id'        => $customer->id,
+            'capture_method' => 'automatic',
+            'metadata' => [
+                'customer_id' => $customer->id,
                 'payment_method_fee' => 'card_present',
             ],
         ]);
@@ -279,9 +293,9 @@ class StripeService
         if ($result['status'] !== 'success') {
             Log::channel('stripe')->warning('stripe_service: createTerminalPaymentIntent', [
                 'customer_id' => $customer->id,
-                'amount'      => $amount,
-                'currency'    => $currency,
-                'message'     => $result['message'],
+                'amount' => $amount,
+                'currency' => $currency,
+                'message' => $result['message'],
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
@@ -294,39 +308,39 @@ class StripeService
 
         try {
             $transaction = Transaction::create([
-                'tpa_id'                       => $tpa->id,
-                'customer_id'                  => $customer->id,
-                'type'                         => TransactionType::CARD_PRESENT,
-                'direction'                    => TransactionDirection::Credit,
-                'stripe_payment_intent_id'     => $intent['id'],
-                'payment_method_type'          => 'card_present',
-                'amount'                       => $amount,
-                'stripe_fee'                   => 0,
-                'platform_fee'                 => 0,
-                'net_amount'                   => 0,
-                'currency'                     => strtoupper($currency),
-                'status'                       => 'pending',
-                'description'                  => $description,
-                'stripe_metadata'              => $intent,
-                'stripe_created_at'            => isset($intent['created'])
+                'tpa_id' => $tpa->id,
+                'customer_id' => $customer->id,
+                'type' => TransactionType::CARD_PRESENT,
+                'direction' => TransactionDirection::Credit,
+                'stripe_payment_intent_id' => $intent['id'],
+                'payment_method_type' => 'card_present',
+                'amount' => $amount,
+                'stripe_fee' => 0,
+                'platform_fee' => 0,
+                'net_amount' => 0,
+                'currency' => strtoupper($currency),
+                'status' => 'pending',
+                'description' => $description,
+                'stripe_metadata' => $intent,
+                'stripe_created_at' => isset($intent['created'])
                     ? Carbon::createFromTimestamp($intent['created'])
                     : now(),
             ]);
         } catch (\Throwable $e) {
             Log::channel('stripe')->error('stripe_service: terminal_transaction_create_failed', [
-                'customer_id'              => $customer->id,
+                'customer_id' => $customer->id,
                 'stripe_payment_intent_id' => $intent['id'],
-                'exception'                => $e->getMessage(),
+                'exception' => $e->getMessage(),
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 502,
-                'Erro ao registrar a transação. Payment intent criado no Stripe: ' . $intent['id']
+                'Erro ao registrar a transação. Payment intent criado no Stripe: '.$intent['id']
             );
         }
 
         return [
-            'transaction'   => $transaction,
+            'transaction' => $transaction,
             'client_secret' => $intent['client_secret'],
         ];
     }
@@ -341,7 +355,7 @@ class StripeService
             );
         }
 
-        if (!\in_array($transaction->status, ['pending', 'requires_capture'])) {
+        if (! \in_array($transaction->status, ['pending', 'requires_capture'])) {
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 422,
@@ -353,9 +367,9 @@ class StripeService
 
         if ($result['status'] !== 'success') {
             Log::channel('stripe')->warning('stripe_service: captureTerminalPayment', [
-                'transaction_id'           => $transaction->id,
+                'transaction_id' => $transaction->id,
                 'stripe_payment_intent_id' => $transaction->stripe_payment_intent_id,
-                'message'                  => $result['message'],
+                'message' => $result['message'],
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
@@ -365,7 +379,7 @@ class StripeService
         }
 
         Log::channel('stripe')->info('stripe_service: captureTerminalPayment — captura solicitada', [
-            'transaction_id'           => $transaction->id,
+            'transaction_id' => $transaction->id,
             'stripe_payment_intent_id' => $transaction->stripe_payment_intent_id,
         ]);
 
@@ -389,8 +403,8 @@ class StripeService
         if ($result['status'] !== 'success') {
             Log::channel('stripe')->warning('stripe_service: createSubscription', [
                 'customer_id' => $customer->id,
-                'price_id'    => $priceId,
-                'message'     => $result['message'],
+                'price_id' => $priceId,
+                'message' => $result['message'],
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_SUBSCRIPTION_FAILED,
@@ -409,7 +423,7 @@ class StripeService
         if ($result['status'] !== 'success') {
             Log::channel('stripe')->warning('stripe_service: cancelSubscription', [
                 'subscription_id' => $subscriptionId,
-                'message'         => $result['message'],
+                'message' => $result['message'],
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_SUBSCRIPTION_CANCEL_FAILED,
@@ -427,10 +441,10 @@ class StripeService
         $object = $payload['data']['object'] ?? [];
 
         match ($eventType) {
-            'payment_intent.succeeded'                          => $this->handlePaymentIntentSucceeded($object),
-            'payment_intent.payment_failed'                     => $this->handlePaymentIntentFailed($object),
-            'charge.updated'                                    => $this->handleChargeUpdated($object),
-            'customer.cash_balance_settings.updated'            => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
+            'payment_intent.succeeded' => $this->handlePaymentIntentSucceeded($object),
+            'payment_intent.payment_failed' => $this->handlePaymentIntentFailed($object),
+            'charge.updated' => $this->handleChargeUpdated($object),
+            'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
             default => Log::info('Stripe webhook ignorado', ['type' => $eventType]),
         };
     }
@@ -442,7 +456,7 @@ class StripeService
         if ($result['status'] !== 'success') {
             Log::channel('stripe')->warning('stripe_service: getCashBalance', [
                 'customer_id' => $customerId,
-                'message'     => $result['message'],
+                'message' => $result['message'],
             ]);
             throw new ApiException(
                 ErrorCode::STRIPE_CASH_BALANCE_FAILED,
@@ -457,11 +471,12 @@ class StripeService
     private function handleCashBalanceFunded(array $object): void
     {
         $stripeCustomerId = $object['customer'] ?? null;
-        $currency         = strtoupper($object['currency'] ?? '');
-        $netAmount        = $object['net_amount'] ?? 0;
+        $currency = strtoupper($object['currency'] ?? '');
+        $netAmount = $object['net_amount'] ?? 0;
 
         if (! $stripeCustomerId || ! $currency || $netAmount <= 0) {
             Log::channel('stripe')->warning('Stripe webhook: cash_balance.funded com dados inválidos', $object);
+
             return;
         }
 
@@ -471,6 +486,7 @@ class StripeService
             Log::channel('stripe')->warning('Stripe webhook: CustomerStripeAccount não encontrada', [
                 'stripe_customer_id' => $stripeCustomerId,
             ]);
+
             return;
         }
 
@@ -480,6 +496,7 @@ class StripeService
             Log::channel('stripe')->info('Stripe webhook: cash_balance.funded já processado', [
                 'stripe_cash_balance_transaction_id' => $transactionId,
             ]);
+
             return;
         }
 
@@ -488,7 +505,7 @@ class StripeService
             ->where('is_active', true)
             ->first();
 
-        $platformFee  = $feeConfig ? $feeConfig->calculatePlatformFee($netAmount) : 0;
+        $platformFee = $feeConfig ? $feeConfig->calculatePlatformFee($netAmount) : 0;
         $creditAmount = $netAmount - $platformFee;
 
         // Determina a data de liquidação esperada (2 dias úteis por defeito para bank transfers)
@@ -498,28 +515,28 @@ class StripeService
 
         try {
             Transaction::create([
-                'customer_id'                           => $stripeAccount->customer_id,
-                'stripe_payment_method_fee_id'          => $feeConfig?->id,
-                'type'                                  => TransactionType::BANK_TRANSFER,
-                'direction'                             => TransactionDirection::Credit,
-                'payment_method_type'                   => 'bank_transfer',
-                'amount'                                => $netAmount,
-                'stripe_fee'                            => 0,
-                'platform_fee'                          => $platformFee,
-                'net_amount'                            => $creditAmount,
-                'currency'                              => $currency,
-                'status'                                => 'succeeded',
-                'description'                           => 'Cash balance funded via bank transfer',
-                'stripe_cash_balance_transaction_id'    => $object['id'] ?? null,
-                'bank_transfer_type'                    => $object['funded']['bank_transfer']['type'] ?? null,
-                'bank_transfer_reference'               => $object['funded']['bank_transfer']['reference'] ?? null,
-                'bank_transfer_sender_name'             => $object['funded']['bank_transfer']['eu_bank_transfer']['sender_name'] ?? null,
-                'bank_transfer_bic'                     => $object['funded']['bank_transfer']['eu_bank_transfer']['bic'] ?? null,
-                'bank_transfer_iban_last4'              => $object['funded']['bank_transfer']['eu_bank_transfer']['iban_last4'] ?? null,
-                'bank_transfer_amount'                  => $netAmount,
-                'stripe_metadata'                       => $object,
-                'available_on'                          => $availableOn,
-                'stripe_created_at'                     => isset($object['created'])
+                'customer_id' => $stripeAccount->customer_id,
+                'stripe_payment_method_fee_id' => $feeConfig?->id,
+                'type' => TransactionType::BANK_TRANSFER,
+                'direction' => TransactionDirection::Credit,
+                'payment_method_type' => 'bank_transfer',
+                'amount' => $netAmount,
+                'stripe_fee' => 0,
+                'platform_fee' => $platformFee,
+                'net_amount' => $creditAmount,
+                'currency' => $currency,
+                'status' => 'succeeded',
+                'description' => 'Cash balance funded via bank transfer',
+                'stripe_cash_balance_transaction_id' => $object['id'] ?? null,
+                'bank_transfer_type' => $object['funded']['bank_transfer']['type'] ?? null,
+                'bank_transfer_reference' => $object['funded']['bank_transfer']['reference'] ?? null,
+                'bank_transfer_sender_name' => $object['funded']['bank_transfer']['eu_bank_transfer']['sender_name'] ?? null,
+                'bank_transfer_bic' => $object['funded']['bank_transfer']['eu_bank_transfer']['bic'] ?? null,
+                'bank_transfer_iban_last4' => $object['funded']['bank_transfer']['eu_bank_transfer']['iban_last4'] ?? null,
+                'bank_transfer_amount' => $netAmount,
+                'stripe_metadata' => $object,
+                'available_on' => $availableOn,
+                'stripe_created_at' => isset($object['created'])
                     ? Carbon::createFromTimestamp($object['created'])
                     : now(),
             ]);
@@ -529,15 +546,16 @@ class StripeService
         } catch (\Throwable $e) {
             Log::channel('stripe')->error('Stripe webhook: erro ao processar cash_balance.funded', [
                 'stripe_customer_id' => $stripeCustomerId,
-                'exception'          => $e->getMessage(),
+                'exception' => $e->getMessage(),
             ]);
+
             return;
         }
 
         Log::channel('stripe')->info('Stripe webhook: customer.cash_balance.funded', [
             'stripe_customer_id' => $stripeCustomerId,
-            'currency'           => $currency,
-            'net_amount'         => $netAmount,
+            'currency' => $currency,
+            'net_amount' => $netAmount,
         ]);
     }
 
@@ -545,13 +563,14 @@ class StripeService
     {
         $transaction = Transaction::where('stripe_payment_intent_id', $intent['id'])->first();
 
-        if (!$transaction) {
+        if (! $transaction) {
             Log::channel('stripe')->warning('Stripe webhook: transaction não encontrada', ['payment_intent_id' => $intent['id']]);
+
             return;
         }
 
         $transaction->update([
-            'status'          => 'succeeded',
+            'status' => 'succeeded',
             'stripe_metadata' => $intent,
         ]);
 
@@ -566,35 +585,36 @@ class StripeService
         }
     }
 
-    private function  createPlatformTransfer(Transaction $sourceTransaction): void
+    private function createPlatformTransfer(Transaction $sourceTransaction): void
     {
         $platformCustomer = Cache::rememberForever('platform_customer', fn () => Customer::where('type', 'platform')->first());
 
-        if (!$platformCustomer) {
+        if (! $platformCustomer) {
             Log::channel('stripe')->warning('Stripe webhook: conta platform não encontrada para transfer', [
                 'transaction_id' => $sourceTransaction->id,
             ]);
+
             return;
         }
 
         try {
             Transaction::create([
-                'customer_id'                  => $platformCustomer->id,
+                'customer_id' => $platformCustomer->id,
                 'stripe_payment_method_fee_id' => $sourceTransaction->stripe_payment_method_fee_id,
-                'related_transaction_id'       => $sourceTransaction->id,
-                'type'                         => TransactionType::P2P,
-                'direction'                    => TransactionDirection::Credit,
-                'stripe_payment_intent_id'     => $sourceTransaction->stripe_payment_intent_id,
-                'stripe_charge_id'             => $sourceTransaction->stripe_charge_id,
-                'payment_method_type'          => $sourceTransaction->payment_method_type,
-                'amount'                       => $sourceTransaction->net_amount,
-                'stripe_fee'                   => 0,
-                'platform_fee'                 => 0,
-                'net_amount'                   => $sourceTransaction->net_amount,
-                'currency'                     => $sourceTransaction->currency,
-                'status'                       => 'succeeded',
-                'description'                  => "Platform transfer from transaction #{$sourceTransaction->id}",
-                'stripe_created_at'            => now(),
+                'related_transaction_id' => $sourceTransaction->id,
+                'type' => TransactionType::P2P,
+                'direction' => TransactionDirection::Credit,
+                'stripe_payment_intent_id' => $sourceTransaction->stripe_payment_intent_id,
+                'stripe_charge_id' => $sourceTransaction->stripe_charge_id,
+                'payment_method_type' => $sourceTransaction->payment_method_type,
+                'amount' => $sourceTransaction->net_amount,
+                'stripe_fee' => 0,
+                'platform_fee' => 0,
+                'net_amount' => $sourceTransaction->net_amount,
+                'currency' => $sourceTransaction->currency,
+                'status' => 'succeeded',
+                'description' => "Platform transfer from transaction #{$sourceTransaction->id}",
+                'stripe_created_at' => now(),
             ]);
 
             $this->incrementBalance(
@@ -618,6 +638,7 @@ class StripeService
 
         if ($transaction->net_amount <= 0) {
             $transaction->update(['balance_settled_at' => now()]);
+
             return;
         }
 
@@ -625,7 +646,7 @@ class StripeService
             $transaction->customer_id,
             $transaction->currency,
             available: $transaction->net_amount,
-            pending:   -$transaction->net_amount,
+            pending: -$transaction->net_amount,
         );
 
         $this->createPlatformTransfer($transaction);
@@ -634,10 +655,28 @@ class StripeService
 
         Log::channel('stripe')->info('stripe_service: settleTransaction — saldo libertado', [
             'transaction_id' => $transaction->id,
-            'net_amount'     => $transaction->net_amount,
-            'currency'       => $transaction->currency,
-            'available_on'   => $transaction->available_on,
+            'net_amount' => $transaction->net_amount,
+            'currency' => $transaction->currency,
+            'available_on' => $transaction->available_on,
         ]);
+    }
+
+    private function assertDailyTopupLimitNotExceeded(Customer $customer, int $amount): void
+    {
+        $succeededTopupToday = Transaction::query()
+            ->where('customer_id', $customer->id)
+            ->where('type', TransactionType::TOPUP)
+            ->where('status', 'succeeded')
+            ->where('created_at', '>=', now()->startOfDay())
+            ->sum('amount');
+
+        if ($succeededTopupToday + $amount > self::DAILY_TOPUP_LIMIT_CENTS) {
+            throw new ApiException(
+                ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
+                422,
+                'Limite diário de top-up (100 EUR) excedido.'
+            );
+        }
     }
 
     private function incrementBalance(int $customerId, string $currency, int $available = 0, int $pending = 0): void
@@ -649,7 +688,7 @@ class StripeService
 
         CustomerBalance::where('id', $balance->id)->update([
             'available' => DB::raw("available + {$available}"),
-            'pending'   => DB::raw("pending + {$pending}"),
+            'pending' => DB::raw("pending + {$pending}"),
         ]);
     }
 
@@ -657,8 +696,9 @@ class StripeService
     {
         $transaction = Transaction::where('stripe_payment_intent_id', $intent['id'])->first();
 
-        if (!$transaction) {
+        if (! $transaction) {
             Log::channel('stripe')->warning('Stripe webhook: transaction não encontrada', ['payment_intent_id' => $intent['id']]);
+
             return;
         }
 
@@ -667,13 +707,9 @@ class StripeService
             'stripe_metadata' => $intent,
         ]);
 
-        // Reverte o pending adicionado pelo charge.updated (se tiver chegado antes do failed)
+        // Reverte crédito aplicado pelo charge.updated (se tiver chegado antes do failed)
         if ($transaction->net_amount > 0) {
-            $this->incrementBalance(
-                $transaction->customer_id,
-                $transaction->currency,
-                pending: -$transaction->net_amount,
-            );
+            $this->stripePaymentWallet->reverseStripePayment($transaction->fresh());
         }
 
         Log::info('Stripe webhook: payment_intent.payment_failed', ['pi' => $intent['id'], 'transaction_id' => $transaction->id]);
@@ -691,7 +727,7 @@ class StripeService
     {
         $paymentIntentId = $charge['payment_intent'] ?? null;
 
-        if (!$paymentIntentId) {
+        if (! $paymentIntentId) {
             return;
         }
 
@@ -700,7 +736,7 @@ class StripeService
 
         $balanceTxnId = $charge['balance_transaction'] ?? null;
 
-        if (!\is_string($balanceTxnId) || !str_starts_with($balanceTxnId, 'txn_')) {
+        if (! \is_string($balanceTxnId) || ! str_starts_with($balanceTxnId, 'txn_')) {
             return;
         }
 
@@ -709,14 +745,15 @@ class StripeService
         if ($result['status'] !== 'success') {
             Log::channel('stripe')->warning('stripe_service: getBalanceTransaction failed', [
                 'balance_transaction_id' => $balanceTxnId,
-                'payment_intent_id'      => $paymentIntentId,
+                'payment_intent_id' => $paymentIntentId,
             ]);
+
             return;
         }
 
         $realStripeFee = $result['data']['fee'] ?? null;
-        $availableOn   = isset($result['data']['available_on'])
-            ? \Carbon\Carbon::createFromTimestamp($result['data']['available_on'])->toDateString()
+        $availableOn = isset($result['data']['available_on'])
+            ? Carbon::createFromTimestamp($result['data']['available_on'])->toDateString()
             : null;
 
         if ($realStripeFee === null) {
@@ -727,44 +764,48 @@ class StripeService
             ->whereNull('related_transaction_id')
             ->first();
 
-        if (!$transaction) {
+        if (! $transaction) {
             return;
         }
 
         // Classifica o método de pagamento real (para cartões, pelo país do cartão)
-        $pmDetails  = $charge['payment_method_details'] ?? [];
-        $pmType     = $pmDetails['type'] ?? null;
-        $feeMethod  = $this->resolvePaymentMethodCategory($pmType, $pmDetails);
+        $pmDetails = $charge['payment_method_details'] ?? [];
+        $pmType = $pmDetails['type'] ?? null;
+        $feeMethod = $this->resolvePaymentMethodCategory($pmType, $pmDetails);
 
         $feeConfig = StripePaymentMethodFee::where('payment_method', $feeMethod)
             ->where('currency', $transaction->currency)
             ->where('is_active', true)
             ->first();
 
-        $platformFee   = $feeConfig ? $feeConfig->calculatePlatformFee($transaction->amount) : 0;
+        $platformFee = $feeConfig ? $feeConfig->calculatePlatformFee($transaction->amount) : 0;
         $realNetAmount = $transaction->amount - $realStripeFee - $platformFee;
 
         $transaction->update([
             'stripe_payment_method_fee_id' => $feeConfig?->id,
-            'payment_method_type'          => $feeMethod,
-            'stripe_fee'                   => $realStripeFee,
-            'platform_fee'                 => $platformFee,
-            'net_amount'                   => $realNetAmount,
-            'available_on'                 => $availableOn,
+            'payment_method_type' => $feeMethod,
+            'stripe_fee' => $realStripeFee,
+            'platform_fee' => $platformFee,
+            'net_amount' => $realNetAmount,
+            'available_on' => $availableOn,
         ]);
 
-        // Saldo fica sempre em pending; settlement job moverá para available na data available_on
-        $this->incrementBalance($transaction->customer_id, $transaction->currency, pending: $realNetAmount);
+        // Credit wallet immediately (D+2 settlement deferred).
+        $this->stripePaymentWallet->creditFromStripePayment($transaction->fresh());
 
         Log::channel('stripe')->info('stripe_service: charge.updated — fees e categoria aplicados', [
-            'payment_intent_id'       => $paymentIntentId,
-            'balance_transaction_id'  => $balanceTxnId,
+            'payment_intent_id' => $paymentIntentId,
+            'balance_transaction_id' => $balanceTxnId,
             'payment_method_category' => $feeMethod,
-            'stripe_fee'              => $realStripeFee,
-            'platform_fee'            => $platformFee,
-            'net_amount'              => $realNetAmount,
-            'available_on'            => $availableOn,
+            'stripe_fee' => $realStripeFee,
+            'platform_fee' => $platformFee,
+            'net_amount' => $realNetAmount,
+            'available_on' => $availableOn,
         ]);
+
+        if ($this->topupFundingPolicy->shouldDispatchPartnerFundingJob($transaction->fresh(), $charge)) {
+            FundWallesterTopupFromStripeJob::dispatch($transaction->id);
+        }
     }
 
     private function resolvePaymentMethodCategory(string $pmType, array $pmDetails): string
@@ -776,9 +817,9 @@ class StripeService
         $country = strtoupper($pmDetails['card']['country'] ?? '');
 
         $eeaCountries = [
-            'AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI',
-            'FR','GR','HR','HU','IE','IS','IT','LI','LT','LU',
-            'LV','MT','NL','NO','PL','PT','RO','SE','SI','SK',
+            'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI',
+            'FR', 'GR', 'HR', 'HU', 'IE', 'IS', 'IT', 'LI', 'LT', 'LU',
+            'LV', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK',
         ];
 
         if (\in_array($country, $eeaCountries, true)) {

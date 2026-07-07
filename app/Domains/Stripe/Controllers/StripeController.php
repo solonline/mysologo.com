@@ -2,6 +2,7 @@
 
 namespace App\Domains\Stripe\Controllers;
 
+use App\Domains\Stripe\Services\StripeService;
 use App\Exceptions\ApiException;
 use App\Http\Requests\Stripe\CreatePaymentIntentRequest;
 use App\Http\Requests\Stripe\CreateTerminalPaymentIntentRequest;
@@ -10,7 +11,6 @@ use App\Http\Resources\Stripe\PaymentMethodResource;
 use App\Http\Resources\TransactionResource;
 use App\Models\StripePaymentMethodFee;
 use App\Models\Transaction;
-use App\Domains\Stripe\Services\StripeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -19,9 +19,7 @@ use Illuminate\Support\Facades\Cache;
 
 class StripeController extends Controller
 {
-    public function __construct(protected StripeService $stripeService)
-    {
-    }
+    public function __construct(protected StripeService $stripeService) {}
 
     /**
      * List Payment Methods
@@ -29,17 +27,17 @@ class StripeController extends Controller
      * Returns the active payment methods available for a given currency, including their fee structure.
      *
      * @tags Stripe
+     *
      * @queryParam currency string optional ISO 4217 currency code. Defaults to `EUR`. Example: EUR
      */
     public function paymentMethods(Request $request): AnonymousResourceCollection
     {
         $currency = strtoupper($request->query('currency', 'EUR'));
 
-        $methods = Cache::remember("payment_methods:{$currency}", 300, fn () =>
-            StripePaymentMethodFee::where('is_active', true)
-                ->where('currency', $currency)
-                ->orderBy('id')
-                ->get()
+        $methods = Cache::remember("payment_methods:{$currency}", 300, fn () => StripePaymentMethodFee::where('is_active', true)
+            ->where('currency', $currency)
+            ->orderBy('id')
+            ->get()
         );
 
         return PaymentMethodResource::collection($methods);
@@ -62,14 +60,15 @@ class StripeController extends Controller
                 customer: $customer,
                 amount: $data['amount'],
                 paymentMethodFeeId: $data['payment_method_id'],
-                currency: $data['currency'] ?? 'eur'
+                currency: $data['currency'] ?? 'eur',
+                isTopup: true,
             );
         } catch (ApiException $e) {
             return response()->json($e->toArray(), $e->status);
         }
 
         return response()->json([
-            'transaction'   => new TransactionResource($result['transaction']),
+            'transaction' => new TransactionResource($result['transaction']),
             'client_secret' => $result['client_secret'],
         ], 201);
     }
@@ -111,7 +110,7 @@ class StripeController extends Controller
         }
 
         return response()->json([
-            'transaction'   => new TransactionResource($result['transaction']),
+            'transaction' => new TransactionResource($result['transaction']),
             'client_secret' => $result['client_secret'],
         ], 201);
     }
@@ -131,7 +130,7 @@ class StripeController extends Controller
             ->where('customer_id', $customer->id)
             ->first();
 
-        if (!$transaction) {
+        if (! $transaction) {
             return response()->json(['message' => 'Transação não encontrada.'], 404);
         }
 
@@ -150,16 +149,16 @@ class StripeController extends Controller
      * Returns the fee breakdown (platform + Stripe) for each active payment method. Useful for showing the total cost to the customer before initiating a payment.
      *
      * @tags Stripe
+     *
      * @queryParam currency string optional ISO 4217 currency code. Defaults to `EUR`. Example: EUR
      */
     public function feeEstimates(Request $request): AnonymousResourceCollection
     {
         $currency = strtoupper($request->query('currency', 'EUR'));
 
-        $fees = Cache::remember("fee_estimates:{$currency}", 300, fn () =>
-            StripePaymentMethodFee::where('is_active', true)
-                ->where('currency', $currency)
-                ->get()
+        $fees = Cache::remember("fee_estimates:{$currency}", 300, fn () => StripePaymentMethodFee::where('is_active', true)
+            ->where('currency', $currency)
+            ->get()
         );
 
         return FeeEstimateResource::collection($fees)

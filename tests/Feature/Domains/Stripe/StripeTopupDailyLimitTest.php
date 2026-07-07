@@ -1,0 +1,189 @@
+<?php
+
+namespace Tests\Feature\Domains\Stripe;
+
+use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
+use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use App\Domains\Stripe\Services\StripeService;
+use App\Domains\Wallet\Enums\TransactionDirection;
+use App\Domains\Wallet\Enums\TransactionType;
+use App\Exceptions\ApiException;
+use App\Models\StripePaymentMethodFee;
+use App\Models\Transaction;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+use Tests\Concerns\InteractsWithOnboarding;
+use Tests\TestCase;
+
+class StripeTopupDailyLimitTest extends TestCase
+{
+    use InteractsWithOnboarding;
+    use RefreshDatabase;
+
+    private StripePaymentMethodFee $feeConfig;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->feeConfig = StripePaymentMethodFee::query()->create([
+            'payment_method' => 'card',
+            'label' => 'Cartão',
+            'stripe_fee_percentage' => 0.0150,
+            'stripe_fee_fixed' => 0.25,
+            'platform_fee_percentage' => 0.0050,
+            'platform_fee_fixed' => 0.00,
+            'currency' => 'EUR',
+            'is_active' => true,
+        ]);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+
+        parent::tearDown();
+    }
+
+    public function test_topup_transaction_is_stored_with_topup_type_and_payment_method_type(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $this->createStripeAccount($customer);
+        $this->mockStripeGateway();
+
+        $service = app(StripeService::class);
+
+        $result = $service->createPaymentIntent(
+            customer: $customer,
+            amount: 5_000,
+            paymentMethodFeeId: $this->feeConfig->id,
+            isTopup: true,
+        );
+
+        $this->assertSame(TransactionType::TOPUP, $result['transaction']->type);
+        $this->assertSame('card', $result['transaction']->payment_method_type);
+
+        $this->assertDatabaseHas('stripe_transactions', [
+            'id' => $result['transaction']->id,
+            'type' => TransactionType::TOPUP->value,
+            'payment_method_type' => 'card',
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_topup_daily_limit_blocks_when_succeeded_total_plus_amount_exceeds_100_eur(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $this->createStripeAccount($customer);
+        $this->mockStripeGateway();
+
+        Transaction::query()->create([
+            'customer_id' => $customer->id,
+            'stripe_payment_method_fee_id' => $this->feeConfig->id,
+            'type' => TransactionType::TOPUP,
+            'direction' => TransactionDirection::Credit,
+            'payment_method_type' => 'card',
+            'amount' => 9_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 0,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+        ]);
+
+        $service = app(StripeService::class);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('Limite diário de top-up (100 EUR) excedido.');
+
+        $service->createPaymentIntent(
+            customer: $customer,
+            amount: 2_000,
+            paymentMethodFeeId: $this->feeConfig->id,
+            isTopup: true,
+        );
+    }
+
+    public function test_topup_daily_limit_ignores_pending_topups(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $this->createStripeAccount($customer);
+        $this->mockStripeGateway();
+
+        Transaction::query()->create([
+            'customer_id' => $customer->id,
+            'stripe_payment_method_fee_id' => $this->feeConfig->id,
+            'type' => TransactionType::TOPUP,
+            'direction' => TransactionDirection::Credit,
+            'payment_method_type' => 'card',
+            'amount' => 9_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 0,
+            'currency' => 'EUR',
+            'status' => 'pending',
+        ]);
+
+        $service = app(StripeService::class);
+
+        $result = $service->createPaymentIntent(
+            customer: $customer,
+            amount: 5_000,
+            paymentMethodFeeId: $this->feeConfig->id,
+            isTopup: true,
+        );
+
+        $this->assertSame(TransactionType::TOPUP, $result['transaction']->type);
+    }
+
+    public function test_create_intent_payment_endpoint_registers_topup_type(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $this->createStripeAccount($customer);
+        $this->mockStripeGateway();
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson('/api/stripe/create-intent-payment', [
+                'amount' => 5_000,
+                'payment_method_id' => $this->feeConfig->id,
+                'currency' => 'eur',
+            ], [
+                'Idempotency-Key' => 'topup-test-'.uniqid(),
+            ])
+            ->assertCreated()
+            ->assertJsonPath('transaction.type', TransactionType::TOPUP->value)
+            ->assertJsonPath('transaction.payment_method_type', 'card');
+    }
+
+    private function createActiveCustomer()
+    {
+        return $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'email_verified_at' => now(),
+            'doc_status' => 'approved',
+        ]);
+    }
+
+    private function mockStripeGateway(): void
+    {
+        $gateway = Mockery::mock(StripeGatewayInterface::class);
+        $gateway->shouldReceive('createPaymentIntent')
+            ->andReturnUsing(function () {
+                static $counter = 0;
+                $counter++;
+
+                return [
+                    'status' => 'success',
+                    'data' => [
+                        'id' => 'pi_test_'.$counter,
+                        'client_secret' => 'cs_test_'.$counter,
+                        'created' => now()->timestamp,
+                    ],
+                ];
+            });
+
+        $this->app->instance(StripeGatewayInterface::class, $gateway);
+    }
+}

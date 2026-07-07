@@ -11,7 +11,7 @@ class WalletAccountService
     public function getDetails(Customer $customer): array
     {
         $stripeAccount = $customer->stripeAccount;
-        $wallesterAccount = $customer->wallesterAccounts;
+        $wallesterAccount = $customer->wallesterAccount;
 
         return [
             'stripe' => $stripeAccount
@@ -40,6 +40,8 @@ class WalletAccountService
                     'bank_name' => $wallesterAccount->bank_name,
                     'currency_code' => $wallesterAccount->currency_code,
                     'status' => $wallesterAccount->status,
+                    'balance' => $wallesterAccount->balance,
+                    'available_amount' => $wallesterAccount->available_amount,
                 ]
                 : null,
         ];

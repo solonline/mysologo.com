@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wallet\Services;
 
+use App\Domains\Auth\Services\DeviceAuthService;
 use App\Domains\Customer\Contracts\CustomerRepositoryInterface;
 use App\Domains\Wallet\Contracts\TransactionRepositoryInterface;
 use App\Domains\Wallet\Enums\LedgerEntryType;
@@ -11,9 +12,9 @@ use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\Transaction;
-use App\Domains\Auth\Services\DeviceAuthService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class WalletTransactionService
@@ -23,6 +24,7 @@ class WalletTransactionService
         protected CustomerRepositoryInterface $customerRepository,
         protected DeviceAuthService $deviceAuthService,
         protected LedgerService $ledgerService,
+        protected FundingPartnerMovementService $fundingPartnerMovements,
     ) {}
 
     public function list(Customer $customer, int $perPage = 15): LengthAwarePaginator
@@ -53,6 +55,10 @@ class WalletTransactionService
     ): array {
         $this->deviceAuthService->verifyPin($sender, $deviceToken, $pin);
 
+        if ($sender->type === 'platform') {
+            throw new ApiException(ErrorCode::ACCOUNT_NOT_ACTIVE, 403, 'Conta platform não pode usar P2P.');
+        }
+
         $currency = strtoupper($currency);
 
         $recipient = $this->customerRepository->findByUsername($recipientUsername, excludeId: $sender->id);
@@ -65,15 +71,17 @@ class WalletTransactionService
             throw new ApiException(ErrorCode::P2P_SELF_TRANSFER, 422, 'Não é possível transferir para si mesmo.');
         }
 
-        $available = $this->transactionRepository->getAvailableBalance($sender->id, $currency);
+        $idempotencyKey = 'p2p:'.Str::uuid()->toString();
+        $description ??= 'P2P transfer';
 
-        if ($available < $amount) {
-            throw new ApiException(
-                ErrorCode::INSUFFICIENT_BALANCE,
-                422,
-                "Saldo insuficiente. Disponível: {$available} {$currency}."
-            );
-        }
+        $this->fundingPartnerMovements->transferBetweenCustomers(
+            from: $sender,
+            to: $recipient,
+            amountCents: $amount,
+            currency: $currency,
+            description: $description,
+            idempotencyKey: $idempotencyKey,
+        );
 
         return DB::transaction(function () use ($sender, $recipient, $amount, $currency, $description) {
             $base = [

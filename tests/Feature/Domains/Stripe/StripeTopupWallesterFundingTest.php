@@ -1,0 +1,371 @@
+<?php
+
+namespace Tests\Feature\Domains\Stripe;
+
+use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
+use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use App\Domains\Stripe\Services\StripeService;
+use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
+use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
+use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
+use App\Domains\Wallet\Enums\LedgerEntryType;
+use App\Domains\Wallet\Enums\PartnerFundingStatus;
+use App\Domains\Wallet\Enums\TransactionType;
+use App\Domains\Wallet\Services\FundingPartnerMovementService;
+use App\Domains\Wallet\Services\LedgerService;
+use App\Models\Customer;
+use App\Models\CustomerBalance;
+use App\Models\LedgerEntry;
+use App\Models\StripePaymentMethodFee;
+use App\Models\Transaction;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
+use Mockery;
+use Tests\Concerns\InteractsWithOnboarding;
+use Tests\Concerns\InteractsWithWallesterSettings;
+use Tests\TestCase;
+
+class StripeTopupWallesterFundingTest extends TestCase
+{
+    use InteractsWithOnboarding;
+    use InteractsWithWallesterSettings;
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seedWallesterSettings();
+        Cache::flush();
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+
+        parent::tearDown();
+    }
+
+    public function test_charge_updated_dispatches_wallester_topup_job_for_eligible_topup(): void
+    {
+        Bus::fake([FundWallesterTopupFromStripeJob::class]);
+
+        $customer = $this->createActiveCustomer();
+        $this->createStripeAccount($customer);
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
+
+        $transaction = Transaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 5_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 0,
+            'currency' => 'EUR',
+            'status' => 'pending',
+            'stripe_payment_intent_id' => 'pi_topup_1',
+        ]);
+
+        $this->mockStripeGatewayForChargeUpdated();
+
+        $service = app(StripeService::class);
+        $service->handleWebhook([
+            'type' => 'charge.updated',
+            'data' => [
+                'object' => [
+                    'id' => 'ch_topup_1',
+                    'payment_intent' => 'pi_topup_1',
+                    'status' => 'succeeded',
+                    'paid' => true,
+                    'balance_transaction' => 'txn_topup_1',
+                    'payment_method_details' => ['type' => 'card', 'card' => ['country' => 'PT']],
+                ],
+            ],
+        ]);
+
+        Bus::assertDispatched(FundWallesterTopupFromStripeJob::class, function (FundWallesterTopupFromStripeJob $job) use ($transaction): bool {
+            return $job->stripeTransactionId === $transaction->id;
+        });
+    }
+
+    public function test_charge_updated_credits_pending_and_ledger_for_eligible_topup(): void
+    {
+        Bus::fake([FundWallesterTopupFromStripeJob::class]);
+
+        $customer = $this->createActiveCustomer();
+        $this->createPlatformCustomer();
+        $this->createStripeAccount($customer);
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
+
+        Transaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 5_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 0,
+            'currency' => 'EUR',
+            'status' => 'pending',
+            'stripe_payment_intent_id' => 'pi_topup_ledger',
+        ]);
+
+        $this->mockStripeGatewayForChargeUpdated();
+
+        app(StripeService::class)->handleWebhook([
+            'type' => 'charge.updated',
+            'data' => [
+                'object' => [
+                    'id' => 'ch_topup_ledger',
+                    'payment_intent' => 'pi_topup_ledger',
+                    'status' => 'succeeded',
+                    'paid' => true,
+                    'balance_transaction' => 'txn_topup_ledger',
+                    'payment_method_details' => ['type' => 'card', 'card' => ['country' => 'PT']],
+                ],
+            ],
+        ]);
+
+        $transaction = Transaction::query()->where('stripe_payment_intent_id', 'pi_topup_ledger')->firstOrFail();
+
+        $this->assertNotNull($transaction->balance_settled_at);
+        $this->assertSame(4_875, (int) $transaction->net_amount);
+        $this->assertSame(25, (int) $transaction->platform_fee);
+        $this->assertSame(PartnerFundingStatus::Pending, $transaction->partner_funding_status);
+
+        $balance = CustomerBalance::query()
+            ->where('customer_id', $customer->id)
+            ->where('currency', 'EUR')
+            ->first();
+
+        $this->assertNotNull($balance);
+        $this->assertSame(0, (int) $balance->available);
+        $this->assertSame(4_875, (int) $balance->pending);
+
+        $this->assertTrue(
+            LedgerEntry::query()
+                ->where('customer_id', $customer->id)
+                ->where('entry_type', LedgerEntryType::PAYMENT_RECEIVED)
+                ->where('amount', 4_875)
+                ->exists()
+        );
+    }
+
+    public function test_charge_updated_does_not_dispatch_for_non_topup(): void
+    {
+        Bus::fake([FundWallesterTopupFromStripeJob::class]);
+
+        $customer = $this->createActiveCustomer();
+        $this->createStripeAccount($customer);
+        $this->createWallesterAccount($customer);
+
+        Transaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::CARD,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 5_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 0,
+            'currency' => 'EUR',
+            'status' => 'pending',
+            'stripe_payment_intent_id' => 'pi_card_1',
+        ]);
+
+        $this->mockStripeGatewayForChargeUpdated();
+
+        app(StripeService::class)->handleWebhook([
+            'type' => 'charge.updated',
+            'data' => [
+                'object' => [
+                    'id' => 'ch_card_1',
+                    'payment_intent' => 'pi_card_1',
+                    'status' => 'succeeded',
+                    'paid' => true,
+                    'balance_transaction' => 'txn_card_1',
+                    'payment_method_details' => ['type' => 'card', 'card' => ['country' => 'PT']],
+                ],
+            ],
+        ]);
+
+        Bus::assertNotDispatched(FundWallesterTopupFromStripeJob::class);
+    }
+
+    public function test_topup_job_transfers_net_amount_and_is_idempotent(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $platform = $this->createPlatformCustomer();
+        $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'master-eur-uuid', [
+            'is_main' => true,
+            'currency_code' => 'EUR',
+            'funding_currency' => 'EUR',
+        ]);
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
+
+        $transaction = Transaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 3_000,
+            'stripe_fee' => 100,
+            'platform_fee' => 25,
+            'net_amount' => 2_875,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'partner_funding_status' => PartnerFundingStatus::Pending,
+            'balance_settled_at' => now(),
+        ]);
+
+        app(LedgerService::class)->recordPendingCredit(
+            customerId: $customer->id,
+            currency: 'EUR',
+            entryType: LedgerEntryType::PAYMENT_RECEIVED,
+            amount: 2_875,
+            reference: $transaction,
+            description: 'Stripe payment #'.$transaction->id,
+        );
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(fn (array $payload): bool => ($payload['amount'] ?? null) === 28.75), Mockery::any())
+            ->andReturn(['id' => 'pay_topup_1']);
+
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $job = new FundWallesterTopupFromStripeJob($transaction->id);
+        $job->handle(app(FundingPartnerMovementService::class));
+        $job->handle(app(FundingPartnerMovementService::class));
+
+        $this->assertDatabaseCount('funding_partner_movements', 2);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'amount' => 2_875,
+            'idempotency_key' => 'stripe_topup:'.$transaction->id.':out',
+            'status' => FundingPartnerMovementStatus::Completed->value,
+        ]);
+
+        $transaction->refresh();
+        $this->assertSame(PartnerFundingStatus::Completed, $transaction->partner_funding_status);
+        $this->assertNotNull($transaction->partner_funded_at);
+
+        $balance = CustomerBalance::query()
+            ->where('customer_id', $customer->id)
+            ->where('currency', 'EUR')
+            ->firstOrFail();
+
+        $this->assertSame(2_875, (int) $balance->available);
+        $this->assertSame(0, (int) $balance->pending);
+    }
+
+    public function test_topup_job_marks_awaiting_liquidity_on_insufficient_main_funds(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $platform = $this->createPlatformCustomer();
+        $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'master-eur-uuid', [
+            'is_main' => true,
+            'currency_code' => 'EUR',
+            'funding_currency' => 'EUR',
+        ]);
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
+
+        $transaction = Transaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 2_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 2_000,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'partner_funding_status' => PartnerFundingStatus::Pending,
+            'balance_settled_at' => now(),
+        ]);
+
+        app(LedgerService::class)->recordPendingCredit(
+            customerId: $customer->id,
+            currency: 'EUR',
+            entryType: LedgerEntryType::PAYMENT_RECEIVED,
+            amount: 2_000,
+            reference: $transaction,
+            description: 'Stripe payment #'.$transaction->id,
+        );
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->andThrow(new \RuntimeException('Wallester API error: {"error_code":20005,"message":"not enough funds on account available amount"}'));
+
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        try {
+            (new FundWallesterTopupFromStripeJob($transaction->id))
+                ->handle(app(FundingPartnerMovementService::class));
+            $this->fail('Expected transfer exception.');
+        } catch (\Throwable) {
+            // expected
+        }
+
+        $transaction->refresh();
+        $this->assertSame(PartnerFundingStatus::AwaitingLiquidity, $transaction->partner_funding_status);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'idempotency_key' => 'stripe_topup:'.$transaction->id.':out',
+            'status' => FundingPartnerMovementStatus::Failed->value,
+        ]);
+    }
+
+    private function createActiveCustomer(): Customer
+    {
+        return $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'email_verified_at' => now(),
+            'doc_status' => 'approved',
+        ]);
+    }
+
+    private function createPlatformCustomer(): Customer
+    {
+        return $this->createRetailCustomer([
+            'email' => 'master@yoop.com',
+            'username' => 'platform',
+            'type' => 'platform',
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'email_verified_at' => now(),
+            'doc_status' => 'approved',
+        ]);
+    }
+
+    private function mockStripeGatewayForChargeUpdated(): void
+    {
+        StripePaymentMethodFee::query()->create([
+            'payment_method' => 'card',
+            'label' => 'Cartão',
+            'stripe_fee_percentage' => 0.0150,
+            'stripe_fee_fixed' => 0.25,
+            'platform_fee_percentage' => 0.0050,
+            'platform_fee_fixed' => 0.00,
+            'currency' => 'EUR',
+            'is_active' => true,
+        ]);
+
+        $gateway = Mockery::mock(StripeGatewayInterface::class);
+        $gateway->shouldReceive('getBalanceTransaction')
+            ->andReturn([
+                'status' => 'success',
+                'data' => [
+                    'fee' => 100,
+                    'available_on' => now()->addDays(2)->timestamp,
+                ],
+            ]);
+
+        $this->app->instance(StripeGatewayInterface::class, $gateway);
+    }
+}
