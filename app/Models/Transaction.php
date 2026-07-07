@@ -2,37 +2,39 @@
 
 namespace App\Models;
 
+use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
- * @property int         $id
- * @property int         $customer_id
- * @property int|null    $stripe_payment_method_fee_id
- * @property int|null    $related_transaction_id
- * @property string      $type
- * @property string      $direction
+ * @property int $id
+ * @property int $customer_id
+ * @property int|null $stripe_payment_method_fee_id
+ * @property int|null $related_transaction_id
+ * @property string $type
+ * @property string $direction
  * @property string|null $stripe_payment_intent_id
  * @property string|null $stripe_charge_id
- * @property string      $payment_method_type
- * @property int         $amount
- * @property int         $stripe_fee
- * @property int         $platform_fee
- * @property int         $net_amount
- * @property string      $currency
- * @property string      $status
+ * @property string $payment_method_type
+ * @property int $amount
+ * @property int $stripe_fee
+ * @property int $platform_fee
+ * @property int $net_amount
+ * @property string $currency
+ * @property string $status
  * @property string|null $description
- * @property array|null  $stripe_metadata
- * @property \Carbon\Carbon|null $stripe_created_at
+ * @property array|null $stripe_metadata
+ * @property Carbon|null $stripe_created_at
  */
 class Transaction extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -73,6 +75,9 @@ class Transaction extends Model
         'bank_transfer_amount',
         'bank_transfer_fee',
         'balance_settled_at',
+        'partner_funding_status',
+        'partner_funding_failure_reason',
+        'partner_funded_at',
         'ebury_transfer_id',
         'ebury_settled_at',
         'stripe_created_at',
@@ -81,12 +86,14 @@ class Transaction extends Model
     ];
 
     protected $casts = [
-        'direction'         => TransactionDirection::class,
-        'stripe_metadata'   => 'array',
-        'stripe_created_at'  => 'datetime',
-        'settles_at'         => 'datetime',
+        'direction' => TransactionDirection::class,
+        'stripe_metadata' => 'array',
+        'stripe_created_at' => 'datetime',
+        'settles_at' => 'datetime',
         'balance_settled_at' => 'datetime',
-        'ebury_settled_at'   => 'datetime',
+        'partner_funding_status' => PartnerFundingStatus::class,
+        'partner_funded_at' => 'datetime',
+        'ebury_settled_at' => 'datetime',
     ];
 
     public function getTypeAttribute(mixed $value): ?TransactionType

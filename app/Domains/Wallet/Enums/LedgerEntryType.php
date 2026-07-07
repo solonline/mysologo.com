@@ -14,6 +14,7 @@ enum LedgerEntryType: string
     case CARD_UNLOAD = 'card_unload';
     case CARD_PURCHASE = 'card_purchase';
     case SETTLEMENT = 'settlement';
+    case PARTNER_FUNDING_RELEASED = 'partner_funding_released';
     case MANUAL_CREDIT = 'manual_credit';
     case MANUAL_DEBIT = 'manual_debit';
 
@@ -30,6 +31,7 @@ enum LedgerEntryType: string
             self::CARD_UNLOAD => 'Estorno de Cartão',
             self::CARD_PURCHASE => 'Compra com Cartão',
             self::SETTLEMENT => 'Liquidação',
+            self::PARTNER_FUNDING_RELEASED => 'Libertação de Funding Parceiro',
             self::MANUAL_CREDIT => 'Crédito Manual',
             self::MANUAL_DEBIT => 'Débito Manual',
         };
@@ -42,6 +44,7 @@ enum LedgerEntryType: string
             self::PAYMENT_REFUND,
             self::P2P_RECEIVE,
             self::CARD_UNLOAD,
+            self::PARTNER_FUNDING_RELEASED,
             self::MANUAL_CREDIT => TransactionDirection::Credit,
             self::PAYMENT_FEE,
             self::PLATFORM_FEE,

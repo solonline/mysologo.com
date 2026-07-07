@@ -35,6 +35,7 @@ enum TransactionType: string
     case WECHAT_PAY = 'wechat_pay';
     case GRABPAY = 'grabpay';
     case P2P = 'p2p';
+    case TOPUP = 'topup';
     case CUSTOMER_BALANCE = 'customer_balance';
 
     public function label(): string
@@ -71,6 +72,7 @@ enum TransactionType: string
             self::WECHAT_PAY => 'WeChat Pay',
             self::GRABPAY => 'GrabPay',
             self::P2P => 'P2P',
+            self::TOPUP => 'Carregamento',
             self::CUSTOMER_BALANCE => 'Saldo do Cliente',
         };
     }

@@ -18,6 +18,7 @@ class CustomerWallesterAccount extends Model
         'wallester_account_id',
         'wallester_oob_id',
         'currency_code',
+        'funding_currency',
         'product_id',
         'company_id',
         'credit_limit',

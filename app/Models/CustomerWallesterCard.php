@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CustomerWallesterCard extends Model
 {
+    /** @var list<string> */
+    public const OPERATIONAL_STATUSES = ['Active', 'Created'];
+
     protected $fillable = [
         'customer_wallester_account_id',
         'wallester_card_id',
@@ -69,6 +73,20 @@ class CustomerWallesterCard extends Model
     public function wallesterAccount(): BelongsTo
     {
         return $this->belongsTo(CustomerWallesterAccount::class, 'customer_wallester_account_id');
+    }
+
+    public function isOperational(): bool
+    {
+        return in_array($this->status, self::OPERATIONAL_STATUSES, true);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeOperational($query)
+    {
+        return $query->whereIn('status', self::OPERATIONAL_STATUSES);
     }
 
     /**
