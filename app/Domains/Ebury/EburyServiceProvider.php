@@ -4,6 +4,7 @@ namespace App\Domains\Ebury;
 
 use App\Domains\Ebury\Contracts\EburyGatewayInterface;
 use App\Domains\Ebury\Gateways\SimulatedEburyGateway;
+use App\Domains\Ebury\Services\EburyFundingTransferDriver;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -18,6 +19,8 @@ class EburyServiceProvider extends ServiceProvider
 
             return $this->app->make(SimulatedEburyGateway::class);
         });
+
+        $this->app->singleton(EburyFundingTransferDriver::class);
     }
 
     public function boot(): void

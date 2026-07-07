@@ -2,6 +2,7 @@
 
 use App\Domains\Wallet\Controllers\WalletAccountController;
 use App\Domains\Wallet\Controllers\WalletDashboardController;
+use App\Domains\Wallet\Controllers\WalletFundingAccountController;
 use App\Domains\Wallet\Controllers\WalletTransactionController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,6 +24,10 @@ Route::middleware([
         Route::get('/', [WalletAccountController::class, 'index'])->name('wallet.account');
         Route::get('/balance', [WalletAccountController::class, 'balance'])->name('wallet.account.balance');
     });
+
+    Route::get('/funding-accounts/{id}/movements', [WalletFundingAccountController::class, 'movements'])
+        ->where('id', '[0-9]+')
+        ->name('wallet.funding-accounts.movements');
 
     Route::prefix('transactions')->group(function () {
         Route::get('/', [WalletTransactionController::class, 'index'])->name('wallet.transactions.index');
