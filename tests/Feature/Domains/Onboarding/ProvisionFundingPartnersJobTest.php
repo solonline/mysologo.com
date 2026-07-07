@@ -45,8 +45,8 @@ class ProvisionFundingPartnersJobTest extends TestCase
         );
 
         $customer->refresh();
-        $this->assertNotNull($customer->wallesterAccounts);
-        $this->assertSame(IntegrationAccountStatus::ACTIVE, $customer->wallesterAccounts->status);
+        $this->assertNotNull($customer->wallesterAccount);
+        $this->assertSame(IntegrationAccountStatus::ACTIVE, $customer->wallesterAccount->status);
         $this->assertTrue(CustomerStripeAccount::query()->where('customer_id', $customer->id)->exists());
         $this->assertSame(CustomerLifecycleStatus::ACTIVE, $customer->status);
     }
@@ -82,7 +82,7 @@ class ProvisionFundingPartnersJobTest extends TestCase
 
         $customer->refresh();
         $this->assertSame(CustomerLifecycleStatus::PROVISIONING, $customer->status);
-        $this->assertSame(IntegrationAccountStatus::FAILED, $customer->wallesterAccounts->status);
+        $this->assertSame(IntegrationAccountStatus::FAILED, $customer->wallesterAccount->status);
         $this->assertFalse(CustomerStripeAccount::query()->where('customer_id', $customer->id)->exists());
         $this->assertTrue(
             UserNotification::query()->where('user_id', $staff->id)->where('type', 'provisioning.wallester_failed')->exists(),

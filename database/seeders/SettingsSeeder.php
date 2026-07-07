@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 
 class SettingsSeeder extends Seeder
 {
+    private const DEFAULT_WALLESTER_MASTER_EUR = '75d92dc4-6de9-4580-8b62-3cbd3513af56';
+
     public function run(): void
     {
         $settings = [
@@ -67,6 +69,23 @@ class SettingsSeeder extends Seeder
             ['key' => 'currency.accepted',  'label' => 'Accepted Currencies', 'type' => 'json',   'value' => json_encode(['EUR', 'USD', 'GBP', 'CHF'])],
             // Payment methods
             ['key' => 'payment_methods.enabled',  'label' => 'Enabled Payment Methods', 'type' => 'json',   'value' => json_encode(['card', 'card_non_eea', 'sepa_debit', 'mb_way', 'multibanco', 'bank_transfer'])],
+            // Wallester — global
+            ['key' => 'wallester.base_url',                  'label' => 'Base URL',                    'type' => 'url',      'value' => env('WALLESTER_BASE_URL', 'https://api-frontend.wallester.com/v1/')],
+            ['key' => 'wallester.audit_source_type',         'label' => 'Audit Source Type',           'type' => 'text',     'value' => env('WALLESTER_AUDIT_SOURCE_TYPE', 'Backend')],
+            ['key' => 'wallester.card_rsa_private_key',    'label' => 'Card RSA Private Key (PEM)',  'type' => 'textarea', 'value' => env('WALLESTER_CARD_RSA_PRIVATE_KEY', '')],
+            ['key' => 'wallester.3ds_challenge_ttl_seconds', 'label' => '3DS Challenge TTL (seconds)', 'type' => 'number', 'value' => (string) env('WALLESTER_3DS_CHALLENGE_TTL', 300)],
+            ['key' => 'wallester.3ds_webhook_username',    'label' => '3DS Webhook Username',        'type' => 'secret',   'value' => ''],
+            ['key' => 'wallester.3ds_webhook_password',    'label' => '3DS Webhook Password',        'type' => 'secret',   'value' => ''],
+            // Wallester — EUR
+            ['key' => 'wallester.eur.api_key',                     'label' => 'API Key',                     'type' => 'secret',   'value' => env('WALLESTER_API_KEY', '')],
+            ['key' => 'wallester.eur.private_key',                 'label' => 'Private Key (PEM)',           'type' => 'textarea', 'value' => env('WALLESTER_PRIVATE_KEY', '')],
+            ['key' => 'wallester.eur.product_code',                'label' => 'Product Code',                'type' => 'text',     'value' => env('WALLESTER_PRODUCT_CODE', '')],
+            ['key' => 'wallester.eur.platform_master_account_id',  'label' => 'Platform Master Account ID',  'type' => 'text',     'value' => env('WALLESTER_PLATFORM_MASTER_EUR', env('WALLESTER_PLATFORM_MASTER_ACCOUNT_ID', self::DEFAULT_WALLESTER_MASTER_EUR))],
+            // Wallester — USD
+            ['key' => 'wallester.usd.api_key',                     'label' => 'API Key',                     'type' => 'secret',   'value' => env('WALLESTER_USD_API_KEY', '')],
+            ['key' => 'wallester.usd.private_key',                 'label' => 'Private Key (PEM)',           'type' => 'textarea', 'value' => env('WALLESTER_USD_PRIVATE_KEY', '')],
+            ['key' => 'wallester.usd.product_code',                'label' => 'Product Code',                'type' => 'text',     'value' => env('WALLESTER_USD_PRODUCT_CODE', '')],
+            ['key' => 'wallester.usd.platform_master_account_id',  'label' => 'Platform Master Account ID',  'type' => 'text',     'value' => env('WALLESTER_PLATFORM_MASTER_USD', '')],
         ];
 
         foreach ($settings as $setting) {

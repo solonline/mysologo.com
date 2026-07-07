@@ -79,7 +79,7 @@ class FinancialProvisioningServiceTest extends TestCase
 
         $this->assertTrue(app(FinancialProvisioningService::class)->provisionWallester($customer));
 
-        $account = $customer->fresh()->wallesterAccounts;
+        $account = $customer->fresh()->wallesterAccount;
         $this->assertNotNull($account);
         $this->assertSame('wal_api_test', $account->wallester_account_id);
         $this->assertSame(IntegrationAccountStatus::ACTIVE, $account->status);
@@ -96,7 +96,7 @@ class FinancialProvisioningServiceTest extends TestCase
 
         $this->assertFalse(app(FinancialProvisioningService::class)->provisionWallester($customer));
 
-        $account = $customer->fresh()->wallesterAccounts;
+        $account = $customer->fresh()->wallesterAccount;
         $this->assertNotNull($account);
         $this->assertSame(IntegrationAccountStatus::FAILED, $account->status);
         $this->assertSame('Wallester API unavailable', $account->status_reason);

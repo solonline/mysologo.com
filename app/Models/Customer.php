@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
+use App\Domains\Wallester\Services\PlatformMasterCurrencyResolver;
 use Carbon\Carbon;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Activitylog\LogOptions;
@@ -113,14 +115,31 @@ class Customer extends Model
         return $this->hasOne(CustomerStripeAccount::class);
     }
 
-    public function wallesterAccounts()
+    public function wallesterAccounts(): HasMany
     {
-        return $this->hasOne(CustomerWallesterAccount::class);
+        return $this->hasMany(CustomerWallesterAccount::class);
     }
 
-    public function wallesterAccount()
+    public function wallesterAccount(): HasOne
     {
-        return $this->wallesterAccounts();
+        return $this->hasOne(CustomerWallesterAccount::class)
+            ->where('is_main', false)
+            ->latestOfMany();
+    }
+
+    public function platformWallesterMainAccounts(): HasMany
+    {
+        return $this->hasMany(CustomerWallesterAccount::class)
+            ->where('is_main', true);
+    }
+
+    public function wallesterAccountFor(string $currency): ?CustomerWallesterAccount
+    {
+        $routingCurrency = app(PlatformMasterCurrencyResolver::class)->resolve($currency);
+
+        return $this->wallesterAccounts()
+            ->where('funding_currency', $routingCurrency)
+            ->first();
     }
 
     public function wallester3dsChallenges(): HasMany

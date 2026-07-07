@@ -44,15 +44,7 @@ return [
         'webhook_secret' => env('DIDIT_WEBHOOK_SECRET'),
     ],
 
-    'wallester' => [
-        'base_url' => env('WALLESTER_BASE_URL'),
-        'api_key' => env('WALLESTER_API_KEY'),
-        'private_key' => env('WALLESTER_PRIVATE_KEY'), // Coloque a chave privada PEM aqui ou use variável de ambiente
-        'product_code' => env('WALLESTER_PRODUCT_CODE'),
-        'audit_source_type' => env('WALLESTER_AUDIT_SOURCE_TYPE', 'Backend'),
-        'card_rsa_private_key' => env('WALLESTER_CARD_RSA_PRIVATE_KEY'),
-        '3ds_challenge_ttl_seconds' => (int) env('WALLESTER_3DS_CHALLENGE_TTL', 300),
-    ],
+    'wallester' => [],
 
     'provisioning' => [
         'tries' => env('PROVISIONING_TRIES', 3),

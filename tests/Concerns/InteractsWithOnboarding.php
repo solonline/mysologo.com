@@ -67,18 +67,21 @@ trait InteractsWithOnboarding
         Customer $customer,
         IntegrationAccountStatus $status = IntegrationAccountStatus::ACTIVE,
         ?string $externalId = null,
+        array $overrides = [],
     ): CustomerWallesterAccount {
         $suffix = (string) $customer->id;
 
-        return CustomerWallesterAccount::query()->create([
+        return CustomerWallesterAccount::query()->create(array_merge([
             'customer_id' => $customer->id,
             'wallester_account_id' => $externalId ?? 'wal_'.$suffix,
-            'currency_code' => 'EUR_'.$suffix,
+            'currency_code' => 'EUR',
+            'funding_currency' => 'EUR',
             'product_id' => 'prod_'.$suffix,
             'company_id' => 'comp_'.$suffix,
+            'is_main' => false,
             'status' => $status,
             'status_changed_at' => now(),
-        ]);
+        ], $overrides));
     }
 
     protected function createStripeAccount(

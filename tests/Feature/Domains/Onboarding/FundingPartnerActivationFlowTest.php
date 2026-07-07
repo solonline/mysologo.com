@@ -42,7 +42,7 @@ class FundingPartnerActivationFlowTest extends TestCase
         $customer->refresh();
         $this->assertSame(CustomerLifecycleStatus::ACTIVE, $customer->status);
         $this->assertTrue(CustomerStripeAccount::query()->where('customer_id', $customer->id)->exists());
-        $this->assertSame(IntegrationAccountStatus::ACTIVE, $customer->wallesterAccounts->status);
+        $this->assertSame(IntegrationAccountStatus::ACTIVE, $customer->wallesterAccount->status);
     }
 
     public function test_kyc_to_active_when_ebury_rejects_but_wallester_is_active(): void
@@ -82,7 +82,7 @@ class FundingPartnerActivationFlowTest extends TestCase
         );
 
         $customer->refresh();
-        $wallester = $customer->wallesterAccounts;
+        $wallester = $customer->wallesterAccount;
         $this->assertNotNull($wallester);
         $ebury = $this->createEburyAccount($customer, IntegrationAccountStatus::ACTIVE, 'sim:'.$customer->id);
 
@@ -125,6 +125,6 @@ class FundingPartnerActivationFlowTest extends TestCase
         $this->assertFalse(
             CustomerStripeAccount::query()->where('customer_id', $customer->id)->exists(),
         );
-        $this->assertSame(IntegrationAccountStatus::FAILED, $customer->fresh()->wallesterAccounts?->status);
+        $this->assertSame(IntegrationAccountStatus::FAILED, $customer->fresh()->wallesterAccount?->status);
     }
 }

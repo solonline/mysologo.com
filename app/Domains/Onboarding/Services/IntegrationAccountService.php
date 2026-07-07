@@ -130,6 +130,7 @@ class IntegrationAccountService
             [
                 'wallester_account_id' => 'pending:'.$customer->id,
                 'currency_code' => 'EUR_'.$suffix,
+                'funding_currency' => 'EUR',
                 'product_id' => 'prod_'.$suffix,
                 'company_id' => 'comp_'.$suffix,
                 'status' => IntegrationAccountStatus::PENDING,
@@ -182,7 +183,7 @@ class IntegrationAccountService
     public function canWithdrawWallester(Customer $customer): bool
     {
         return $this->lifecycle->canTransact($customer)
-            && $this->normalizeStatus($customer->wallesterAccounts?->status)?->allowsWithdrawals() === true;
+            && $this->normalizeStatus($customer->wallesterAccount?->status)?->allowsWithdrawals() === true;
     }
 
     public function canReceiveEbury(Customer $customer): bool
@@ -216,7 +217,7 @@ class IntegrationAccountService
             ),
             IntegrationProvider::WALLESTER->value => $this->stateFromAccount(
                 IntegrationProvider::WALLESTER,
-                $customer->wallesterAccounts,
+                $customer->wallesterAccount,
             ),
             IntegrationProvider::EBURY->value => $this->stateFromAccount(
                 IntegrationProvider::EBURY,

@@ -10,6 +10,7 @@ use App\Domains\Stripe\Contracts\StripeAccountRepositoryInterface;
 use App\Domains\Stripe\DTOs\CreateStripeAccountDTO;
 use App\Domains\Stripe\Services\StripeService;
 use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
+use App\Domains\Wallester\Services\PlatformMasterCurrencyResolver;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Models\Customer;
 use App\Models\CustomerWallesterAccount;
@@ -46,7 +47,7 @@ class FinancialProvisioningService
     public function handleProvisioningExhausted(Customer $customer, string $reason): void
     {
         $customer = $customer->fresh('wallesterAccounts');
-        $account = $customer->wallesterAccounts;
+        $account = $customer->wallesterAccount;
 
         if ($account !== null && $this->normalizeStatus($account->status) !== IntegrationAccountStatus::ACTIVE) {
             $this->integrationAccounts->updateWallester(
@@ -163,7 +164,7 @@ class FinancialProvisioningService
     private function provisionWallesterAccount(Customer $customer): bool
     {
         $customer = $customer->fresh('wallesterAccounts');
-        $account = $customer->wallesterAccounts;
+        $account = $customer->wallesterAccount;
 
         if ($account !== null && $this->normalizeStatus($account->status) === IntegrationAccountStatus::ACTIVE) {
             return true;
@@ -197,6 +198,9 @@ class FinancialProvisioningService
 
             $account->wallester_account_id = $wallesterAccount['id'];
             $account->currency_code = $wallesterAccount['currency_code'] ?? 'EUR_'.$suffix;
+            $account->funding_currency = app(PlatformMasterCurrencyResolver::class)->resolve(
+                (string) ($wallesterAccount['currency_code'] ?? 'EUR'),
+            );
             $account->product_id = $wallesterAccount['product_id'] ?? 'prod_'.$suffix;
             $account->company_id = $wallesterAccount['company_id'] ?? 'comp_'.$suffix;
             $account->save();

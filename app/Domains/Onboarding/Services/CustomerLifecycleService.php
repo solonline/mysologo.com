@@ -57,7 +57,7 @@ class CustomerLifecycleService
     public function hasApprovedFundingPartner(Customer $customer): bool
     {
         return $this->integrationActive($customer->eburyAccount)
-            || $this->integrationActive($customer->wallesterAccounts);
+            || $this->integrationActive($customer->wallesterAccount);
     }
 
     public function beginEburyOnboarding(Customer $customer, ?string $reason = null): Customer
@@ -179,7 +179,7 @@ class CustomerLifecycleService
     private function pendingPartnerReason(Customer $customer): string
     {
         $eburyRejected = $this->isFundingPartnerRejected($customer->eburyAccount?->status);
-        $wallesterRejected = $this->isFundingPartnerRejected($customer->wallesterAccounts?->status);
+        $wallesterRejected = $this->isFundingPartnerRejected($customer->wallesterAccount?->status);
 
         if ($wallesterRejected && ! $eburyRejected) {
             return 'Falha Wallester. A aguardar intervenção.';
@@ -199,7 +199,7 @@ class CustomerLifecycleService
     private function areBothFundingPartnersRejected(Customer $customer): bool
     {
         $eburyStatus = $this->normalizeIntegrationStatus($customer->eburyAccount?->status);
-        $wallesterStatus = $this->normalizeIntegrationStatus($customer->wallesterAccounts?->status);
+        $wallesterStatus = $this->normalizeIntegrationStatus($customer->wallesterAccount?->status);
 
         if ($eburyStatus === null || $wallesterStatus === null) {
             return false;
