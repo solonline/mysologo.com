@@ -3,6 +3,7 @@
 namespace App\Domains\Wallester\Controllers;
 
 use App\Domains\Onboarding\Services\IntegrationAccountService;
+use App\Domains\Wallester\Services\WallesterCardMovementIngestService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,7 @@ class WallesterWebhookController extends Controller
 {
     public function __construct(
         protected IntegrationAccountService $integrationAccounts,
+        protected WallesterCardMovementIngestService $cardMovements,
     ) {}
 
     /**
@@ -27,7 +29,7 @@ class WallesterWebhookController extends Controller
         $status = $payload['status'] ?? $payload['account_status'] ?? null;
         $reason = $payload['reason'] ?? $payload['message'] ?? null;
 
-        if ($accountId && $status) {
+        if ($accountId && $status && ! isset($payload['card_id']) && ! isset($payload['authorization_amount'])) {
             $account = $this->integrationAccounts->findWallesterByExternalId((string) $accountId);
 
             if ($account) {
@@ -39,6 +41,8 @@ class WallesterWebhookController extends Controller
                 );
             }
         }
+
+        $this->cardMovements->ingest($payload);
 
         return response()->json(['success' => true]);
     }

@@ -21,6 +21,25 @@ class WallesterCardController extends Controller
     /**
      * @hideFromApiDocs
      */
+    public function index(Request $request): JsonResponse
+    {
+        $customerId = $request->user()->id;
+
+        $cards = CustomerWallesterCard::query()
+            ->whereHas('wallesterAccount', fn ($query) => $query->where('customer_id', $customerId))
+            ->operational()
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (CustomerWallesterCard $card) => $this->transformCard($card));
+
+        return response()->json([
+            'data' => $cards,
+        ]);
+    }
+
+    /**
+     * @hideFromApiDocs
+     */
     public function store(CreateWallesterCardRequest $request): JsonResponse
     {
         $card = $this->wallesterService->createCardForCustomer(

@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wallester\Clients;
 
+use App\Domains\Wallester\Services\WallesterSettingsService;
 use Firebase\JWT\JWT;
 use GuzzleHttp\Client;
 
@@ -9,28 +10,48 @@ class WallesterHttpClient
 {
     protected Client $httpClient;
 
-    protected string $baseUrl;
+    protected string $currency = 'eur';
 
-    protected ?string $apiKey;
+    protected ?string $apiKey = null;
 
-    protected ?string $privateKey;
+    protected ?string $privateKey = null;
 
-    public function __construct()
-    {
-        $configuredBaseUrl = config('services.wallester.base_url', 'https://api-frontend.wallester.com/v1/');
-        $this->baseUrl = rtrim((string) $configuredBaseUrl, '/').'/';
-        $this->apiKey = config('services.wallester.api_key');
-        $this->privateKey = config('services.wallester.private_key');
+    protected ?string $productCode = null;
+
+    public function __construct(
+        protected WallesterSettingsService $settings,
+    ) {
         $this->httpClient = new Client([
-            'base_uri' => $this->baseUrl,
             'headers' => [
                 'Accept' => 'application/json',
             ],
         ]);
     }
 
+    public function forCurrency(string $currency): self
+    {
+        $normalizedCurrency = strtolower($currency);
+
+        if ($normalizedCurrency !== $this->currency || $this->apiKey === null) {
+            $this->currency = $normalizedCurrency;
+            $this->apiKey = $this->settings->apiKey($normalizedCurrency);
+            $this->privateKey = $this->settings->privateKey($normalizedCurrency);
+            $this->productCode = $this->settings->productCode($normalizedCurrency);
+            $this->httpClient = new Client([
+                'base_uri' => $this->settings->baseUrl(),
+                'headers' => [
+                    'Accept' => 'application/json',
+                ],
+            ]);
+        }
+
+        return $this;
+    }
+
     public function authenticate(): string
     {
+        $this->ensureCurrencyResolved();
+
         $claims = [
             'api_key' => $this->apiKey,
             'ts' => time(),
@@ -51,15 +72,15 @@ class WallesterHttpClient
     /** @return array<string, string> */
     protected function getRequestHeaders(?string $auditUserId = null): array
     {
+        $this->ensureCurrencyResolved();
+
         $headers = $this->getAuthHeaders();
 
-        $productCode = config('services.wallester.product_code');
-
-        if (is_string($productCode) && $productCode !== '') {
-            $headers['X-Product-Code'] = $productCode;
+        if (is_string($this->productCode) && $this->productCode !== '') {
+            $headers['X-Product-Code'] = $this->productCode;
         }
 
-        $headers['X-Audit-Source-Type'] = (string) config('services.wallester.audit_source_type', 'Backend');
+        $headers['X-Audit-Source-Type'] = $this->settings->auditSourceType();
 
         if ($auditUserId !== null && $auditUserId !== '') {
             $headers['X-Audit-User-Id'] = $auditUserId;
@@ -189,5 +210,25 @@ class WallesterHttpClient
         ]);
 
         return json_decode($response->getBody()->getContents(), true);
+    }
+
+    /**
+     * @param  array{from_account_id: string, to_account_id: string, amount: float, description?: string}  $data
+     */
+    public function accountTransfer(array $data, ?string $auditUserId = null): array
+    {
+        $response = $this->httpClient->post('payments/account-transfer', [
+            'headers' => $this->getRequestHeaders($auditUserId),
+            'json' => $data,
+        ]);
+
+        return json_decode($response->getBody()->getContents(), true);
+    }
+
+    private function ensureCurrencyResolved(): void
+    {
+        if ($this->apiKey === null) {
+            $this->forCurrency('eur');
+        }
     }
 }

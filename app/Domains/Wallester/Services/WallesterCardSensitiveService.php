@@ -29,18 +29,21 @@ class WallesterCardSensitiveService
         $this->ensureCustomerOwnsCard($customer, $card);
         $this->ensureCardCanRevealSensitiveData($card);
 
+        $card->loadMissing('wallesterAccount');
+        $currency = (string) ($card->wallesterAccount?->funding_currency ?? 'EUR');
         $auditUserId = (string) $customer->id;
-        $publicKey = $this->rsaKeys->publicKeyBase64();
+        $publicKey = $this->rsaKeys->publicKeyBase64($currency);
         $wallesterCardId = $card->wallester_card_id;
+        $gateway = $this->gateway->forCurrency($currency);
 
-        $cardDetails = $this->gateway->getCard($wallesterCardId, $auditUserId);
-        $encryptedCardNumber = $this->gateway->getEncryptedCardNumber($wallesterCardId, $publicKey, $auditUserId);
-        $encryptedCvv = $this->gateway->getEncryptedCvv2($wallesterCardId, $publicKey, $auditUserId);
+        $cardDetails = $gateway->getCard($wallesterCardId, $auditUserId);
+        $encryptedCardNumber = $gateway->getEncryptedCardNumber($wallesterCardId, $publicKey, $auditUserId);
+        $encryptedCvv = $gateway->getEncryptedCvv2($wallesterCardId, $publicKey, $auditUserId);
 
         try {
             return [
-                'card_number' => $this->decryptor->decryptCardNumber($encryptedCardNumber),
-                'cvv' => $this->decryptor->decryptCvv2($encryptedCvv),
+                'card_number' => $this->decryptor->decryptCardNumber($encryptedCardNumber, $currency),
+                'cvv' => $this->decryptor->decryptCvv2($encryptedCvv, $currency),
                 'expiry_date' => isset($cardDetails['expiry_date']) ? (string) $cardDetails['expiry_date'] : $card->expiry_date?->toIso8601String(),
             ];
         } catch (\RuntimeException $exception) {

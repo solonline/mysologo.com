@@ -22,6 +22,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/accounts/{account}', [WallesterAccountController::class, 'show'])
             ->where('account', '[0-9a-fA-F-]{36}')
             ->name('wallester.accounts.show');
+        Route::get('/cards', [WallesterCardController::class, 'index'])
+            ->name('wallester.cards.index');
         Route::post('/cards', [WallesterCardController::class, 'store'])
             ->name('wallester.cards.store');
         Route::get('/cards/{card}', [WallesterCardController::class, 'show'])

@@ -14,6 +14,13 @@ class WallesterGateway implements WallesterGatewayInterface
         protected WallesterHttpClient $client,
     ) {}
 
+    public function forCurrency(string $currency): static
+    {
+        $this->client->forCurrency($currency);
+
+        return $this;
+    }
+
     public function authenticate(): string
     {
         return $this->client->authenticate();
@@ -228,6 +235,37 @@ class WallesterGateway implements WallesterGatewayInterface
         );
 
         return $this->normalizeTransactionResponse(is_array($response) ? $response : []);
+    }
+
+    /**
+     * @param  array{from_account_id: string, to_account_id: string, amount: float, description?: string}  $data
+     * @return array<string, mixed>
+     */
+    public function accountTransfer(array $data, ?string $auditUserId = null): array
+    {
+        $response = $this->run(
+            'accountTransfer',
+            fn () => $this->client->accountTransfer($data, $auditUserId),
+            [
+                'request' => $data,
+                'audit_user_id' => $auditUserId,
+            ],
+        );
+
+        return $this->normalizePaymentResponse(is_array($response) ? $response : []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     * @return array<string, mixed>
+     */
+    private function normalizePaymentResponse(array $response): array
+    {
+        if (isset($response['payment']) && is_array($response['payment'])) {
+            return $response['payment'];
+        }
+
+        return $response;
     }
 
     /**

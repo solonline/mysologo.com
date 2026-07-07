@@ -8,31 +8,34 @@ use RuntimeException;
 
 class WallesterCardRsaKeyService
 {
-    public function publicKeyBase64(): string
+    public function __construct(
+        private readonly WallesterSettingsService $wallesterSettings,
+    ) {}
+
+    public function publicKeyBase64(string $currency = 'eur'): string
     {
-        $publicKeyPem = $this->publicKeyPem();
+        $publicKeyPem = $this->publicKeyPem($currency);
 
         return base64_encode($publicKeyPem);
     }
 
-    public function privateKeyPem(): string
+    public function privateKeyPem(string $currency = 'eur'): string
     {
-        $privateKey = config('services.wallester.card_rsa_private_key');
-
-        if (! is_string($privateKey) || trim($privateKey) === '') {
+        try {
+            return $this->wallesterSettings->cardRsaPrivateKey($currency);
+        } catch (RuntimeException $exception) {
             throw new ApiException(
                 ErrorCode::INTERNAL_ERROR,
                 500,
                 'Wallester card RSA private key is not configured.',
+                previous: $exception,
             );
         }
-
-        return str_replace('\\n', "\n", trim($privateKey));
     }
 
-    private function publicKeyPem(): string
+    private function publicKeyPem(string $currency = 'eur'): string
     {
-        $privateKey = openssl_pkey_get_private($this->privateKeyPem());
+        $privateKey = openssl_pkey_get_private($this->privateKeyPem($currency));
 
         if ($privateKey === false) {
             throw new RuntimeException('Invalid Wallester card RSA private key.');

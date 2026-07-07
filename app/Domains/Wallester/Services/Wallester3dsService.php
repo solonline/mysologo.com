@@ -17,6 +17,7 @@ class Wallester3dsService
 {
     public function __construct(
         protected CustomerNotificationService $notifications,
+        protected WallesterSettingsService $wallesterSettings,
     ) {}
 
     /**
@@ -52,7 +53,7 @@ class Wallester3dsService
             ->first();
 
         $customer = $localCard?->wallesterAccount?->customer;
-        $ttlSeconds = (int) config('services.wallester.3ds_challenge_ttl_seconds', 300);
+        $ttlSeconds = $this->wallesterSettings->threeDsChallengeTtlSeconds();
 
         $challenge = Wallester3dsChallenge::query()->create([
             'wallester_request_id' => $requestId,

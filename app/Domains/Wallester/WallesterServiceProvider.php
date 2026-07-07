@@ -7,7 +7,10 @@ use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Gateways\WallesterGateway;
 use App\Domains\Wallester\Repositories\WallesterAccountRepository;
+use App\Domains\Wallester\Services\PlatformMasterCurrencyResolver;
 use App\Domains\Wallester\Services\Wallester3dsService;
+use App\Domains\Wallester\Services\WallesterCardMovementIngestService;
+use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Domains\Wallester\Services\WallesterSettingsService;
 use App\Domains\Wallester\Services\WallesterTransactionService;
@@ -25,6 +28,9 @@ class WallesterServiceProvider extends ServiceProvider
         $this->app->singleton(Wallester3dsService::class);
         $this->app->singleton(WallesterSettingsService::class);
         $this->app->singleton(WallesterTransactionService::class);
+        $this->app->singleton(WallesterFundingTransferDriver::class);
+        $this->app->singleton(PlatformMasterCurrencyResolver::class);
+        $this->app->singleton(WallesterCardMovementIngestService::class);
     }
 
     public function boot(): void

@@ -17,7 +17,7 @@ class WallesterAccountService
      * @param  array<string, mixed>  $filters
      * @return array{total_records_number: int, accounts: array<int, array<string, mixed>>}
      */
-    public function listForCustomer(Customer $customer, array $filters): array
+    public function listForCustomer(Customer $customer, array $filters, string $currency = 'EUR'): array
     {
         $baseQuery = $this->buildWallesterQuery($filters);
         $auditUserId = (string) $customer->id;
@@ -26,7 +26,7 @@ class WallesterAccountService
         $totalRecordsNumber = 0;
 
         do {
-            $response = $this->gateway->listAccounts([
+            $response = $this->gateway->forCurrency($currency)->listAccounts([
                 ...$baseQuery,
                 'from_record' => $fromRecord,
                 'records_count' => self::PAGE_SIZE,
@@ -52,9 +52,9 @@ class WallesterAccountService
     /**
      * @return array<string, mixed>
      */
-    public function showForCustomer(Customer $customer, string $wallesterAccountId): array
+    public function showForCustomer(Customer $customer, string $wallesterAccountId, string $currency = 'EUR'): array
     {
-        return $this->gateway->getAccount($wallesterAccountId, (string) $customer->id);
+        return $this->gateway->forCurrency($currency)->getAccount($wallesterAccountId, (string) $customer->id);
     }
 
     /**

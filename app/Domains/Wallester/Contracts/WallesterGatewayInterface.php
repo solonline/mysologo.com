@@ -4,6 +4,8 @@ namespace App\Domains\Wallester\Contracts;
 
 interface WallesterGatewayInterface
 {
+    public function forCurrency(string $currency): self;
+
     public function authenticate(): string;
 
     public function createAccount(array $data): array;
@@ -49,4 +51,10 @@ interface WallesterGatewayInterface
      * @return array<string, mixed>
      */
     public function getTransaction(string $transactionId, ?string $auditUserId = null, array $query = []): array;
+
+    /**
+     * @param  array{from_account_id: string, to_account_id: string, amount: float, description?: string}  $data
+     * @return array<string, mixed>
+     */
+    public function accountTransfer(array $data, ?string $auditUserId = null): array;
 }

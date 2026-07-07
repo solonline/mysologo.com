@@ -10,24 +10,24 @@ class WallesterSensitiveDataDecryptor
         private readonly WallesterCardRsaKeyService $rsaKeys,
     ) {}
 
-    public function decryptCardNumber(string $encryptedPayload): string
+    public function decryptCardNumber(string $encryptedPayload, string $currency = 'eur'): string
     {
-        return $this->decrypt($encryptedPayload, 'CardNumber');
+        return $this->decrypt($encryptedPayload, 'CardNumber', $currency);
     }
 
-    public function decryptCvv2(string $encryptedPayload): string
+    public function decryptCvv2(string $encryptedPayload, string $currency = 'eur'): string
     {
-        return $this->decrypt($encryptedPayload, 'CVV2');
+        return $this->decrypt($encryptedPayload, 'CVV2', $currency);
     }
 
-    private function decrypt(string $encryptedPayload, string $messageLabel): string
+    private function decrypt(string $encryptedPayload, string $messageLabel, string $currency): string
     {
         $ciphertext = $this->extractCiphertext($encryptedPayload, $messageLabel);
 
         try {
             return WallesterRsaOaep::decrypt(
                 $ciphertext,
-                $this->rsaKeys->privateKeyPem(),
+                $this->rsaKeys->privateKeyPem($currency),
                 $messageLabel,
             );
         } catch (RuntimeException $exception) {

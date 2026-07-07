@@ -19,9 +19,13 @@ class WallesterAccountController extends Controller
      */
     public function index(ListWallesterAccountsRequest $request): JsonResponse
     {
+        $customer = $request->user();
+        $currency = (string) ($customer->wallesterAccount?->funding_currency ?? 'EUR');
+
         $result = $this->accountService->listForCustomer(
-            $request->user(),
+            $customer,
             $request->validated(),
+            $currency,
         );
 
         return response()->json([
@@ -37,8 +41,13 @@ class WallesterAccountController extends Controller
      */
     public function show(Request $request, string $account): JsonResponse
     {
+        $customer = $request->user();
+        $currency = (string) ($customer->wallesterAccounts()
+            ->where('wallester_account_id', $account)
+            ->value('funding_currency') ?? $customer->wallesterAccount?->funding_currency ?? 'EUR');
+
         return response()->json([
-            'data' => $this->accountService->showForCustomer($request->user(), $account),
+            'data' => $this->accountService->showForCustomer($customer, $account, $currency),
         ]);
     }
 }

@@ -21,16 +21,18 @@ class WallesterService
         protected Wallester3dsService $threeDsService,
     ) {}
 
-    public function createAccount(array $data): array
+    public function createAccount(array $data, string $currency = 'EUR'): array
     {
-        return $this->gateway->createAccount($data);
+        return $this->gateway->forCurrency($currency)->createAccount($data);
     }
 
     public function showCardForCustomer(Customer $customer, CustomerWallesterCard $card): array
     {
         $this->ensureCustomerOwnsCard($customer, $card);
+        $card->loadMissing('wallesterAccount');
+        $currency = (string) ($card->wallesterAccount?->funding_currency ?? 'EUR');
 
-        return $this->gateway->getCard($card->wallester_card_id, (string) $customer->id);
+        return $this->gateway->forCurrency($currency)->getCard($card->wallester_card_id, (string) $customer->id);
     }
 
     /**
@@ -56,6 +58,8 @@ class WallesterService
             );
         }
 
+        $this->ensureCustomerHasNoCard($account);
+
         $card = $this->createCard(
             $this->buildCreateCardPayload($customer, $account, $data),
             (string) $customer->id,
@@ -77,7 +81,11 @@ class WallesterService
             return $card;
         }
 
-        $wallesterCard = $this->gateway->activateCard($card->wallester_card_id, (string) $customer->id);
+        $card->loadMissing('wallesterAccount');
+
+        $wallesterCard = $this->gateway
+            ->forCurrency((string) ($card->wallesterAccount?->funding_currency ?? 'EUR'))
+            ->activateCard($card->wallester_card_id, (string) $customer->id);
 
         if (! isset($wallesterCard['id'])) {
             throw new RuntimeException('Wallester card activation returned empty response.');
@@ -105,7 +113,9 @@ class WallesterService
             throw new RuntimeException("Wallester account [{$wallesterAccountId}] was not found.");
         }
 
-        $card = $this->gateway->createCard($data, $auditUserId);
+        $card = $this->gateway
+            ->forCurrency((string) ($account->funding_currency ?? 'EUR'))
+            ->createCard($data, $auditUserId);
 
         if (! isset($card['id'])) {
             throw new RuntimeException('Wallester card creation returned empty response.');
@@ -172,6 +182,17 @@ class WallesterService
                 ErrorCode::ACCOUNT_NOT_ACTIVE,
                 422,
                 'This card cannot be activated in its current status.',
+            );
+        }
+    }
+
+    private function ensureCustomerHasNoCard(CustomerWallesterAccount $account): void
+    {
+        if ($account->cards()->operational()->exists()) {
+            throw new ApiException(
+                ErrorCode::CARD_ALREADY_EXISTS,
+                422,
+                'Customer already has an active Wallester card.',
             );
         }
     }

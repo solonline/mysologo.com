@@ -25,14 +25,15 @@ class WallesterTransactionService
     public function listForCustomer(Customer $customer, array $filters): array
     {
         $account = $this->resolveActiveAccount($customer);
+        $currency = (string) ($account->funding_currency ?? 'EUR');
         $query = $this->buildWallesterQuery($filters);
         $auditUserId = (string) $customer->id;
 
         if (isset($filters['card_id'])) {
             $card = $this->resolveCustomerCard($customer, (int) $filters['card_id']);
-            $response = $this->gateway->listCardTransactions($card->wallester_card_id, $query, $auditUserId);
+            $response = $this->gateway->forCurrency($currency)->listCardTransactions($card->wallester_card_id, $query, $auditUserId);
         } else {
-            $response = $this->gateway->listAccountTransactions($account->wallester_account_id, $query, $auditUserId);
+            $response = $this->gateway->forCurrency($currency)->listAccountTransactions($account->wallester_account_id, $query, $auditUserId);
         }
 
         return [
@@ -49,7 +50,9 @@ class WallesterTransactionService
     public function showForCustomer(Customer $customer, string $wallesterTransactionId): array
     {
         $account = $this->resolveActiveAccount($customer);
-        $transaction = $this->gateway->getTransaction($wallesterTransactionId, (string) $customer->id);
+        $transaction = $this->gateway
+            ->forCurrency((string) ($account->funding_currency ?? 'EUR'))
+            ->getTransaction($wallesterTransactionId, (string) $customer->id);
 
         $this->ensureCustomerOwnsTransaction($customer, $account, $transaction);
 
