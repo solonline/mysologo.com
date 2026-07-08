@@ -33,6 +33,7 @@ Thumbs.db
 /android-terminal/local.properties
 
 # AI agent skills & related docs (local editor config, not app source)
+/.agents/
 /.cursor/skills/
 /.claude/skills/
 /.cursor/rules/
