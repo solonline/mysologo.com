@@ -923,10 +923,10 @@
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
             <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-slate-900">Transações</h2>
-                <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->transactions->count() }}</span>
+                <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->stripeTransactions->count() }}</span>
             </div>
 
-            @if ($customer->transactions->isEmpty())
+            @if ($customer->stripeTransactions->isEmpty())
             <div class="px-5 py-10 text-center">
                 <div class="flex flex-col items-center gap-2">
                     <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
@@ -942,7 +942,7 @@
                 <div class="relative">
                     <div class="absolute left-[7px] top-2 bottom-2 w-px bg-slate-200"></div>
                     <div class="space-y-0">
-                        @foreach ($customer->transactions as $tx)
+                        @foreach ($customer->stripeTransactions as $tx)
                         @php
                             $isCredit    = $tx->direction?->value === 'credit' || $tx->direction === 'credit';
                             $amount      = number_format(abs($tx->amount ?? 0) / 100, 2, ',', '.');

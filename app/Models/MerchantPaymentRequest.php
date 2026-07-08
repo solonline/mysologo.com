@@ -95,8 +95,8 @@ class MerchantPaymentRequest extends Model
         return $this->belongsTo(Payer::class);
     }
 
-    public function transaction()
+    public function stripeTransaction()
     {
-        return $this->belongsTo(Transaction::class);
+        return $this->belongsTo(StripeTransaction::class, 'transaction_id');
     }
 }

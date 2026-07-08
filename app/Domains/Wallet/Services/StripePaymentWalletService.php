@@ -6,7 +6,7 @@ use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +18,7 @@ class StripePaymentWalletService
         protected TopupWallesterFundingPolicy $topupFundingPolicy,
     ) {}
 
-    public function creditFromStripePayment(Transaction $transaction): bool
+    public function creditFromStripePayment(StripeTransaction $transaction): bool
     {
         if ($transaction->balance_settled_at !== null) {
             return false;
@@ -95,7 +95,7 @@ class StripePaymentWalletService
         return true;
     }
 
-    public function reverseStripePayment(Transaction $transaction): void
+    public function reverseStripePayment(StripeTransaction $transaction): void
     {
         if ($transaction->balance_settled_at === null) {
             return;
@@ -127,7 +127,7 @@ class StripePaymentWalletService
         });
     }
 
-    private function hasPaymentLedgerEntry(Transaction $transaction): bool
+    private function hasPaymentLedgerEntry(StripeTransaction $transaction): bool
     {
         return LedgerEntry::query()
             ->where('reference_type', $transaction->getMorphClass())
@@ -136,7 +136,7 @@ class StripePaymentWalletService
             ->exists();
     }
 
-    private function hasPaymentReversalLedgerEntry(Transaction $transaction): bool
+    private function hasPaymentReversalLedgerEntry(StripeTransaction $transaction): bool
     {
         return LedgerEntry::query()
             ->where('reference_type', $transaction->getMorphClass())

@@ -6,7 +6,7 @@ use App\Domains\Backoffice\Services\StaffNotificationService;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\CustomerWallesterAccount;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Support\Facades\Cache;
 
 class FundingLiquidityNotifier
@@ -16,7 +16,7 @@ class FundingLiquidityNotifier
         protected TopupWallesterFundingPolicy $policy,
     ) {}
 
-    public function notifyIfNeeded(Transaction $transaction, string $currency): void
+    public function notifyIfNeeded(StripeTransaction $transaction, string $currency): void
     {
         if ($transaction->partner_funding_status !== PartnerFundingStatus::AwaitingLiquidity) {
             return;
@@ -29,7 +29,7 @@ class FundingLiquidityNotifier
             return;
         }
 
-        $blocked = Transaction::query()
+        $blocked = StripeTransaction::query()
             ->where('type', TransactionType::TOPUP->value)
             ->where('status', 'succeeded')
             ->where('partner_funding_status', PartnerFundingStatus::AwaitingLiquidity->value)

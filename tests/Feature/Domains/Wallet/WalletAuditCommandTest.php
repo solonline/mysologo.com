@@ -15,7 +15,7 @@ use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\CustomerBalance;
 use App\Models\FundingPartnerMovement;
 use App\Models\LedgerEntry;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithOnboarding;
 use Tests\Concerns\InteractsWithWallesterSettings;
@@ -49,7 +49,7 @@ class WalletAuditCommandTest extends TestCase
             'pending' => 4_731,
         ]);
 
-        Transaction::query()->create([
+        StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::CARD,
             'payment_method_type' => 'card',
@@ -62,7 +62,7 @@ class WalletAuditCommandTest extends TestCase
             'status' => 'succeeded',
         ]);
 
-        Transaction::query()->create([
+        StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::CARD,
             'payment_method_type' => 'card',
@@ -91,7 +91,7 @@ class WalletAuditCommandTest extends TestCase
             'doc_status' => 'approved',
         ]);
 
-        Transaction::query()->create([
+        StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::CARD,
             'payment_method_type' => 'card',
@@ -119,7 +119,7 @@ class WalletAuditCommandTest extends TestCase
 
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_audit');
 
-        $transaction = Transaction::query()->create([
+        $transaction = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',
@@ -180,7 +180,7 @@ class WalletAuditCommandTest extends TestCase
 
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_partner_audit');
 
-        $awaiting = Transaction::query()->create([
+        $awaiting = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',
@@ -211,7 +211,7 @@ class WalletAuditCommandTest extends TestCase
             'failure_reason' => 'not enough funds',
         ]);
 
-        $failed = Transaction::query()->create([
+        $failed = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',

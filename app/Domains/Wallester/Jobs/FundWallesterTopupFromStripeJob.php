@@ -4,7 +4,7 @@ namespace App\Domains\Wallester\Jobs;
 
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -33,7 +33,7 @@ class FundWallesterTopupFromStripeJob implements ShouldQueue
 
     public function handle(FundingPartnerMovementService $movements): void
     {
-        $transaction = Transaction::query()->find($this->stripeTransactionId);
+        $transaction = StripeTransaction::query()->find($this->stripeTransactionId);
 
         if ($transaction === null || (int) $transaction->net_amount <= 0) {
             return;
@@ -73,7 +73,7 @@ class FundWallesterTopupFromStripeJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        $transaction = Transaction::query()->find($this->stripeTransactionId);
+        $transaction = StripeTransaction::query()->find($this->stripeTransactionId);
 
         if ($transaction === null) {
             return;

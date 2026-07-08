@@ -6,13 +6,13 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\FundingPartnerMovement;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 
 class TopupWallesterFundingPolicy
 {
     public const DAILY_TOPUP_LIMIT_CENTS = 10_000;
 
-    public function requiresPartnerFunding(Transaction $transaction): bool
+    public function requiresPartnerFunding(StripeTransaction $transaction): bool
     {
         if ($transaction->type !== TransactionType::TOPUP) {
             return false;
@@ -27,7 +27,7 @@ class TopupWallesterFundingPolicy
         return $wallesterAccount !== null && $wallesterAccount->status->isOperational();
     }
 
-    public function shouldDispatchPartnerFundingJob(Transaction $transaction, array $charge): bool
+    public function shouldDispatchPartnerFundingJob(StripeTransaction $transaction, array $charge): bool
     {
         if (! $this->requiresPartnerFunding($transaction)) {
             return false;
@@ -60,7 +60,7 @@ class TopupWallesterFundingPolicy
         return true;
     }
 
-    public function isRetriable(Transaction $transaction): bool
+    public function isRetriable(StripeTransaction $transaction): bool
     {
         if (! $this->requiresPartnerFunding($transaction)) {
             return false;
@@ -75,7 +75,7 @@ class TopupWallesterFundingPolicy
         return ! $this->hasCompletedMovement($transaction);
     }
 
-    public function hasCompletedMovement(Transaction $transaction): bool
+    public function hasCompletedMovement(StripeTransaction $transaction): bool
     {
         return FundingPartnerMovement::query()
             ->where('idempotency_key', $this->movementKey($transaction).':out')
@@ -83,7 +83,7 @@ class TopupWallesterFundingPolicy
             ->exists();
     }
 
-    public function hasPendingMovement(Transaction $transaction): bool
+    public function hasPendingMovement(StripeTransaction $transaction): bool
     {
         return FundingPartnerMovement::query()
             ->where('idempotency_key', $this->movementKey($transaction).':out')
@@ -91,7 +91,7 @@ class TopupWallesterFundingPolicy
             ->exists();
     }
 
-    public function movementKey(Transaction $transaction): string
+    public function movementKey(StripeTransaction $transaction): string
     {
         return 'stripe_topup:'.$transaction->id;
     }

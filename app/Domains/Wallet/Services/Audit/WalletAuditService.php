@@ -15,7 +15,7 @@ use App\Models\CustomerWallesterAccount;
 use App\Models\FundingPartnerMovement;
 use App\Models\LedgerEntry;
 use App\Models\StripePaymentMethodFee;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -95,7 +95,7 @@ class WalletAuditService
         $this->creditTransactionQuery($from, $to, $customerId, $currency)
             ->where('amount', '>', 0)
             ->whereNotIn('status', ['failed', 'canceled', 'cancelled'])
-            ->each(function (Transaction $transaction) use (&$findings): void {
+            ->each(function (StripeTransaction $transaction) use (&$findings): void {
                 $expected = (int) $transaction->stripe_fee + (int) $transaction->platform_fee + (int) $transaction->net_amount;
 
                 if ((int) $transaction->amount !== $expected) {
@@ -160,7 +160,7 @@ class WalletAuditService
             ->where('status', 'succeeded')
             ->where('amount', '>', 0)
             ->where('net_amount', '<=', 0)
-            ->each(function (Transaction $transaction) use (&$findings): void {
+            ->each(function (StripeTransaction $transaction) use (&$findings): void {
                 $findings[] = new AuditFinding(
                     severity: 'critical',
                     code: 'UNCALCULATED_FEES',
@@ -191,7 +191,7 @@ class WalletAuditService
         $this->creditTransactionQuery($from, $to, $customerId, $currency)
             ->where('status', 'succeeded')
             ->where('net_amount', '>', 0)
-            ->each(function (Transaction $transaction) use (&$findings): void {
+            ->each(function (StripeTransaction $transaction) use (&$findings): void {
                 if ($this->hasPaymentLedgerEntry($transaction)) {
                     return;
                 }
@@ -225,7 +225,7 @@ class WalletAuditService
             ->where('status', 'succeeded')
             ->where('net_amount', '>', 0)
             ->whereNull('balance_settled_at')
-            ->each(function (Transaction $transaction) use (&$findings): void {
+            ->each(function (StripeTransaction $transaction) use (&$findings): void {
                 $findings[] = new AuditFinding(
                     severity: 'warning',
                     code: 'UNSETTLED_WALLET_CREDIT',
@@ -251,7 +251,7 @@ class WalletAuditService
             $currencyValue = strtoupper((string) $pair['currency']);
 
             $expectedFromLedger = $this->ledgerService->recalculateBalance($customerIdValue, $currencyValue);
-            $expectedFromSettledTx = (int) Transaction::query()
+            $expectedFromSettledTx = (int) StripeTransaction::query()
                 ->where('customer_id', $customerIdValue)
                 ->where('currency', $currencyValue)
                 ->where('direction', TransactionDirection::Credit->value)
@@ -302,7 +302,7 @@ class WalletAuditService
                 );
             }
 
-            $uncreditedNet = (int) Transaction::query()
+            $uncreditedNet = (int) StripeTransaction::query()
                 ->where('customer_id', $customerIdValue)
                 ->where('currency', $currencyValue)
                 ->where('direction', TransactionDirection::Credit->value)
@@ -411,7 +411,7 @@ class WalletAuditService
         $this->creditTransactionQuery($from, $to, $customerId, $currency)
             ->where('type', TransactionType::TOPUP->value)
             ->where('status', 'succeeded')
-            ->each(function (Transaction $transaction) use (&$findings): void {
+            ->each(function (StripeTransaction $transaction) use (&$findings): void {
                 $movement = $this->findTopupOutMovement($transaction);
 
                 if ($movement === null) {
@@ -451,7 +451,7 @@ class WalletAuditService
             ->where('status', 'succeeded')
             ->where('amount', '<=', self::DAILY_TOPUP_LIMIT_CENTS)
             ->where('net_amount', '>', 0)
-            ->each(function (Transaction $transaction) use (&$findings): void {
+            ->each(function (StripeTransaction $transaction) use (&$findings): void {
                 $movement = $this->findTopupOutMovement($transaction);
 
                 if ($movement !== null) {
@@ -503,7 +503,7 @@ class WalletAuditService
             ->where('type', TransactionType::TOPUP->value)
             ->where('status', 'succeeded')
             ->whereNotNull('partner_funding_status')
-            ->each(function (Transaction $transaction) use (&$findings): void {
+            ->each(function (StripeTransaction $transaction) use (&$findings): void {
                 $status = $transaction->partner_funding_status;
 
                 if (! $status instanceof PartnerFundingStatus) {
@@ -586,7 +586,7 @@ class WalletAuditService
         ?int $customerId,
         ?string $currency,
     ): Builder {
-        $query = Transaction::query();
+        $query = StripeTransaction::query();
 
         if ($from !== null) {
             $query->whereDate('created_at', '>=', $from);
@@ -615,7 +615,7 @@ class WalletAuditService
             ->when($currency !== null, fn ($q) => $q->where('currency', strtoupper($currency)))
             ->get(['customer_id', 'currency']);
 
-        $fromTransactions = Transaction::query()
+        $fromTransactions = StripeTransaction::query()
             ->when($customerId !== null, fn ($q) => $q->where('customer_id', $customerId))
             ->when($currency !== null, fn ($q) => $q->where('currency', strtoupper($currency)))
             ->whereNull('related_transaction_id')
@@ -628,7 +628,7 @@ class WalletAuditService
                 'customer_id' => $b->customer_id,
                 'currency' => strtoupper($b->currency),
             ]))
-            ->merge($fromTransactions->map(fn (Transaction $t) => [
+            ->merge($fromTransactions->map(fn (StripeTransaction $t) => [
                 'customer_id' => $t->customer_id,
                 'currency' => strtoupper($t->currency),
             ]))
@@ -636,7 +636,7 @@ class WalletAuditService
             ->values();
     }
 
-    private function hasPaymentLedgerEntry(Transaction $transaction): bool
+    private function hasPaymentLedgerEntry(StripeTransaction $transaction): bool
     {
         return LedgerEntry::query()
             ->where('reference_type', $transaction->getMorphClass())
@@ -645,7 +645,7 @@ class WalletAuditService
             ->exists();
     }
 
-    private function findTopupOutMovement(Transaction $transaction): ?FundingPartnerMovement
+    private function findTopupOutMovement(StripeTransaction $transaction): ?FundingPartnerMovement
     {
         return FundingPartnerMovement::query()
             ->where('idempotency_key', 'stripe_topup:'.$transaction->id.':out')

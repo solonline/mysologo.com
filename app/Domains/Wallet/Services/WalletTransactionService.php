@@ -11,7 +11,7 @@ use App\Domains\Wallet\Enums\TransactionType;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -32,7 +32,7 @@ class WalletTransactionService
         return $this->transactionRepository->getPaginated($customer, $perPage);
     }
 
-    public function show(Customer $customer, int $id): Transaction
+    public function show(Customer $customer, int $id): StripeTransaction
     {
         $transaction = $this->transactionRepository->findForCustomer($customer, $id);
 
@@ -43,7 +43,7 @@ class WalletTransactionService
         return $transaction;
     }
 
-    /** @return array{debit: Transaction, credit: Transaction} */
+    /** @return array{debit: StripeTransaction, credit: StripeTransaction} */
     public function p2pTransfer(
         Customer $sender,
         string $recipientUsername,

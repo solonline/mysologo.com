@@ -22,13 +22,15 @@
     ];
 
     $logLabels = [
-        'customers'    => 'Clientes',
-        'transactions' => 'Transações',
-        'default'      => 'Sistema',
+        'customers'            => 'Clientes',
+        'stripe_transactions'  => 'Transações Stripe',
+        'transactions'         => 'Transações',
+        'default'              => 'Sistema',
     ];
 
     $subjectLabels = [
         'App\\Models\\Customer'    => 'Cliente',
+        'App\\Models\\StripeTransaction' => 'Transação Stripe',
         'App\\Models\\Transaction' => 'Transação',
     ];
 
@@ -70,7 +72,8 @@
                     class="py-2 px-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-slate-700 transition">
                 <option value="">Todos os canais</option>
                 <option value="customers"    {{ request('log') === 'customers'    ? 'selected' : '' }}>Clientes</option>
-                <option value="transactions" {{ request('log') === 'transactions' ? 'selected' : '' }}>Transações</option>
+                <option value="stripe_transactions" {{ request('log') === 'stripe_transactions' ? 'selected' : '' }}>Transações Stripe</option>
+                <option value="transactions" {{ request('log') === 'transactions' ? 'selected' : '' }}>Transações (legado)</option>
                 <option value="default"      {{ request('log') === 'default'      ? 'selected' : '' }}>Sistema</option>
             </select>
 

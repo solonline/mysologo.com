@@ -105,9 +105,9 @@ class Customer extends Model
         return $this->hasMany(Tpa::class);
     }
 
-    public function transactions()
+    public function stripeTransactions()
     {
-        return $this->hasMany(Transaction::class);
+        return $this->hasMany(StripeTransaction::class);
     }
 
     public function stripeAccount()

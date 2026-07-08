@@ -7,7 +7,7 @@ use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
 use App\Domains\Wallet\Services\WallesterMainAccountSyncService;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 
 class RetryAwaitingWallesterTopupsAction
 {
@@ -26,7 +26,7 @@ class RetryAwaitingWallesterTopupsAction
         $dispatched = 0;
         $skipped = 0;
 
-        Transaction::query()
+        StripeTransaction::query()
             ->where('type', TransactionType::TOPUP->value)
             ->where('status', 'succeeded')
             ->whereIn('partner_funding_status', [
@@ -36,7 +36,7 @@ class RetryAwaitingWallesterTopupsAction
             ])
             ->where('net_amount', '>', 0)
             ->orderBy('id')
-            ->each(function (Transaction $transaction) use (&$dispatched, &$skipped): void {
+            ->each(function (StripeTransaction $transaction) use (&$dispatched, &$skipped): void {
                 if (! $this->fundingPolicy->isRetriable($transaction)) {
                     $skipped++;
 

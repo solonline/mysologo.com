@@ -32,7 +32,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property array|null $stripe_metadata
  * @property Carbon|null $stripe_created_at
  */
-class Transaction extends Model
+class StripeTransaction extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
 
@@ -42,7 +42,7 @@ class Transaction extends Model
             ->logFillable()
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->useLogName('transactions');
+            ->useLogName('stripe_transactions');
     }
 
     protected $table = 'stripe_transactions';
@@ -121,8 +121,8 @@ class Transaction extends Model
         return $this->belongsTo(StripePaymentMethodFee::class, 'stripe_payment_method_fee_id');
     }
 
-    public function relatedTransaction()
+    public function relatedStripeTransaction()
     {
-        return $this->belongsTo(Transaction::class, 'related_transaction_id');
+        return $this->belongsTo(StripeTransaction::class, 'related_transaction_id');
     }
 }

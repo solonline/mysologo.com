@@ -19,7 +19,7 @@ use App\Models\Customer;
 use App\Models\CustomerBalance;
 use App\Models\CustomerStripeAccount;
 use App\Models\StripePaymentMethodFee;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -184,7 +184,7 @@ class StripeService
         $intent = $result['data'];
 
         try {
-            $transaction = Transaction::create([
+            $transaction = StripeTransaction::create([
                 'customer_id' => $customer->id,
                 'stripe_payment_method_fee_id' => $feeConfig->id,
                 'type' => $isTopup ? TransactionType::TOPUP : TransactionType::from($feeConfig->payment_method),
@@ -307,7 +307,7 @@ class StripeService
         $intent = $result['data'];
 
         try {
-            $transaction = Transaction::create([
+            $transaction = StripeTransaction::create([
                 'tpa_id' => $tpa->id,
                 'customer_id' => $customer->id,
                 'type' => TransactionType::CARD_PRESENT,
@@ -345,7 +345,7 @@ class StripeService
         ];
     }
 
-    public function captureTerminalPayment(Transaction $transaction): array
+    public function captureTerminalPayment(StripeTransaction $transaction): array
     {
         if ($transaction->payment_method_type !== 'card_present') {
             throw new ApiException(
@@ -492,7 +492,7 @@ class StripeService
 
         $transactionId = $object['id'] ?? null;
 
-        if ($transactionId && Transaction::where('stripe_cash_balance_transaction_id', $transactionId)->exists()) {
+        if ($transactionId && StripeTransaction::where('stripe_cash_balance_transaction_id', $transactionId)->exists()) {
             Log::channel('stripe')->info('Stripe webhook: cash_balance.funded já processado', [
                 'stripe_cash_balance_transaction_id' => $transactionId,
             ]);
@@ -514,7 +514,7 @@ class StripeService
             : null;
 
         try {
-            Transaction::create([
+            StripeTransaction::create([
                 'customer_id' => $stripeAccount->customer_id,
                 'stripe_payment_method_fee_id' => $feeConfig?->id,
                 'type' => TransactionType::BANK_TRANSFER,
@@ -561,10 +561,10 @@ class StripeService
 
     private function handlePaymentIntentSucceeded(array $intent): void
     {
-        $transaction = Transaction::where('stripe_payment_intent_id', $intent['id'])->first();
+        $transaction = StripeTransaction::where('stripe_payment_intent_id', $intent['id'])->first();
 
         if (! $transaction) {
-            Log::channel('stripe')->warning('Stripe webhook: transaction não encontrada', ['payment_intent_id' => $intent['id']]);
+            Log::channel('stripe')->warning('Stripe webhook: StripeTransaction não encontrada', ['payment_intent_id' => $intent['id']]);
 
             return;
         }
@@ -585,7 +585,7 @@ class StripeService
         }
     }
 
-    private function createPlatformTransfer(Transaction $sourceTransaction): void
+    private function createPlatformTransfer(StripeTransaction $sourceTransaction): void
     {
         $platformCustomer = Cache::rememberForever('platform_customer', fn () => Customer::where('type', 'platform')->first());
 
@@ -598,7 +598,7 @@ class StripeService
         }
 
         try {
-            Transaction::create([
+            StripeTransaction::create([
                 'customer_id' => $platformCustomer->id,
                 'stripe_payment_method_fee_id' => $sourceTransaction->stripe_payment_method_fee_id,
                 'related_transaction_id' => $sourceTransaction->id,
@@ -630,7 +630,7 @@ class StripeService
         }
     }
 
-    public function settleTransaction(Transaction $transaction): void
+    public function settleTransaction(StripeTransaction $transaction): void
     {
         if ($transaction->balance_settled_at !== null) {
             return;
@@ -663,7 +663,7 @@ class StripeService
 
     private function assertDailyTopupLimitNotExceeded(Customer $customer, int $amount): void
     {
-        $succeededTopupToday = Transaction::query()
+        $succeededTopupToday = StripeTransaction::query()
             ->where('customer_id', $customer->id)
             ->where('type', TransactionType::TOPUP)
             ->where('status', 'succeeded')
@@ -694,10 +694,10 @@ class StripeService
 
     private function handlePaymentIntentFailed(array $intent): void
     {
-        $transaction = Transaction::where('stripe_payment_intent_id', $intent['id'])->first();
+        $transaction = StripeTransaction::where('stripe_payment_intent_id', $intent['id'])->first();
 
         if (! $transaction) {
-            Log::channel('stripe')->warning('Stripe webhook: transaction não encontrada', ['payment_intent_id' => $intent['id']]);
+            Log::channel('stripe')->warning('Stripe webhook: StripeTransaction não encontrada', ['payment_intent_id' => $intent['id']]);
 
             return;
         }
@@ -731,7 +731,7 @@ class StripeService
             return;
         }
 
-        Transaction::where('stripe_payment_intent_id', $paymentIntentId)
+        StripeTransaction::where('stripe_payment_intent_id', $paymentIntentId)
             ->update(['stripe_charge_id' => $charge['id']]);
 
         $balanceTxnId = $charge['balance_transaction'] ?? null;
@@ -760,7 +760,7 @@ class StripeService
             return;
         }
 
-        $transaction = Transaction::where('stripe_payment_intent_id', $paymentIntentId)
+        $transaction = StripeTransaction::where('stripe_payment_intent_id', $paymentIntentId)
             ->whereNull('related_transaction_id')
             ->first();
 

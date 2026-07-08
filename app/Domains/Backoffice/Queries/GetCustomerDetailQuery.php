@@ -13,7 +13,7 @@ class GetCustomerDetailQuery
             'diditSessions' => fn ($q) => $q->latest(),
             'responsibles',
             'balances',
-            'transactions' => fn ($q) => $q->latest('stripe_created_at')->limit(50),
+            'stripeTransactions' => fn ($q) => $q->latest('stripe_created_at')->limit(50),
             'stripeAccount',
             'wallesterAccount',
             'wallesterAccounts',

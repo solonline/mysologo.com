@@ -3,7 +3,7 @@
 namespace App\Domains\Wallet\Contracts;
 
 use App\Models\Customer;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -15,9 +15,9 @@ interface TransactionRepositoryInterface
 
     public function getPaginated(Customer $customer, int $perPage = 15): LengthAwarePaginator;
 
-    public function findForCustomer(Customer $customer, int $id): ?Transaction;
+    public function findForCustomer(Customer $customer, int $id): ?StripeTransaction;
 
-    public function create(array $data): Transaction;
+    public function create(array $data): StripeTransaction;
 
     public function getAvailableBalance(int $customerId, string $currency): int;
 

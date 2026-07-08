@@ -18,7 +18,7 @@ use App\Models\Customer;
 use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
 use App\Models\FundingPartnerMovement;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -167,7 +167,7 @@ class FundingPartnerMovementService
         ?object $reference = null,
     ): void {
         if ($this->hasCompletedMovement($idempotencyKey)) {
-            if ($reference instanceof Transaction) {
+            if ($reference instanceof StripeTransaction) {
                 $this->partnerTopupFundingCompleter->complete($reference);
             }
 
@@ -221,7 +221,7 @@ class FundingPartnerMovementService
             $this->markMovementCompleted($outMovement, is_string($partnerExternalId) ? $partnerExternalId : null);
             $this->markMovementCompleted($inMovement);
 
-            if ($reference instanceof Transaction) {
+            if ($reference instanceof StripeTransaction) {
                 $this->partnerTopupFundingCompleter->complete($reference);
             }
         } catch (Throwable $exception) {
@@ -494,7 +494,7 @@ class FundingPartnerMovementService
         string $currency,
         Throwable $exception,
     ): void {
-        if (! $reference instanceof Transaction) {
+        if (! $reference instanceof StripeTransaction) {
             return;
         }
 

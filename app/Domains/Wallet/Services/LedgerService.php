@@ -6,7 +6,7 @@ use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Models\CustomerBalance;
 use App\Models\LedgerEntry;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -144,7 +144,7 @@ class LedgerService
         });
     }
 
-    public function hasReleasedPartnerFunding(Transaction $transaction): bool
+    public function hasReleasedPartnerFunding(StripeTransaction $transaction): bool
     {
         return LedgerEntry::query()
             ->where('reference_type', $transaction->getMorphClass())

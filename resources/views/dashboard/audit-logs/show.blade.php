@@ -33,6 +33,7 @@
 
     $subjectLabels = [
         'App\\Models\\Customer'    => 'Cliente',
+        'App\\Models\\StripeTransaction' => 'Transação Stripe',
         'App\\Models\\Transaction' => 'Transação',
     ];
 

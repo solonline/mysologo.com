@@ -10,7 +10,7 @@ use App\Http\Resources\Stripe\FeeEstimateResource;
 use App\Http\Resources\Stripe\PaymentMethodResource;
 use App\Http\Resources\TransactionResource;
 use App\Models\StripePaymentMethodFee;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -126,7 +126,7 @@ class StripeController extends Controller
     {
         $customer = $request->user();
 
-        $transaction = Transaction::where('id', $transactionId)
+        $transaction = StripeTransaction::where('id', $transactionId)
             ->where('customer_id', $customer->id)
             ->first();
 

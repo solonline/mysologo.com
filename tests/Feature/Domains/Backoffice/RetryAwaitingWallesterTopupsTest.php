@@ -9,7 +9,7 @@ use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -72,7 +72,7 @@ class RetryAwaitingWallesterTopupsTest extends TestCase
         ]);
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_retry_ops');
 
-        $awaiting = Transaction::query()->create([
+        $awaiting = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',
@@ -139,7 +139,7 @@ class RetryAwaitingWallesterTopupsTest extends TestCase
         ]);
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_retry_ops');
 
-        $awaiting = Transaction::query()->create([
+        $awaiting = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',

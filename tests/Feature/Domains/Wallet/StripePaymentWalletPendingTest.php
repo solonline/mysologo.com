@@ -8,7 +8,7 @@ use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Domains\Wallet\Services\StripePaymentWalletService;
 use App\Models\CustomerBalance;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\Concerns\InteractsWithOnboarding;
@@ -35,7 +35,7 @@ class StripePaymentWalletPendingTest extends TestCase
         ]);
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_pending');
 
-        $transaction = Transaction::query()->create([
+        $transaction = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',
@@ -71,7 +71,7 @@ class StripePaymentWalletPendingTest extends TestCase
         ]);
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_not_required');
 
-        $transaction = Transaction::query()->create([
+        $transaction = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',

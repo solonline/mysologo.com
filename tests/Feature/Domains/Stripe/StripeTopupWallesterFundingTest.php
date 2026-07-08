@@ -18,7 +18,7 @@ use App\Models\Customer;
 use App\Models\CustomerBalance;
 use App\Models\LedgerEntry;
 use App\Models\StripePaymentMethodFee;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -56,7 +56,7 @@ class StripeTopupWallesterFundingTest extends TestCase
         $this->createStripeAccount($customer);
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
 
-        $transaction = Transaction::query()->create([
+        $transaction = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',
@@ -101,7 +101,7 @@ class StripeTopupWallesterFundingTest extends TestCase
         $this->createStripeAccount($customer);
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
 
-        Transaction::query()->create([
+        StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',
@@ -131,7 +131,7 @@ class StripeTopupWallesterFundingTest extends TestCase
             ],
         ]);
 
-        $transaction = Transaction::query()->where('stripe_payment_intent_id', 'pi_topup_ledger')->firstOrFail();
+        $transaction = StripeTransaction::query()->where('stripe_payment_intent_id', 'pi_topup_ledger')->firstOrFail();
 
         $this->assertNotNull($transaction->balance_settled_at);
         $this->assertSame(4_875, (int) $transaction->net_amount);
@@ -164,7 +164,7 @@ class StripeTopupWallesterFundingTest extends TestCase
         $this->createStripeAccount($customer);
         $this->createWallesterAccount($customer);
 
-        Transaction::query()->create([
+        StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::CARD,
             'payment_method_type' => 'card',
@@ -208,7 +208,7 @@ class StripeTopupWallesterFundingTest extends TestCase
         ]);
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
 
-        $transaction = Transaction::query()->create([
+        $transaction = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',
@@ -275,7 +275,7 @@ class StripeTopupWallesterFundingTest extends TestCase
         ]);
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
 
-        $transaction = Transaction::query()->create([
+        $transaction = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',

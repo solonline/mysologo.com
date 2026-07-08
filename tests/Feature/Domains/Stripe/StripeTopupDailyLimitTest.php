@@ -9,7 +9,7 @@ use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Exceptions\ApiException;
 use App\Models\StripePaymentMethodFee;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\Concerns\InteractsWithOnboarding;
@@ -77,7 +77,7 @@ class StripeTopupDailyLimitTest extends TestCase
         $this->createStripeAccount($customer);
         $this->mockStripeGateway();
 
-        Transaction::query()->create([
+        StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'stripe_payment_method_fee_id' => $this->feeConfig->id,
             'type' => TransactionType::TOPUP,
@@ -110,7 +110,7 @@ class StripeTopupDailyLimitTest extends TestCase
         $this->createStripeAccount($customer);
         $this->mockStripeGateway();
 
-        Transaction::query()->create([
+        StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'stripe_payment_method_fee_id' => $this->feeConfig->id,
             'type' => TransactionType::TOPUP,

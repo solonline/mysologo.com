@@ -3,7 +3,7 @@
 namespace App\Domains\Wallet\Services;
 
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 
 class PartnerTopupFundingCompleter
 {
@@ -11,7 +11,7 @@ class PartnerTopupFundingCompleter
         protected LedgerService $ledgerService,
     ) {}
 
-    public function complete(Transaction $transaction): void
+    public function complete(StripeTransaction $transaction): void
     {
         $transaction = $transaction->fresh();
 

@@ -16,7 +16,7 @@ use App\Domains\Wallet\Enums\TransactionType;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
 use App\Models\FundingPartnerMovement;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Mockery;
@@ -67,7 +67,7 @@ class FundingPartnerMovementRetryTest extends TestCase
         ]);
         $toAccount = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_retry_customer');
 
-        $transaction = Transaction::query()->create([
+        $transaction = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',

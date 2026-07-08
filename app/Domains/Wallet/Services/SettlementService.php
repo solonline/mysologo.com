@@ -10,7 +10,7 @@ use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\CustomerPayout;
 use App\Models\CustomerWallesterAccount;
 use App\Models\SettlementBatch;
-use App\Models\Transaction;
+use App\Models\StripeTransaction;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -27,7 +27,7 @@ class SettlementService
      */
     public function runDailySettlement(Carbon $date): array
     {
-        $eligible = Transaction::query()
+        $eligible = StripeTransaction::query()
             ->where('status', 'succeeded')
             ->where('direction', TransactionDirection::Credit->value)
             ->whereNotNull('available_on')
@@ -69,7 +69,7 @@ class SettlementService
             return;
         }
 
-        $transactions ??= Transaction::query()
+        $transactions ??= StripeTransaction::query()
             ->where('status', 'succeeded')
             ->where('direction', TransactionDirection::Credit->value)
             ->where('currency', $batch->currency)
@@ -109,7 +109,7 @@ class SettlementService
         }
     }
 
-    private function settleTransaction(Transaction $tx, SettlementBatch $batch): void
+    private function settleTransaction(StripeTransaction $tx, SettlementBatch $batch): void
     {
         if ($tx->balance_settled_at !== null) {
             return;
@@ -153,7 +153,7 @@ class SettlementService
 
     private function distributeToCustomers(SettlementBatch $batch): void
     {
-        $byCustomer = Transaction::query()
+        $byCustomer = StripeTransaction::query()
             ->where('status', 'succeeded')
             ->where('direction', TransactionDirection::Credit->value)
             ->where('currency', $batch->currency)
