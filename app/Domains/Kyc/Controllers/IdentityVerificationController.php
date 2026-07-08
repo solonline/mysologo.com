@@ -30,6 +30,12 @@ class IdentityVerificationController extends Controller
             default => $this->identityVerification->ensureValidIndividualDocument($customer),
         };
 
-        return DiditSessionResource::make($result);
+        if (($result['status'] ?? '') === 'failed' || empty($result['session'])) {
+            return response()->json([
+                'message' => $result['message'] ?? 'Não foi possível criar a sessão de verificação.',
+            ], 422);
+        }
+
+        return DiditSessionResource::make($result['session']);
     }
 }

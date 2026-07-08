@@ -32,8 +32,10 @@ use App\Domains\Backoffice\Queries\GetWallesterFundingOverviewQuery;
 use App\Domains\Backoffice\Queries\ListAccountsPayableQuery;
 use App\Domains\Backoffice\Queries\ListAuditLogsQuery;
 use App\Domains\Backoffice\Queries\ListCustomersQuery;
+use App\Domains\Backoffice\Queries\ListFundingPartnerMovementsQuery;
 use App\Domains\Backoffice\Queries\ListRolesQuery;
 use App\Domains\Backoffice\Queries\ListStripeFeesQuery;
+use App\Domains\Backoffice\Queries\ListStripeTransactionsQuery;
 use App\Domains\Backoffice\Queries\ListUsersQuery;
 use App\Domains\Backoffice\Services\SettingsManagementService;
 use App\Domains\Backoffice\Services\StaffNotificationService;
@@ -56,6 +58,8 @@ class BackofficeServiceProvider extends ServiceProvider
         ListStripeFeesQuery::class,
         ListAccountsPayableQuery::class,
         ListAuditLogsQuery::class,
+        ListStripeTransactionsQuery::class,
+        ListFundingPartnerMovementsQuery::class,
         GetAuditLogDetailQuery::class,
         UpdateCustomerFromBackofficeAction::class,
         RetryCustomerProvisioningAction::class,

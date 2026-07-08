@@ -87,7 +87,8 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
 
     {{-- Total de Movimentos --}}
-    <div class="card p-5">
+    <a href="{{ route('dashboard.transactions', ['tab' => 'wallester']) }}"
+       class="card p-5 block transition-all hover:shadow-md hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-300/40 group">
         <div class="flex items-start justify-between mb-4">
             <div class="p-2.5 rounded-xl stat-icon-1">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,7 +112,8 @@
                 <p class="text-sm font-bold text-red-900">{{ number_format($stats['movements_failed'] ?? 0) }}</p>
             </div>
         </div>
-    </div>
+        <span class="text-xs font-semibold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity mt-3 inline-block">Ver movimentos →</span>
+    </a>
 
     {{-- Clientes --}}
     <a href="{{ route('dashboard.customers') }}"

@@ -11,6 +11,7 @@ use App\Domains\Backoffice\Controllers\OperationsController;
 use App\Domains\Backoffice\Controllers\RoleController;
 use App\Domains\Backoffice\Controllers\SettingsController;
 use App\Domains\Backoffice\Controllers\StripeFeeController;
+use App\Domains\Backoffice\Controllers\TransactionController;
 use App\Domains\Backoffice\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +40,10 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth')->group(functio
         Route::delete('/customers/{customer}/tpas/{tpa}', [CustomerTpaController::class, 'destroy'])->name('.customers.tpas.destroy');
         Route::post('/customers/{customer}/tpas/{tpa}/fees', [CustomerTpaController::class, 'storeFee'])->name('.customers.tpas.fees.store');
         Route::delete('/customers/{customer}/tpas/{tpa}/fees/{fee}', [CustomerTpaController::class, 'destroyFee'])->name('.customers.tpas.fees.destroy');
+    });
+
+    Route::middleware('can:transactions.view')->group(function () {
+        Route::get('/transactions', [TransactionController::class, 'index'])->name('.transactions');
     });
 
     Route::middleware('can:users.view')->group(function () {

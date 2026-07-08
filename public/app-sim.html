@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Yoop — Simulação</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -302,12 +302,7 @@ body {
 .tx-amount.credit { color: #059669; }
 .tx-amount.debit  { color: #dc2626; }
 
-/* Quick actions */
-.quick-actions {
-  display: flex;
-  justify-content: space-around;
-  padding: 28px 16px 16px;
-}
+/* Quick actions — see extended styles below */
 
 .action-btn {
   display: flex;
@@ -684,6 +679,451 @@ body {
   color: #5b21b6;
   line-height: 1.45;
 }
+
+/* ── Auth / welcome screens ───────────────────────── */
+.auth-screen {
+  background: linear-gradient(160deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
+  justify-content: space-between;
+  padding: 60px 32px 40px;
+}
+
+.auth-hero { color: #fff; }
+.auth-hero h1 { font-size: 32px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.auth-hero p  { font-size: 15px; color: rgba(255,255,255,.6); margin-top: 8px; }
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-secondary {
+  width: 100%;
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.btn-secondary:active { background: rgba(255,255,255,.18); }
+
+.btn-link {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.7);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  text-align: center;
+  padding: 8px;
+}
+
+.btn-link:active { color: #fff; }
+
+.register-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.register-body .field input { color: #fff; }
+
+/* ── Onboarding ───────────────────────────────────── */
+#screen-onboarding { background: var(--slate-50); }
+
+.onboarding-header {
+  background: linear-gradient(135deg, var(--indigo) 0%, var(--violet) 100%);
+  padding: 24px 24px 32px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.onboarding-header h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.onboarding-header p  { font-size: 13px; color: rgba(255,255,255,.75); }
+
+.onboarding-body { padding: 20px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+
+.onboarding-step {
+  background: #fff;
+  border: 1.5px solid var(--slate-100);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+
+.onboarding-step.step-done { border-color: #a7f3d0; }
+.onboarding-step.step-active { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.step-icon {
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  background: var(--slate-100);
+  color: var(--slate-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-done .step-icon { background: #d1fae5; color: #065f46; }
+.step-active .step-icon { background: #ede9fe; color: var(--indigo); }
+
+.step-title { font-size: 14px; font-weight: 700; color: var(--slate-800); }
+.step-desc  { font-size: 12px; color: var(--slate-500); margin-top: 2px; }
+
+.step-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+
+.btn-step {
+  background: var(--slate-50);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  color: var(--slate-700);
+  cursor: pointer;
+  text-align: center;
+}
+
+.btn-step.primary { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+.btn-step:active { opacity: .85; }
+
+.sms-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sms-input input {
+  flex: 1;
+  background: var(--slate-50);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: .3em;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── PIN keypad ───────────────────────────────────── */
+.pin-screen { background: #fff; align-items: center; padding: 40px 32px 32px; }
+
+.pin-title { font-size: 20px; font-weight: 700; color: var(--slate-900); text-align: center; margin-bottom: 6px; }
+.pin-subtitle { font-size: 13px; color: var(--slate-500); text-align: center; margin-bottom: 32px; }
+
+.pin-dots {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+
+.pin-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--slate-300);
+  transition: background .15s, border-color .15s;
+}
+
+.pin-dot.filled { background: var(--indigo); border-color: var(--indigo); }
+
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.pin-key {
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  background: var(--slate-50);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--slate-800);
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background .1s;
+}
+
+.pin-key:active { background: var(--slate-200); }
+.pin-key.empty { background: transparent; cursor: default; }
+.pin-key.action { font-size: 14px; font-weight: 600; color: var(--slate-500); }
+
+/* ── Quick actions scroll ─────────────────────────── */
+.quick-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 28px 16px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.quick-actions::-webkit-scrollbar { display: none; }
+
+.quick-actions .action-btn { flex-shrink: 0; min-width: 64px; }
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--indigo);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── P2P ──────────────────────────────────────────── */
+.recipient-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #f5f3ff;
+  border: 1.5px solid #ddd6fe;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.recipient-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--indigo);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.recipient-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.recipient-name { font-size: 15px; font-weight: 700; color: var(--slate-800); }
+.recipient-username { font-size: 12px; color: var(--slate-500); }
+
+/* ── PIN overlay (P2P confirm) ──────────────────── */
+.pin-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15,23,42,.5);
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+}
+
+.pin-overlay.show { display: flex; }
+
+.pin-sheet {
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+  padding: 28px 32px 40px;
+  width: 100%;
+  animation: slideUp .25s ease;
+}
+
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* ── Transaction detail ───────────────────────────── */
+.detail-grid { display: flex; flex-direction: column; gap: 0; }
+
+.detail-amount {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.detail-amount-value { font-size: 36px; font-weight: 700; color: var(--slate-900); }
+.detail-amount-label { font-size: 13px; color: var(--slate-500); margin-top: 4px; }
+
+.btn-logout {
+  width: 100%;
+  background: #fff;
+  border: 1.5px solid #fca5a5;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #dc2626;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.btn-logout:active { background: #fef2f2; }
+
+.load-more-btn {
+  background: var(--slate-50);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-600);
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  width: calc(100% - 40px);
+  margin: 12px 20px 20px;
+}
+
+.tx-item.clickable { cursor: pointer; }
+.tx-item.clickable:active { background: var(--slate-50); }
+
+/* ── KYC (Didit real) ───────────────────────────── */
+#screen-kyc {
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+.kyc-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--slate-100);
+  flex-shrink: 0;
+  background: #fff;
+  z-index: 2;
+}
+
+.kyc-header h2 { font-size: 15px; font-weight: 700; color: var(--slate-900); flex: 1; }
+
+.kyc-status-bar {
+  padding: 10px 16px;
+  background: #f5f3ff;
+  border-bottom: 1px solid #ddd6fe;
+  font-size: 12px;
+  color: #5b21b6;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kyc-status-bar.review { background: #fef3c7; border-color: #fde68a; color: #92400e; }
+.kyc-status-bar.done  { background: #d1fae5; border-color: #a7f3d0; color: #065f46; }
+
+.kyc-frame-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: var(--slate-50);
+}
+
+#kyc-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+.kyc-fallback {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  height: 100%;
+}
+
+.kyc-fallback.show { display: flex; }
+
+.kyc-fallback p { font-size: 13px; color: var(--slate-500); line-height: 1.5; }
+
+.kyc-fallback .btn-action { max-width: 280px; }
+
+/* ── Mobile: ecrã completo (sem frame de telemóvel) ── */
+@media (max-width: 640px) {
+  body {
+    padding: 0;
+    background: #fff;
+    min-height: 100dvh;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  #phone {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  #phone::before { display: none; }
+
+  #status-bar { display: none; }
+
+  #bottom-nav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  #toast {
+    bottom: max(88px, calc(72px + env(safe-area-inset-bottom)));
+  }
+
+  .auth-screen {
+    padding-top: max(48px, calc(env(safe-area-inset-top) + 24px));
+    padding-bottom: max(32px, env(safe-area-inset-bottom));
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .register-body {
+    padding-left: 24px;
+    padding-right: 24px;
+    padding-bottom: max(32px, env(safe-area-inset-bottom));
+  }
+
+  .pin-screen {
+    padding-bottom: max(32px, env(safe-area-inset-bottom));
+  }
+
+  .screen-header {
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+
+  .kyc-header {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+}
 </style>
 </head>
 <body>
@@ -720,9 +1160,63 @@ body {
   <!-- Screens -->
   <div id="screens">
 
+    <!-- ── Welcome ── -->
+    <div id="screen-welcome" class="screen auth-screen active">
+      <div class="auth-hero">
+        <h1>Yoop</h1>
+        <p>A tua carteira digital</p>
+      </div>
+      <div class="auth-card">
+        <button class="btn-primary" onclick="navigate('register')">Criar conta</button>
+        <button class="btn-secondary" onclick="navigate('login')">Entrar</button>
+        <button class="btn-link" onclick="navigate('pin-login')">Entrar com PIN</button>
+      </div>
+    </div>
+
+    <!-- ── Register ── -->
+    <div id="screen-register" class="screen auth-screen">
+      <div class="auth-hero" style="padding-bottom:16px">
+        <button class="btn-link" style="text-align:left;padding:0;margin-bottom:16px" onclick="navigate('welcome')">← Voltar</button>
+        <h1>Criar conta</h1>
+        <p>Preencha os seus dados</p>
+      </div>
+      <div class="register-body">
+        <div class="field">
+          <label>Nome completo</label>
+          <input id="reg-name" type="text" placeholder="João Silva" />
+        </div>
+        <div class="field">
+          <label>E-mail</label>
+          <input id="reg-email" type="email" placeholder="seu@email.com" />
+        </div>
+        <div class="field">
+          <label>Username</label>
+          <input id="reg-username" type="text" placeholder="joaosilva" />
+        </div>
+        <div class="field">
+          <label>Telefone</label>
+          <input id="reg-phone" type="tel" placeholder="351912345678" />
+        </div>
+        <div class="field">
+          <label>Senha</label>
+          <input id="reg-password" type="password" placeholder="••••••••" />
+        </div>
+        <div class="field">
+          <label>Moeda</label>
+          <select id="reg-currency" style="width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:12px 16px;font-size:15px;font-family:inherit;color:#fff;appearance:none">
+            <option value="EUR">EUR — Euro</option>
+            <option value="USD">USD — Dólar</option>
+            <option value="GBP">GBP — Libra</option>
+          </select>
+        </div>
+        <button class="btn-primary" id="register-btn" onclick="doRegister()">Criar conta</button>
+      </div>
+    </div>
+
     <!-- ── Login ── -->
-    <div id="screen-login" class="screen active">
-      <div class="login-hero">
+    <div id="screen-login" class="screen auth-screen">
+      <div class="auth-hero">
+        <button class="btn-link" style="text-align:left;padding:0;margin-bottom:16px" onclick="navigate('welcome')">← Voltar</button>
         <h1>Olá,<br>bem-vindo.</h1>
         <p>Faça login para continuar</p>
       </div>
@@ -739,6 +1233,63 @@ body {
         <button class="btn-primary" id="login-btn" onclick="doLogin()">
           Entrar
         </button>
+      </div>
+    </div>
+
+    <!-- ── PIN Login ── -->
+    <div id="screen-pin-login" class="screen pin-screen">
+      <button class="btn-link" style="color:var(--slate-500);align-self:flex-start;margin-bottom:16px" onclick="navigate('welcome')">← Voltar</button>
+      <div class="pin-title">Entrar com PIN</div>
+      <div class="pin-subtitle" id="pin-login-subtitle">Introduza o seu PIN</div>
+      <div class="field" style="width:100%;margin-bottom:20px">
+        <label style="color:var(--slate-500);text-transform:uppercase;font-size:11px;font-weight:600;letter-spacing:.06em">E-mail</label>
+        <input id="pin-login-email" type="email" class="form-input" placeholder="seu@email.com" style="margin-top:6px" />
+      </div>
+      <div class="pin-dots" id="pin-login-dots"></div>
+      <div class="pin-keypad" id="pin-login-keypad"></div>
+    </div>
+
+    <!-- ── PIN Setup ── -->
+    <div id="screen-pin-setup" class="screen pin-screen">
+      <div class="pin-title">Criar PIN</div>
+      <div class="pin-subtitle" id="pin-setup-subtitle">Escolha um PIN de 4 dígitos</div>
+      <div class="pin-dots" id="pin-setup-dots"></div>
+      <div class="pin-keypad" id="pin-setup-keypad"></div>
+    </div>
+
+    <!-- ── Onboarding ── -->
+    <div id="screen-onboarding" class="screen">
+      <div class="onboarding-header">
+        <h2 id="onboarding-title">A configurar a sua conta</h2>
+        <p id="onboarding-status">Complete os passos abaixo</p>
+      </div>
+      <div class="onboarding-body" id="onboarding-steps"></div>
+    </div>
+
+    <!-- ── KYC Didit (verificação real) ── -->
+    <div id="screen-kyc" class="screen">
+      <div class="kyc-header">
+        <button class="back-btn" onclick="closeKycScreen()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+        </button>
+        <h2>Verificação de identidade</h2>
+      </div>
+      <div class="kyc-status-bar" id="kyc-status-bar">
+        <span id="kyc-status-text">A carregar sessão Didit…</span>
+        <span class="spin" id="kyc-status-spin" style="width:14px;height:14px;border-width:2px;border-color:var(--slate-200);border-top-color:var(--indigo)"></span>
+      </div>
+      <div class="kyc-frame-wrap">
+        <iframe id="kyc-iframe" title="Verificação Didit" allow="camera; microphone; geolocation" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-top-navigation"></iframe>
+        <div class="kyc-fallback" id="kyc-fallback">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--indigo)" stroke-width="1.5" style="opacity:.6">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <p>Complete a verificação de identidade no Didit.<br>É obrigatório para activar a conta.</p>
+          <button class="btn-action" onclick="openKycExternal()">Abrir verificação Didit</button>
+          <button class="btn-step" onclick="pollKycStatus(true)">Já concluí — verificar estado</button>
+        </div>
       </div>
     </div>
 
@@ -768,6 +1319,23 @@ body {
           </div>
           <span>Depositar</span>
         </button>
+        <button class="action-btn" onclick="navigate('p2p')">
+          <div class="action-icon amber">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+          </div>
+          <span>Enviar</span>
+        </button>
+        <button class="action-btn" onclick="navigate('movements')">
+          <div class="action-icon sky">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+          </div>
+          <span>Movimentos</span>
+        </button>
         <button class="action-btn" onclick="openCardFlow()">
           <div class="action-icon indigo">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -790,7 +1358,10 @@ body {
 
       <!-- Recent transactions -->
       <div class="section">
-        <div class="section-title">Atividade recente</div>
+        <div class="section-header-row">
+          <div class="section-title" style="margin-bottom:0">Atividade recente</div>
+          <button class="section-link" onclick="navigate('movements')">Ver todas</button>
+        </div>
         <div class="info-card">
           <div id="home-tx-list" class="tx-list">
             <div style="padding:14px 16px"><span class="skeleton" style="width:80%;display:inline-block">&nbsp;</span></div>
@@ -824,6 +1395,7 @@ body {
             <span class="info-row-value" id="info-wallester">—</span>
           </div>
         </div>
+        <button class="btn-logout" onclick="doLogout()">Terminar sessão</button>
       </div>
 
       <!-- Payment methods -->
@@ -1027,6 +1599,99 @@ body {
       </div>
     </div>
 
+    <!-- ── Movements ── -->
+    <div id="screen-movements" class="screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="goBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+        </button>
+        <h2>Movimentações</h2>
+      </div>
+      <div id="movements-list" class="tx-list"></div>
+      <button class="load-more-btn" id="movements-load-more" onclick="loadMoreMovements()" style="display:none">Carregar mais</button>
+    </div>
+
+    <!-- ── Transaction detail ── -->
+    <div id="screen-transaction-detail" class="screen tx-screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="goBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+        </button>
+        <h2>Detalhe</h2>
+      </div>
+      <div class="tx-body" id="transaction-detail-body">
+        <div class="detail-amount">
+          <div class="detail-amount-value" id="tx-detail-amount">—</div>
+          <div class="detail-amount-label" id="tx-detail-type">—</div>
+        </div>
+        <div class="info-card detail-grid" id="tx-detail-info"></div>
+      </div>
+    </div>
+
+    <!-- ── P2P ── -->
+    <div id="screen-p2p" class="screen tx-screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="goBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+        </button>
+        <h2>Enviar dinheiro</h2>
+      </div>
+      <div class="tx-body">
+        <div class="form-field">
+          <label class="form-label">Destinatário</label>
+          <div style="display:flex;gap:8px">
+            <input class="form-input" id="p2p-username" type="text" placeholder="@username" style="flex:1" />
+            <button class="btn-step primary" style="white-space:nowrap;padding:12px 16px" onclick="findP2PRecipient()">Buscar</button>
+          </div>
+        </div>
+        <div id="p2p-recipient-preview" style="display:none"></div>
+
+        <div class="amount-field">
+          <div class="balance-label" style="color:var(--slate-400);font-size:11px;letter-spacing:.08em;text-align:center;margin-bottom:8px">VALOR</div>
+          <div class="amount-input-wrap">
+            <span class="amount-prefix" id="p2p-prefix">€</span>
+            <input class="amount-big" id="p2p-amount" type="number" min="0.01" step="0.01" placeholder="0.00" />
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label">Moeda</label>
+          <select class="form-input form-select" id="p2p-currency">
+            <option value="EUR" selected>EUR — Euro</option>
+            <option value="USD">USD — Dólar</option>
+            <option value="GBP">GBP — Libra</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label">Descrição (opcional)</label>
+          <input class="form-input" id="p2p-description" type="text" placeholder="Ex: Almoço" maxlength="255" />
+        </div>
+
+        <div id="p2p-result" class="result-card"></div>
+
+        <button class="btn-action" id="p2p-btn" onclick="openP2PConfirm()">
+          Continuar
+        </button>
+      </div>
+
+      <div class="pin-overlay" id="p2p-pin-overlay">
+        <div class="pin-sheet">
+          <div class="pin-title" style="font-size:17px">Confirmar envio</div>
+          <div class="pin-subtitle" id="p2p-confirm-summary" style="margin-bottom:24px">—</div>
+          <div class="pin-dots" id="p2p-pin-dots"></div>
+          <div class="pin-keypad" id="p2p-pin-keypad"></div>
+          <button class="btn-link" style="color:var(--slate-500);width:100%;margin-top:16px" onclick="closeP2PConfirm()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Notifications ── -->
     <div id="screen-notifications" class="screen">
       <div class="screen-header">
@@ -1082,7 +1747,7 @@ body {
 const BASE       = window.location.origin + '/api';
 const STRIPE_PK  = 'pk_test_51T2hGe2QaRyGWkxZfszIzoH8ptXpnvyZJKbSsxkooaxf8qLbhk1zbhr01eU7sutPuYVHS8WwS2sFRUvcAlWgZGdH00xWuRIIUp';
 let token         = localStorage.getItem('yoop_sim_token') || null;
-let currentScreen = 'login';
+let currentScreen = 'welcome';
 let prevScreen    = null;
 let stripeClient  = null;
 let stripeElements = null;
@@ -1090,6 +1755,27 @@ let depositStripeElements = null;
 let authSession   = null;
 let wallesterReady = false;
 let currentCard   = null;
+let p2pRecipient  = null;
+let movementsPage = 1;
+let movementsHasMore = false;
+let currentTxId   = null;
+let currentKycUrl = null;
+let kycPollTimer  = null;
+
+let deviceToken = localStorage.getItem('yoop_sim_device');
+if (!deviceToken) {
+  deviceToken = crypto.randomUUID();
+  localStorage.setItem('yoop_sim_device', deviceToken);
+}
+let pinConfigured = localStorage.getItem('yoop_sim_pin_set') === '1';
+let savedEmail = localStorage.getItem('yoop_sim_email') || '';
+
+const AUTH_SCREENS = ['welcome', 'login', 'register', 'pin-login'];
+const NO_NAV_SCREENS = [
+  'welcome', 'login', 'register', 'pin-login', 'pin-setup', 'onboarding', 'kyc',
+  'deposit', 'payment', 'notifications', 'card-create', 'card-detail',
+  'movements', 'transaction-detail', 'p2p',
+];
 
 const CURRENCY_SYMBOLS = { eur: '€', usd: '$', gbp: '£', brl: 'R$' };
 
@@ -1124,28 +1810,37 @@ function showToast(msg, type = '') {
 function navigate(screen) {
   prevScreen = currentScreen;
 
-  // exit current
   const cur = document.getElementById('screen-' + currentScreen);
-  cur.classList.remove('active');
-  cur.classList.add('exit');
-  setTimeout(() => cur.classList.remove('exit'), 300);
+  if (cur) {
+    cur.classList.remove('active');
+    cur.classList.add('exit');
+    setTimeout(() => cur.classList.remove('exit'), 300);
+  }
 
-  // enter new
   currentScreen = screen;
   const next = document.getElementById('screen-' + screen);
-  next.classList.add('active');
+  if (next) next.classList.add('active');
 
-  // nav bar
   const navMap = { home: 'nav-home', deposit: 'nav-deposit', payment: 'nav-payment', notifications: 'nav-notifications' };
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   if (navMap[screen]) document.getElementById(navMap[screen]).classList.add('active');
 
-  // status bar
-  setStatusBarColor(screen === 'home');
+  const lightScreens = ['home'];
+  setStatusBarColor(lightScreens.includes(screen));
 
-  // load data for screens
   if (screen === 'home') loadHomeData();
   if (screen === 'notifications') loadNotifications();
+  if (screen === 'onboarding' && authSession) {
+    renderOnboardingHub(authSession);
+    startOnboardingPolling();
+  }
+  if (screen === 'kyc') resumeKycScreen();
+  if (prevScreen === 'kyc' && screen !== 'kyc') stopKycPolling();
+  if (screen !== 'onboarding' && screen !== 'kyc') stopOnboardingPolling();
+  if (screen === 'pin-login') initPinLoginScreen();
+  if (screen === 'pin-setup') initPinSetupScreen();
+  if (screen === 'movements') loadMovements(1);
+  if (screen === 'p2p') resetP2PScreen();
   if (screen === 'deposit') {
     resetDepositScreen();
     loadDepositMethods();
@@ -1164,25 +1859,83 @@ function navigate(screen) {
     resetDepositScreen();
   }
   if (screen === 'card-detail' && currentCard) renderCardDetail(currentCard);
+  if (screen === 'transaction-detail' && currentTxId) loadTransactionDetail(currentTxId);
 
-  // hide nav on sub-screens without tab
-  const noNav = ['deposit','payment','notifications','card-create','card-detail'];
-  document.getElementById('bottom-nav').className = noNav.includes(screen) ? 'hidden' : '';
-  if (noNav.includes(screen)) document.getElementById('bottom-nav').classList.add('hidden');
-  else document.getElementById('bottom-nav').classList.remove('hidden');
+  const showNav = token && !NO_NAV_SCREENS.includes(screen);
+  document.getElementById('bottom-nav').className = showNav ? '' : 'hidden';
 }
 
 function goBack() {
-  navigate(prevScreen && prevScreen !== 'login' ? prevScreen : 'home');
+  const authFlow = ['login', 'register', 'pin-login'];
+  if (authFlow.includes(currentScreen)) {
+    navigate('welcome');
+    return;
+  }
+  if (currentScreen === 'transaction-detail') {
+    navigate('movements');
+    return;
+  }
+  if (currentScreen === 'kyc') {
+    closeKycScreen();
+    return;
+  }
+  if (AUTH_SCREENS.includes(prevScreen) || prevScreen === 'onboarding' || prevScreen === 'pin-setup') {
+    navigate('home');
+    return;
+  }
+  navigate(prevScreen && prevScreen !== 'welcome' ? prevScreen : 'home');
 }
 
 // ── API ───────────────────────────────────────────────
+const PUBLIC_AUTH_PATHS = [
+  '/auth/login',
+  '/auth/register-retail',
+  '/auth/login-pin',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/logout',
+];
+
+let handlingUnauthorized = false;
+
+function isPublicAuthPath(path) {
+  const base = String(path).split('?')[0];
+  return PUBLIC_AUTH_PATHS.includes(base);
+}
+
+function handleUnauthorized() {
+  if (handlingUnauthorized) return;
+  handlingUnauthorized = true;
+
+  stopKycPolling();
+  stopOnboardingPolling();
+
+  token = null;
+  authSession = null;
+  localStorage.removeItem('yoop_sim_token');
+  document.getElementById('bottom-nav').classList.add('hidden');
+  setStatusBarColor(false);
+
+  const loginEmail = document.getElementById('login-email');
+  if (loginEmail && savedEmail) loginEmail.value = savedEmail;
+
+  navigate('login');
+  showToast('Sessão expirada — faça login novamente', 'error');
+
+  setTimeout(() => { handlingUnauthorized = false; }, 1500);
+}
+
 async function api(method, path, body, extraHeaders) {
   const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
   if (extraHeaders) Object.assign(headers, extraHeaders);
   const res = await fetch(BASE + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
+
+  if (res.status === 401 && token && !isPublicAuthPath(path)) {
+    handleUnauthorized();
+  }
+
   return { ok: res.ok, status: res.status, data };
 }
 
@@ -1359,6 +2112,827 @@ function setWallesterReadyFromSession(session) {
   el.innerHTML = `<span class="badge ${badge}">${status}</span>`;
 }
 
+function lifecycleStatus(session) {
+  const raw = session?.lifecycle?.status || session?.user?.status || '';
+  return normalizeStatus(raw);
+}
+
+function normalizeStatus(status) {
+  if (!status) return '';
+  if (typeof status === 'string') return status.toUpperCase();
+  if (typeof status === 'object' && status.value) return String(status.value).toUpperCase();
+  return String(status).toUpperCase();
+}
+
+function saveAuthSession(session) {
+  authSession = session;
+  token = session.token;
+  localStorage.setItem('yoop_sim_token', token);
+  const email = session?.user?.email;
+  if (email) {
+    savedEmail = email;
+    localStorage.setItem('yoop_sim_email', email);
+  }
+  setWallesterReadyFromSession(session);
+}
+
+function routePostAuth(session) {
+  saveAuthSession(session);
+  const status = lifecycleStatus(session);
+
+  if (['BLOCKED', 'SUSPENDED', 'IDENTITY_REJECTED'].includes(status)) {
+    renderOnboardingHub(session);
+    navigate('onboarding');
+    return;
+  }
+
+  if (status !== 'ACTIVE') {
+    renderOnboardingHub(session);
+    navigate('onboarding');
+    return;
+  }
+
+  if (!pinConfigured) {
+    navigate('pin-setup');
+    return;
+  }
+
+  navigate('home');
+  loadHomeData();
+}
+
+async function doLogout() {
+  if (token) await api('POST', '/auth/logout');
+  handlingUnauthorized = true;
+  token = null;
+  authSession = null;
+  localStorage.removeItem('yoop_sim_token');
+  stopKycPolling();
+  stopOnboardingPolling();
+  document.getElementById('bottom-nav').classList.add('hidden');
+  setStatusBarColor(false);
+  navigate('welcome');
+  showToast('Sessão terminada', 'success');
+  setTimeout(() => { handlingUnauthorized = false; }, 500);
+}
+
+// ── Register ──────────────────────────────────────────
+async function doRegister() {
+  const name     = document.getElementById('reg-name').value.trim();
+  const email    = document.getElementById('reg-email').value.trim();
+  const username = document.getElementById('reg-username').value.trim();
+  const phone    = document.getElementById('reg-phone').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const currency = document.getElementById('reg-currency').value;
+  const btn      = document.getElementById('register-btn');
+
+  if (!name || !email || !username || !phone || !password) {
+    showToast('Preencha todos os campos', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin" style="border-top-color:var(--indigo)"></div>';
+
+  try {
+    const { ok, data } = await api('POST', '/auth/register-retail', {
+      name, email, username, password, phone, currency, language: 'pt',
+    });
+
+    if (ok) {
+      const session = unwrap(data);
+      showToast('Conta criada!', 'success');
+      routePostAuth(session);
+    } else {
+      const msg = data?.message || Object.values(data?.errors || {}).flat()[0] || 'Erro no registo';
+      showToast(msg, 'error');
+    }
+  } catch {
+    showToast('Erro de conexão', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Criar conta';
+}
+
+// ── Onboarding hub ────────────────────────────────────
+function onboardingStepState(session, step) {
+  const status = lifecycleStatus(session);
+  const verification = session?.verification || {};
+
+  switch (step) {
+    case 'email':
+      if (verification.email || session?.user?.email_verified) return 'done';
+      if (status === 'PENDING_EMAIL_VERIFICATION') return 'active';
+      return 'pending';
+    case 'phone':
+      if (verification.phone || session?.user?.phone_verified) return 'done';
+      if (status === 'PENDING_PHONE_VERIFICATION') return 'active';
+      return 'pending';
+    case 'identity':
+      if (isDocApproved(verification.identity) || isDocApproved(session?.user?.kyc_status) || ['ACTIVE', 'PROVISIONING'].includes(status)) return 'done';
+      if (status === 'IDENTITY_UNDER_REVIEW') return 'active';
+      if (['PENDING_IDENTITY_VERIFICATION'].includes(status)) return 'active';
+      return 'pending';
+    case 'provisioning':
+      if (status === 'ACTIVE') return 'done';
+      if (status === 'PROVISIONING') return 'active';
+      return 'pending';
+    default:
+      return 'pending';
+  }
+}
+
+function renderOnboardingHub(session) {
+  const title = document.getElementById('onboarding-title');
+  const statusEl = document.getElementById('onboarding-status');
+  const container = document.getElementById('onboarding-steps');
+  if (!container) return;
+
+  const lifecycle = session?.lifecycle || {};
+  const status = lifecycleStatus(session);
+  title.textContent = lifecycle.label || 'A configurar a sua conta';
+  statusEl.textContent = lifecycle.reason || status || 'Complete os passos abaixo';
+
+  if (['BLOCKED', 'SUSPENDED', 'IDENTITY_REJECTED', 'EBURY_REJECTED'].includes(status)) {
+    container.innerHTML = `
+      <div class="hint-box" style="background:#fef2f2;border-color:#fca5a5;color:#991b1b">
+        Conta bloqueada ou rejeitada.${lifecycle.reason ? '<br><br>' + lifecycle.reason : ''}
+      </div>
+      <button class="btn-step" onclick="doLogout()">Terminar sessão</button>`;
+    return;
+  }
+
+  const kycStatus = authSession?.user?.kyc_status || authSession?.identity_verification?.status || '';
+  const kycLabel = kycStatusLabel(kycStatus);
+  const isUnderReview = status === 'IDENTITY_UNDER_REVIEW';
+
+  const steps = [
+    {
+      id: 'email', num: 1, title: 'Verificar e-mail',
+      desc: 'Abra o link enviado para o seu e-mail',
+      state: onboardingStepState(session, 'email'),
+      actions: `
+        <button class="btn-step" onclick="resendValidationEmail()">Reenviar e-mail</button>
+        <button class="btn-step primary" onclick="refreshOnboarding()">Já verifiquei</button>`,
+    },
+    {
+      id: 'phone', num: 2, title: 'Verificar telefone',
+      desc: 'Receba e introduza o código SMS',
+      state: onboardingStepState(session, 'phone'),
+      actions: `
+        <button class="btn-step" onclick="sendPhoneCode()">Enviar SMS</button>
+        <div class="sms-input">
+          <input id="phone-code-input" type="text" maxlength="6" placeholder="000000" inputmode="numeric" />
+        </div>
+        <button class="btn-step primary" onclick="validatePhoneCode()">Validar código</button>`,
+    },
+    {
+      id: 'identity', num: 3, title: 'Verificação de identidade (Didit)',
+      desc: isUnderReview
+        ? `Documentos em análise (${kycLabel}) — aguarde o resultado`
+        : 'Verificação real obrigatória — documento + selfie via Didit',
+      state: onboardingStepState(session, 'identity'),
+      actions: isUnderReview ? `
+        <div class="hint-box">A sua verificação foi submetida e está a ser analisada. Este passo actualiza automaticamente.</div>
+        <button class="btn-step primary" onclick="pollKycStatus(true)">Verificar estado</button>` : `
+        <div class="hint-box">Deve completar o formulário Didit com documento válido e selfie. Não é possível saltar este passo.</div>
+        <button class="btn-step primary" onclick="resumeKycFromSession()">${getExistingKycUrl() ? 'Continuar verificação Didit' : 'Iniciar verificação Didit'}</button>
+        <button class="btn-step" onclick="pollKycStatus(true)">Já concluí — verificar estado</button>`,
+    },
+    {
+      id: 'provisioning', num: 4, title: 'Activar conta',
+      desc: 'A provisionar contas nos parceiros',
+      state: onboardingStepState(session, 'provisioning'),
+      actions: `
+        <button class="btn-step primary" onclick="refreshOnboarding()">Actualizar</button>`,
+    },
+  ];
+
+  container.innerHTML = steps.map(s => `
+    <div class="onboarding-step ${s.state === 'done' ? 'step-done' : ''} ${s.state === 'active' ? 'step-active' : ''}">
+      <div class="step-header">
+        <div class="step-icon">${s.state === 'done' ? '✓' : s.num}</div>
+        <div>
+          <div class="step-title">${s.title}</div>
+          <div class="step-desc">${s.desc}</div>
+        </div>
+      </div>
+      ${s.state !== 'done' ? `<div class="step-actions">${s.actions}</div>` : ''}
+    </div>`).join('');
+}
+
+async function refreshOnboarding() {
+  const { ok, data } = await api('GET', '/customer/me');
+  if (!ok) {
+    showToast('Erro ao actualizar estado', 'error');
+    return;
+  }
+  const customer = unwrap(data);
+  if (authSession) {
+    authSession.user = { ...authSession.user, ...customer };
+    authSession.lifecycle = authSession.lifecycle || {};
+    authSession.lifecycle.status = normalizeStatus(customer.status);
+    authSession.verification = {
+      email: !!customer.email_verified,
+      phone: !!customer.phone_verified,
+      identity: isDocApproved(customer.document_verified),
+    };
+    if (customer.didit_session) {
+      authSession.identity_verification = authSession.identity_verification || {};
+      authSession.identity_verification.session = customer.didit_session;
+    }
+  }
+  const status = lifecycleStatus(authSession);
+  if (status === 'ACTIVE') {
+    stopOnboardingPolling();
+    showToast('Conta activa!', 'success');
+    routePostAuth(authSession);
+    return;
+  }
+  renderOnboardingHub(authSession);
+  startOnboardingPolling();
+  showToast('Estado actualizado', 'success');
+}
+
+async function resendValidationEmail() {
+  const { ok, data } = await api('POST', '/customer/send-validation-email');
+  showToast(ok ? 'E-mail reenviado' : (data?.message || 'Erro ao reenviar'), ok ? 'success' : 'error');
+}
+
+async function sendPhoneCode() {
+  const phone = authSession?.user?.phone || '';
+  const { ok, data } = await api('POST', '/onboarding/phone/send', { phone });
+  showToast(ok ? 'SMS enviado' : (data?.message || 'Erro ao enviar SMS'), ok ? 'success' : 'error');
+}
+
+async function validatePhoneCode() {
+  const code = document.getElementById('phone-code-input')?.value?.trim();
+  if (!code) { showToast('Introduza o código', 'error'); return; }
+  const { ok, data } = await api('POST', '/onboarding/phone/validate', { code });
+  if (ok) {
+    showToast('Telefone verificado!', 'success');
+    await refreshOnboarding();
+  } else {
+    showToast(data?.message || 'Código inválido', 'error');
+  }
+}
+
+function isDocApproved(val) {
+  return normalizeStatus(val) === 'APPROVED';
+}
+
+function getExistingKycUrl() {
+  return authSession?.user?.didit_session?.session_url
+    || authSession?.user?.didit_session?.verification_url
+    || authSession?.identity_verification?.session?.verification_url
+    || null;
+}
+
+function resumeKycFromSession() {
+  const url = getExistingKycUrl();
+  if (url) {
+    navigate('kyc');
+    loadKycIframe(url);
+    return;
+  }
+  startKycSession();
+}
+
+function kycStatusLabel(status) {
+  const map = {
+    PENDING: 'Pendente',
+    ANALYSING: 'Em análise',
+    APPROVED: 'Aprovado',
+    DECLINED: 'Recusado',
+    'Not Started': 'Não iniciado',
+    'In Progress': 'Em progresso',
+    Approved: 'Aprovado',
+    Declined: 'Recusado',
+    Abandoned: 'Abandonado',
+    Expired: 'Expirado',
+  };
+  return map[status] || status || 'Pendente';
+}
+
+function extractKycUrl(data) {
+  const d = unwrap(data);
+  if (!d) return null;
+  return d.session_url
+    || d.verification_url
+    || d.session?.session_url
+    || authSession?.identity_verification?.session?.verification_url
+    || authSession?.user?.didit_session?.session_url
+    || authSession?.user?.didit_session?.verification_url
+    || null;
+}
+
+function extractKycSessionStatus(data) {
+  const d = unwrap(data);
+  return d?.status || d?.session?.status || null;
+}
+
+function isKycComplete(status, lifecycle) {
+  const ls = normalizeStatus(lifecycle);
+  if (['PROVISIONING', 'ACTIVE'].includes(ls)) return true;
+  if (ls === 'IDENTITY_UNDER_REVIEW') return 'review';
+  const doc = normalizeStatus(status);
+  if (doc === 'APPROVED') return true;
+  if (doc === 'DECLINED') return 'declined';
+  return false;
+}
+
+function setKycStatusBar(mode, text) {
+  const bar = document.getElementById('kyc-status-bar');
+  const textEl = document.getElementById('kyc-status-text');
+  const spin = document.getElementById('kyc-status-spin');
+  if (!bar || !textEl) return;
+  bar.className = 'kyc-status-bar' + (mode ? ' ' + mode : '');
+  textEl.textContent = text;
+  if (spin) spin.style.display = mode === 'polling' ? 'block' : 'none';
+}
+
+function showKycFallback(show) {
+  const iframe = document.getElementById('kyc-iframe');
+  const fallback = document.getElementById('kyc-fallback');
+  if (iframe) iframe.style.display = show ? 'none' : 'block';
+  if (fallback) fallback.classList.toggle('show', show);
+}
+
+function loadKycIframe(url) {
+  currentKycUrl = url;
+  const iframe = document.getElementById('kyc-iframe');
+  if (!iframe) return;
+
+  showKycFallback(false);
+  setKycStatusBar('polling', 'Complete a verificação no formulário abaixo');
+
+  iframe.onload = () => {
+    try {
+      const blocked = !iframe.contentWindow || iframe.contentDocument?.body?.innerHTML === '';
+      if (blocked) showKycFallback(true);
+    } catch {
+      // cross-origin = iframe loaded externally (expected for Didit)
+    }
+  };
+
+  iframe.onerror = () => showKycFallback(true);
+
+  setTimeout(() => {
+    try {
+      const doc = iframe.contentDocument;
+      if (doc && !doc.body?.childElementCount) showKycFallback(true);
+    } catch {
+      // Didit is cross-origin — iframe is working
+    }
+  }, 3000);
+
+  iframe.src = url;
+  startKycPolling();
+}
+
+function openKycExternal() {
+  if (!currentKycUrl) { showToast('Sessão não disponível', 'error'); return; }
+  window.open(currentKycUrl, '_blank', 'noopener');
+  showToast('Complete o KYC no Didit e volte aqui', 'success');
+  startKycPolling();
+}
+
+function resumeKycScreen() {
+  if (currentKycUrl) {
+    const iframe = document.getElementById('kyc-iframe');
+    if (iframe && !iframe.src) loadKycIframe(currentKycUrl);
+    else startKycPolling();
+  }
+}
+
+function closeKycScreen() {
+  stopKycPolling();
+  navigate('onboarding');
+}
+
+function startKycPolling() {
+  stopKycPolling();
+  kycPollTimer = setInterval(() => pollKycStatus(false), 5000);
+}
+
+function stopKycPolling() {
+  if (kycPollTimer) { clearInterval(kycPollTimer); kycPollTimer = null; }
+}
+
+let onboardingPollTimer = null;
+
+function startOnboardingPolling() {
+  if (onboardingPollTimer) return;
+  const status = lifecycleStatus(authSession);
+  if (!['PENDING_IDENTITY_VERIFICATION', 'IDENTITY_UNDER_REVIEW', 'PROVISIONING'].includes(status)) return;
+  onboardingPollTimer = setInterval(() => pollKycStatus(false), 8000);
+}
+
+function stopOnboardingPolling() {
+  if (onboardingPollTimer) { clearInterval(onboardingPollTimer); onboardingPollTimer = null; }
+}
+
+async function pollKycStatus(manual) {
+  if (!token) return;
+
+  const { ok, data } = await api('GET', '/customer/me');
+  if (!ok) return;
+
+  const customer = unwrap(data);
+  if (authSession) {
+    authSession.user = { ...authSession.user, ...customer };
+    authSession.lifecycle = authSession.lifecycle || {};
+    authSession.lifecycle.status = normalizeStatus(customer.status);
+    authSession.verification = {
+      email: !!customer.email_verified,
+      phone: !!customer.phone_verified,
+      identity: isDocApproved(customer.document_verified),
+    };
+    if (customer.didit_session) {
+      authSession.identity_verification = authSession.identity_verification || {};
+      authSession.identity_verification.session = customer.didit_session;
+    }
+  }
+
+  const lifecycle = lifecycleStatus(authSession);
+  const kycStatus = customer.kyc_status || customer.document_verified;
+  const kycDone = isKycComplete(kycStatus, lifecycle);
+
+  if (currentScreen === 'kyc') {
+    if (kycDone === true) {
+      setKycStatusBar('done', 'Verificação concluída!');
+      stopKycPolling();
+      showToast('KYC concluído!', 'success');
+      setTimeout(() => routePostAuth(authSession), 1200);
+      return;
+    }
+    if (kycDone === 'review') {
+      setKycStatusBar('review', 'Documentos em análise — aguarde');
+    } else if (kycDone === 'declined') {
+      setKycStatusBar('', 'Verificação recusada — tente novamente');
+    } else if (manual) {
+      showToast('KYC ainda pendente — complete o formulário', 'error');
+    }
+  }
+
+  if (currentScreen === 'onboarding') {
+    renderOnboardingHub(authSession);
+    if (kycDone === true || lifecycle === 'ACTIVE') {
+      stopOnboardingPolling();
+      if (manual || lifecycle === 'PROVISIONING' || lifecycle === 'ACTIVE') {
+        showToast('Estado actualizado', 'success');
+        if (lifecycle === 'ACTIVE') routePostAuth(authSession);
+      }
+    }
+  }
+}
+
+async function startKycSession() {
+  setKycStatusBar('polling', 'A criar sessão Didit…');
+
+  const { ok, data } = await api('POST', '/kyc/identity/session');
+  if (!ok) {
+    showToast(data?.message || 'Erro ao iniciar KYC', 'error');
+    return;
+  }
+
+  const url = extractKycUrl(data);
+  const sessionStatus = extractKycSessionStatus(data);
+
+  if (!url) {
+    showToast('URL de verificação não disponível — verifique a configuração Didit', 'error');
+    return;
+  }
+
+  if (authSession?.identity_verification) {
+    authSession.identity_verification.session = authSession.identity_verification.session || {};
+    authSession.identity_verification.session.verification_url = url;
+    authSession.identity_verification.status = sessionStatus || 'pending';
+  }
+
+  showToast('Sessão Didit criada — complete a verificação', 'success');
+  navigate('kyc');
+  loadKycIframe(url);
+}
+
+// ── PIN keypad ────────────────────────────────────────
+function createPinKeypad(dotsId, keypadId, options) {
+  const dotsEl = document.getElementById(dotsId);
+  const keypadEl = document.getElementById(keypadId);
+  if (!dotsEl || !keypadEl) return null;
+
+  let pin = '';
+  const maxLen = options.length || 4;
+
+  function renderDots() {
+    dotsEl.innerHTML = Array.from({ length: maxLen }, (_, i) =>
+      `<div class="pin-dot ${i < pin.length ? 'filled' : ''}"></div>`
+    ).join('');
+  }
+
+  function reset() {
+    pin = '';
+    renderDots();
+    if (options.onReset) options.onReset();
+  }
+
+  function handleDigit(d) {
+    if (pin.length >= maxLen) return;
+    pin += d;
+    renderDots();
+    if (pin.length === maxLen) {
+      setTimeout(() => options.onComplete(pin, reset), 150);
+    }
+  }
+
+  keypadEl.innerHTML = [
+    '1','2','3','4','5','6','7','8','9','','0','⌫',
+  ].map(k => {
+    if (k === '') return '<button class="pin-key empty"></button>';
+    if (k === '⌫') return `<button class="pin-key action" data-action="back">⌫</button>`;
+    return `<button class="pin-key" data-digit="${k}">${k}</button>`;
+  }).join('');
+
+  keypadEl.querySelectorAll('.pin-key').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.digit) handleDigit(btn.dataset.digit);
+      if (btn.dataset.action === 'back') {
+        pin = pin.slice(0, -1);
+        renderDots();
+      }
+    });
+  });
+
+  renderDots();
+  return { reset };
+}
+
+let pinSetupController = null;
+let pinLoginController = null;
+let p2pPinController = null;
+let pinSetupFirst = null;
+
+function initPinSetupScreen() {
+  pinSetupFirst = null;
+  document.getElementById('pin-setup-subtitle').textContent = 'Escolha um PIN de 4 dígitos';
+  if (pinSetupController) pinSetupController.reset();
+  pinSetupController = createPinKeypad('pin-setup-dots', 'pin-setup-keypad', {
+    onComplete: async (pin, reset) => {
+      if (!pinSetupFirst) {
+        pinSetupFirst = pin;
+        document.getElementById('pin-setup-subtitle').textContent = 'Confirme o PIN';
+        reset();
+        return;
+      }
+      if (pin !== pinSetupFirst) {
+        showToast('PINs não coincidem', 'error');
+        pinSetupFirst = null;
+        document.getElementById('pin-setup-subtitle').textContent = 'Escolha um PIN de 4 dígitos';
+        reset();
+        return;
+      }
+      const { ok, data } = await api('POST', '/auth/create-pin', {
+        device_token: deviceToken,
+        device_name: 'App Sim',
+        pin,
+      });
+      if (ok) {
+        pinConfigured = true;
+        localStorage.setItem('yoop_sim_pin_set', '1');
+        showToast('PIN criado!', 'success');
+        navigate('home');
+        loadHomeData();
+      } else {
+        showToast(data?.message || 'Erro ao criar PIN', 'error');
+        pinSetupFirst = null;
+        document.getElementById('pin-setup-subtitle').textContent = 'Escolha um PIN de 4 dígitos';
+        reset();
+      }
+    },
+  });
+}
+
+function initPinLoginScreen() {
+  const emailEl = document.getElementById('pin-login-email');
+  if (emailEl && savedEmail) emailEl.value = savedEmail;
+  if (pinLoginController) pinLoginController.reset();
+  pinLoginController = createPinKeypad('pin-login-dots', 'pin-login-keypad', {
+    onComplete: async (pin, reset) => {
+      const email = document.getElementById('pin-login-email').value.trim();
+      if (!email) { showToast('Informe o e-mail', 'error'); reset(); return; }
+      const { ok, data } = await api('POST', '/auth/login-pin', { email, device_token: deviceToken, pin });
+      if (ok) {
+        routePostAuth(unwrap(data));
+        showToast('Login realizado!', 'success');
+      } else {
+        showToast(data?.message || 'PIN inválido', 'error');
+        reset();
+      }
+    },
+  });
+}
+
+// ── Movements ─────────────────────────────────────────
+function renderTxItemClickable(t) {
+  const base = renderTxItem(t);
+  return base.replace('<div class="tx-item">', `<div class="tx-item clickable" onclick="openTransactionDetail(${t.id})">`);
+}
+
+async function loadMovements(page) {
+  const list = document.getElementById('movements-list');
+  const loadMore = document.getElementById('movements-load-more');
+  if (!list) return;
+
+  if (page === 1) {
+    movementsPage = 1;
+    list.innerHTML = `<div class="empty-state"><div class="spin" style="border-color:var(--slate-200);border-top-color:var(--indigo);width:32px;height:32px"></div></div>`;
+  }
+
+  try {
+    const { ok, data } = await api('GET', `/wallet/transactions?per_page=20&page=${page}`);
+    if (!ok) {
+      if (page === 1) list.innerHTML = `<div class="empty-state"><p>Erro ao carregar</p></div>`;
+      return;
+    }
+
+    const unwrapped = unwrap(data);
+    const items = Array.isArray(unwrapped) ? unwrapped : (unwrapped?.data || []);
+    const meta = data?.meta || unwrapped?.meta || {};
+    movementsHasMore = meta.current_page < meta.last_page;
+
+    if (page === 1 && !items.length) {
+      list.innerHTML = `<div class="empty-state"><p>Sem movimentações</p></div>`;
+      loadMore.style.display = 'none';
+      return;
+    }
+
+    const html = items.map(t => renderTxItemClickable(t)).join('');
+    if (page === 1) list.innerHTML = html;
+    else list.insertAdjacentHTML('beforeend', html);
+
+    movementsPage = page;
+    loadMore.style.display = movementsHasMore ? 'block' : 'none';
+  } catch {
+    if (page === 1) list.innerHTML = `<div class="empty-state"><p>Erro ao carregar</p></div>`;
+  }
+}
+
+function loadMoreMovements() {
+  if (movementsHasMore) loadMovements(movementsPage + 1);
+}
+
+function openTransactionDetail(id) {
+  currentTxId = id;
+  navigate('transaction-detail');
+}
+
+async function loadTransactionDetail(id) {
+  const amountEl = document.getElementById('tx-detail-amount');
+  const typeEl = document.getElementById('tx-detail-type');
+  const infoEl = document.getElementById('tx-detail-info');
+  if (!infoEl) return;
+
+  infoEl.innerHTML = `<div class="info-row"><span class="info-row-label skeleton" style="width:60%">&nbsp;</span></div>`;
+
+  const { ok, data } = await api('GET', `/wallet/transactions/${id}`);
+  if (!ok) {
+    infoEl.innerHTML = `<div class="info-row"><span class="info-row-label">Erro ao carregar</span></div>`;
+    return;
+  }
+
+  const t = unwrap(data);
+  const isCredit = t.direction === 'credit';
+  const sign = isCredit ? '+' : '−';
+  const cur = sanitizeCurrency(t.currency);
+  amountEl.textContent = sign + formatMoney(t.net_amount ?? t.amount, cur);
+  amountEl.style.color = isCredit ? '#059669' : '#dc2626';
+  typeEl.textContent = String(t.type || 'transação').replace(/_/g, ' ');
+
+  const rows = [
+    ['Status', `<span class="badge ${String(t.status || 'pending').toLowerCase()}">${t.status || '—'}</span>`],
+    ['Direcção', t.direction || '—'],
+    ['Montante', formatMoney(t.amount, cur)],
+    ['Taxa', t.fee ? formatMoney(t.fee, cur) : '—'],
+    ['Líquido', formatMoney(t.net_amount ?? t.amount, cur)],
+    ['Descrição', t.description || '—'],
+    ['Método', t.payment_method_type || '—'],
+    ['Data', t.created_at ? new Date(t.created_at).toLocaleString('pt-PT') : '—'],
+  ];
+  if (t.stripe_payment_intent_id) rows.push(['Stripe PI', t.stripe_payment_intent_id]);
+  if (t.stripe_charge_id) rows.push(['Stripe Charge', t.stripe_charge_id]);
+  if (t.partner_funding_status) rows.push(['Funding', t.partner_funding_status]);
+
+  infoEl.innerHTML = rows.map(([label, value]) => `
+    <div class="info-row">
+      <span class="info-row-label">${label}</span>
+      <span class="info-row-value" style="text-align:right;max-width:55%;word-break:break-word">${value}</span>
+    </div>`).join('');
+}
+
+// ── P2P ───────────────────────────────────────────────
+function resetP2PScreen() {
+  p2pRecipient = null;
+  document.getElementById('p2p-username').value = '';
+  document.getElementById('p2p-amount').value = '';
+  document.getElementById('p2p-description').value = '';
+  document.getElementById('p2p-recipient-preview').style.display = 'none';
+  document.getElementById('p2p-result').className = 'result-card';
+  closeP2PConfirm();
+  const currency = authSession?.user?.currency || 'EUR';
+  document.getElementById('p2p-currency').value = currency;
+  document.getElementById('p2p-prefix').textContent = currencySymbol(currency);
+}
+
+document.getElementById('p2p-currency')?.addEventListener('change', function() {
+  document.getElementById('p2p-prefix').textContent = currencySymbol(this.value);
+});
+
+async function findP2PRecipient() {
+  let username = document.getElementById('p2p-username').value.trim().replace(/^@/, '');
+  if (!username) { showToast('Informe o username', 'error'); return; }
+
+  const { ok, data } = await api('GET', `/customer/find/${encodeURIComponent(username)}`);
+  const preview = document.getElementById('p2p-recipient-preview');
+
+  if (!ok) {
+    p2pRecipient = null;
+    preview.style.display = 'none';
+    showToast(data?.message || 'Utilizador não encontrado', 'error');
+    return;
+  }
+
+  p2pRecipient = unwrap(data);
+  const initial = (p2pRecipient.name || p2pRecipient.username || '?')[0].toUpperCase();
+  const avatar = p2pRecipient.avatar_url
+    ? `<img src="${p2pRecipient.avatar_url}" alt="" />`
+    : initial;
+
+  preview.innerHTML = `
+    <div class="recipient-preview">
+      <div class="recipient-avatar">${avatar}</div>
+      <div>
+        <div class="recipient-name">${p2pRecipient.name || '—'}</div>
+        <div class="recipient-username">@${p2pRecipient.username}</div>
+      </div>
+    </div>`;
+  preview.style.display = 'block';
+  showToast('Destinatário encontrado', 'success');
+}
+
+function openP2PConfirm() {
+  const amount = parseFloat(document.getElementById('p2p-amount').value);
+  const currency = document.getElementById('p2p-currency').value;
+
+  if (!p2pRecipient) { showToast('Busque o destinatário primeiro', 'error'); return; }
+  if (!amount || amount <= 0) { showToast('Informe um valor válido', 'error'); return; }
+
+  document.getElementById('p2p-confirm-summary').textContent =
+    `Enviar ${formatMajorMoney(amount, currency)} para @${p2pRecipient.username}`;
+
+  document.getElementById('p2p-pin-overlay').classList.add('show');
+  if (p2pPinController) p2pPinController.reset();
+  p2pPinController = createPinKeypad('p2p-pin-dots', 'p2p-pin-keypad', {
+    onComplete: (pin) => doP2PTransfer(pin),
+  });
+}
+
+function closeP2PConfirm() {
+  document.getElementById('p2p-pin-overlay')?.classList.remove('show');
+  if (p2pPinController) p2pPinController.reset();
+}
+
+async function doP2PTransfer(pin) {
+  const amount = parseFloat(document.getElementById('p2p-amount').value);
+  const currency = document.getElementById('p2p-currency').value;
+  const description = document.getElementById('p2p-description').value.trim();
+  const result = document.getElementById('p2p-result');
+
+  const body = {
+    recipient_username: p2pRecipient.username,
+    amount: Math.round(amount * 100),
+    currency,
+    device_token: deviceToken,
+    pin,
+  };
+  if (description) body.description = description;
+
+  closeP2PConfirm();
+
+  const { ok, data } = await api('POST', '/wallet/transactions/p2p', body);
+
+  if (ok) {
+    result.className = 'result-card show success';
+    result.textContent = `Enviado com sucesso!\nDébito: #${unwrap(data)?.debit?.id || '—'}`;
+    showToast('Transferência realizada!', 'success');
+    setTimeout(loadHomeData, 1500);
+  } else {
+    result.className = 'result-card show error';
+    result.textContent = data?.message || JSON.stringify(data, null, 2);
+    showToast(data?.message || 'Erro na transferência', 'error');
+  }
+}
+
 // ── Login ─────────────────────────────────────────────
 async function doLogin() {
   const email    = document.getElementById('login-email').value.trim();
@@ -1375,15 +2949,8 @@ async function doLogin() {
 
     if (ok) {
       const session = unwrap(data);
-      token = session.token;
-      authSession = session;
-      localStorage.setItem('yoop_sim_token', token);
-      setWallesterReadyFromSession(session);
       showToast('Login realizado!', 'success');
-      navigate('home');
-      document.getElementById('bottom-nav').classList.remove('hidden');
-      setStatusBarColor(true);
-      await loadHomeData();
+      routePostAuth(session);
     } else {
       const msg = data?.message || data?.errors?.email?.[0] || 'Credenciais inválidas';
       showToast(msg, 'error');
@@ -1949,26 +3516,59 @@ document.getElementById('login-password').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
 
+// Pre-fill saved email
+if (savedEmail) {
+  const loginEmail = document.getElementById('login-email');
+  if (loginEmail) loginEmail.value = savedEmail;
+}
+
 // ── Auto-login if token exists ─────────────────────────
-if (token) {
+async function tryAutoLogin() {
+  if (!token) return;
+
+  const { ok, data } = await api('GET', '/customer/me');
+  if (!ok) return; // 401 → handleUnauthorized já redireccionou para login
+
+  const customer = unwrap(data);
+  authSession = authSession || { token, user: customer };
+  authSession.user = { ...authSession.user, ...customer };
+  authSession.lifecycle = authSession.lifecycle || {};
+  authSession.lifecycle.status = normalizeStatus(customer.status);
+  authSession.verification = {
+    email: !!customer.email_verified,
+    phone: !!customer.phone_verified,
+    identity: isDocApproved(customer.document_verified),
+  };
+
+  const lifecycle = lifecycleStatus(authSession);
+  if (lifecycle !== 'ACTIVE') {
+    renderOnboardingHub(authSession);
+    navigate('onboarding');
+    return;
+  }
+
+  if (!pinConfigured) {
+    navigate('pin-setup');
+    return;
+  }
+
   navigate('home');
-  document.getElementById('bottom-nav').classList.remove('hidden');
-  setStatusBarColor(true);
   loadHomeData();
-  api('GET', '/wallet/account').then(async ({ ok, data }) => {
-    if (!ok) return;
-    const w = unwrap(data)?.wallester;
+
+  api('GET', '/wallet/account').then(async ({ ok: accOk, data: accData }) => {
+    if (!accOk) return;
+    const w = unwrap(accData)?.wallester;
     wallesterReady = !!(w?.wallester_account_id && integrationStatusValue(w?.status) === 'ACTIVE');
     if (w?.wallester_account_id) {
       const st = integrationStatusValue(w.status || 'UNKNOWN');
       const badge = st === 'ACTIVE' ? 'active' : (st === 'PENDING' ? 'pending' : 'inactive');
       document.getElementById('info-wallester').innerHTML = `<span class="badge ${badge}">${st}</span>`;
     }
-    if (wallesterReady) {
-      await loadCustomerCard();
-    }
+    if (wallesterReady) await loadCustomerCard();
   });
 }
+
+tryAutoLogin();
 </script>
 </body>
 </html>

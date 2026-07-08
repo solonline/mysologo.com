@@ -937,7 +937,7 @@
             </div>
         </div>
         @endif
-        
+
         {{-- Conta Stripe --}}
         @if ($customer->stripeAccount)
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
@@ -959,13 +959,11 @@
             </div>
         </div>
         @endif
-
-      
-
+     
         {{-- Transações (timeline) --}}
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+        <div id="transactions" class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
             <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-900">Transações</h2>
+                <h2 class="text-sm font-semibold text-slate-900">Transações (Carregamentos)</h2>
                 <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->stripeTransactions->count() }}</span>
             </div>
 
@@ -1017,6 +1015,9 @@
                                             @endif
                                         </div>
                                         <p class="text-xs text-slate-600 truncate">{{ $typeLabel }}</p>
+                                        <div class="mt-1">
+                                            @include('dashboard.partials.topup-settlement-route', ['transaction' => $tx])
+                                        </div>
                                         <p class="text-xs text-slate-400 mt-0.5 flex items-baseline gap-1.5 min-w-0">
                                             <span class="flex-shrink-0 text-slate-500">
                                                 {{ $txDate?->format('d/m/Y') }}
@@ -1037,16 +1038,6 @@
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border {{ $statusBadge }}">
                                             {{ $tx->status ?? '—' }}
                                         </span>
-                                        @if ($tx->available_on)
-                                        @php
-                                            $availableOn = $tx->available_on;
-                                            $amountIsAvailable = $availableOn->isPast() || $availableOn->isToday() || $tx->balance_settled_at;
-                                        @endphp
-                                        <p class="text-[10px] mt-1 {{ $amountIsAvailable ? 'text-slate-400' : 'text-amber-600' }}">
-                                            {{ $amountIsAvailable ? 'Disp. desde' : 'Disp. em' }}
-                                            {{ $availableOn->format('d/m/Y') }}
-                                        </p>
-                                        @endif
                                     </div>
                                 </div>
                             </div>

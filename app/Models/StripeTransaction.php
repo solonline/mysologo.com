@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
+use App\Domains\Wallet\Enums\TopupSettlementRoute;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
 use Carbon\Carbon;
@@ -128,5 +129,10 @@ class StripeTransaction extends Model
     public function relatedStripeTransaction()
     {
         return $this->belongsTo(StripeTransaction::class, 'related_transaction_id');
+    }
+
+    public function topupSettlementRoute(): ?TopupSettlementRoute
+    {
+        return TopupSettlementRoute::resolve($this);
     }
 }
