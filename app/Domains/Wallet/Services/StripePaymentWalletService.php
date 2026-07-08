@@ -4,6 +4,7 @@ namespace App\Domains\Wallet\Services;
 
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
+use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Customer;
 use App\Models\LedgerEntry;
 use App\Models\StripeTransaction;
@@ -26,6 +27,11 @@ class StripePaymentWalletService
 
         $netAmount = (int) $transaction->net_amount;
         $platformFee = (int) $transaction->platform_fee;
+        $wallesterFundingNet = $this->topupFundingPolicy->wallesterFundingNetAmount($transaction);
+        $stripeDeferredNet = $this->topupFundingPolicy->stripeDeferredNetAmount($transaction);
+        $walletCreditNet = $transaction->type === TransactionType::TOPUP
+            ? $wallesterFundingNet
+            : $netAmount;
 
         if ($netAmount <= 0 && $platformFee <= 0) {
             $transaction->update(['balance_settled_at' => now()]);
@@ -33,22 +39,37 @@ class StripePaymentWalletService
             return false;
         }
 
-        if ($this->hasPaymentLedgerEntry($transaction)) {
+        if ($walletCreditNet > 0 && $this->hasImmediateWalletLedgerEntry($transaction)) {
+            if ($stripeDeferredNet <= 0) {
+                $transaction->update(['balance_settled_at' => now()]);
+            }
+
+            return false;
+        }
+
+        if ($walletCreditNet <= 0 && $stripeDeferredNet <= 0 && $this->hasImmediateWalletLedgerEntry($transaction)) {
             $transaction->update(['balance_settled_at' => now()]);
 
             return false;
         }
 
-        DB::transaction(function () use ($transaction, $netAmount, $platformFee): void {
-            $requiresPartnerFunding = $this->topupFundingPolicy->requiresPartnerFunding($transaction);
+        DB::transaction(function () use (
+            $transaction,
+            $walletCreditNet,
+            $platformFee,
+            $wallesterFundingNet,
+            $stripeDeferredNet,
+        ): void {
+            $requiresPartnerFunding = $wallesterFundingNet > 0
+                && $this->topupFundingPolicy->hasOperationalWallesterAccount($transaction);
 
-            if ($netAmount > 0) {
+            if ($walletCreditNet > 0) {
                 if ($requiresPartnerFunding) {
                     $this->ledgerService->recordPendingCredit(
                         customerId: $transaction->customer_id,
                         currency: $transaction->currency,
                         entryType: LedgerEntryType::PAYMENT_RECEIVED,
-                        amount: $netAmount,
+                        amount: $walletCreditNet,
                         reference: $transaction,
                         description: 'Stripe payment #'.$transaction->id,
                     );
@@ -57,7 +78,7 @@ class StripePaymentWalletService
                         customerId: $transaction->customer_id,
                         currency: $transaction->currency,
                         entryType: LedgerEntryType::PAYMENT_RECEIVED,
-                        amount: $netAmount,
+                        amount: $walletCreditNet,
                         reference: $transaction,
                         description: 'Stripe payment #'.$transaction->id,
                     );
@@ -85,7 +106,7 @@ class StripePaymentWalletService
             }
 
             $transaction->update([
-                'balance_settled_at' => now(),
+                'balance_settled_at' => $stripeDeferredNet > 0 ? null : now(),
                 'partner_funding_status' => $requiresPartnerFunding
                     ? PartnerFundingStatus::Pending
                     : PartnerFundingStatus::NotRequired,
@@ -95,9 +116,45 @@ class StripePaymentWalletService
         return true;
     }
 
+    public function creditDeferredStripeSettlement(StripeTransaction $transaction): bool
+    {
+        if ($transaction->type !== TransactionType::TOPUP) {
+            return false;
+        }
+
+        $deferredNet = $this->topupFundingPolicy->stripeDeferredNetAmount($transaction);
+
+        if ($deferredNet <= 0) {
+            return false;
+        }
+
+        if ($this->hasDeferredSettlementLedgerEntry($transaction)) {
+            if ($transaction->balance_settled_at === null) {
+                $transaction->update(['balance_settled_at' => now()]);
+            }
+
+            return false;
+        }
+
+        DB::transaction(function () use ($transaction, $deferredNet): void {
+            $this->ledgerService->record(
+                customerId: $transaction->customer_id,
+                currency: $transaction->currency,
+                entryType: LedgerEntryType::PAYMENT_RECEIVED,
+                amount: $deferredNet,
+                reference: $transaction,
+                description: 'Stripe deferred settlement #'.$transaction->id,
+            );
+
+            $transaction->update(['balance_settled_at' => now()]);
+        });
+
+        return true;
+    }
+
     public function reverseStripePayment(StripeTransaction $transaction): void
     {
-        if ($transaction->balance_settled_at === null) {
+        if ($transaction->balance_settled_at === null && ! $this->hasImmediateWalletLedgerEntry($transaction)) {
             return;
         }
 
@@ -127,12 +184,23 @@ class StripePaymentWalletService
         });
     }
 
-    private function hasPaymentLedgerEntry(StripeTransaction $transaction): bool
+    private function hasImmediateWalletLedgerEntry(StripeTransaction $transaction): bool
     {
         return LedgerEntry::query()
             ->where('reference_type', $transaction->getMorphClass())
             ->where('reference_id', $transaction->id)
             ->where('entry_type', LedgerEntryType::PAYMENT_RECEIVED)
+            ->where('description', 'Stripe payment #'.$transaction->id)
+            ->exists();
+    }
+
+    private function hasDeferredSettlementLedgerEntry(StripeTransaction $transaction): bool
+    {
+        return LedgerEntry::query()
+            ->where('reference_type', $transaction->getMorphClass())
+            ->where('reference_id', $transaction->id)
+            ->where('entry_type', LedgerEntryType::PAYMENT_RECEIVED)
+            ->where('description', 'Stripe deferred settlement #'.$transaction->id)
             ->exists();
     }
 

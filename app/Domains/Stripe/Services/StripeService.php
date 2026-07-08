@@ -27,8 +27,6 @@ use Illuminate\Support\Facades\Log;
 
 class StripeService
 {
-    private const DAILY_TOPUP_LIMIT_CENTS = 10_000;
-
     private const PAYMENT_METHOD_CURRENCIES = [
         'mbway' => ['eur'],
         'twint' => ['chf'],
@@ -125,10 +123,6 @@ class StripeService
                 422,
                 'Método de pagamento não suportado ou inativo.'
             );
-        }
-
-        if ($isTopup) {
-            $this->assertDailyTopupLimitNotExceeded($customer, $amount);
         }
 
         $this->validatePaymentMethodCurrency($feeConfig->payment_method, $currency);
@@ -661,24 +655,6 @@ class StripeService
         ]);
     }
 
-    private function assertDailyTopupLimitNotExceeded(Customer $customer, int $amount): void
-    {
-        $succeededTopupToday = StripeTransaction::query()
-            ->where('customer_id', $customer->id)
-            ->where('type', TransactionType::TOPUP)
-            ->where('status', 'succeeded')
-            ->where('created_at', '>=', now()->startOfDay())
-            ->sum('amount');
-
-        if ($succeededTopupToday + $amount > self::DAILY_TOPUP_LIMIT_CENTS) {
-            throw new ApiException(
-                ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
-                422,
-                'Limite diário de top-up (100 EUR) excedido.'
-            );
-        }
-    }
-
     private function incrementBalance(int $customerId, string $currency, int $available = 0, int $pending = 0): void
     {
         $balance = CustomerBalance::firstOrCreate(
@@ -790,7 +766,19 @@ class StripeService
             'available_on' => $availableOn,
         ]);
 
-        // Credit wallet immediately (D+2 settlement deferred).
+        $transaction = $transaction->fresh();
+
+        if ($transaction->type === TransactionType::TOPUP) {
+            $allocation = $this->topupFundingPolicy->allocate($transaction);
+
+            $transaction->update([
+                'immediate_gross_amount' => $allocation->immediateGrossCents,
+                'wallester_funding_net_amount' => $allocation->wallesterFundingNetCents,
+                'stripe_deferred_net_amount' => $allocation->stripeDeferredNetCents,
+            ]);
+        }
+
+        // Credit wallet immediately for the quota Wallester; deferred quota waits for Stripe settlement.
         $this->stripePaymentWallet->creditFromStripePayment($transaction->fresh());
 
         Log::channel('stripe')->info('stripe_service: charge.updated — fees e categoria aplicados', [

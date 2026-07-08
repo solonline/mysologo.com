@@ -2,45 +2,26 @@
 
 namespace App\Domains\Backoffice\Controllers;
 
+use App\Domains\Backoffice\Queries\GetWallesterFundingOverviewQuery;
 use App\Domains\Backoffice\Requests\UpdateSettingsRequest;
 use App\Domains\Backoffice\Services\SettingsManagementService;
-use App\Domains\Wallet\Enums\PartnerFundingStatus;
-use App\Domains\Wallet\Enums\TransactionType;
 use App\Http\Controllers\Controller;
-use App\Models\CustomerWallesterAccount;
-use App\Models\StripeTransaction;
 
 class SettingsController extends Controller
 {
     public function __construct(
         protected SettingsManagementService $settings,
+        protected GetWallesterFundingOverviewQuery $wallesterFundingOverviewQuery,
     ) {}
 
     public function index()
     {
+        $wallesterFunding = $this->wallesterFundingOverviewQuery->execute();
+
         return view('dashboard.settings.index', [
             'settings' => $this->settings->allKeyedByKey(),
-            'wallesterMainAccounts' => CustomerWallesterAccount::query()
-                ->where('is_main', true)
-                ->orderBy('funding_currency')
-                ->get(['id', 'funding_currency', 'currency_code', 'wallester_account_id', 'available_amount', 'balance']),
-            'wallesterTopupFundingCounts' => [
-                'awaiting_liquidity' => StripeTransaction::query()
-                    ->where('type', TransactionType::TOPUP->value)
-                    ->where('status', 'succeeded')
-                    ->where('partner_funding_status', PartnerFundingStatus::AwaitingLiquidity->value)
-                    ->count(),
-                'failed' => StripeTransaction::query()
-                    ->where('type', TransactionType::TOPUP->value)
-                    ->where('status', 'succeeded')
-                    ->where('partner_funding_status', PartnerFundingStatus::Failed->value)
-                    ->count(),
-                'pending' => StripeTransaction::query()
-                    ->where('type', TransactionType::TOPUP->value)
-                    ->where('status', 'succeeded')
-                    ->where('partner_funding_status', PartnerFundingStatus::Pending->value)
-                    ->count(),
-            ],
+            'wallesterMainAccounts' => $wallesterFunding['mainAccounts'],
+            'wallesterTopupFundingCounts' => $wallesterFunding['topupFundingCounts'],
         ]);
     }
 

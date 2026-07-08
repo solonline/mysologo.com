@@ -46,6 +46,13 @@
 
 @section('content')
 
+@php
+    $fundingCounts = $wallesterTopupFundingCounts ?? ['awaiting_liquidity' => 0, 'failed' => 0, 'pending' => 0];
+    $blockedTopups = ($fundingCounts['awaiting_liquidity'] ?? 0) + ($fundingCounts['failed'] ?? 0) + ($fundingCounts['pending'] ?? 0);
+@endphp
+
+<div x-data="{ showWallesterFundingModal: false }">
+
 @if ($stats['maintenance_mode'])
 <div class="mb-7 flex items-start gap-4 px-5 py-4 rounded-2xl"
      style="background:#fffbeb;border:1px solid #fcd34d;">
@@ -79,83 +86,134 @@
 {{-- ══════════════════════════ STAT CARDS ══════════════════════════ --}}
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
 
-    {{-- Total Clientes --}}
+    {{-- Total de Movimentos --}}
     <div class="card p-5">
-        <div class="flex items-start justify-between mb-5">
+        <div class="flex items-start justify-between mb-4">
             <div class="p-2.5 rounded-xl stat-icon-1">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                </svg>
+            </div>
+        </div>
+        <p class="text-3xl font-bold text-slate-900 tracking-tight">{{ number_format($stats['total_movements'] ?? 0) }}</p>
+        <p class="text-sm text-slate-500 mt-1 font-medium">Total de Movimentos</p>
+        <div class="mt-4 grid grid-cols-3 gap-2">
+            <div class="rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1.5 text-center">
+                <p class="text-[10px] font-semibold text-emerald-700 uppercase">OK</p>
+                <p class="text-sm font-bold text-emerald-900">{{ number_format($stats['movements_completed'] ?? 0) }}</p>
+            </div>
+            <div class="rounded-lg bg-amber-50 border border-amber-100 px-2 py-1.5 text-center">
+                <p class="text-[10px] font-semibold text-amber-700 uppercase">Pend.</p>
+                <p class="text-sm font-bold text-amber-900">{{ number_format($stats['movements_pending'] ?? 0) }}</p>
+            </div>
+            <div class="rounded-lg bg-red-50 border border-red-100 px-2 py-1.5 text-center">
+                <p class="text-[10px] font-semibold text-red-700 uppercase">Falha</p>
+                <p class="text-sm font-bold text-red-900">{{ number_format($stats['movements_failed'] ?? 0) }}</p>
+            </div>
+        </div>
+    </div>
+
+    {{-- Clientes --}}
+    <a href="{{ route('dashboard.customers') }}"
+       class="card p-5 block transition-all hover:shadow-md hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-300/40 group">
+        <div class="flex items-start justify-between mb-4">
+            <div class="p-2.5 rounded-xl stat-icon-2">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
             </div>
-            <span class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style="background:#f0fdf4;color:#059669;">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-                +12%
-            </span>
+            <span class="text-xs font-semibold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">Ver todos →</span>
         </div>
         <p class="text-3xl font-bold text-slate-900 tracking-tight">{{ number_format($stats['total_customers'] ?? 0) }}</p>
-        <p class="text-sm text-slate-500 mt-1 font-medium">Total de Clientes</p>
-        <div class="mt-4 h-1 bg-slate-100 rounded-full overflow-hidden">
-            <div class="h-full rounded-full transition-all duration-1000" style="width:72%;background:linear-gradient(90deg,#7c3aed,#a855f7)"></div>
-        </div>
-    </div>
-
-    {{-- Clientes Ativos --}}
-    <div class="card p-5">
-        <div class="flex items-start justify-between mb-5">
-            <div class="p-2.5 rounded-xl stat-icon-2">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                </svg>
+        <p class="text-sm text-slate-500 mt-1 font-medium">Clientes</p>
+        <div class="mt-4 space-y-2">
+            @php
+                $customerBreakdown = [
+                    ['label' => 'Ativos', 'value' => $stats['active_customers'] ?? 0, 'color' => '#10b981'],
+                    ['label' => 'Pendentes', 'value' => $stats['pending_customers'] ?? 0, 'color' => '#f59e0b'],
+                    ['label' => 'Em análise', 'value' => $stats['analysis_customers'] ?? 0, 'color' => '#0ea5e9'],
+                    ['label' => 'Bloqueados', 'value' => $stats['blocked_customers'] ?? 0, 'color' => '#ef4444'],
+                    ['label' => 'Docs pendentes', 'value' => $stats['pending_documents'] ?? 0, 'color' => '#64748b'],
+                ];
+            @endphp
+            @foreach ($customerBreakdown as $row)
+            <div class="flex items-center justify-between text-xs">
+                <span class="flex items-center gap-1.5 text-slate-600">
+                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:{{ $row['color'] }}"></span>
+                    {{ $row['label'] }}
+                </span>
+                <span class="font-bold text-slate-800">{{ number_format($row['value']) }}</span>
             </div>
-            <span class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style="background:#f0fdf4;color:#059669;">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-                +5%
-            </span>
+            @endforeach
         </div>
-        <p class="text-3xl font-bold text-slate-900 tracking-tight">{{ number_format($stats['active_customers'] ?? 0) }}</p>
-        <p class="text-sm text-slate-500 mt-1 font-medium">Clientes Ativos</p>
-        <div class="mt-4 h-1 bg-slate-100 rounded-full overflow-hidden">
-            <div class="h-full rounded-full transition-all duration-1000" style="width:55%;background:linear-gradient(90deg,#0ea5e9,#38bdf8)"></div>
-        </div>
-    </div>
+    </a>
 
-    {{-- Documentos Pendentes --}}
-    <div class="card p-5">
-        <div class="flex items-start justify-between mb-5">
+    {{-- Wallester --}}
+    <button type="button"
+            @click="showWallesterFundingModal = true"
+            class="card p-5 text-left w-full transition-all hover:shadow-md hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-300/40 group">
+        <div class="flex items-start justify-between mb-4">
             <div class="p-2.5 rounded-xl stat-icon-3">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
                 </svg>
             </div>
-            <span class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style="background:#fef2f2;color:#dc2626;">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-                -2%
+            @if ($blockedTopups > 0)
+            <span class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style="background:#fffbeb;color:#d97706;">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                {{ $blockedTopups }} bloqueado{{ $blockedTopups !== 1 ? 's' : '' }}
             </span>
+            @else
+            <span class="text-xs font-semibold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">Gerir →</span>
+            @endif
         </div>
-        <p class="text-3xl font-bold text-slate-900 tracking-tight">{{ number_format($stats['pending_documents'] ?? 0) }}</p>
-        <p class="text-sm text-slate-500 mt-1 font-medium">Docs Pendentes</p>
-        <div class="mt-4 h-1 bg-slate-100 rounded-full overflow-hidden">
-            <div class="h-full rounded-full transition-all duration-1000" style="width:38%;background:linear-gradient(90deg,#10b981,#34d399)"></div>
-        </div>
-    </div>
 
-    {{-- Volume Total --}}
-    <div class="card p-5">
-        <div class="flex items-start justify-between mb-5">
+        @if (($wallesterMainAccounts ?? collect())->isEmpty())
+        <p class="text-3xl font-bold text-slate-400 tracking-tight">—</p>
+        @else
+        <div class="space-y-1">
+            @foreach ($wallesterMainAccounts as $mainAccount)
+            @php $currency = strtoupper($mainAccount->funding_currency ?: $mainAccount->currency_code); @endphp
+            <p class="text-xl font-bold text-slate-900 tracking-tight leading-tight">
+                {{ number_format(((int) $mainAccount->available_amount) / 100, 2, ',', '.') }}
+                <span class="text-sm font-semibold text-slate-500">{{ $currency }}</span>
+            </p>
+            @endforeach
+        </div>
+        @endif
+        <p class="text-sm text-slate-500 mt-2 font-medium">Wallester · Main</p>
+        @if ($blockedTopups > 0)
+        <p class="text-xs text-amber-600 mt-2">{{ $fundingCounts['awaiting_liquidity'] ?? 0 }} à espera de liquidez</p>
+        @endif
+    </button>
+
+    {{-- Ebury (placeholder futuro) --}}
+    <div class="card p-5 relative overflow-hidden opacity-90">
+        <div class="absolute top-3 right-3">
+            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Em breve</span>
+        </div>
+        <div class="flex items-start justify-between mb-4">
             <div class="p-2.5 rounded-xl stat-icon-4">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
             </div>
-            <span class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style="background:#f0fdf4;color:#059669;">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-                +18%
-            </span>
         </div>
-        <p class="text-3xl font-bold text-slate-900 tracking-tight">R$ {{ number_format($stats['total_balance'] ?? 0, 2, ',', '.') }}</p>
-        <p class="text-sm text-slate-500 mt-1 font-medium">Volume Total</p>
-        <div class="mt-4 h-1 bg-slate-100 rounded-full overflow-hidden">
-            <div class="h-full rounded-full transition-all duration-1000" style="width:83%;background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div>
+        <p class="text-3xl font-bold text-slate-400 tracking-tight">—</p>
+        <p class="text-sm text-slate-500 mt-1 font-medium">Ebury · FX</p>
+        <div class="mt-4 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Contas activas</span>
+                <span class="font-bold text-slate-800">{{ number_format($stats['ebury_active_accounts'] ?? 0) }}</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Saldo disponível</span>
+                <span class="font-medium text-slate-400 italic">N/D</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Transferências</span>
+                <span class="font-medium text-slate-400 italic">N/D</span>
+            </div>
         </div>
     </div>
 
@@ -268,45 +326,6 @@
     {{-- ── Right column ── --}}
     <div class="flex flex-col gap-6">
 
-        {{-- Status breakdown --}}
-        <div class="card p-5">
-            <div class="flex items-center justify-between mb-5">
-                <div>
-                    <h2 class="section-title">Distribuição</h2>
-                    <p class="section-sub">Por status de cliente</p>
-                </div>
-            </div>
-            <div class="space-y-4">
-                @php
-                    $total = max(1, ($stats['active_customers'] ?? 0) + ($stats['pending_customers'] ?? 0) + ($stats['analysis_customers'] ?? 0) + ($stats['blocked_customers'] ?? 0));
-                    $statuses = [
-                        ['label' => 'Ativos',      'value' => $stats['active_customers'] ?? 0,   'bar' => 'linear-gradient(90deg,#10b981,#34d399)', 'dot' => '#10b981'],
-                        ['label' => 'Pendentes',   'value' => $stats['pending_customers'] ?? 0,  'bar' => 'linear-gradient(90deg,#f59e0b,#fbbf24)', 'dot' => '#f59e0b'],
-                        ['label' => 'Em Análise',  'value' => $stats['analysis_customers'] ?? 0, 'bar' => 'linear-gradient(90deg,#0ea5e9,#38bdf8)', 'dot' => '#0ea5e9'],
-                        ['label' => 'Bloqueados',  'value' => $stats['blocked_customers'] ?? 0,  'bar' => 'linear-gradient(90deg,#ef4444,#f87171)', 'dot' => '#ef4444'],
-                    ];
-                @endphp
-                @foreach ($statuses as $s)
-                @php $pct = round(($s['value'] / $total) * 100); @endphp
-                <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:{{ $s['dot'] }}"></span>
-                            <span class="text-sm font-medium text-slate-700">{{ $s['label'] }}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm font-bold text-slate-900">{{ number_format($s['value']) }}</span>
-                            <span class="text-xs text-slate-400">{{ $pct }}%</span>
-                        </div>
-                    </div>
-                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div class="h-full rounded-full transition-all duration-700" style="width:{{ $pct }}%;background:{{ $s['bar'] }}"></div>
-                    </div>
-                </div>
-                @endforeach
-            </div>
-        </div>
-
         {{-- Quick actions --}}
         <div class="card p-5">
             <div class="mb-5">
@@ -385,6 +404,90 @@
         </div>
 
     </div>
+
+</div>
+
+{{-- Modal: Funding Wallester --}}
+<div x-show="showWallesterFundingModal" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center p-4"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0">
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-md" @click="showWallesterFundingModal = false"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100">
+        <div class="px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-4">
+            <div>
+                <h3 class="text-base font-semibold text-slate-900">Funding Wallester</h3>
+                <p class="text-xs text-slate-500 mt-1">Saldo das contas main e reprocessamento de top-ups bloqueados.</p>
+            </div>
+            <button type="button" @click="showWallesterFundingModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+            @forelse ($wallesterMainAccounts ?? [] as $mainAccount)
+            @php $currency = strtoupper($mainAccount->funding_currency ?: $mainAccount->currency_code); @endphp
+            <div class="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                    <p class="text-sm font-semibold text-slate-800">Main {{ $currency }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5 font-mono">{{ $mainAccount->wallester_account_id }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-slate-500 uppercase tracking-wider">Disponível</p>
+                    <p class="text-lg font-bold text-slate-900">
+                        {{ number_format(((int) $mainAccount->available_amount) / 100, 2, ',', '.') }}
+                        {{ $currency }}
+                    </p>
+                </div>
+            </div>
+            @empty
+            <p class="text-sm text-slate-500 text-center py-4">Nenhuma conta main configurada.</p>
+            @endforelse
+
+            <div class="grid grid-cols-3 gap-3">
+                <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                    <p class="text-xs font-semibold text-amber-700 uppercase">À espera</p>
+                    <p class="text-2xl font-bold text-amber-900">{{ $fundingCounts['awaiting_liquidity'] ?? 0 }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-red-50 border border-red-200 text-center">
+                    <p class="text-xs font-semibold text-red-700 uppercase">Falhados</p>
+                    <p class="text-2xl font-bold text-red-900">{{ $fundingCounts['failed'] ?? 0 }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 text-center">
+                    <p class="text-xs font-semibold text-blue-700 uppercase">Pendentes</p>
+                    <p class="text-2xl font-bold text-blue-900">{{ $fundingCounts['pending'] ?? 0 }}</p>
+                </div>
+            </div>
+        </div>
+
+        @can('settings.edit')
+        <div class="px-6 py-5 border-t border-slate-100 bg-slate-50/50">
+            <form method="POST" action="{{ route('dashboard.operations.retry-wallester-topups') }}"
+                  onsubmit="return confirm('Sincronizar main e reprocessar top-ups elegíveis?');">
+                @csrf
+                <button type="submit"
+                        class="w-full px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition shadow-sm shadow-indigo-500/25">
+                    Actualizar main e reprocessar top-ups
+                </button>
+            </form>
+            <p class="text-xs text-slate-400 text-center mt-3">Sincroniza saldos via API Wallester e reenvia jobs de funding.</p>
+        </div>
+        @else
+        <div class="px-6 py-5 border-t border-slate-100">
+            <p class="text-xs text-slate-500 text-center">Sem permissão para reprocessar top-ups.</p>
+        </div>
+        @endcan
+    </div>
+</div>
 
 </div>
 

@@ -171,7 +171,7 @@ class RetryAwaitingWallesterTopupsTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('dashboard.operations.retry-wallester-topups'))
-            ->assertRedirect(route('dashboard.settings', ['tab' => 'wallester']))
+            ->assertRedirect(route('dashboard.settings'))
             ->assertSessionHas('success');
 
         Bus::assertDispatched(FundWallesterTopupFromStripeJob::class);

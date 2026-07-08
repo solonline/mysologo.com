@@ -19,6 +19,7 @@ class SettlementService
 {
     public function __construct(
         protected LedgerService $ledgerService,
+        protected StripePaymentWalletService $stripePaymentWallet,
     ) {}
 
     /**
@@ -112,6 +113,12 @@ class SettlementService
     private function settleTransaction(StripeTransaction $tx, SettlementBatch $batch): void
     {
         if ($tx->balance_settled_at !== null) {
+            return;
+        }
+
+        if ($tx->type === TransactionType::TOPUP && (int) ($tx->stripe_deferred_net_amount ?? 0) > 0) {
+            $this->stripePaymentWallet->creditDeferredStripeSettlement($tx->fresh());
+
             return;
         }
 

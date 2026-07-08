@@ -7,7 +7,6 @@ use App\Domains\Stripe\Contracts\StripeGatewayInterface;
 use App\Domains\Stripe\Services\StripeService;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
-use App\Exceptions\ApiException;
 use App\Models\StripePaymentMethodFee;
 use App\Models\StripeTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -71,7 +70,7 @@ class StripeTopupDailyLimitTest extends TestCase
         ]);
     }
 
-    public function test_topup_daily_limit_blocks_when_succeeded_total_plus_amount_exceeds_100_eur(): void
+    public function test_topup_allows_any_amount_even_when_daily_immediate_quota_is_exhausted(): void
     {
         $customer = $this->createActiveCustomer();
         $this->createStripeAccount($customer);
@@ -83,25 +82,28 @@ class StripeTopupDailyLimitTest extends TestCase
             'type' => TransactionType::TOPUP,
             'direction' => TransactionDirection::Credit,
             'payment_method_type' => 'card',
-            'amount' => 9_000,
+            'amount' => 10_000,
             'stripe_fee' => 0,
             'platform_fee' => 0,
-            'net_amount' => 0,
+            'net_amount' => 10_000,
+            'immediate_gross_amount' => 10_000,
+            'wallester_funding_net_amount' => 10_000,
+            'stripe_deferred_net_amount' => 0,
             'currency' => 'EUR',
             'status' => 'succeeded',
         ]);
 
         $service = app(StripeService::class);
 
-        $this->expectException(ApiException::class);
-        $this->expectExceptionMessage('Limite diário de top-up (100 EUR) excedido.');
-
-        $service->createPaymentIntent(
+        $result = $service->createPaymentIntent(
             customer: $customer,
-            amount: 2_000,
+            amount: 20_000,
             paymentMethodFeeId: $this->feeConfig->id,
             isTopup: true,
         );
+
+        $this->assertSame(TransactionType::TOPUP, $result['transaction']->type);
+        $this->assertSame(20_000, (int) $result['transaction']->amount);
     }
 
     public function test_topup_daily_limit_ignores_pending_topups(): void

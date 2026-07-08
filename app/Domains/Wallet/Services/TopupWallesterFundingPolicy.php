@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wallet\Services;
 
+use App\Domains\Wallet\DTOs\TopupSettlementAllocation;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
@@ -10,21 +11,58 @@ use App\Models\StripeTransaction;
 
 class TopupWallesterFundingPolicy
 {
-    public const DAILY_TOPUP_LIMIT_CENTS = 10_000;
+    public const DAILY_IMMEDIATE_TOPUP_GROSS_LIMIT_CENTS = 10_000;
+
+    public function allocate(StripeTransaction $transaction): TopupSettlementAllocation
+    {
+        $grossAmount = (int) $transaction->amount;
+        $netAmount = max(0, (int) $transaction->net_amount);
+
+        if ($transaction->type !== TransactionType::TOPUP || $grossAmount <= 0) {
+            return new TopupSettlementAllocation(0, 0, $netAmount);
+        }
+
+        $remainingQuota = max(
+            0,
+            self::DAILY_IMMEDIATE_TOPUP_GROSS_LIMIT_CENTS - $this->dailyImmediateGrossUsedCents($transaction),
+        );
+
+        if ($grossAmount <= $remainingQuota && $this->hasOperationalWallesterAccount($transaction)) {
+            return new TopupSettlementAllocation(
+                immediateGrossCents: $grossAmount,
+                wallesterFundingNetCents: $netAmount,
+                stripeDeferredNetCents: 0,
+            );
+        }
+
+        return new TopupSettlementAllocation(
+            immediateGrossCents: 0,
+            wallesterFundingNetCents: 0,
+            stripeDeferredNetCents: $netAmount,
+        );
+    }
 
     public function requiresPartnerFunding(StripeTransaction $transaction): bool
     {
-        if ($transaction->type !== TransactionType::TOPUP) {
-            return false;
+        return $this->wallesterFundingNetAmount($transaction) > 0;
+    }
+
+    public function wallesterFundingNetAmount(StripeTransaction $transaction): int
+    {
+        if ($transaction->wallester_funding_net_amount !== null) {
+            return max(0, (int) $transaction->wallester_funding_net_amount);
         }
 
-        if ((int) $transaction->amount > self::DAILY_TOPUP_LIMIT_CENTS) {
-            return false;
+        return $this->allocate($transaction)->wallesterFundingNetCents;
+    }
+
+    public function stripeDeferredNetAmount(StripeTransaction $transaction): int
+    {
+        if ($transaction->stripe_deferred_net_amount !== null) {
+            return max(0, (int) $transaction->stripe_deferred_net_amount);
         }
 
-        $wallesterAccount = $transaction->customer?->wallesterAccountFor($transaction->currency);
-
-        return $wallesterAccount !== null && $wallesterAccount->status->isOperational();
+        return $this->allocate($transaction)->stripeDeferredNetCents;
     }
 
     public function shouldDispatchPartnerFundingJob(StripeTransaction $transaction, array $charge): bool
@@ -75,6 +113,13 @@ class TopupWallesterFundingPolicy
         return ! $this->hasCompletedMovement($transaction);
     }
 
+    public function hasOperationalWallesterAccount(StripeTransaction $transaction): bool
+    {
+        $wallesterAccount = $transaction->customer?->wallesterAccountFor($transaction->currency);
+
+        return $wallesterAccount !== null && $wallesterAccount->status->isOperational();
+    }
+
     public function hasCompletedMovement(StripeTransaction $transaction): bool
     {
         return FundingPartnerMovement::query()
@@ -94,5 +139,17 @@ class TopupWallesterFundingPolicy
     public function movementKey(StripeTransaction $transaction): string
     {
         return 'stripe_topup:'.$transaction->id;
+    }
+
+    public function dailyImmediateGrossUsedCents(StripeTransaction $transaction): int
+    {
+        return (int) StripeTransaction::query()
+            ->where('customer_id', $transaction->customer_id)
+            ->where('type', TransactionType::TOPUP->value)
+            ->where('status', 'succeeded')
+            ->where('created_at', '>=', now()->startOfDay())
+            ->when($transaction->exists, fn ($query) => $query->where('id', '!=', $transaction->id))
+            ->where('immediate_gross_amount', '>', 0)
+            ->sum('immediate_gross_amount');
     }
 }

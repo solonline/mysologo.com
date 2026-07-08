@@ -817,56 +817,6 @@
 
     {{-- ==================== RIGHT COLUMN ==================== --}}
     <div class="flex flex-col gap-6">
-
-        {{-- Conta Stripe --}}
-        @if ($customer->stripeAccount)
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
-            <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-                </svg>
-                Conta Stripe
-            </h2>
-            <div class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-slate-500">Customer ID</span>
-                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->stripe_customer_id ?? '—' }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-slate-500">Account ID</span>
-                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->stripe_account_id ?? '—' }}</span>
-                </div>
-            </div>
-        </div>
-        @endif
-
-        {{-- Conta Wallester --}}
-        @if ($customer->wallesterAccount)
-        <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5">
-            <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                Conta Wallester
-                @if ($wallesterFailed)
-                <span class="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">FAILED</span>
-                @endif
-            </h2>
-            <div class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-slate-500">Account ID</span>
-                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->wallesterAccount->wallester_account_id ?? '—' }}</span>
-                </div>
-                @if ($customer->wallesterAccount->status_reason)
-                <div class="flex justify-between gap-4">
-                    <span class="text-slate-500 flex-shrink-0">Motivo</span>
-                    <span class="text-xs text-red-700 text-right">{{ $customer->wallesterAccount->status_reason }}</span>
-                </div>
-                @endif
-            </div>
-        </div>
-        @endif
-
         {{-- Saldo --}}
         @if ($customer->balances->isNotEmpty())
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -893,7 +843,7 @@
                                 <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
                             </span>
                         </div>
-                        @if ($balance->pending > 0)
+                        {{-- @if ($balance->pending > 0) --}}
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-1.5">
                                 <span class="w-2 h-2 rounded-full bg-amber-400"></span>
@@ -904,7 +854,7 @@
                                 <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
                             </span>
                         </div>
-                        @endif
+                        {{-- @endif --}}
                         <div class="pt-1 border-t border-slate-100 flex items-center justify-between">
                             <span class="text-xs text-slate-400">Total</span>
                             <span class="text-sm font-bold text-slate-800">
@@ -918,6 +868,99 @@
             </div>
         </div>
         @endif
+        
+        {{-- Conta Wallester --}}
+        @if ($customer->wallesterAccount)
+        <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5">
+            <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Conta Wallester
+                @if ($wallesterFailed)
+                <span class="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">FAILED</span>
+                @endif
+            </h2>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Account ID</span>
+                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->wallesterAccount->wallester_account_id ?? '—' }}</span>
+                </div>
+                @if ($customer->wallesterAccount->status_reason)
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500 flex-shrink-0">Motivo</span>
+                    <span class="text-xs text-red-700 text-right">{{ $customer->wallesterAccount->status_reason }}</span>
+                </div>
+                @endif
+
+                @if ($customer->wallesterAccount->cards->isNotEmpty())
+                <div class="pt-3 mt-1 border-t border-slate-100 space-y-3">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cartões</p>
+                    @foreach ($customer->wallesterAccount->cards as $card)
+                    @php
+                        $cardStatus = (string) ($card->status ?? '');
+                        $cardStatusMap = match ($cardStatus) {
+                            'Active' => ['bg-emerald-50 text-emerald-700 border-emerald-200', 'Ativo'],
+                            'Created' => ['bg-sky-50 text-sky-700 border-sky-200', 'Criado'],
+                            'Blocked' => ['bg-red-50 text-red-700 border-red-200', 'Bloqueado'],
+                            'Closed' => ['bg-slate-100 text-slate-600 border-slate-200', 'Encerrado'],
+                            default => ['bg-slate-50 text-slate-600 border-slate-200', $cardStatus ?: '—'],
+                        };
+                        $expiryLabel = $card->expiry_date
+                            ? $card->expiry_date->format('m/Y')
+                            : '—';
+                    @endphp
+                    <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-slate-900 truncate">{{ $card->name ?? '—' }}</p>
+                                <p class="font-mono text-xs text-slate-600 mt-0.5">{{ $card->masked_card_number ?? '—' }}</p>
+                            </div>
+                            <span class="flex-shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border {{ $cardStatusMap[0] }}">
+                                {{ $cardStatusMap[1] }}
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="text-slate-400">Validade</span>
+                                <p class="font-medium text-slate-700 mt-0.5">{{ $expiryLabel }}</p>
+                            </div>
+                            <div>
+                                <span class="text-slate-400">Tipo</span>
+                                <p class="font-medium text-slate-700 mt-0.5">{{ $card->type ?? '—' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
+        
+        {{-- Conta Stripe --}}
+        @if ($customer->stripeAccount)
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
+            <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                Conta Stripe
+            </h2>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Customer ID</span>
+                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->stripe_customer_id ?? '—' }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Account ID</span>
+                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->stripe_account_id ?? '—' }}</span>
+                </div>
+            </div>
+        </div>
+        @endif
+
+      
 
         {{-- Transações (timeline) --}}
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -974,9 +1017,15 @@
                                             @endif
                                         </div>
                                         <p class="text-xs text-slate-600 truncate">{{ $typeLabel }}</p>
-                                        @if ($tx->description)
-                                        <p class="text-xs text-slate-400 truncate mt-0.5">{{ $tx->description }}</p>
-                                        @endif
+                                        <p class="text-xs text-slate-400 mt-0.5 flex items-baseline gap-1.5 min-w-0">
+                                            <span class="flex-shrink-0 text-slate-500">
+                                                {{ $txDate?->format('d/m/Y') }}
+                                                <span class="text-slate-300">{{ $txDate?->format('H:i') }}</span>
+                                            </span>
+                                            @if ($tx->description)
+                                            <span class="truncate">{{ $tx->description }}</span>
+                                            @endif
+                                        </p>
                                         @if ($tx->bank_transfer_sender_name)
                                         <p class="text-xs text-slate-400 mt-0.5">
                                             De: {{ $tx->bank_transfer_sender_name }}
@@ -988,8 +1037,16 @@
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border {{ $statusBadge }}">
                                             {{ $tx->status ?? '—' }}
                                         </span>
-                                        <p class="text-[10px] text-slate-400 mt-1">{{ $txDate?->format('d/m/Y') }}</p>
-                                        <p class="text-[10px] text-slate-300">{{ $txDate?->format('H:i') }}</p>
+                                        @if ($tx->available_on)
+                                        @php
+                                            $availableOn = $tx->available_on;
+                                            $amountIsAvailable = $availableOn->isPast() || $availableOn->isToday() || $tx->balance_settled_at;
+                                        @endphp
+                                        <p class="text-[10px] mt-1 {{ $amountIsAvailable ? 'text-slate-400' : 'text-amber-600' }}">
+                                            {{ $amountIsAvailable ? 'Disp. desde' : 'Disp. em' }}
+                                            {{ $availableOn->format('d/m/Y') }}
+                                        </p>
+                                        @endif
                                     </div>
                                 </div>
                             </div>

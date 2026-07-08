@@ -6,7 +6,10 @@ use App\Domains\Backoffice\DTOs\DashboardOverview;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Settings\Services\SettingsService;
+use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Models\Customer;
+use App\Models\CustomerEburyAccount;
+use App\Models\FundingPartnerMovement;
 
 class GetDashboardOverviewQuery
 {
@@ -39,6 +42,11 @@ class GetDashboardOverviewQuery
             ])->count(),
             'inactive_customers' => Customer::where('status', CustomerLifecycleStatus::SUSPENDED)->count(),
             'pending_documents' => Customer::where('doc_status', 'pending')->count(),
+            'total_movements' => FundingPartnerMovement::count(),
+            'movements_completed' => FundingPartnerMovement::where('status', FundingPartnerMovementStatus::Completed)->count(),
+            'movements_pending' => FundingPartnerMovement::where('status', FundingPartnerMovementStatus::Pending)->count(),
+            'movements_failed' => FundingPartnerMovement::where('status', FundingPartnerMovementStatus::Failed)->count(),
+            'ebury_active_accounts' => CustomerEburyAccount::where('status', IntegrationAccountStatus::ACTIVE)->count(),
             'total_balance' => 0,
             'maintenance_mode' => $this->settingsService->getByKey('system.maintenance_mode') === 'true',
             'platform_customers' => Customer::where('type', 'platform')->count(),

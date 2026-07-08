@@ -19,7 +19,7 @@ class PartnerTopupFundingCompleter
             return;
         }
 
-        $netAmount = (int) $transaction->net_amount;
+        $netAmount = max(0, (int) ($transaction->wallester_funding_net_amount ?? $transaction->net_amount));
 
         if ($netAmount > 0 && ! $this->ledgerService->hasReleasedPartnerFunding($transaction)) {
             $this->ledgerService->releasePendingToAvailable(
@@ -31,10 +31,16 @@ class PartnerTopupFundingCompleter
             );
         }
 
-        $transaction->update([
+        $updates = [
             'partner_funding_status' => PartnerFundingStatus::Completed,
             'partner_funding_failure_reason' => null,
             'partner_funded_at' => now(),
-        ]);
+        ];
+
+        if ((int) ($transaction->stripe_deferred_net_amount ?? 0) <= 0) {
+            $updates['balance_settled_at'] = $transaction->balance_settled_at ?? now();
+        }
+
+        $transaction->update($updates);
     }
 }

@@ -21,8 +21,6 @@ use Illuminate\Support\Collection;
 
 class WalletAuditService
 {
-    private const DAILY_TOPUP_LIMIT_CENTS = 10_000;
-
     private const PARTNER_FUNDING_STALE_MINUTES = 15;
 
     public function __construct(
@@ -449,7 +447,7 @@ class WalletAuditService
         $this->creditTransactionQuery($from, $to, $customerId, $currency)
             ->where('type', TransactionType::TOPUP->value)
             ->where('status', 'succeeded')
-            ->where('amount', '<=', self::DAILY_TOPUP_LIMIT_CENTS)
+            ->where('wallester_funding_net_amount', '>', 0)
             ->where('net_amount', '>', 0)
             ->each(function (StripeTransaction $transaction) use (&$findings): void {
                 $movement = $this->findTopupOutMovement($transaction);

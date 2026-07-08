@@ -17,7 +17,7 @@ class OperationsController extends Controller
         $result = $this->retryAwaitingTopups->execute();
 
         return redirect()
-            ->route('dashboard.settings', ['tab' => 'wallester'])
+            ->back(fallback: route('dashboard'))
             ->with('success', sprintf(
                 'Main sincronizada (%d conta(s)). %d top-up(s) reenviado(s), %d ignorado(s).',
                 $result['synced_main'],

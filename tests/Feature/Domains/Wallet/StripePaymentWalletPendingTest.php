@@ -62,7 +62,7 @@ class StripePaymentWalletPendingTest extends TestCase
         $this->assertSame(4_875, (int) $balance->pending);
     }
 
-    public function test_large_topup_credits_available_and_not_required(): void
+    public function test_large_topup_defers_entire_amount_to_stripe_settlement(): void
     {
         $customer = $this->createRetailCustomer([
             'status' => CustomerLifecycleStatus::ACTIVE,
@@ -80,6 +80,9 @@ class StripePaymentWalletPendingTest extends TestCase
             'stripe_fee' => 0,
             'platform_fee' => 0,
             'net_amount' => 15_000,
+            'immediate_gross_amount' => 0,
+            'wallester_funding_net_amount' => 0,
+            'stripe_deferred_net_amount' => 15_000,
             'currency' => 'EUR',
             'status' => 'succeeded',
         ]);
@@ -88,13 +91,13 @@ class StripePaymentWalletPendingTest extends TestCase
 
         $transaction->refresh();
         $this->assertSame(PartnerFundingStatus::NotRequired, $transaction->partner_funding_status);
+        $this->assertNull($transaction->balance_settled_at);
 
         $balance = CustomerBalance::query()
             ->where('customer_id', $customer->id)
             ->where('currency', 'EUR')
-            ->firstOrFail();
+            ->first();
 
-        $this->assertSame(15_000, (int) $balance->available);
-        $this->assertSame(0, (int) $balance->pending);
+        $this->assertNull($balance);
     }
 }

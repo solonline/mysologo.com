@@ -35,7 +35,13 @@ class FundWallesterTopupFromStripeJob implements ShouldQueue
     {
         $transaction = StripeTransaction::query()->find($this->stripeTransactionId);
 
-        if ($transaction === null || (int) $transaction->net_amount <= 0) {
+        if ($transaction === null) {
+            return;
+        }
+
+        $amountCents = max(0, (int) ($transaction->wallester_funding_net_amount ?? 0));
+
+        if ($amountCents <= 0) {
             return;
         }
 
@@ -55,7 +61,7 @@ class FundWallesterTopupFromStripeJob implements ShouldQueue
         try {
             $movements->retryTransferFromMasterToCustomer(
                 to: $transaction->customer,
-                amountCents: (int) $transaction->net_amount,
+                amountCents: $amountCents,
                 currency: $transaction->currency,
                 description: 'Stripe top-up #'.$transaction->id,
                 idempotencyKey: $idempotencyKey,

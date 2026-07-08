@@ -15,7 +15,7 @@ class GetCustomerDetailQuery
             'balances',
             'stripeTransactions' => fn ($q) => $q->latest('stripe_created_at')->limit(50),
             'stripeAccount',
-            'wallesterAccount',
+            'wallesterAccount.cards' => fn ($q) => $q->orderByDesc('id'),
             'wallesterAccounts',
             'eburyAccount',
             'phoneVerifications',
