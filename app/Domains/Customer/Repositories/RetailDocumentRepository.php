@@ -10,8 +10,10 @@ class RetailDocumentRepository implements RetailDocumentRepositoryInterface
     public function firstOrCreateByDocumentNumber(string $documentNumber, int $customerId): CustomerRetailDocument
     {
         return CustomerRetailDocument::firstOrCreate(
-            ['document_number' => $documentNumber],
-            ['customer_id' => $customerId],
+            [
+                'document_number' => $documentNumber,
+                'customer_id' => $customerId,
+            ],
         );
     }
 

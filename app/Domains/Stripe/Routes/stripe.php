@@ -22,6 +22,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware(['idempotency', 'throttle:stripe-intent']);
         Route::post('/create-funding', [StripeController::class, 'createFunding'])
             ->middleware('throttle:stripe-intent');
+        Route::get('/get-funding-instructions', [StripeController::class, 'getFundingInstructions']);
         Route::post('/terminal/{transaction}/capture', [StripeController::class, 'captureTerminal'])
             ->where('transaction', '[0-9]+')
             ->middleware('throttle:stripe-intent');

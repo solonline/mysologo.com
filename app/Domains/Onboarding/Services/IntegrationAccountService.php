@@ -6,6 +6,7 @@ use App\Domains\Onboarding\DTOs\IntegrationAccountState;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Onboarding\Enums\IntegrationProvider;
+use App\Domains\Stripe\Enums\StripeFundingStatus;
 use App\Models\Customer;
 use App\Models\CustomerEburyAccount;
 use App\Models\CustomerStripeAccount;
@@ -224,6 +225,53 @@ class IntegrationAccountService
                 $customer->eburyAccount,
             ),
         ];
+    }
+
+    public function handleStripeFundingInstructionsCreated(CustomerStripeAccount $account, array $fundingInstructions): CustomerStripeAccount
+    {
+        $bankTransfer = $fundingInstructions['bank_transfer'] ?? [];
+        $financialAddresses = $bankTransfer['financial_addresses'] ?? [];
+        $ibanAddress = $this->resolveIbanFinancialAddress($financialAddresses);
+        $ibanDetails = is_array($ibanAddress['iban'] ?? null) ? $ibanAddress['iban'] : [];
+
+        $fundingIban = $ibanDetails['iban'] ?? null;
+
+        $account->funding_type = $fundingInstructions['funding_type'] ?? null;
+        $account->bank_transfer_type = $bankTransfer['type'] ?? null;
+        $account->funding_iban = $fundingIban;
+        $account->funding_bic = $ibanDetails['bic'] ?? null;
+        $account->funding_account_holder_name = $ibanDetails['account_holder_name'] ?? null;
+        $account->funding_country = $ibanDetails['country'] ?? null;
+        $account->funding_financial_addresses = $financialAddresses;
+        $account->viban = $fundingIban;
+        $account->funding_status = StripeFundingStatus::ACTIVE;
+        $account->funding_status_reason = null;
+        $account->funding_status_changed_at = now();
+        $account->save();
+
+        return $account;
+    }
+
+    public function markStripeFundingFailed(CustomerStripeAccount $account, string $reason): CustomerStripeAccount
+    {
+        $account->funding_status = StripeFundingStatus::FAILED;
+        $account->funding_status_reason = $reason;
+        $account->funding_status_changed_at = now();
+        $account->save();
+
+        return $account;
+    }
+
+    /** @param list<array<string, mixed>> $financialAddresses */
+    private function resolveIbanFinancialAddress(array $financialAddresses): array
+    {
+        foreach ($financialAddresses as $address) {
+            if (($address['type'] ?? null) === 'iban') {
+                return $address;
+            }
+        }
+
+        return $financialAddresses[0] ?? [];
     }
 
     private function handleStripeCashBalanceSettingsUpdated(array $object): void

@@ -5,6 +5,7 @@ namespace Tests\Unit\Domains\Onboarding;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Onboarding\Services\IntegrationAccountService;
+use App\Domains\Stripe\Enums\StripeFundingStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
@@ -94,5 +95,40 @@ class IntegrationAccountServiceTest extends TestCase
         $customer->refresh();
         $this->assertSame(CustomerLifecycleStatus::BLOCKED, $customer->status);
         $this->assertSame(IntegrationAccountStatus::FAILED, $ebury->fresh()->status);
+    }
+
+    public function test_handle_stripe_funding_instructions_created_persists_iban_details(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE);
+
+        $this->integrations->handleStripeFundingInstructionsCreated(
+            $account,
+            $this->sampleStripeFundingInstructionsPayload(),
+        );
+
+        $account->refresh();
+
+        $this->assertSame(StripeFundingStatus::ACTIVE, $account->funding_status);
+        $this->assertSame('DE89370400440532013000', $account->funding_iban);
+        $this->assertSame('COBADEFFXXX', $account->funding_bic);
+        $this->assertSame('Test User', $account->funding_account_holder_name);
+        $this->assertSame('DE', $account->funding_country);
+        $this->assertSame('bank_transfer', $account->funding_type);
+        $this->assertSame('eu_bank_transfer', $account->bank_transfer_type);
+    }
+
+    public function test_mark_stripe_funding_failed_persists_reason(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE);
+
+        $this->integrations->markStripeFundingFailed($account, 'Stripe API unavailable');
+
+        $account->refresh();
+
+        $this->assertSame(StripeFundingStatus::FAILED, $account->funding_status);
+        $this->assertSame('Stripe API unavailable', $account->funding_status_reason);
+        $this->assertNotNull($account->funding_status_changed_at);
     }
 }

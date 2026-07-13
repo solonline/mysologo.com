@@ -18,6 +18,8 @@ class AccountDetailsResource extends JsonResource
                 'stripe_payment_method_id' => $stripe['stripe_payment_method_id'],
                 'currency' => $stripe['currency'],
                 'status' => $stripe['status'],
+                'funding_status' => $stripe['funding_status'],
+                'funding_status_reason' => $stripe['funding_status_reason'],
                 'viban' => $stripe['viban'],
                 'funding_type' => $stripe['funding_type'],
                 'bank_transfer_type' => $stripe['bank_transfer_type'],

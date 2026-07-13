@@ -4,8 +4,12 @@ namespace Tests\Concerns;
 
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Onboarding\Jobs\ProvisionFundingPartnersJob;
+use App\Domains\Onboarding\Services\CustomerLifecycleService;
+use App\Domains\Onboarding\Services\FinancialProvisioningService;
 use App\Domains\Sms\Contracts\SmsGatewayInterface;
-use App\Domains\Stripe\Services\StripeService;
+use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use App\Domains\Stripe\Enums\StripeFundingStatus;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Models\Customer;
 use App\Models\CustomerDiditSession;
@@ -88,14 +92,17 @@ trait InteractsWithOnboarding
         Customer $customer,
         IntegrationAccountStatus $status = IntegrationAccountStatus::ACTIVE,
         ?string $externalId = null,
+        array $overrides = [],
     ): CustomerStripeAccount {
-        return CustomerStripeAccount::query()->create([
+        return CustomerStripeAccount::query()->create(array_merge([
             'customer_id' => $customer->id,
             'stripe_customer_id' => $externalId ?? 'cus_'.$customer->id,
             'currency' => 'EUR',
             'status' => $status,
             'status_changed_at' => now(),
-        ]);
+            'funding_status' => StripeFundingStatus::PENDING,
+            'funding_status_changed_at' => now(),
+        ], $overrides));
     }
 
     protected function createDiditSession(Customer $customer, string $sessionId = 'sess_test_1'): CustomerDiditSession
@@ -116,10 +123,41 @@ trait InteractsWithOnboarding
                 ->andReturnUsing(fn () => ['id' => 'wal_api_'.uniqid()]);
         });
 
-        $this->mock(StripeService::class, function ($mock) {
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
             $mock->shouldReceive('createCustomer')
-                ->andReturnUsing(fn () => ['id' => 'cus_api_'.uniqid()]);
+                ->andReturnUsing(fn () => [
+                    'status' => 'success',
+                    'message' => null,
+                    'data' => ['id' => 'cus_api_'.uniqid()],
+                ]);
+            $mock->shouldReceive('createCustomerFundingInstructions')
+                ->andReturnUsing(fn () => [
+                    'status' => 'success',
+                    'message' => null,
+                    'data' => $this->sampleStripeFundingInstructionsPayload(),
+                ]);
         });
+    }
+
+    /** @return array<string, mixed> */
+    protected function sampleStripeFundingInstructionsPayload(): array
+    {
+        return [
+            'funding_type' => 'bank_transfer',
+            'currency' => 'eur',
+            'bank_transfer' => [
+                'type' => 'eu_bank_transfer',
+                'financial_addresses' => [[
+                    'type' => 'iban',
+                    'iban' => [
+                        'iban' => 'DE89370400440532013000',
+                        'bic' => 'COBADEFFXXX',
+                        'account_holder_name' => 'Test User',
+                        'country' => 'DE',
+                    ],
+                ]],
+            ],
+        ];
     }
 
     protected function mockSmsGateway(): void
@@ -134,6 +172,14 @@ trait InteractsWithOnboarding
         $this->seedOnboardingSettings();
         $this->mockFinancialPartnerApis();
         $this->mockSmsGateway();
+    }
+
+    protected function runProvisionFundingPartnersJob(Customer $customer): void
+    {
+        (new ProvisionFundingPartnersJob($customer->id))->handle(
+            app(FinancialProvisioningService::class),
+            app(CustomerLifecycleService::class),
+        );
     }
 
     /** @return array<string, mixed> */

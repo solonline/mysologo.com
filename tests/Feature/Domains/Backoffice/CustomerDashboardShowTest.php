@@ -3,6 +3,8 @@
 namespace Tests\Feature\Domains\Backoffice;
 
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
+use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Stripe\Enums\StripeFundingStatus;
 use App\Models\Customer;
 use App\Models\CustomerDiditSession;
 use App\Models\CustomerRetailDocument;
@@ -10,10 +12,12 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
+use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
 
 class CustomerDashboardShowTest extends TestCase
 {
+    use InteractsWithOnboarding;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -21,6 +25,8 @@ class CustomerDashboardShowTest extends TestCase
         parent::setUp();
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+        Permission::findOrCreate('customers.view');
+        Permission::findOrCreate('customers.edit');
     }
 
     public function test_customer_show_displays_didit_session_and_kyc_warnings(): void
@@ -77,6 +83,52 @@ class CustomerDashboardShowTest extends TestCase
         $response->assertSee('SCREEN_CAPTURE_DETECTED');
         $response->assertSee('ID_CARD_GENERIC');
         $response->assertSee('Identidade recusada pelo provedor de verificação.');
+    }
+
+    public function test_customer_show_displays_stripe_funding_iban_when_active(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+
+        $customer = Customer::factory()->create(['doc_status' => 'approved']);
+        $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE, 'cus_show_funding', [
+            'funding_status' => StripeFundingStatus::ACTIVE,
+            'funding_iban' => 'DE89370400440532013000',
+            'funding_bic' => 'COBADEFFXXX',
+            'funding_account_holder_name' => 'Mario Rossi',
+            'bank_transfer_type' => 'eu_bank_transfer',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertSee('IBAN de Funding (Stripe)');
+        $response->assertSee('DE89370400440532013000');
+        $response->assertSee('COBADEFFXXX');
+        $response->assertSee('Mario Rossi');
+        $response->assertSee('Activo');
+    }
+
+    public function test_customer_show_displays_stripe_funding_failure_and_retry_button(): void
+    {
+        $user = User::factory()->create();
+        $user->givePermissionTo(['customers.view', 'customers.edit']);
+
+        $customer = Customer::factory()->create(['doc_status' => 'approved']);
+        $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE, 'cus_show_failed', [
+            'funding_status' => StripeFundingStatus::FAILED,
+            'funding_status_reason' => 'Stripe API unavailable',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertSee('IBAN de Funding (Stripe)');
+        $response->assertSee('A criação do IBAN falhou.');
+        $response->assertSee('Stripe API unavailable');
+        $response->assertSee('Repetir criação do IBAN');
+        $response->assertSee(route('dashboard.customers.retry-stripe-funding', $customer), false);
     }
 
     private function userWithPermission(string $permission): User

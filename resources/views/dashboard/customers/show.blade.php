@@ -72,6 +72,18 @@
         : strtoupper((string) $wallesterStatus) === 'FAILED';
     $canRetryProvisioning = ($customer->status === \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::PROVISIONING)
         && ($wallesterFailed || $customer->wallesterAccount === null);
+    $stripeFundingStatus = $customer->stripeAccount?->funding_status;
+    $stripeFundingActive = $stripeFundingStatus === \App\Domains\Stripe\Enums\StripeFundingStatus::ACTIVE;
+    $stripeFundingFailed = $stripeFundingStatus === \App\Domains\Stripe\Enums\StripeFundingStatus::FAILED;
+    $stripeFundingPending = $stripeFundingStatus === \App\Domains\Stripe\Enums\StripeFundingStatus::PENDING;
+    $canRetryStripeFunding = $customer->stripeAccount !== null
+        && ($stripeFundingStatus?->canRetry() ?? false);
+    $stripeFundingBadge = match ($stripeFundingStatus) {
+        \App\Domains\Stripe\Enums\StripeFundingStatus::ACTIVE => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'label' => 'Activo'],
+        \App\Domains\Stripe\Enums\StripeFundingStatus::FAILED => ['badge' => 'bg-red-50 text-red-700 border-red-200', 'label' => 'Falhou'],
+        \App\Domains\Stripe\Enums\StripeFundingStatus::PENDING => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'label' => 'Pendente'],
+        default => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'label' => '—'],
+    };
     $custBadge = match($customer->status) {
         \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::ACTIVE => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Ativo'],
         \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::PENDING_EMAIL_VERIFICATION,
@@ -957,6 +969,83 @@
                     <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->stripe_account_id ?? '—' }}</span>
                 </div>
             </div>
+        </div>
+        @endif
+
+        {{-- IBAN de Funding (Stripe) --}}
+        @if ($customer->stripeAccount)
+        <div class="bg-white rounded-2xl border {{ $stripeFundingFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5">
+            <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                IBAN de Funding (Stripe)
+                <span class="ml-auto text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border {{ $stripeFundingBadge['badge'] }}">
+                    {{ $stripeFundingBadge['label'] }}
+                </span>
+            </h2>
+
+            <div class="space-y-3 text-sm">
+                @if ($stripeFundingActive && filled($customer->stripeAccount->funding_iban))
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500 flex-shrink-0">IBAN</span>
+                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded text-right break-all">{{ $customer->stripeAccount->funding_iban }}</span>
+                </div>
+                @if (filled($customer->stripeAccount->funding_bic))
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500 flex-shrink-0">BIC</span>
+                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->funding_bic }}</span>
+                </div>
+                @endif
+                @if (filled($customer->stripeAccount->funding_account_holder_name))
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500 flex-shrink-0">Titular</span>
+                    <span class="text-xs text-slate-700 text-right">{{ $customer->stripeAccount->funding_account_holder_name }}</span>
+                </div>
+                @endif
+                @if (filled($customer->stripeAccount->bank_transfer_type))
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500 flex-shrink-0">Tipo</span>
+                    <span class="text-xs text-slate-700 text-right">{{ $customer->stripeAccount->bank_transfer_type }}</span>
+                </div>
+                @endif
+                @else
+                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                    <p class="text-sm text-slate-600">
+                        @if ($stripeFundingFailed)
+                            A criação do IBAN falhou.
+                        @elseif ($stripeFundingPending)
+                            IBAN ainda não provisionado.
+                        @else
+                            IBAN indisponível.
+                        @endif
+                    </p>
+                    @if (filled($customer->stripeAccount->funding_status_reason))
+                    <p class="text-xs text-red-700 mt-2">{{ $customer->stripeAccount->funding_status_reason }}</p>
+                    @elseif ($stripeFundingPending)
+                    <p class="text-xs text-amber-700 mt-2">Aguarda conclusão do provisioning ou tente criar manualmente.</p>
+                    @endif
+                </div>
+                @endif
+
+                @if ($customer->stripeAccount->funding_status_changed_at)
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500 flex-shrink-0">Actualizado</span>
+                    <span class="text-xs text-slate-600">{{ $formatDateTime($customer->stripeAccount->funding_status_changed_at) }}</span>
+                </div>
+                @endif
+            </div>
+
+            @can('customers.edit')
+            @if ($canRetryStripeFunding)
+            <form method="POST" action="{{ route('dashboard.customers.retry-stripe-funding', $customer) }}" class="mt-4">
+                @csrf
+                <button type="submit" class="btn-secondary btn-sm w-full sm:w-auto">
+                    {{ $stripeFundingFailed ? 'Repetir criação do IBAN' : 'Criar IBAN' }}
+                </button>
+            </form>
+            @endif
+            @endcan
         </div>
         @endif
      

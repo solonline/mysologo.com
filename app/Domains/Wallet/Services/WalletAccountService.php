@@ -20,6 +20,8 @@ class WalletAccountService
                     'stripe_payment_method_id' => $stripeAccount->stripe_payment_method_id,
                     'currency' => $stripeAccount->currency,
                     'status' => $stripeAccount->status,
+                    'funding_status' => $stripeAccount->funding_status,
+                    'funding_status_reason' => $stripeAccount->funding_status_reason,
                     'viban' => $stripeAccount->viban,
                     'funding_type' => $stripeAccount->funding_type,
                     'bank_transfer_type' => $stripeAccount->bank_transfer_type,

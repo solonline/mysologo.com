@@ -7,6 +7,7 @@ use App\Domains\Kyc\Jobs\UploadDocumentMediaJob;
 use App\Domains\Kyc\Services\IdentityVerificationWebhookService;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Models\CustomerDiditSession;
+use App\Models\CustomerRetailDocument;
 use App\Models\CustomerWallesterAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -37,6 +38,8 @@ class IdentityVerificationWebhookTest extends TestCase
         app(IdentityVerificationWebhookService::class)->handleDataUpdated(
             $this->diditApprovedPayload($customer->id, $session->session_id),
         );
+
+        $this->runProvisionFundingPartnersJob($customer->fresh());
 
         $customer->refresh();
 
@@ -73,14 +76,17 @@ class IdentityVerificationWebhookTest extends TestCase
             'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
         ]);
         $session = $this->createDiditSession($customer, 'sess_kyc_3');
-
-        $response = $this->postDiditWebhook($this->diditApprovedPayload(
+        $payload = $this->diditApprovedPayload(
             $customer->id,
             $session->session_id,
             'DOC777',
-        ));
+        );
+
+        $response = $this->postDiditWebhook($payload);
 
         $response->assertOk()->assertJson(['success' => true]);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated($payload);
 
         $customer->refresh();
         $this->assertSame(DocumentStatus::APPROVED->value, $customer->doc_status);
@@ -170,6 +176,8 @@ class IdentityVerificationWebhookTest extends TestCase
             $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Approved'),
         );
 
+        $this->runProvisionFundingPartnersJob($customer->fresh());
+
         $customer->refresh();
 
         $this->assertSame(DocumentStatus::APPROVED->value, $customer->doc_status);
@@ -185,12 +193,13 @@ class IdentityVerificationWebhookTest extends TestCase
             'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
         ]);
         $this->createDiditSession($customer, $applicationId);
+        $payload = $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Declined');
 
-        $response = $this->postDiditWebhook(
-            $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Declined'),
-        );
+        $response = $this->postDiditWebhook($payload);
 
         $response->assertOk()->assertJson(['success' => true]);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated($payload);
 
         $customer->refresh();
         $this->assertSame(CustomerLifecycleStatus::IDENTITY_REJECTED, $customer->status);
@@ -405,5 +414,90 @@ class IdentityVerificationWebhookTest extends TestCase
         $this->assertSame('Declined', $document->extra_fields['status']);
 
         Queue::assertPushed(UploadDocumentMediaJob::class);
+    }
+
+    public function test_status_updated_does_not_apply_decision_to_wrong_customer_when_application_id_collides(): void
+    {
+        $applicationId = 'c159a625-9dde-444c-990d-9accf2298448';
+        $sessionId = '9e06e806-4b55-4b79-b7fa-792287ae7ed8';
+
+        $targetCustomer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+        ]);
+        $otherCustomer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+        ]);
+
+        CustomerDiditSession::query()->create([
+            'customer_id' => $targetCustomer->id,
+            'session_id' => $sessionId,
+            'status' => 'In Progress',
+            'workflow_id' => 'wf_test',
+            'session_url' => 'https://didit.test/session-target',
+            'metadata' => ['application_id' => $applicationId],
+        ]);
+
+        $this->createDiditSession($otherCustomer, $applicationId);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditStatusUpdatedPayload($applicationId, $sessionId, 'Approved'),
+        );
+
+        $targetCustomer->refresh();
+        $otherCustomer->refresh();
+
+        $this->assertSame(DocumentStatus::APPROVED->value, $targetCustomer->doc_status);
+        $this->assertSame(CustomerLifecycleStatus::PROVISIONING, $targetCustomer->status);
+        $this->assertSame('pending', $otherCustomer->doc_status);
+        $this->assertSame(CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW, $otherCustomer->status);
+    }
+
+    public function test_status_updated_scopes_retail_document_to_matching_customer(): void
+    {
+        $applicationId = 'app-doc-scope-001';
+        $sessionId = 'sess-doc-scope-001';
+
+        $customerA = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+        ]);
+        $customerB = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+        ]);
+
+        $this->createDiditSession($customerA, $sessionId);
+
+        CustomerRetailDocument::query()->create([
+            'customer_id' => $customerB->id,
+            'document_number' => 'DOC123',
+            'document_type' => 'Identity Card',
+        ]);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditStatusUpdatedPayload($applicationId, $sessionId, 'In Review', [
+                'id_verifications' => [
+                    [
+                        'document_number' => 'DOC123',
+                        'full_name' => 'Correct Customer',
+                        'status' => 'In Review',
+                    ],
+                ],
+            ]),
+        );
+
+        $customerA->refresh();
+        $customerB->refresh();
+
+        $this->assertSame('Correct Customer', $customerA->name);
+        $this->assertNotSame('Correct Customer', $customerB->name);
+        $this->assertDatabaseHas('customer_retail_documents', [
+            'customer_id' => $customerA->id,
+            'document_number' => 'DOC123',
+            'full_name' => 'Correct Customer',
+        ]);
+        $this->assertDatabaseMissing('customer_retail_documents', [
+            'customer_id' => $customerB->id,
+            'document_number' => 'DOC123',
+            'full_name' => 'Correct Customer',
+        ]);
     }
 }

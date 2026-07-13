@@ -3,8 +3,9 @@
 namespace App\Models;
 
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
-use Illuminate\Database\Eloquent\Model;
+use App\Domains\Stripe\Enums\StripeFundingStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CustomerStripeAccount extends Model
@@ -20,6 +21,9 @@ class CustomerStripeAccount extends Model
         'status_reason',
         'status_source',
         'status_changed_at',
+        'funding_status',
+        'funding_status_reason',
+        'funding_status_changed_at',
         'viban',
         'funding_type',
         'bank_transfer_type',
@@ -34,6 +38,8 @@ class CustomerStripeAccount extends Model
         'funding_financial_addresses' => 'array',
         'status' => IntegrationAccountStatus::class,
         'status_changed_at' => 'datetime',
+        'funding_status' => StripeFundingStatus::class,
+        'funding_status_changed_at' => 'datetime',
     ];
 
     public function customer()

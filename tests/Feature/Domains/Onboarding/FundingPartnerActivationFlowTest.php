@@ -5,6 +5,7 @@ namespace Tests\Feature\Domains\Onboarding;
 use App\Domains\Kyc\Services\IdentityVerificationWebhookService;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Stripe\Enums\StripeFundingStatus;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Models\CustomerStripeAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,10 +40,14 @@ class FundingPartnerActivationFlowTest extends TestCase
             $this->diditApprovedPayload($customer->id, $session->session_id),
         );
 
+        $this->runProvisionFundingPartnersJob($customer->fresh());
+
         $customer->refresh();
         $this->assertSame(CustomerLifecycleStatus::ACTIVE, $customer->status);
         $this->assertTrue(CustomerStripeAccount::query()->where('customer_id', $customer->id)->exists());
         $this->assertSame(IntegrationAccountStatus::ACTIVE, $customer->wallesterAccount->status);
+        $this->assertSame(StripeFundingStatus::ACTIVE, $customer->stripeAccount->funding_status);
+        $this->assertSame('DE89370400440532013000', $customer->stripeAccount->funding_iban);
     }
 
     public function test_kyc_to_active_when_ebury_rejects_but_wallester_is_active(): void
@@ -55,6 +60,8 @@ class FundingPartnerActivationFlowTest extends TestCase
         app(IdentityVerificationWebhookService::class)->handleDataUpdated(
             $this->diditApprovedPayload($customer->id, $session->session_id),
         );
+
+        $this->runProvisionFundingPartnersJob($customer->fresh());
 
         $customer->refresh();
         $ebury = $this->createEburyAccount($customer, IntegrationAccountStatus::ACTIVE, 'sim:'.$customer->id);
@@ -80,6 +87,8 @@ class FundingPartnerActivationFlowTest extends TestCase
         app(IdentityVerificationWebhookService::class)->handleDataUpdated(
             $this->diditApprovedPayload($customer->id, $session->session_id),
         );
+
+        $this->runProvisionFundingPartnersJob($customer->fresh());
 
         $customer->refresh();
         $wallester = $customer->wallesterAccount;
@@ -118,6 +127,7 @@ class FundingPartnerActivationFlowTest extends TestCase
             app(IdentityVerificationWebhookService::class)->handleDataUpdated(
                 $this->diditApprovedPayload($customer->id, $session->session_id),
             );
+            $this->runProvisionFundingPartnersJob($customer->fresh());
         } catch (\RuntimeException) {
             // Sync queue exhausts retries and rethrows after marking FAILED.
         }

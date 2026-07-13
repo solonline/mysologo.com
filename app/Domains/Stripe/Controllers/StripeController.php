@@ -164,4 +164,43 @@ class StripeController extends Controller
         return FeeEstimateResource::collection($fees)
             ->additional(['currency' => $currency]);
     }
+
+    /**
+     * Create Funding Instructions
+     *
+     * Creates or retries Stripe bank transfer funding instructions for the authenticated customer.
+     *
+     * @tags Stripe
+     */
+    public function createFunding(Request $request): JsonResponse
+    {
+        $customer = $request->user();
+
+        try {
+            $data = $this->stripeService->createCustomerFundingInstructions($customer);
+        } catch (ApiException $e) {
+            return response()->json($e->toArray(), $e->status);
+        }
+
+        return response()->json(['data' => $data], 201);
+    }
+
+    /**
+     * Get Funding Instructions
+     *
+     * Returns the persisted Stripe funding instructions for the authenticated customer.
+     *
+     * @tags Stripe
+     */
+    public function getFundingInstructions(Request $request): JsonResponse
+    {
+        $customer = $request->user();
+        $data = $this->stripeService->getFundingInstructions($customer);
+
+        if ($data === null) {
+            return response()->json(['message' => 'Cliente não possui conta Stripe associada.'], 404);
+        }
+
+        return response()->json(['data' => $data]);
+    }
 }

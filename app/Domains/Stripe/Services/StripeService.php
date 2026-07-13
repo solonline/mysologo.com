@@ -95,6 +95,103 @@ class StripeService
         return $result['data'];
     }
 
+    public function createCustomerFundingInstructions(Customer $customer): array
+    {
+        $stripeAccount = $customer->stripeAccount;
+
+        if (! $stripeAccount) {
+            throw new ApiException(
+                ErrorCode::STRIPE_FUNDING_INSTRUCTIONS_FAILED,
+                422,
+                'Cliente não possui conta Stripe associada.'
+            );
+        }
+
+        $currency = strtolower((string) ($customer->currency ?? $stripeAccount->currency ?? 'eur'));
+        $fundingType = match ($currency) {
+            'eur' => 'eu_bank_transfer',
+            'gbp' => 'gb_bank_transfer',
+            'usd' => 'usd_bank_transfer',
+            default => 'eu_bank_transfer',
+        };
+
+        $data = [
+            'bank_transfer[type]' => $fundingType,
+            'currency' => $currency,
+            'funding_type' => 'bank_transfer',
+        ];
+
+        $result = $this->stripeGateway->createCustomerFundingInstructions(
+            $stripeAccount->stripe_customer_id,
+            $data,
+        );
+
+        if (($result['status'] ?? null) !== 'success') {
+            $message = $result['message'] ?? 'Erro ao criar instruções de funding no Stripe.';
+
+            $this->integrationAccounts->markStripeFundingFailed($stripeAccount->fresh(), $message);
+
+            throw new ApiException(
+                ErrorCode::STRIPE_FUNDING_INSTRUCTIONS_FAILED,
+                502,
+                $message,
+            );
+        }
+
+        $fundingInstructions = $result['data'] ?? [];
+
+        try {
+            $this->integrationAccounts->handleStripeFundingInstructionsCreated(
+                $stripeAccount->fresh(),
+                $fundingInstructions,
+            );
+        } catch (\Throwable $e) {
+            Log::channel('stripe')->error('Failed to process create viban funding instructions', [
+                'customer_id' => $customer->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->integrationAccounts->markStripeFundingFailed(
+                $stripeAccount->fresh(),
+                $e->getMessage(),
+            );
+
+            throw new ApiException(
+                ErrorCode::STRIPE_FUNDING_INSTRUCTIONS_FAILED,
+                502,
+                'Erro ao persistir instruções de funding.'
+            );
+        }
+
+        return $fundingInstructions;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getFundingInstructions(Customer $customer): ?array
+    {
+        $stripeAccount = $customer->stripeAccount;
+
+        if (! $stripeAccount) {
+            return null;
+        }
+
+        return [
+            'stripe_customer_id' => $stripeAccount->stripe_customer_id,
+            'currency' => $stripeAccount->currency,
+            'status' => $stripeAccount->status,
+            'funding_status' => $stripeAccount->funding_status,
+            'funding_status_reason' => $stripeAccount->funding_status_reason,
+            'viban' => $stripeAccount->viban,
+            'funding_type' => $stripeAccount->funding_type,
+            'bank_transfer_type' => $stripeAccount->bank_transfer_type,
+            'funding_iban' => $stripeAccount->funding_iban,
+            'funding_bic' => $stripeAccount->funding_bic,
+            'funding_account_holder_name' => $stripeAccount->funding_account_holder_name,
+            'funding_country' => $stripeAccount->funding_country,
+            'funding_financial_addresses' => $stripeAccount->funding_financial_addresses,
+        ];
+    }
+
     public function createPaymentIntent(
         Customer $customer,
         int $amount,

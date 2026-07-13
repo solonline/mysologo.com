@@ -16,6 +16,7 @@ use App\Domains\Backoffice\Actions\DeleteTpaPaymentMethodFeeAction;
 use App\Domains\Backoffice\Actions\MarkAccountPayablePaidAction;
 use App\Domains\Backoffice\Actions\RetryAwaitingWallesterTopupsAction;
 use App\Domains\Backoffice\Actions\RetryCustomerProvisioningAction;
+use App\Domains\Backoffice\Actions\RetryStripeFundingAction;
 use App\Domains\Backoffice\Actions\StoreAccountPayableAttachmentsAction;
 use App\Domains\Backoffice\Actions\UnlinkCustomerTpaAction;
 use App\Domains\Backoffice\Actions\UpdateAccountPayableAction;
@@ -63,6 +64,7 @@ class BackofficeServiceProvider extends ServiceProvider
         GetAuditLogDetailQuery::class,
         UpdateCustomerFromBackofficeAction::class,
         RetryCustomerProvisioningAction::class,
+        RetryStripeFundingAction::class,
         RetryAwaitingWallesterTopupsAction::class,
         UnlinkCustomerTpaAction::class,
         UpsertTpaPaymentMethodFeeAction::class,

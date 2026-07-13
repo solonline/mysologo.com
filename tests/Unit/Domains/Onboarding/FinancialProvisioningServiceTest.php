@@ -5,6 +5,8 @@ namespace Tests\Unit\Domains\Onboarding;
 use App\Domains\Ebury\Contracts\EburyGatewayInterface;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Onboarding\Services\FinancialProvisioningService;
+use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use App\Domains\Stripe\Enums\StripeFundingStatus;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Models\CustomerStripeAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -100,5 +102,103 @@ class FinancialProvisioningServiceTest extends TestCase
         $this->assertNotNull($account);
         $this->assertSame(IntegrationAccountStatus::FAILED, $account->status);
         $this->assertSame('Wallester API unavailable', $account->status_reason);
+    }
+
+    public function test_provision_stripe_creates_customer_before_funding_instructions(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $callOrder = [];
+
+        $this->mock(StripeGatewayInterface::class, function ($mock) use (&$callOrder) {
+            $mock->shouldReceive('createCustomer')
+                ->once()
+                ->ordered()
+                ->andReturnUsing(function () use (&$callOrder) {
+                    $callOrder[] = 'createCustomer';
+
+                    return [
+                        'status' => 'success',
+                        'message' => null,
+                        'data' => ['id' => 'cus_order_test'],
+                    ];
+                });
+            $mock->shouldReceive('createCustomerFundingInstructions')
+                ->once()
+                ->ordered()
+                ->andReturnUsing(function () use (&$callOrder) {
+                    $callOrder[] = 'createCustomerFundingInstructions';
+
+                    return [
+                        'status' => 'success',
+                        'message' => null,
+                        'data' => $this->sampleStripeFundingInstructionsPayload(),
+                    ];
+                });
+        });
+
+        $this->assertTrue(app(FinancialProvisioningService::class)->provisionStripe($customer));
+
+        $account = $customer->fresh()->stripeAccount;
+        $this->assertNotNull($account);
+        $this->assertSame('cus_order_test', $account->stripe_customer_id);
+        $this->assertSame(StripeFundingStatus::ACTIVE, $account->funding_status);
+        $this->assertSame('DE89370400440532013000', $account->funding_iban);
+        $this->assertSame(['createCustomer', 'createCustomerFundingInstructions'], $callOrder);
+    }
+
+    public function test_provision_stripe_keeps_customer_active_when_funding_fails(): void
+    {
+        $customer = $this->createRetailCustomer();
+
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('createCustomer')
+                ->once()
+                ->andReturn([
+                    'status' => 'success',
+                    'message' => null,
+                    'data' => ['id' => 'cus_funding_fail'],
+                ]);
+            $mock->shouldReceive('createCustomerFundingInstructions')
+                ->once()
+                ->andReturn([
+                    'status' => 'failed',
+                    'message' => 'Funding unavailable',
+                    'data' => null,
+                ]);
+        });
+
+        $this->assertTrue(app(FinancialProvisioningService::class)->provisionStripe($customer));
+
+        $account = $customer->fresh()->stripeAccount;
+        $this->assertNotNull($account);
+        $this->assertSame(IntegrationAccountStatus::ACTIVE, $account->status);
+        $this->assertSame(StripeFundingStatus::FAILED, $account->funding_status);
+        $this->assertSame('Funding unavailable', $account->funding_status_reason);
+    }
+
+    public function test_provision_stripe_retries_funding_when_account_already_exists(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE, 'cus_existing', [
+            'funding_status' => StripeFundingStatus::FAILED,
+            'funding_status_reason' => 'Previous failure',
+        ]);
+
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('createCustomer')->never();
+            $mock->shouldReceive('createCustomerFundingInstructions')
+                ->once()
+                ->andReturn([
+                    'status' => 'success',
+                    'message' => null,
+                    'data' => $this->sampleStripeFundingInstructionsPayload(),
+                ]);
+        });
+
+        $this->assertTrue(app(FinancialProvisioningService::class)->provisionStripe($customer));
+
+        $account = $customer->fresh()->stripeAccount;
+        $this->assertSame(StripeFundingStatus::ACTIVE, $account->funding_status);
+        $this->assertNull($account->funding_status_reason);
     }
 }

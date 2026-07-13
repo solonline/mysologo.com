@@ -18,8 +18,15 @@ class IdentityVerificationSessionRepository implements IdentityVerificationSessi
 
     public function findBySessionId(string $sessionId): ?CustomerDiditSession
     {
-        $session = CustomerDiditSession::query()
+        return CustomerDiditSession::query()
             ->where('session_id', $sessionId)
+            ->first();
+    }
+
+    public function findByApplicationId(string $applicationId): ?CustomerDiditSession
+    {
+        $session = CustomerDiditSession::query()
+            ->where('metadata->application_id', $applicationId)
             ->first();
 
         if ($session) {
@@ -27,9 +34,10 @@ class IdentityVerificationSessionRepository implements IdentityVerificationSessi
         }
 
         return CustomerDiditSession::query()
-            ->where(function ($query) use ($sessionId) {
-                $query->where('metadata->application_id', $sessionId)
-                    ->orWhere('metadata->session_id', $sessionId);
+            ->where('session_id', $applicationId)
+            ->where(function ($query) {
+                $query->whereNull('metadata')
+                    ->orWhereNull('metadata->application_id');
             })
             ->first();
     }

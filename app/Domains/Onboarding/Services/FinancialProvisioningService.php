@@ -8,6 +8,7 @@ use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Onboarding\Jobs\ProvisionFundingPartnersJob;
 use App\Domains\Stripe\Contracts\StripeAccountRepositoryInterface;
 use App\Domains\Stripe\DTOs\CreateStripeAccountDTO;
+use App\Domains\Stripe\Enums\StripeFundingStatus;
 use App\Domains\Stripe\Services\StripeService;
 use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
 use App\Domains\Wallester\Services\PlatformMasterCurrencyResolver;
@@ -129,8 +130,17 @@ class FinancialProvisioningService
 
     private function provisionStripeAccount(Customer $customer): bool
     {
-        if ($customer->stripeAccount) {
-            return $this->normalizeStatus($customer->stripeAccount->status) === IntegrationAccountStatus::ACTIVE;
+        $customer = $customer->fresh('stripeAccount');
+        $account = $customer->stripeAccount;
+
+        if ($account !== null) {
+            if ($this->normalizeStatus($account->status) !== IntegrationAccountStatus::ACTIVE) {
+                return false;
+            }
+
+            $this->provisionStripeFundingAccountViban($customer);
+
+            return true;
         }
 
         try {
@@ -140,6 +150,8 @@ class FinancialProvisioningService
                 $stripeCustomer['id'],
             ));
             $this->integrationAccounts->updateStripe($account, IntegrationAccountStatus::ACTIVE, null, 'onboarding.provisioning');
+
+            $this->provisionStripeFundingAccountViban($customer->fresh('stripeAccount'));
 
             return true;
         } catch (\Throwable $e) {
@@ -158,6 +170,29 @@ class FinancialProvisioningService
             }
 
             return false;
+        }
+    }
+
+    private function provisionStripeFundingAccountViban(Customer $customer): void
+    {
+        $customer = $customer->fresh('stripeAccount');
+        $account = $customer->stripeAccount;
+
+        if ($account === null) {
+            return;
+        }
+
+        if ($account->funding_status === StripeFundingStatus::ACTIVE) {
+            return;
+        }
+
+        try {
+            $this->stripeService->createCustomerFundingInstructions($customer);
+        } catch (\Throwable $e) {
+            Log::channel('stripe')->error('Stripe funding provisioning failed', [
+                'customer_id' => $customer->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

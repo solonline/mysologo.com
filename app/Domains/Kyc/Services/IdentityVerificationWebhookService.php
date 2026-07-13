@@ -39,11 +39,13 @@ class IdentityVerificationWebhookService
 
     public function handleDataUpdated(array $payload): void
     {
-        match ($payload['webhook_type'] ?? null) {
-            // 'user.data.updated' => $this->handleUserDataUpdated($payload),
-            'status.updated' => $this->handleStatusUpdated($payload),
-            default => $this->handleStatusUpdated($payload),
-        };
+        if (($payload['webhook_type'] ?? null) === 'user.data.updated') {
+            $this->handleUserDataUpdated($payload);
+
+            return;
+        }
+
+        $this->handleStatusUpdated($payload);
     }
 
     private function handleUserDataUpdated(array $payload): void
@@ -240,15 +242,36 @@ class IdentityVerificationWebhookService
     /** @param array<string, mixed> $payload */
     private function resolveDiditSession(array $payload): ?CustomerDiditSession
     {
-        foreach ($this->collectExternalSessionIds($payload) as $externalId) {
-            $session = $this->sessionRepository->findBySessionId($externalId);
+        $decision = $payload['decision'] ?? [];
+
+        foreach ($this->collectDiditSessionIds($payload, $decision) as $sessionId) {
+            $session = $this->sessionRepository->findBySessionId($sessionId);
 
             if ($session) {
                 return $session;
             }
         }
 
+        $applicationId = $payload['application_id'] ?? null;
+
+        if (is_string($applicationId) && $applicationId !== '') {
+            return $this->sessionRepository->findByApplicationId($applicationId);
+        }
+
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $decision
+     * @return list<string>
+     */
+    private function collectDiditSessionIds(array $payload, array $decision): array
+    {
+        return array_values(array_unique(array_filter([
+            $payload['session_id'] ?? null,
+            $decision['session_id'] ?? null,
+        ])));
     }
 
     /** @return list<string> */
@@ -257,9 +280,8 @@ class IdentityVerificationWebhookService
         $decision = $payload['decision'] ?? [];
 
         return array_values(array_unique(array_filter([
+            ...$this->collectDiditSessionIds($payload, $decision),
             $payload['application_id'] ?? null,
-            $payload['session_id'] ?? null,
-            $decision['session_id'] ?? null,
         ])));
     }
 

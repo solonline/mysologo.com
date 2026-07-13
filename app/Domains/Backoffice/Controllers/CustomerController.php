@@ -3,6 +3,7 @@
 namespace App\Domains\Backoffice\Controllers;
 
 use App\Domains\Backoffice\Actions\RetryCustomerProvisioningAction;
+use App\Domains\Backoffice\Actions\RetryStripeFundingAction;
 use App\Domains\Backoffice\Actions\UpdateCustomerFromBackofficeAction;
 use App\Domains\Backoffice\DTOs\UpdateCustomerFromBackofficeData;
 use App\Domains\Backoffice\Queries\GetCustomerDetailQuery;
@@ -10,6 +11,7 @@ use App\Domains\Backoffice\Queries\ListCustomersQuery;
 use App\Domains\Backoffice\Requests\UpdateCustomerRequest;
 use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
+use App\Domains\Stripe\Enums\StripeFundingStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use Illuminate\Http\Request;
@@ -21,6 +23,7 @@ class CustomerController extends Controller
         protected GetCustomerDetailQuery $customerDetail,
         protected UpdateCustomerFromBackofficeAction $updateCustomer,
         protected RetryCustomerProvisioningAction $retryProvisioning,
+        protected RetryStripeFundingAction $retryStripeFunding,
     ) {}
 
     public function index(Request $request)
@@ -60,5 +63,19 @@ class CustomerController extends Controller
         $this->retryProvisioning->execute($customer);
 
         return back()->with('success', 'Provisioning reenviado para a fila.');
+    }
+
+    public function retryStripeFunding(Customer $customer)
+    {
+        $customer = $this->retryStripeFunding->execute($customer);
+
+        $message = $customer->stripeAccount?->funding_status === StripeFundingStatus::ACTIVE
+            ? 'IBAN de funding criado com sucesso.'
+            : 'Não foi possível criar o IBAN de funding.';
+
+        return back()->with(
+            $customer->stripeAccount?->funding_status === StripeFundingStatus::ACTIVE ? 'success' : 'error',
+            $message,
+        );
     }
 }
