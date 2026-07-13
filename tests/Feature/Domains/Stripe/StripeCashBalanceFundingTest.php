@@ -72,7 +72,7 @@ class StripeCashBalanceFundingTest extends TestCase
 
         $service = app(StripeService::class);
         $service->handleWebhook([
-            'type' => 'customer.cash_balance_transaction.created',
+            'type' => 'customer_cash_balance_transaction.created',
             'data' => ['object' => $this->sampleFundedCashBalancePayload('cus_cash_balance_1')],
         ]);
 
@@ -118,7 +118,7 @@ class StripeCashBalanceFundingTest extends TestCase
         $this->app->instance(StripeGatewayInterface::class, $gateway);
 
         app(StripeService::class)->handleWebhook([
-            'type' => 'customer.cash_balance_transaction.created',
+            'type' => 'customer_cash_balance_transaction.created',
             'data' => ['object' => $this->sampleFundedCashBalancePayload('cus_cash_balance_2')],
         ]);
 
@@ -140,7 +140,7 @@ class StripeCashBalanceFundingTest extends TestCase
         $this->app->instance(StripeGatewayInterface::class, $gateway);
 
         app(StripeService::class)->handleWebhook([
-            'type' => 'customer.cash_balance_transaction.created',
+            'type' => 'customer_cash_balance_transaction.created',
             'data' => [
                 'object' => array_merge($this->sampleFundedCashBalancePayload('cus_cash_balance_3'), [
                     'type' => 'applied_to_payment',

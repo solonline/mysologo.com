@@ -160,7 +160,7 @@ class IntegrationAccountService
     public function handleStripeWebhook(string $eventType, array $object): void
     {
         match ($eventType) {
-            'customer.cash_balance_settings.updated' => $this->handleStripeCashBalanceSettingsUpdated($object),
+            'customer_cash_balance_settings.updated', 'customer.cash_balance_settings.updated' => $this->handleStripeCashBalanceSettingsUpdated($object),
             default => null,
         };
     }

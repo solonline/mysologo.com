@@ -569,8 +569,8 @@ class StripeService
             'payment_intent.succeeded' => $this->handlePaymentIntentSucceeded($object),
             'payment_intent.payment_failed' => $this->handlePaymentIntentFailed($object),
             'charge.updated' => $this->handleChargeUpdated($object),
-            'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
-            'customer.cash_balance_transaction.created' => $this->handleCashBalanceTransactionCreated($object),
+            'customer_cash_balance_settings.updated', 'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
+            'customer_cash_balance_transaction.created', 'customer.cash_balance_transaction.created' => $this->handleCashBalanceTransactionCreated($object),
             default => Log::info('Stripe webhook ignorado', ['type' => $eventType]),
         };
     }
