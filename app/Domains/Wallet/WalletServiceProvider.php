@@ -33,6 +33,7 @@ class WalletServiceProvider extends ServiceProvider
         SettlementService::class,
         TopupWallesterFundingPolicy::class,
         PartnerTopupFundingCompleter::class,
+        BankTransferTopupNotifier::class,
         FundingLiquidityNotifier::class,
         WallesterMainAccountSyncService::class,
         FundingPartnerMovementService::class,

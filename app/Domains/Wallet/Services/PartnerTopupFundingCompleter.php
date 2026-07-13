@@ -9,6 +9,7 @@ class PartnerTopupFundingCompleter
 {
     public function __construct(
         protected LedgerService $ledgerService,
+        protected BankTransferTopupNotifier $bankTransferTopupNotifier,
     ) {}
 
     public function complete(StripeTransaction $transaction): void
@@ -42,5 +43,7 @@ class PartnerTopupFundingCompleter
         }
 
         $transaction->update($updates);
+
+        $this->bankTransferTopupNotifier->notifyIfEligible($transaction->fresh());
     }
 }

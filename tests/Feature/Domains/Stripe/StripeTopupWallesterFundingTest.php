@@ -12,6 +12,7 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
+use App\Domains\Wallet\Jobs\SendBankTransferTopupReceivedEmail;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
 use App\Models\Customer;
@@ -199,6 +200,8 @@ class StripeTopupWallesterFundingTest extends TestCase
 
     public function test_topup_job_transfers_net_amount_and_is_idempotent(): void
     {
+        Bus::fake([SendBankTransferTopupReceivedEmail::class]);
+
         $customer = $this->createActiveCustomer();
         $platform = $this->createPlatformCustomer();
         $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'master-eur-uuid', [
@@ -265,6 +268,8 @@ class StripeTopupWallesterFundingTest extends TestCase
 
         $this->assertSame(2_875, (int) $balance->available);
         $this->assertSame(0, (int) $balance->pending);
+
+        Bus::assertNotDispatched(SendBankTransferTopupReceivedEmail::class);
     }
 
     public function test_topup_job_marks_awaiting_liquidity_on_insufficient_main_funds(): void
