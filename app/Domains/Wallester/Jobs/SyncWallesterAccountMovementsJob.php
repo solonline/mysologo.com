@@ -86,7 +86,7 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
             return;
         }
 
-        $amountCents = $wallesterDriver->amountToCents($transaction['account_amount'] ?? $transaction['amount'] ?? 0);
+        $amountCents = $wallesterDriver->absoluteAmountToCents($transaction['account_amount'] ?? $transaction['amount'] ?? 0);
 
         if ($amountCents <= 0) {
             return;

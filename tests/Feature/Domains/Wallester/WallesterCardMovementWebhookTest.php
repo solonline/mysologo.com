@@ -6,6 +6,9 @@ use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
+use App\Domains\Wallet\Enums\LedgerEntryType;
+use App\Domains\Wallet\Enums\TransactionDirection;
+use App\Models\CustomerBalance;
 use App\Models\CustomerWallesterCard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithOnboarding;
@@ -51,10 +54,146 @@ class WallesterCardMovementWebhookTest extends TestCase
         ]);
     }
 
+    public function test_webhook_ingests_nested_authorization_payload_from_production(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_nested_spend');
+
+        $card = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => '26a1eaff-4652-48b1-b5f7-f3306050db45',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 10000,
+            'pending' => 0,
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => '4dc0e494-c674-47bd-80ed-567e2aa19fdc',
+                'card_id' => '26a1eaff-4652-48b1-b5f7-f3306050db45',
+                'type' => 'payWaveLowValuePurchase',
+                'account_amount' => -0.9,
+                'account_currency_code' => 'EUR',
+                'group' => 'Purchase',
+                'merchant_name' => 'DISTRICT',
+                'response_code' => 'Approved',
+                'is_declined' => false,
+                'is_reversal' => false,
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'funding_account_id' => $account->id,
+            'customer_wallester_card_id' => $card->id,
+            'type' => FundingPartnerMovementType::CardPurchase->value,
+            'direction' => 'out',
+            'amount' => 90,
+            'partner_external_id' => '4dc0e494-c674-47bd-80ed-567e2aa19fdc',
+            'description' => 'DISTRICT',
+        ]);
+
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'direction' => TransactionDirection::Debit->value,
+            'amount' => 90,
+            'balance_after' => 9910,
+            'entry_type' => LedgerEntryType::CARD_PURCHASE->value,
+            'description' => 'DISTRICT',
+        ]);
+
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 9910,
+        ]);
+    }
+
+    public function test_webhook_resolves_account_by_card_when_account_id_is_missing(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_card_only');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_only_1',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => 'txn_card_only',
+                'card_id' => 'card_only_1',
+                'type' => 'payWaveLowValuePurchase',
+                'account_amount' => -2.50,
+                'account_currency_code' => 'EUR',
+                'merchant_name' => 'Shop',
+                'response_code' => 'Approved',
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'funding_account_id' => $account->id,
+            'amount' => 250,
+            'partner_external_id' => 'txn_card_only',
+        ]);
+    }
+
+    public function test_webhook_ignores_declined_authorizations(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_declined');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_declined',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => 'txn_declined',
+                'card_id' => 'card_declined',
+                'account_id' => 'wal_declined',
+                'account_amount' => -5.00,
+                'account_currency_code' => 'EUR',
+                'response_code' => 'Declined',
+                'is_declined' => true,
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseCount('funding_partner_movements', 0);
+        $this->assertDatabaseCount('ledger_entries', 0);
+    }
+
     public function test_webhook_card_movement_is_idempotent(): void
     {
         $customer = $this->createActiveCustomer();
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_card_idem');
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 5000,
+            'pending' => 0,
+        ]);
 
         $payload = [
             'event_type' => 'transaction',
@@ -68,6 +207,12 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->postJson('/api/webhooks/wallester', $payload)->assertOk();
 
         $this->assertDatabaseCount('funding_partner_movements', 1);
+        $this->assertDatabaseCount('ledger_entries', 1);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 4500,
+        ]);
     }
 
     private function createActiveCustomer()

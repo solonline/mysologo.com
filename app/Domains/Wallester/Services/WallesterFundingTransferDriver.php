@@ -173,4 +173,9 @@ class WallesterFundingTransferDriver implements FundingPartnerTransferInterface
 
         return (int) round(((float) $amount) * 100);
     }
+
+    public function absoluteAmountToCents(float|int|string|null $amount): int
+    {
+        return abs($this->amountToCents($amount));
+    }
 }

@@ -11,6 +11,7 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
+use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
@@ -18,6 +19,7 @@ use App\Models\Customer;
 use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
 use App\Models\FundingPartnerMovement;
+use App\Models\LedgerEntry;
 use App\Models\StripeTransaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +36,7 @@ class FundingPartnerMovementService
         protected PartnerTopupFundingCompleter $partnerTopupFundingCompleter,
         protected WallesterTransferErrorClassifier $transferErrorClassifier,
         protected FundingLiquidityNotifier $fundingLiquidityNotifier,
+        protected LedgerService $ledger,
     ) {}
 
     public function transferBetweenCustomers(
@@ -248,31 +251,89 @@ class FundingPartnerMovementService
     ): FundingPartnerMovement {
         $idempotencyKey = 'card:'.$partnerExternalId.':'.$direction->value;
 
-        $existing = FundingPartnerMovement::query()
-            ->where('idempotency_key', $idempotencyKey)
-            ->first();
+        return DB::transaction(function () use (
+            $account,
+            $type,
+            $direction,
+            $amountCents,
+            $currency,
+            $partnerExternalId,
+            $source,
+            $card,
+            $description,
+            $metadata,
+            $idempotencyKey,
+        ): FundingPartnerMovement {
+            $existing = FundingPartnerMovement::query()
+                ->where('idempotency_key', $idempotencyKey)
+                ->first();
 
-        if ($existing instanceof FundingPartnerMovement) {
-            return $existing;
+            if ($existing instanceof FundingPartnerMovement) {
+                $this->applyCardMovementLedger($existing, $account);
+
+                return $existing;
+            }
+
+            $movement = FundingPartnerMovement::query()->create([
+                'provider' => IntegrationProvider::WALLESTER,
+                'funding_account_type' => $account::class,
+                'funding_account_id' => $account->id,
+                'external_account_id' => $account->wallester_account_id,
+                'direction' => $direction,
+                'type' => $type,
+                'amount' => $amountCents,
+                'currency' => strtoupper($currency),
+                'customer_wallester_card_id' => $card?->id,
+                'partner_external_id' => $partnerExternalId,
+                'status' => FundingPartnerMovementStatus::Completed,
+                'source' => $source,
+                'idempotency_key' => $idempotencyKey,
+                'description' => $description,
+                'metadata' => $metadata,
+            ]);
+
+            $this->applyCardMovementLedger($movement, $account);
+
+            return $movement;
+        });
+    }
+
+    private function applyCardMovementLedger(
+        FundingPartnerMovement $movement,
+        CustomerWallesterAccount $account,
+    ): void {
+        $entryType = match ($movement->type) {
+            FundingPartnerMovementType::CardPurchase => LedgerEntryType::CARD_PURCHASE,
+            FundingPartnerMovementType::CardRefund => LedgerEntryType::CARD_UNLOAD,
+            default => null,
+        };
+
+        if ($entryType === null) {
+            return;
         }
 
-        return FundingPartnerMovement::query()->create([
-            'provider' => IntegrationProvider::WALLESTER,
-            'funding_account_type' => $account::class,
-            'funding_account_id' => $account->id,
-            'external_account_id' => $account->wallester_account_id,
-            'direction' => $direction,
-            'type' => $type,
-            'amount' => $amountCents,
-            'currency' => strtoupper($currency),
-            'customer_wallester_card_id' => $card?->id,
-            'partner_external_id' => $partnerExternalId,
-            'status' => FundingPartnerMovementStatus::Completed,
-            'source' => $source,
-            'idempotency_key' => $idempotencyKey,
-            'description' => $description,
-            'metadata' => $metadata,
-        ]);
+        $alreadyRecorded = LedgerEntry::query()
+            ->where('reference_type', $movement->getMorphClass())
+            ->where('reference_id', $movement->id)
+            ->where('entry_type', $entryType)
+            ->exists();
+
+        if ($alreadyRecorded) {
+            return;
+        }
+
+        $this->ledger->record(
+            customerId: (int) $account->customer_id,
+            currency: (string) $movement->currency,
+            entryType: $entryType,
+            amount: (int) $movement->amount,
+            reference: $movement,
+            description: $movement->description,
+            metadata: [
+                'partner_external_id' => $movement->partner_external_id,
+                'customer_wallester_card_id' => $movement->customer_wallester_card_id,
+            ],
+        );
     }
 
     public function listForFundingAccount(Model $fundingAccount, int $perPage = 15): LengthAwarePaginator

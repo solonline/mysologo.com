@@ -85,6 +85,7 @@ class FundingPartnerMovementServiceTest extends TestCase
         );
 
         $this->assertSame(1234, $driver->amountToCents(12.34));
+        $this->assertSame(90, $driver->absoluteAmountToCents(-0.9));
         $this->assertSame(0, $driver->amountToCents(null));
     }
 }

@@ -23,26 +23,25 @@ class WallesterCardMovementIngestService
      */
     public function ingest(array $payload): void
     {
-        $eventType = strtolower((string) ($payload['event_type'] ?? $payload['type'] ?? ''));
+        $payload = $this->normalizePayload($payload);
 
-        if (! $this->isCardSpendEvent($eventType, $payload)) {
+        if (! $this->isCardSpendEvent($payload) || $this->isDeclined($payload)) {
             return;
         }
 
-        $accountId = (string) ($payload['account_id'] ?? $payload['account']['id'] ?? '');
         $externalId = (string) ($payload['id'] ?? $payload['transaction_id'] ?? $payload['authorization_id'] ?? '');
 
-        if ($accountId === '' || $externalId === '') {
+        if ($externalId === '') {
             return;
         }
 
-        $account = $this->integrationAccounts->findWallesterByExternalId($accountId);
+        $account = $this->resolveAccount($payload);
 
         if (! $account instanceof CustomerWallesterAccount) {
             return;
         }
 
-        $amountCents = $this->wallesterDriver->amountToCents(
+        $amountCents = $this->wallesterDriver->absoluteAmountToCents(
             $payload['account_amount'] ?? $payload['amount'] ?? $payload['authorization_amount'] ?? 0,
         );
 
@@ -50,7 +49,7 @@ class WallesterCardMovementIngestService
             return;
         }
 
-        $isRefund = str_contains($eventType, 'refund') || str_contains($eventType, 'reversal');
+        $isRefund = $this->isRefundEvent($payload);
         $movementType = $isRefund
             ? FundingPartnerMovementType::CardRefund
             : FundingPartnerMovementType::CardPurchase;
@@ -76,10 +75,42 @@ class WallesterCardMovementIngestService
 
     /**
      * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
      */
-    private function isCardSpendEvent(string $eventType, array $payload): bool
+    private function normalizePayload(array $payload): array
     {
-        if (in_array($eventType, [
+        $data = $payload['data'] ?? null;
+
+        if (! is_array($data) || $data === []) {
+            return $payload;
+        }
+
+        $envelopeType = strtolower((string) ($payload['event_type'] ?? $payload['type'] ?? ''));
+        $envelopeEvent = strtolower((string) ($payload['event'] ?? ''));
+
+        $normalized = array_merge($payload, $data);
+        $normalized['wallester_event_type'] = $envelopeType;
+        $normalized['wallester_event'] = $envelopeEvent;
+        $normalized['transaction_type'] = strtolower((string) ($data['type'] ?? ''));
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function isCardSpendEvent(array $payload): bool
+    {
+        $envelopeType = strtolower((string) (
+            $payload['wallester_event_type']
+            ?? $payload['event_type']
+            ?? $payload['type']
+            ?? ''
+        ));
+        $transactionType = strtolower((string) ($payload['transaction_type'] ?? $payload['type'] ?? ''));
+        $group = strtolower((string) ($payload['group'] ?? ''));
+
+        if (in_array($envelopeType, [
             'authorization',
             'transaction',
             'card_transaction',
@@ -91,13 +122,86 @@ class WallesterCardMovementIngestService
             return true;
         }
 
-        return isset($payload['card_id']) || isset($payload['authorization_amount']) || isset($payload['merchant_name']);
+        if (in_array($transactionType, [
+            'paywavelowvaluepurchase',
+            'purchase',
+            'card_payment',
+            'refund',
+            'card_refund',
+            'reversal',
+        ], true) || str_contains($transactionType, 'purchase')) {
+            return true;
+        }
+
+        if (in_array($group, ['purchase', 'refund', 'reversal'], true)) {
+            return true;
+        }
+
+        return isset($payload['card_id'])
+            || isset($payload['authorization_amount'])
+            || isset($payload['merchant_name']);
     }
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function resolveCard(array $payload, CustomerWallesterAccount $account): ?CustomerWallesterCard
+    private function isDeclined(array $payload): bool
+    {
+        if (($payload['is_declined'] ?? false) === true) {
+            return true;
+        }
+
+        $responseCode = strtolower((string) ($payload['response_code'] ?? ''));
+
+        if ($responseCode !== '' && $responseCode !== 'approved') {
+            return true;
+        }
+
+        $status = strtolower((string) ($payload['status'] ?? ''));
+
+        return in_array($status, ['declined', 'failed', 'rejected'], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function isRefundEvent(array $payload): bool
+    {
+        if (($payload['is_reversal'] ?? false) === true) {
+            return true;
+        }
+
+        $envelopeType = strtolower((string) ($payload['wallester_event_type'] ?? $payload['event_type'] ?? $payload['type'] ?? ''));
+        $transactionType = strtolower((string) ($payload['transaction_type'] ?? $payload['type'] ?? ''));
+        $group = strtolower((string) ($payload['group'] ?? ''));
+
+        return str_contains($envelopeType, 'refund')
+            || str_contains($envelopeType, 'reversal')
+            || str_contains($transactionType, 'refund')
+            || str_contains($transactionType, 'reversal')
+            || in_array($group, ['refund', 'reversal'], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function resolveAccount(array $payload): ?CustomerWallesterAccount
+    {
+        $accountId = (string) ($payload['account_id'] ?? $payload['account']['id'] ?? '');
+
+        if ($accountId !== '') {
+            return $this->integrationAccounts->findWallesterByExternalId($accountId);
+        }
+
+        $card = $this->resolveCard($payload, null);
+
+        return $card?->wallesterAccount;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function resolveCard(array $payload, ?CustomerWallesterAccount $account): ?CustomerWallesterCard
     {
         $cardId = $payload['card_id'] ?? null;
 
@@ -105,9 +209,12 @@ class WallesterCardMovementIngestService
             return null;
         }
 
-        return CustomerWallesterCard::query()
-            ->where('customer_wallester_account_id', $account->id)
-            ->where('wallester_card_id', $cardId)
-            ->first();
+        $query = CustomerWallesterCard::query()->where('wallester_card_id', $cardId);
+
+        if ($account instanceof CustomerWallesterAccount) {
+            $query->where('customer_wallester_account_id', $account->id);
+        }
+
+        return $query->first();
     }
 }
