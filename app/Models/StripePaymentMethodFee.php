@@ -57,6 +57,11 @@ class StripePaymentMethodFee extends Model
         $platPct   = (float) $this->platform_fee_percentage;
         $platFixed = (float) $this->platform_fee_fixed;
 
+        \Log::debug('Calculating platform fee', [
+            'amount_cents' => $amountCents,
+            'plat_pct'     => $platPct,
+            'plat_fixed'   => $platFixed,
+        ]);
         return (int) round($amountCents * $platPct + $platFixed * 100);
     }
 

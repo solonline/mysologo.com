@@ -16,7 +16,7 @@ class LoginController extends Controller
 
     public function showLogin()
     {
-        if (Auth::check()) {
+        if (Auth::guard('web')->check()) {
             return redirect()->route('dashboard');
         }
 

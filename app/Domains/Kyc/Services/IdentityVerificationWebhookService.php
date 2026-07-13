@@ -40,7 +40,7 @@ class IdentityVerificationWebhookService
     public function handleDataUpdated(array $payload): void
     {
         match ($payload['webhook_type'] ?? null) {
-            'user.data.updated' => $this->handleUserDataUpdated($payload),
+            // 'user.data.updated' => $this->handleUserDataUpdated($payload),
             'status.updated' => $this->handleStatusUpdated($payload),
             default => $this->handleStatusUpdated($payload),
         };

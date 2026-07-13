@@ -439,6 +439,7 @@ class StripeService
             'payment_intent.payment_failed' => $this->handlePaymentIntentFailed($object),
             'charge.updated' => $this->handleChargeUpdated($object),
             'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
+            'customer.cash_balance_transaction.created' => \Log::info('Stripe webhook ignorado', ['type' => $eventType]),
             default => Log::info('Stripe webhook ignorado', ['type' => $eventType]),
         };
     }
@@ -785,6 +786,8 @@ class StripeService
             'payment_intent_id' => $paymentIntentId,
             'balance_transaction_id' => $balanceTxnId,
             'payment_method_category' => $feeMethod,
+            'payment_method_fee_config_found' => (bool) $feeConfig,
+            'payment_method_fee_id' => $feeConfig?->id,
             'stripe_fee' => $realStripeFee,
             'platform_fee' => $platformFee,
             'net_amount' => $realNetAmount,
@@ -796,8 +799,14 @@ class StripeService
         }
     }
 
+    private function handleCashBalanceTransactionCreated(array $object): void
+    {
+        $this->handleCashBalanceFunded($object);
+    }
+
     private function resolvePaymentMethodCategory(string $pmType, array $pmDetails): string
     {
+        // Métodos que não são cartão utilizam o próprio identificador.
         if ($pmType !== 'card') {
             return $pmType;
         }
@@ -810,16 +819,12 @@ class StripeService
             'LV', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK',
         ];
 
-        if (\in_array($country, $eeaCountries, true)) {
+        // Cartões emitidos no EEE
+        if (in_array($country, $eeaCountries, true)) {
             return 'card';
         }
 
-        if ($country === 'GB') {
-            return 'card_non_eea';
-        }
-
-        // Tenta corresponder a qualquer config card_* activa para este país
-        // (ex: card_non_eea cobre GB e outros fora da EEA)
-        return 'card_international';
+        // Qualquer cartão emitido fora do EEE
+        return 'card_non_eea';
     }
 }

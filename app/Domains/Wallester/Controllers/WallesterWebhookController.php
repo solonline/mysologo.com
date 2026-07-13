@@ -19,11 +19,11 @@ class WallesterWebhookController extends Controller
     /**
      * @hideFromApiDocs
      */
-    public function handle(Request $request): JsonResponse
+    public function handle(Request $request): JsonResponse 
     {
         $payload = $request->all();
 
-        Log::info('Received Wallester webhook', ['payload' => $payload]);
+        Log::channel('wallester')->info('Received Wallester webhook', ['payload' => $payload]);
 
         $accountId = $payload['account_id'] ?? $payload['id'] ?? null;
         $status = $payload['status'] ?? $payload['account_status'] ?? null;

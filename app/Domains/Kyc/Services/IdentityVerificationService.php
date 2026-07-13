@@ -59,6 +59,11 @@ class IdentityVerificationService
                 ]
             );
 
+            \Log::info('IdentityVerificationService: session created', [
+                'customer_id' => $customer->id,
+                'session_id' => $diditSession->session_id,
+                'workflow_id' => $diditSession->workflow_id,
+            ]);
             return [
                 'status' => 'success',
                 'message' => null,

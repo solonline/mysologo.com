@@ -29,7 +29,7 @@ Route::post('/login', [LoginController::class, 'login'])->name('login.post');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 // ==================== DASHBOARD ====================
-Route::prefix('dashboard')->name('dashboard')->middleware('auth')->group(function () {
+Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('');
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('.customers')->middleware('can:customers.view');

@@ -7,15 +7,20 @@ use Illuminate\Support\Facades\Auth;
 
 class StaffSessionService
 {
+    protected function guard()
+    {
+        return Auth::guard('web');
+    }
+
     /** @param  array{email: string, password: string}  $credentials */
     public function attempt(array $credentials, bool $remember = false): bool
     {
-        return Auth::attempt($credentials, $remember);
+        return $this->guard()->attempt($credentials, $remember);
     }
 
     public function logout(Request $request): void
     {
-        Auth::logout();
+        $this->guard()->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

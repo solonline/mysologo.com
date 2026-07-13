@@ -25,6 +25,7 @@ class WallesterHttpClient
             'headers' => [
                 'Accept' => 'application/json',
             ],
+            'http_errors' => false,
         ]);
     }
 
@@ -96,7 +97,7 @@ class WallesterHttpClient
             'json' => $data,
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     /**
@@ -109,7 +110,7 @@ class WallesterHttpClient
             'query' => $query,
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     public function getAccount(string $accountId, ?string $auditUserId = null): array
@@ -118,7 +119,7 @@ class WallesterHttpClient
             'headers' => $this->getRequestHeaders($auditUserId),
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     public function getEncryptedCardNumber(string $cardId, string $publicKeyBase64, ?string $auditUserId = null): array
@@ -130,7 +131,7 @@ class WallesterHttpClient
             ],
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     public function getEncryptedCvv2(string $cardId, string $publicKeyBase64, ?string $auditUserId = null): array
@@ -142,7 +143,7 @@ class WallesterHttpClient
             ],
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     public function getCard(string $cardId, ?string $auditUserId = null): array
@@ -151,7 +152,7 @@ class WallesterHttpClient
             'headers' => $this->getRequestHeaders($auditUserId),
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     public function createCard(array $data, ?string $auditUserId = null): array
@@ -161,7 +162,7 @@ class WallesterHttpClient
             'json' => $data,
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     public function activateCard(string $cardId, ?string $auditUserId = null): array
@@ -170,7 +171,7 @@ class WallesterHttpClient
             'headers' => $this->getRequestHeaders($auditUserId),
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     /**
@@ -183,7 +184,7 @@ class WallesterHttpClient
             'query' => $query,
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     /**
@@ -196,7 +197,7 @@ class WallesterHttpClient
             'query' => $query,
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     /**
@@ -209,7 +210,7 @@ class WallesterHttpClient
             'query' => $query,
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     /**
@@ -222,7 +223,7 @@ class WallesterHttpClient
             'json' => $data,
         ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+        return $this->decodeJson($response->getBody()->getContents());
     }
 
     private function ensureCurrencyResolved(): void
@@ -230,5 +231,13 @@ class WallesterHttpClient
         if ($this->apiKey === null) {
             $this->forCurrency('eur');
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function decodeJson(string $content): array
+    {
+        $decoded = json_decode($content, true);
+        
+        return is_array($decoded) ? $decoded : [];
     }
 }
