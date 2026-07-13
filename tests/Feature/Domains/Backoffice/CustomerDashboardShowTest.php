@@ -5,9 +5,16 @@ namespace Tests\Feature\Domains\Backoffice;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Stripe\Enums\StripeFundingStatus;
+use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
+use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
+use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
+use App\Domains\Wallet\Enums\FundingPartnerMovementType;
+use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Customer;
 use App\Models\CustomerDiditSession;
 use App\Models\CustomerRetailDocument;
+use App\Models\FundingPartnerMovement;
+use App\Models\StripeTransaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
@@ -129,6 +136,68 @@ class CustomerDashboardShowTest extends TestCase
         $response->assertSee('Stripe API unavailable');
         $response->assertSee('Repetir criação do IBAN');
         $response->assertSee(route('dashboard.customers.retry-stripe-funding', $customer), false);
+    }
+
+    public function test_customer_show_displays_unified_movements_with_card_purchase(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+
+        $customer = $this->createRetailCustomer([
+            'name' => 'Cliente Movimentos',
+        ]);
+
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_show_movements');
+
+        StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 2_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 2_000,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'Carregamento teste',
+            'stripe_created_at' => now()->subDay(),
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::CardPurchase,
+            'amount' => 90,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Webhook,
+            'idempotency_key' => 'card:show-purchase:out',
+            'partner_external_id' => 'show-purchase',
+            'description' => 'DISTRICT',
+            'metadata' => [
+                'merchant_city' => 'SETUBAL',
+                'merchant_category_code' => '7339',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertSee('Movimentos');
+        $response->assertSee('Entradas e saídas');
+        $response->assertSee('Carregamento teste');
+        $response->assertSee('DISTRICT');
+        $response->assertSee('Compra cartão');
+        $response->assertSee('Wallester');
+        $response->assertSee('Stripe');
+        $response->assertSee('SETUBAL');
+        $response->assertSee('MCC 7339');
+        $response->assertSee('+1 entradas');
+        $response->assertSee('−1 saídas');
     }
 
     private function userWithPermission(string $permission): User

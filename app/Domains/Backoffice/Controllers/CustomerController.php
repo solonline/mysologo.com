@@ -6,6 +6,7 @@ use App\Domains\Backoffice\Actions\RetryCustomerProvisioningAction;
 use App\Domains\Backoffice\Actions\RetryStripeFundingAction;
 use App\Domains\Backoffice\Actions\UpdateCustomerFromBackofficeAction;
 use App\Domains\Backoffice\DTOs\UpdateCustomerFromBackofficeData;
+use App\Domains\Backoffice\Queries\GetCustomerActivityTimelineQuery;
 use App\Domains\Backoffice\Queries\GetCustomerDetailQuery;
 use App\Domains\Backoffice\Queries\ListCustomersQuery;
 use App\Domains\Backoffice\Requests\UpdateCustomerRequest;
@@ -21,6 +22,7 @@ class CustomerController extends Controller
     public function __construct(
         protected ListCustomersQuery $listCustomers,
         protected GetCustomerDetailQuery $customerDetail,
+        protected GetCustomerActivityTimelineQuery $customerActivityTimeline,
         protected UpdateCustomerFromBackofficeAction $updateCustomer,
         protected RetryCustomerProvisioningAction $retryProvisioning,
         protected RetryStripeFundingAction $retryStripeFunding,
@@ -43,6 +45,7 @@ class CustomerController extends Controller
     {
         return view('dashboard.customers.show', [
             'customer' => $this->customerDetail->execute($customer),
+            'activityTimeline' => $this->customerActivityTimeline->execute($customer),
             'customerStatuses' => CustomerLifecycleStatus::cases(),
             'documentStatuses' => DocumentStatus::cases(),
         ]);
