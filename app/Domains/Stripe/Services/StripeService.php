@@ -639,6 +639,8 @@ class StripeService
             'currency' => strtolower($currency),
             'customer' => $stripeCustomerId,
             'payment_method_types' => ['customer_balance'],
+            'payment_method_data' => ['type' => 'customer_balance'],
+            'confirm' => true,
             'description' => 'Bank transfer top-up',
             'metadata' => [
                 'customer_id' => (string) $stripeAccount->customer_id,
@@ -658,6 +660,18 @@ class StripeService
         }
 
         $intent = $paymentIntentResult['data'];
+        $intentStatus = $intent['status'] ?? 'pending';
+
+        if (in_array($intentStatus, ['requires_payment_method', 'requires_action', 'canceled'], true)) {
+            Log::channel('stripe')->error('Stripe webhook: PaymentIntent de cash balance não confirmado', [
+                'stripe_customer_id' => $stripeCustomerId,
+                'cash_balance_transaction_id' => $cashBalanceTransactionId,
+                'stripe_payment_intent_id' => $intent['id'] ?? null,
+                'status' => $intentStatus,
+            ]);
+
+            return;
+        }
 
         try {
             $transaction = StripeTransaction::create([
@@ -673,7 +687,7 @@ class StripeService
                 'platform_fee' => 0,
                 'net_amount' => 0,
                 'currency' => $currency,
-                'status' => 'pending',
+                'status' => $intentStatus === 'succeeded' ? 'succeeded' : 'pending',
                 'description' => 'Bank transfer top-up via VIBAN',
                 'bank_transfer_type' => $object['funded']['bank_transfer']['type'] ?? null,
                 'bank_transfer_reference' => $object['funded']['bank_transfer']['reference'] ?? null,
@@ -696,27 +710,6 @@ class StripeService
             return;
         }
 
-        $applyResult = $this->stripeGateway->applyCustomerBalance($intent['id'], [
-            'amount' => $netAmount,
-            'currency' => strtolower($currency),
-        ]);
-
-        if ($applyResult['status'] !== 'success') {
-            Log::channel('stripe')->error('Stripe webhook: falha ao aplicar cash balance ao PaymentIntent', [
-                'transaction_id' => $transaction->id,
-                'stripe_payment_intent_id' => $intent['id'],
-                'cash_balance_transaction_id' => $cashBalanceTransactionId,
-                'message' => $applyResult['message'] ?? null,
-            ]);
-
-            $transaction->update([
-                'status' => 'failed',
-                'description' => 'Falha ao reconciliar cash balance: '.($applyResult['message'] ?? 'erro desconhecido'),
-            ]);
-
-            return;
-        }
-
         Log::channel('stripe')->info('Stripe webhook: cash balance reconciliado com PaymentIntent', [
             'transaction_id' => $transaction->id,
             'stripe_payment_intent_id' => $intent['id'],
@@ -724,6 +717,7 @@ class StripeService
             'cash_balance_transaction_id' => $cashBalanceTransactionId,
             'net_amount' => $netAmount,
             'currency' => $currency,
+            'payment_intent_status' => $intentStatus,
         ]);
     }
 

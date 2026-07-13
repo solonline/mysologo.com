@@ -56,16 +56,18 @@ class StripeCashBalanceFundingTest extends TestCase
         $gateway = Mockery::mock(StripeGatewayInterface::class);
         $gateway->shouldReceive('createPaymentIntent')
             ->once()
+            ->with(Mockery::on(function (array $payload): bool {
+                return $payload['amount'] === 100
+                    && $payload['currency'] === 'eur'
+                    && $payload['customer'] === 'cus_cash_balance_1'
+                    && $payload['payment_method_types'] === ['customer_balance']
+                    && ($payload['payment_method_data']['type'] ?? null) === 'customer_balance'
+                    && ($payload['confirm'] ?? false) === true
+                    && ($payload['metadata']['purpose'] ?? null) === 'bank_transfer_topup';
+            }))
             ->andReturn([
                 'status' => 'success',
-                'data' => ['id' => 'pi_bank_topup_1', 'client_secret' => 'secret'],
-            ]);
-        $gateway->shouldReceive('applyCustomerBalance')
-            ->once()
-            ->with('pi_bank_topup_1', ['amount' => 100, 'currency' => 'eur'])
-            ->andReturn([
-                'status' => 'success',
-                'data' => ['id' => 'pi_bank_topup_1', 'status' => 'succeeded'],
+                'data' => ['id' => 'pi_bank_topup_1', 'status' => 'succeeded', 'client_secret' => 'secret'],
             ]);
 
         $this->app->instance(StripeGatewayInterface::class, $gateway);
@@ -83,7 +85,7 @@ class StripeCashBalanceFundingTest extends TestCase
             'type' => TransactionType::TOPUP->value,
             'payment_method_type' => 'bank_transfer',
             'amount' => 100,
-            'status' => 'pending',
+            'status' => 'succeeded',
             'bank_transfer_sender_name' => 'Test Sender',
         ]);
     }
@@ -114,7 +116,6 @@ class StripeCashBalanceFundingTest extends TestCase
 
         $gateway = Mockery::mock(StripeGatewayInterface::class);
         $gateway->shouldNotReceive('createPaymentIntent');
-        $gateway->shouldNotReceive('applyCustomerBalance');
         $this->app->instance(StripeGatewayInterface::class, $gateway);
 
         app(StripeService::class)->handleWebhook([
