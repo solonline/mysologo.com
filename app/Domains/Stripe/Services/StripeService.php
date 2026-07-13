@@ -115,11 +115,7 @@ class StripeService
             default => 'eu_bank_transfer',
         };
 
-        $data = [
-            'bank_transfer[type]' => $fundingType,
-            'currency' => $currency,
-            'funding_type' => 'bank_transfer',
-        ];
+        $data = $this->buildFundingInstructionsPayload($customer, $currency, $fundingType);
 
         $result = $this->stripeGateway->createCustomerFundingInstructions(
             $stripeAccount->stripe_customer_id,
@@ -164,6 +160,44 @@ class StripeService
         }
 
         return $fundingInstructions;
+    }
+
+    /** @return array<string, string> */
+    private function buildFundingInstructionsPayload(Customer $customer, string $currency, string $bankTransferType): array
+    {
+        $data = [
+            'funding_type' => 'bank_transfer',
+            'currency' => $currency,
+            'bank_transfer[type]' => $bankTransferType,
+        ];
+
+        if ($bankTransferType === 'eu_bank_transfer') {
+            $data['bank_transfer[eu_bank_transfer][country]'] = $this->resolveEuBankTransferCountry($customer);
+        }
+
+        return $data;
+    }
+
+    private function resolveEuBankTransferCountry(Customer $customer): string
+    {
+        $allowedCountries = ['DE', 'FR', 'IE', 'NL'];
+
+        $customer->loadMissing(['documents', 'corporateDocuments']);
+
+        $candidates = [
+            $customer->documents->first()?->issuing_state,
+            $customer->corporateDocuments->first()?->country_code,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $country = strtoupper(trim((string) $candidate));
+
+            if (in_array($country, $allowedCountries, true)) {
+                return $country;
+            }
+        }
+
+        return 'NL';
     }
 
     /** @return array<string, mixed>|null */

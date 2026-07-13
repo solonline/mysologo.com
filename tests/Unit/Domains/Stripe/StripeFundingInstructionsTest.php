@@ -7,6 +7,7 @@ use App\Domains\Stripe\Contracts\StripeGatewayInterface;
 use App\Domains\Stripe\Enums\StripeFundingStatus;
 use App\Domains\Stripe\Services\StripeService;
 use App\Exceptions\ApiException;
+use App\Models\CustomerRetailDocument;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
@@ -24,6 +25,13 @@ class StripeFundingInstructionsTest extends TestCase
         $this->mock(StripeGatewayInterface::class, function ($mock) {
             $mock->shouldReceive('createCustomerFundingInstructions')
                 ->once()
+                ->withArgs(function (string $customerId, array $data): bool {
+                    return $customerId !== ''
+                        && $data['funding_type'] === 'bank_transfer'
+                        && $data['currency'] === 'eur'
+                        && $data['bank_transfer[type]'] === 'eu_bank_transfer'
+                        && $data['bank_transfer[eu_bank_transfer][country]'] === 'NL';
+                })
                 ->andReturn([
                     'status' => 'success',
                     'message' => null,
@@ -38,6 +46,34 @@ class StripeFundingInstructionsTest extends TestCase
         $account = $customer->fresh()->stripeAccount;
         $this->assertSame(StripeFundingStatus::ACTIVE, $account->funding_status);
         $this->assertSame('DE89370400440532013000', $account->funding_iban);
+    }
+
+    public function test_create_customer_funding_instructions_uses_document_issuing_state_for_eu_country(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $this->createStripeAccount($customer);
+
+        CustomerRetailDocument::query()->create([
+            'customer_id' => $customer->id,
+            'document_number' => 'doc_'.$customer->id,
+            'document_type' => 'Identity Card',
+            'issuing_state' => 'DE',
+        ]);
+
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('createCustomerFundingInstructions')
+                ->once()
+                ->withArgs(function (string $customerId, array $data): bool {
+                    return $data['bank_transfer[eu_bank_transfer][country]'] === 'DE';
+                })
+                ->andReturn([
+                    'status' => 'success',
+                    'message' => null,
+                    'data' => $this->sampleStripeFundingInstructionsPayload(),
+                ]);
+        });
+
+        app(StripeService::class)->createCustomerFundingInstructions($customer->fresh());
     }
 
     public function test_create_customer_funding_instructions_marks_failed_on_gateway_error(): void
