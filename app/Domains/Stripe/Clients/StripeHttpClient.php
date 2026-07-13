@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Domains\Stripe\Clients;
 
 use App\Domains\Settings\Services\SettingsService;
@@ -8,9 +9,11 @@ use Stripe\Webhook;
 
 class StripeHttpClient
 {
-    protected ?string $secretKey     = null;
+    protected ?string $secretKey = null;
+
     protected ?string $webhookSecret = null;
-    protected ?Stripe $stripe        = null;
+
+    protected ?Stripe $stripe = null;
 
     public function __construct(protected SettingsService $settings)
     {
@@ -19,10 +22,10 @@ class StripeHttpClient
 
     public function forCurrency(string $currency): static
     {
-        $key = $this->settings->getByKey('stripe.' . strtolower($currency) . '.secret_key');
-        if (!empty($key) && $key !== $this->secretKey) {
+        $key = $this->settings->getByKey('stripe.'.strtolower($currency).'.secret_key');
+        if (! empty($key) && $key !== $this->secretKey) {
             $this->secretKey = $key;
-            $this->stripe    = null;
+            $this->stripe = null;
         }
 
         return $this;
@@ -31,13 +34,13 @@ class StripeHttpClient
     public function forMode(string $mode, string $currency): static
     {
         $settingKey = $mode === 'test'
-            ? 'stripe.' . strtolower($currency) . '.test_secret_key'
-            : 'stripe.' . strtolower($currency) . '.secret_key';
+            ? 'stripe.'.strtolower($currency).'.test_secret_key'
+            : 'stripe.'.strtolower($currency).'.secret_key';
 
         $key = $this->settings->getByKey($settingKey);
-        if (!empty($key) && $key !== $this->secretKey) {
+        if (! empty($key) && $key !== $this->secretKey) {
             $this->secretKey = $key;
-            $this->stripe    = null;
+            $this->stripe = null;
         }
 
         return $this;
@@ -125,6 +128,11 @@ class StripeHttpClient
     public function createTerminalConnectionToken(): array
     {
         return $this->client()->terminal->connectionTokens->create([])->toArray();
+    }
+
+    public function applyCustomerBalance(string $paymentIntentId, array $params = []): array
+    {
+        return $this->client()->paymentIntents->applyCustomerBalance($paymentIntentId, $params)->toArray();
     }
 
     public function listPaymentMethods(string $type = 'card', ?string $customerId = null): array

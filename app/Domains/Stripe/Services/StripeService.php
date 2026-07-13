@@ -570,7 +570,7 @@ class StripeService
             'payment_intent.payment_failed' => $this->handlePaymentIntentFailed($object),
             'charge.updated' => $this->handleChargeUpdated($object),
             'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
-            'customer.cash_balance_transaction.created' => \Log::info('Stripe webhook ignorado', ['type' => $eventType]),
+            'customer.cash_balance_transaction.created' => $this->handleCashBalanceTransactionCreated($object),
             default => Log::info('Stripe webhook ignorado', ['type' => $eventType]),
         };
     }
@@ -596,12 +596,25 @@ class StripeService
 
     private function handleCashBalanceFunded(array $object): void
     {
-        $stripeCustomerId = $object['customer'] ?? null;
-        $currency = strtoupper($object['currency'] ?? '');
-        $netAmount = $object['net_amount'] ?? 0;
+        if (($object['type'] ?? null) !== 'funded') {
+            return;
+        }
 
-        if (! $stripeCustomerId || ! $currency || $netAmount <= 0) {
+        $stripeCustomerId = $object['customer'] ?? null;
+        $currency = strtoupper((string) ($object['currency'] ?? ''));
+        $netAmount = (int) ($object['net_amount'] ?? 0);
+        $cashBalanceTransactionId = $object['id'] ?? null;
+
+        if (! $stripeCustomerId || $currency === '' || $netAmount <= 0 || ! $cashBalanceTransactionId) {
             Log::channel('stripe')->warning('Stripe webhook: cash_balance.funded com dados inválidos', $object);
+
+            return;
+        }
+
+        if (StripeTransaction::where('stripe_cash_balance_transaction_id', $cashBalanceTransactionId)->exists()) {
+            Log::channel('stripe')->info('Stripe webhook: cash_balance.funded já processado', [
+                'stripe_cash_balance_transaction_id' => $cashBalanceTransactionId,
+            ]);
 
             return;
         }
@@ -616,44 +629,52 @@ class StripeService
             return;
         }
 
-        $transactionId = $object['id'] ?? null;
-
-        if ($transactionId && StripeTransaction::where('stripe_cash_balance_transaction_id', $transactionId)->exists()) {
-            Log::channel('stripe')->info('Stripe webhook: cash_balance.funded já processado', [
-                'stripe_cash_balance_transaction_id' => $transactionId,
-            ]);
-
-            return;
-        }
-
         $feeConfig = StripePaymentMethodFee::where('payment_method', 'bank_transfer')
             ->where('currency', $currency)
             ->where('is_active', true)
             ->first();
 
-        $platformFee = $feeConfig ? $feeConfig->calculatePlatformFee($netAmount) : 0;
-        $creditAmount = $netAmount - $platformFee;
+        $paymentIntentResult = $this->stripeGateway->createPaymentIntent([
+            'amount' => $netAmount,
+            'currency' => strtolower($currency),
+            'customer' => $stripeCustomerId,
+            'payment_method_types' => ['customer_balance'],
+            'description' => 'Bank transfer top-up',
+            'metadata' => [
+                'customer_id' => (string) $stripeAccount->customer_id,
+                'purpose' => 'bank_transfer_topup',
+                'cash_balance_transaction_id' => $cashBalanceTransactionId,
+            ],
+        ]);
 
-        // Determina a data de liquidação esperada (2 dias úteis por defeito para bank transfers)
-        $availableOn = $feeConfig
-            ? now()->addWeekdays(2)->toDateString()
-            : null;
+        if ($paymentIntentResult['status'] !== 'success') {
+            Log::channel('stripe')->error('Stripe webhook: falha ao criar PaymentIntent para cash balance', [
+                'stripe_customer_id' => $stripeCustomerId,
+                'cash_balance_transaction_id' => $cashBalanceTransactionId,
+                'message' => $paymentIntentResult['message'] ?? null,
+            ]);
+
+            return;
+        }
+
+        $intent = $paymentIntentResult['data'];
 
         try {
-            StripeTransaction::create([
+            $transaction = StripeTransaction::create([
                 'customer_id' => $stripeAccount->customer_id,
                 'stripe_payment_method_fee_id' => $feeConfig?->id,
-                'type' => TransactionType::BANK_TRANSFER,
+                'type' => TransactionType::TOPUP,
                 'direction' => TransactionDirection::Credit,
+                'stripe_payment_intent_id' => $intent['id'],
+                'stripe_cash_balance_transaction_id' => $cashBalanceTransactionId,
                 'payment_method_type' => 'bank_transfer',
                 'amount' => $netAmount,
                 'stripe_fee' => 0,
-                'platform_fee' => $platformFee,
-                'net_amount' => $creditAmount,
+                'platform_fee' => 0,
+                'net_amount' => 0,
                 'currency' => $currency,
-                'status' => 'succeeded',
-                'description' => 'Cash balance funded via bank transfer',
-                'stripe_cash_balance_transaction_id' => $object['id'] ?? null,
+                'status' => 'pending',
+                'description' => 'Bank transfer top-up via VIBAN',
                 'bank_transfer_type' => $object['funded']['bank_transfer']['type'] ?? null,
                 'bank_transfer_reference' => $object['funded']['bank_transfer']['reference'] ?? null,
                 'bank_transfer_sender_name' => $object['funded']['bank_transfer']['eu_bank_transfer']['sender_name'] ?? null,
@@ -661,27 +682,48 @@ class StripeService
                 'bank_transfer_iban_last4' => $object['funded']['bank_transfer']['eu_bank_transfer']['iban_last4'] ?? null,
                 'bank_transfer_amount' => $netAmount,
                 'stripe_metadata' => $object,
-                'available_on' => $availableOn,
                 'stripe_created_at' => isset($object['created'])
                     ? Carbon::createFromTimestamp($object['created'])
                     : now(),
             ]);
-
-            // Saldo fica pending até o settlement job libertar na data available_on
-            $this->incrementBalance($stripeAccount->customer_id, $currency, pending: $creditAmount);
         } catch (\Throwable $e) {
-            Log::channel('stripe')->error('Stripe webhook: erro ao processar cash_balance.funded', [
+            Log::channel('stripe')->error('Stripe webhook: erro ao registar transação de cash balance', [
                 'stripe_customer_id' => $stripeCustomerId,
+                'cash_balance_transaction_id' => $cashBalanceTransactionId,
                 'exception' => $e->getMessage(),
             ]);
 
             return;
         }
 
-        Log::channel('stripe')->info('Stripe webhook: customer.cash_balance.funded', [
+        $applyResult = $this->stripeGateway->applyCustomerBalance($intent['id'], [
+            'amount' => $netAmount,
+            'currency' => strtolower($currency),
+        ]);
+
+        if ($applyResult['status'] !== 'success') {
+            Log::channel('stripe')->error('Stripe webhook: falha ao aplicar cash balance ao PaymentIntent', [
+                'transaction_id' => $transaction->id,
+                'stripe_payment_intent_id' => $intent['id'],
+                'cash_balance_transaction_id' => $cashBalanceTransactionId,
+                'message' => $applyResult['message'] ?? null,
+            ]);
+
+            $transaction->update([
+                'status' => 'failed',
+                'description' => 'Falha ao reconciliar cash balance: '.($applyResult['message'] ?? 'erro desconhecido'),
+            ]);
+
+            return;
+        }
+
+        Log::channel('stripe')->info('Stripe webhook: cash balance reconciliado com PaymentIntent', [
+            'transaction_id' => $transaction->id,
+            'stripe_payment_intent_id' => $intent['id'],
             'stripe_customer_id' => $stripeCustomerId,
-            'currency' => $currency,
+            'cash_balance_transaction_id' => $cashBalanceTransactionId,
             'net_amount' => $netAmount,
+            'currency' => $currency,
         ]);
     }
 
@@ -879,7 +921,9 @@ class StripeService
         // Classifica o método de pagamento real (para cartões, pelo país do cartão)
         $pmDetails = $charge['payment_method_details'] ?? [];
         $pmType = $pmDetails['type'] ?? null;
-        $feeMethod = $this->resolvePaymentMethodCategory($pmType, $pmDetails);
+        $feeMethod = filled($transaction->stripe_cash_balance_transaction_id)
+            ? $transaction->payment_method_type
+            : $this->resolvePaymentMethodCategory($pmType, $pmDetails);
 
         $feeConfig = StripePaymentMethodFee::where('payment_method', $feeMethod)
             ->where('currency', $transaction->currency)

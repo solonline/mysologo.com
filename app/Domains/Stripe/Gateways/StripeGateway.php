@@ -19,7 +19,7 @@ class StripeGateway implements StripeGatewayInterface
     public function createCustomer(array $customer): array
     {
         return $this->run('createCustomer', fn () => $this->client->createCustomer([
-            'name'  => $customer['name']  ?? null,
+            'name' => $customer['name'] ?? null,
             'email' => $customer['email'] ?? null,
             'phone' => $customer['phone'] ?? null,
         ]));
@@ -34,15 +34,13 @@ class StripeGateway implements StripeGatewayInterface
     {
         $currency = $data['currency'] ?? 'eur';
 
-        return $this->run('createPaymentIntent', fn () =>
-            $this->client->forCurrency($currency)->createPaymentIntent($data)
+        return $this->run('createPaymentIntent', fn () => $this->client->forCurrency($currency)->createPaymentIntent($data)
         );
     }
 
     public function attachPaymentMethod(string $paymentMethodId, string $customerId): array
     {
-        return $this->run('attachPaymentMethod', fn () =>
-            $this->client->attachPaymentMethod($paymentMethodId, $customerId)
+        return $this->run('attachPaymentMethod', fn () => $this->client->attachPaymentMethod($paymentMethodId, $customerId)
         );
     }
 
@@ -63,22 +61,19 @@ class StripeGateway implements StripeGatewayInterface
 
     public function createCustomerFundingInstructions(string $customerId, array $data): array
     {
-        return $this->run('createCustomerFundingInstructions', fn () =>
-            $this->client->createCustomerFundingInstructions($customerId, $data)
+        return $this->run('createCustomerFundingInstructions', fn () => $this->client->createCustomerFundingInstructions($customerId, $data)
         );
     }
 
     public function getCustomerFundingInstructions(string $customerId): array
     {
-        return $this->run('getCustomerFundingInstructions', fn () =>
-            $this->client->getCustomerFundingInstructions($customerId)
+        return $this->run('getCustomerFundingInstructions', fn () => $this->client->getCustomerFundingInstructions($customerId)
         );
     }
 
     public function getBalanceTransaction(string $balanceTransactionId): array
     {
-        return $this->run('getBalanceTransaction', fn () =>
-            $this->client->getBalanceTransaction($balanceTransactionId)
+        return $this->run('getBalanceTransaction', fn () => $this->client->getBalanceTransaction($balanceTransactionId)
         );
     }
 
@@ -86,29 +81,31 @@ class StripeGateway implements StripeGatewayInterface
     {
         $currency = strtolower($data['currency'] ?? 'eur');
 
-        return $this->run('createPaymentIntent', fn () =>
-            $this->client->forMode($mode, $currency)->createPaymentIntent($data)
+        return $this->run('createPaymentIntent', fn () => $this->client->forMode($mode, $currency)->createPaymentIntent($data)
         );
     }
 
     public function getPaymentIntentWithMode(string $paymentIntentId, string $mode, string $currency = 'eur'): array
     {
-        return $this->run('getPaymentIntent', fn () =>
-            $this->client->forMode($mode, $currency)->getPaymentIntent($paymentIntentId)
+        return $this->run('getPaymentIntent', fn () => $this->client->forMode($mode, $currency)->getPaymentIntent($paymentIntentId)
         );
     }
 
     public function capturePaymentIntent(string $paymentIntentId): array
     {
-        return $this->run('capturePaymentIntent', fn () =>
-            $this->client->capturePaymentIntent($paymentIntentId)
+        return $this->run('capturePaymentIntent', fn () => $this->client->capturePaymentIntent($paymentIntentId)
         );
     }
 
     public function createTerminalConnectionToken(string $currency = 'eur'): array
     {
-        return $this->run('createTerminalConnectionToken', fn () =>
-            $this->client->forCurrency($currency)->createTerminalConnectionToken()
+        return $this->run('createTerminalConnectionToken', fn () => $this->client->forCurrency($currency)->createTerminalConnectionToken()
+        );
+    }
+
+    public function applyCustomerBalance(string $paymentIntentId, array $params = []): array
+    {
+        return $this->run('applyCustomerBalance', fn () => $this->client->applyCustomerBalance($paymentIntentId, $params)
         );
     }
 
@@ -131,7 +128,7 @@ class StripeGateway implements StripeGatewayInterface
         } catch (\Throwable $e) {
             Log::channel('stripe')->error("stripe_unexpected: {$operation}", [
                 'exception' => $e::class,
-                'message'   => $e->getMessage(),
+                'message' => $e->getMessage(),
             ]);
 
             return $this->errorResponse('Erro inesperado na comunicação com o Stripe.');
@@ -143,13 +140,13 @@ class StripeGateway implements StripeGatewayInterface
         $error = $e->getError();
 
         Log::channel('stripe')->error("stripe_error: {$operation}", \array_filter([
-            'http_status'  => $e->getHttpStatus(),
-            'request_id'   => $e->getRequestId(),
-            'type'         => $error?->type,
-            'code'         => $error?->code,
+            'http_status' => $e->getHttpStatus(),
+            'request_id' => $e->getRequestId(),
+            'type' => $error?->type,
+            'code' => $error?->code,
             'decline_code' => $error?->decline_code,
-            'param'        => $error?->param,
-            'message'      => $e->getMessage(),
+            'param' => $error?->param,
+            'message' => $e->getMessage(),
         ]));
 
         return $this->errorResponse($userMessage);
