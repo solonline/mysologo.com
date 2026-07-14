@@ -256,14 +256,12 @@ $currencyColors = [
                 </div>
 
                 @can('settings.edit')
-                <form method="POST" action="{{ route('dashboard.operations.retry-wallester-topups') }}"
-                      onsubmit="return confirm('Sincronizar main e reprocessar top-ups elegíveis?');">
-                    @csrf
                     <button type="submit"
+                            form="retry-wallester-topups-form"
+                            onclick="return confirm('Sincronizar main e reprocessar top-ups elegíveis?');"
                             class="w-full px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition shadow-sm shadow-indigo-500/25">
                         Actualizar main e reprocessar top-ups
                     </button>
-                </form>
                 @endcan
             </div>
         </div>
@@ -282,4 +280,11 @@ $currencyColors = [
     @endcan
 
 </form>
+
+@can('settings.edit')
+<form id="retry-wallester-topups-form" method="POST" action="{{ route('dashboard.operations.retry-wallester-topups') }}" class="hidden">
+    @csrf
+</form>
+@endcan
+
 @endsection

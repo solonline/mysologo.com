@@ -32,7 +32,10 @@ class WallesterSettingsTest extends TestCase
             ->get(route('dashboard.settings'))
             ->assertOk()
             ->assertSee('Wallester')
-            ->assertSee('API Key');
+            ->assertSee('API Key')
+            ->assertSee('id="retry-wallester-topups-form"', false)
+            ->assertSee('form="retry-wallester-topups-form"', false)
+            ->assertSee('Actualizar main e reprocessar top-ups');
 
         $this->actingAs($user)
             ->post(route('dashboard.settings.update'), [
