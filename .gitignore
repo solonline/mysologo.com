@@ -22,6 +22,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+dump.rdb
+etAccessible(true);
 
 # Postman local env (credenciais + JWT)
 /postman/wallester-sandbox.local.postman_environment.json
