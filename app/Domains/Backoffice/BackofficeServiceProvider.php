@@ -29,6 +29,7 @@ use App\Domains\Backoffice\Queries\GetAcceptedCurrenciesQuery;
 use App\Domains\Backoffice\Queries\GetAuditLogDetailQuery;
 use App\Domains\Backoffice\Queries\GetCustomerDetailQuery;
 use App\Domains\Backoffice\Queries\GetDashboardOverviewQuery;
+use App\Domains\Backoffice\Queries\GetPlatformRevenueOverviewQuery;
 use App\Domains\Backoffice\Queries\GetWallesterFundingOverviewQuery;
 use App\Domains\Backoffice\Queries\ListAccountsPayableQuery;
 use App\Domains\Backoffice\Queries\ListAuditLogsQuery;
@@ -50,6 +51,7 @@ class BackofficeServiceProvider extends ServiceProvider
     /** @var array<int, class-string> */
     private array $containerSingletons = [
         GetDashboardOverviewQuery::class,
+        GetPlatformRevenueOverviewQuery::class,
         GetWallesterFundingOverviewQuery::class,
         GetAcceptedCurrenciesQuery::class,
         ListCustomersQuery::class,

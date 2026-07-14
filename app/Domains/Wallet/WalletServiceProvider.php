@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wallet;
 
+use App\Domains\Wallet\Commands\RunPlatformRevenueReportCommand;
 use App\Domains\Wallet\Commands\RunWalletAuditCommand;
 use App\Domains\Wallet\Contracts\TransactionRepositoryInterface;
 use App\Domains\Wallet\Repositories\TransactionRepository;
@@ -11,6 +12,7 @@ use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\FundingPartnerTransferResolver;
 use App\Domains\Wallet\Services\LedgerService;
 use App\Domains\Wallet\Services\PartnerTopupFundingCompleter;
+use App\Domains\Wallet\Services\PlatformRevenueService;
 use App\Domains\Wallet\Services\SettlementService;
 use App\Domains\Wallet\Services\StripePaymentWalletService;
 use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
@@ -38,6 +40,7 @@ class WalletServiceProvider extends ServiceProvider
         WallesterMainAccountSyncService::class,
         FundingPartnerMovementService::class,
         FundingPartnerTransferResolver::class,
+        PlatformRevenueService::class,
         WalletAuditService::class,
     ];
 
@@ -55,6 +58,7 @@ class WalletServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 RunWalletAuditCommand::class,
+                RunPlatformRevenueReportCommand::class,
             ]);
         }
 

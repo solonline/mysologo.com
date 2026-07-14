@@ -8,6 +8,7 @@ use App\Domains\Backoffice\Controllers\CustomerTpaController;
 use App\Domains\Backoffice\Controllers\DashboardController;
 use App\Domains\Backoffice\Controllers\NotificationController;
 use App\Domains\Backoffice\Controllers\OperationsController;
+use App\Domains\Backoffice\Controllers\PlatformRevenueController;
 use App\Domains\Backoffice\Controllers\RoleController;
 use App\Domains\Backoffice\Controllers\SettingsController;
 use App\Domains\Backoffice\Controllers\StripeFeeController;
@@ -45,6 +46,7 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
 
     Route::middleware('can:transactions.view')->group(function () {
         Route::get('/transactions', [TransactionController::class, 'index'])->name('.transactions');
+        Route::get('/platform-revenue', [PlatformRevenueController::class, 'index'])->name('.platform-revenue');
     });
 
     Route::middleware('can:users.view')->group(function () {

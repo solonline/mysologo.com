@@ -38,7 +38,7 @@ class TransactionController extends Controller
             )->withQueryString();
         } else {
             $stripeTransactions = $this->listStripeTransactions->execute(
-                $request->only(['search', 'type', 'status', 'partner_funding_status', 'from', 'to']),
+                $request->only(['search', 'type', 'status', 'partner_funding_status', 'from', 'to', 'with_platform_fee']),
                 $perPage,
             )->withQueryString();
         }

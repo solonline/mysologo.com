@@ -124,11 +124,17 @@
             <input type="date" name="to" value="{{ request('to') }}"
                    class="py-2 px-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-slate-700 transition">
 
+            <label class="inline-flex items-center gap-2 py-2 px-3 text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-700 cursor-pointer">
+                <input type="checkbox" name="with_platform_fee" value="1" {{ request('with_platform_fee') ? 'checked' : '' }}
+                       class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300">
+                Com taxa platform
+            </label>
+
             <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition shadow-sm shadow-indigo-500/25">
                 Filtrar
             </button>
 
-            @if (request()->hasAny(['search', 'type', 'status', 'partner_funding_status', 'from', 'to']))
+            @if (request()->hasAny(['search', 'type', 'status', 'partner_funding_status', 'from', 'to', 'with_platform_fee']))
             <a href="{{ route('dashboard.transactions', ['tab' => 'stripe']) }}"
                class="px-3 py-2 text-sm text-slate-500 hover:text-slate-700 transition">Limpar</a>
             @endif

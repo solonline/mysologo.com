@@ -53,6 +53,10 @@ class ListStripeTransactionsQuery
             $query->whereDate('stripe_created_at', '<=', $to);
         }
 
+        if (! empty($filters['with_platform_fee'])) {
+            $query->where('platform_fee', '>', 0);
+        }
+
         return $query->paginate($perPage);
     }
 }
