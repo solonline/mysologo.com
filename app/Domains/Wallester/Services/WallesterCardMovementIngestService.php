@@ -21,8 +21,10 @@ class WallesterCardMovementIngestService
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function ingest(array $payload): void
-    {
+    public function ingest(
+        array $payload,
+        FundingPartnerMovementSource $source = FundingPartnerMovementSource::Webhook,
+    ): void {
         $payload = $this->normalizePayload($payload);
 
         if (! $this->isCardSpendEvent($payload) || $this->isDeclined($payload)) {
@@ -66,7 +68,7 @@ class WallesterCardMovementIngestService
             amountCents: $amountCents,
             currency: (string) ($payload['account_currency_code'] ?? $payload['currency_code'] ?? 'EUR'),
             partnerExternalId: $externalId,
-            source: FundingPartnerMovementSource::Webhook,
+            source: $source,
             card: $card,
             description: is_string($payload['merchant_name'] ?? null) ? $payload['merchant_name'] : null,
             metadata: $payload,
