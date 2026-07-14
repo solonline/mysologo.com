@@ -50,7 +50,7 @@
     ];
 @endphp
 
-<div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+<div x-data="{ showDetailsModal: false, details: null }" class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
 
     {{-- Tabs --}}
     <div class="px-5 pt-4 border-b border-slate-100">
@@ -156,6 +156,49 @@
                     $isCredit = $tx->direction?->value === 'credit' || $tx->direction === 'credit';
                     $txDate = $tx->stripe_created_at ?? $tx->created_at;
                     $settlementRoute = $tx->topupSettlementRoute();
+
+                    $stripeFields = array_values(array_filter([
+                        ['label' => 'Data', 'value' => $txDate?->format('d/m/Y H:i')],
+                        $tx->customer ? ['label' => 'Cliente', 'value' => $tx->customer->name, 'link' => route('dashboard.customers.show', $tx->customer)] : null,
+                        $tx->customer?->email ? ['label' => 'Email', 'value' => $tx->customer->email] : null,
+                        ['label' => 'Tipo', 'value' => $tx->type?->label() ?? '—'],
+                        ['label' => 'Direção', 'value' => $isCredit ? 'Crédito' : 'Débito'],
+                        ['label' => 'Status', 'value' => $tx->status ?? '—'],
+                        ['label' => 'Método pagamento', 'value' => $tx->payment_method_type ?? null],
+                        $tx->stripe_payment_intent_id ? ['label' => 'PaymentIntent', 'value' => $tx->stripe_payment_intent_id, 'mono' => true, 'full' => true] : null,
+                        $tx->stripe_charge_id ? ['label' => 'Charge', 'value' => $tx->stripe_charge_id, 'mono' => true, 'full' => true] : null,
+                        $settlementRoute ? ['label' => 'Rota de liquidação', 'value' => $settlementRoute->label()] : null,
+                        ($settlementRoute && ($routeDetail = $settlementRoute->detail($tx))) ? ['label' => 'Detalhe rota', 'value' => $routeDetail, 'full' => true] : null,
+                        $tx->partner_funding_status ? ['label' => 'Funding Wallester', 'value' => $partnerFundingLabels[$tx->partner_funding_status->value] ?? $tx->partner_funding_status->value] : null,
+                        $tx->partner_funding_failure_reason ? ['label' => 'Erro funding', 'value' => $tx->partner_funding_failure_reason, 'full' => true] : null,
+                        $tx->available_on ? ['label' => 'Disponível em', 'value' => $tx->available_on->format('d/m/Y')] : null,
+                        $tx->balance_settled_at ? ['label' => 'Liquidado em', 'value' => $tx->balance_settled_at->format('d/m/Y H:i')] : null,
+                        $tx->bank_transfer_sender_name ? ['label' => 'Remetente transferência', 'value' => $tx->bank_transfer_sender_name] : null,
+                        $tx->bank_transfer_iban_last4 ? ['label' => 'IBAN (últimos 4)', 'value' => '···'.$tx->bank_transfer_iban_last4] : null,
+                        $tx->description ? ['label' => 'Descrição', 'value' => $tx->description, 'full' => true] : null,
+                    ], fn ($field) => $field !== null && filled($field['value'] ?? null)));
+
+                    $stripeNetParts = [];
+                    if ($tx->net_amount) {
+                        $stripeNetParts[] = 'Líquido: '.number_format($tx->net_amount / 100, 2, ',', '.');
+                    }
+                    if ($tx->stripe_fee) {
+                        $stripeNetParts[] = 'Stripe: '.number_format($tx->stripe_fee / 100, 2, ',', '.');
+                    }
+                    if ($tx->platform_fee) {
+                        $stripeNetParts[] = 'Plataforma: '.number_format($tx->platform_fee / 100, 2, ',', '.');
+                    }
+
+                    $stripeDetails = [
+                        'kind' => 'stripe',
+                        'subtitle' => ($tx->type?->label() ?? 'Transação').' #'.$tx->id,
+                        'isIncoming' => $isCredit,
+                        'amountLabel' => ($isCredit ? '+' : '−').number_format(abs($tx->amount) / 100, 2, ',', '.').' '.strtoupper($tx->currency),
+                        'netAmountLabel' => $stripeNetParts !== [] ? implode(' · ', $stripeNetParts) : null,
+                        'customerUrl' => $tx->customer ? route('dashboard.customers.show', $tx->customer).'#transactions' : null,
+                        'fields' => $stripeFields,
+                        'metadata' => null,
+                    ];
                 @endphp
                 <tr>
                     <td class="whitespace-nowrap">
@@ -223,11 +266,16 @@
                             <span class="text-slate-300">—</span>
                         @endif
                     </td>
-                    <td class="text-right">
+                    <td class="text-right whitespace-nowrap">
+                        <button type="button"
+                                @click="details = @js($stripeDetails); showDetailsModal = true"
+                                class="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline">
+                            Ver detalhes
+                        </button>
                         @can('customers.view')
                         @if ($tx->customer)
                         <a href="{{ route('dashboard.customers.show', $tx->customer) }}#transactions"
-                           class="text-xs text-indigo-600 hover:underline">Ver cliente</a>
+                           class="text-xs text-slate-400 hover:text-indigo-600 hover:underline block mt-1">Ver cliente</a>
                         @endif
                         @endcan
                     </td>
@@ -333,6 +381,7 @@
                     <th class="text-left">Status</th>
                     <th class="text-left">Origem</th>
                     <th class="text-left">Referência</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -342,6 +391,41 @@
                     $customer = $account instanceof \App\Models\CustomerWallesterAccount ? $account->customer : null;
                     $direction = $movement->direction?->value;
                     $isIn = $direction === 'in';
+                    $card = $movement->wallesterCard;
+
+                    $wallesterFields = array_values(array_filter([
+                        ['label' => 'Data', 'value' => $movement->created_at?->format('d/m/Y H:i')],
+                        $customer ? ['label' => 'Cliente', 'value' => $customer->name, 'link' => route('dashboard.customers.show', $customer)] : null,
+                        $customer?->email ? ['label' => 'Email', 'value' => $customer->email] : null,
+                        ['label' => 'Conta Wallester', 'value' => $movement->external_account_id, 'mono' => true, 'full' => true],
+                        ['label' => 'Tipo', 'value' => $movementTypeLabels[$movement->type?->value ?? ''] ?? ($movement->type?->value ?? '—')],
+                        ['label' => 'Direção', 'value' => strtoupper($direction ?? '—')],
+                        ['label' => 'Status', 'value' => $movementStatusLabels[$movement->status?->value ?? ''] ?? ($movement->status?->value ?? '—')],
+                        ['label' => 'Origem', 'value' => $movementSourceLabels[$movement->source?->value ?? ''] ?? ($movement->source?->value ?? '—')],
+                        $card?->name ? ['label' => 'Cartão', 'value' => $card->name.($card->masked_card_number ? ' ('.$card->masked_card_number.')' : '')] : null,
+                        $movement->partner_external_id ? ['label' => 'ID parceiro', 'value' => $movement->partner_external_id, 'mono' => true, 'full' => true] : null,
+                        $movement->idempotency_key ? ['label' => 'Idempotency', 'value' => $movement->idempotency_key, 'mono' => true, 'full' => true] : null,
+                        $movement->transfer_group_id ? ['label' => 'Transfer group', 'value' => $movement->transfer_group_id, 'mono' => true, 'full' => true] : null,
+                        $movement->counterparty_external_account_id ? ['label' => 'Contraparte', 'value' => $movement->counterparty_external_account_id, 'mono' => true, 'full' => true] : null,
+                        $movement->failure_reason ? ['label' => 'Motivo falha', 'value' => $movement->failure_reason, 'full' => true] : null,
+                        $movement->description ? ['label' => 'Descrição', 'value' => $movement->description, 'full' => true] : null,
+                        $movement->reference instanceof \App\Models\StripeTransaction
+                            ? ['label' => 'Referência Stripe', 'value' => 'Transação #'.$movement->reference->id, 'link' => route('dashboard.transactions', ['tab' => 'stripe', 'search' => $movement->reference->id])]
+                            : null,
+                    ], fn ($field) => $field !== null && filled($field['value'] ?? null)));
+
+                    $wallesterDetails = [
+                        'kind' => 'wallester',
+                        'subtitle' => ($movementTypeLabels[$movement->type?->value ?? ''] ?? 'Movimento').' #'.$movement->id,
+                        'isIncoming' => $isIn,
+                        'amountLabel' => ($isIn ? '+' : '−').number_format($movement->amount / 100, 2, ',', '.').' '.strtoupper($movement->currency),
+                        'netAmountLabel' => null,
+                        'customerUrl' => $customer ? route('dashboard.customers.show', $customer).'#transactions' : null,
+                        'fields' => $wallesterFields,
+                        'metadata' => filled($movement->metadata)
+                            ? json_encode($movement->metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+                            : null,
+                    ];
                 @endphp
                 <tr>
                     <td class="whitespace-nowrap">
@@ -399,10 +483,23 @@
                         <span class="text-slate-300">—</span>
                         @endif
                     </td>
+                    <td class="text-right whitespace-nowrap">
+                        <button type="button"
+                                @click="details = @js($wallesterDetails); showDetailsModal = true"
+                                class="text-xs font-medium text-violet-600 hover:text-violet-800 hover:underline">
+                            Ver detalhes
+                        </button>
+                        @can('customers.view')
+                        @if ($customer)
+                        <a href="{{ route('dashboard.customers.show', $customer) }}#transactions"
+                           class="text-xs text-slate-400 hover:text-violet-600 hover:underline block mt-1">Ver cliente</a>
+                        @endif
+                        @endcan
+                    </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="py-12 text-center text-sm text-slate-400">
+                    <td colspan="9" class="py-12 text-center text-sm text-slate-400">
                         Nenhum movimento Wallester encontrado.
                     </td>
                 </tr>
@@ -417,6 +514,8 @@
     </div>
     @endif
     @endif
+
+    @include('dashboard.transactions.partials.transaction-details-modal')
 
 </div>
 

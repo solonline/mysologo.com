@@ -75,13 +75,16 @@ class TransactionsDashboardTest extends TestCase
             ->assertSee('Stripe')
             ->assertSee('Wallester')
             ->assertSee('Carregamento')
-            ->assertSee('Cliente Teste Transacoes');
+            ->assertSee('Cliente Teste Transacoes')
+            ->assertSee('Ver detalhes')
+            ->assertSee('Detalhes da transação');
 
         $this->actingAs($user)
             ->get(route('dashboard.transactions', ['tab' => 'wallester']))
             ->assertOk()
             ->assertSee('Transferência')
-            ->assertSee('wal-dashboard-test');
+            ->assertSee('wal-dashboard-test')
+            ->assertSee('Ver detalhes');
     }
 
     public function test_guest_cannot_access_transactions_page(): void
