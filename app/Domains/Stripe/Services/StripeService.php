@@ -197,7 +197,7 @@ class StripeService
             }
         }
 
-        return 'NL';
+        return 'FR';
     }
 
     /** @return array<string, mixed>|null */

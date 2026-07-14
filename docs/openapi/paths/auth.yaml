@@ -326,3 +326,48 @@ auth-create-pin:
         $ref: '../components/responses.yaml#/Forbidden'
       '422':
         $ref: '../components/responses.yaml#/ValidationError'
+
+auth-reset-pin:
+  post:
+    tags: [Auth]
+    summary: Refazer PIN do dispositivo
+    operationId: authResetPin
+    description: |
+      Altera o PIN de 4 dígitos do dispositivo após confirmar identidade.
+
+      **Confirmação:** enviar `current_pin` + `device_token` **ou** `password` da conta.
+
+      **Pré-requisitos (middleware):** conta activa, email verificado, KYC aprovado.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [device_token, pin]
+            properties:
+              device_token:
+                type: string
+              pin:
+                type: string
+                minLength: 4
+                maxLength: 4
+                description: Novo PIN
+              current_pin:
+                type: string
+                minLength: 4
+                maxLength: 4
+              password:
+                type: string
+                format: password
+    responses:
+      '200':
+        description: PIN actualizado
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'

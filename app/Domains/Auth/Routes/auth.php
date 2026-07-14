@@ -30,5 +30,6 @@ Route::middleware('auth:sanctum')->group(function () {
         'customer.document.approved',
     ])->group(function () {
         Route::post('/create-pin', [PinController::class, 'store'])->name('auth.create-pin');
+        Route::post('/reset-pin', [PinController::class, 'reset'])->name('auth.reset-pin');
     });
 });

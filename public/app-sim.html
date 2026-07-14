@@ -1285,6 +1285,19 @@ body {
       <div class="pin-keypad" id="pin-setup-keypad"></div>
     </div>
 
+    <!-- ── PIN Reset ── -->
+    <div id="screen-pin-reset" class="screen pin-screen">
+      <button class="back-btn" style="position:absolute;top:20px;left:20px" onclick="goBack()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 5l-7 7 7 7"/>
+        </svg>
+      </button>
+      <div class="pin-title">Refazer PIN</div>
+      <div class="pin-subtitle" id="pin-reset-subtitle">Introduza o PIN actual</div>
+      <div class="pin-dots" id="pin-reset-dots"></div>
+      <div class="pin-keypad" id="pin-reset-keypad"></div>
+    </div>
+
     <!-- ── Onboarding ── -->
     <div id="screen-onboarding" class="screen">
       <div class="onboarding-header">
@@ -1423,6 +1436,7 @@ body {
             <span class="info-row-value" id="info-wallester">—</span>
           </div>
         </div>
+        <button class="btn-link" id="btn-reset-pin" style="margin-top:12px;display:none" onclick="openPinReset()">Refazer PIN</button>
         <button class="btn-logout" onclick="doLogout()">Terminar sessão</button>
       </div>
 
@@ -1813,7 +1827,7 @@ let savedEmail = localStorage.getItem('yoop_sim_email') || '';
 
 const AUTH_SCREENS = ['welcome', 'login', 'register', 'pin-login'];
 const NO_NAV_SCREENS = [
-  'welcome', 'login', 'register', 'pin-login', 'pin-setup', 'onboarding', 'kyc',
+  'welcome', 'login', 'register', 'pin-login', 'pin-setup', 'pin-reset', 'onboarding', 'kyc',
   'deposit', 'payment', 'notifications', 'card-create', 'card-detail',
   'movements', 'transaction-detail', 'p2p',
 ];
@@ -1880,6 +1894,7 @@ function navigate(screen) {
   if (screen !== 'onboarding' && screen !== 'kyc') stopOnboardingPolling();
   if (screen === 'pin-login') initPinLoginScreen();
   if (screen === 'pin-setup') initPinSetupScreen();
+  if (screen === 'pin-reset') initPinResetScreen();
   if (screen === 'movements') loadMovements(1);
   if (screen === 'p2p') resetP2PScreen();
   if (screen === 'deposit') {
@@ -2711,8 +2726,12 @@ function createPinKeypad(dotsId, keypadId, options) {
 
 let pinSetupController = null;
 let pinLoginController = null;
+let pinResetController = null;
 let p2pPinController = null;
 let pinSetupFirst = null;
+let pinResetStep = 'current';
+let pinResetCurrent = null;
+let pinResetFirst = null;
 
 function initPinSetupScreen() {
   pinSetupFirst = null;
@@ -2768,6 +2787,73 @@ function initPinLoginScreen() {
         showToast('Login realizado!', 'success');
       } else {
         showToast(data?.message || 'PIN inválido', 'error');
+        reset();
+      }
+    },
+  });
+}
+
+function updatePinResetSubtitle() {
+  const subtitles = {
+    current: 'Introduza o PIN actual',
+    new: 'Escolha o novo PIN',
+    confirm: 'Confirme o novo PIN',
+  };
+  document.getElementById('pin-reset-subtitle').textContent = subtitles[pinResetStep] || subtitles.current;
+}
+
+function openPinReset() {
+  if (!pinConfigured) {
+    showToast('Configure um PIN primeiro', 'error');
+    return;
+  }
+  navigate('pin-reset');
+}
+
+function initPinResetScreen() {
+  pinResetStep = 'current';
+  pinResetCurrent = null;
+  pinResetFirst = null;
+  updatePinResetSubtitle();
+  if (pinResetController) pinResetController.reset();
+  pinResetController = createPinKeypad('pin-reset-dots', 'pin-reset-keypad', {
+    onComplete: async (pin, reset) => {
+      if (pinResetStep === 'current') {
+        pinResetCurrent = pin;
+        pinResetStep = 'new';
+        updatePinResetSubtitle();
+        reset();
+        return;
+      }
+      if (pinResetStep === 'new') {
+        pinResetFirst = pin;
+        pinResetStep = 'confirm';
+        updatePinResetSubtitle();
+        reset();
+        return;
+      }
+      if (pin !== pinResetFirst) {
+        showToast('PINs não coincidem', 'error');
+        pinResetStep = 'new';
+        pinResetFirst = null;
+        updatePinResetSubtitle();
+        reset();
+        return;
+      }
+      const { ok, data } = await api('POST', '/auth/reset-pin', {
+        device_token: deviceToken,
+        current_pin: pinResetCurrent,
+        pin,
+      });
+      if (ok) {
+        showToast('PIN actualizado!', 'success');
+        navigate('home');
+      } else {
+        showToast(data?.message || 'Erro ao actualizar PIN', 'error');
+        pinResetStep = 'current';
+        pinResetCurrent = null;
+        pinResetFirst = null;
+        updatePinResetSubtitle();
         reset();
       }
     },
@@ -3006,6 +3092,9 @@ async function doLogin() {
 
 // ── Home data ─────────────────────────────────────────
 async function loadHomeData() {
+  const resetPinBtn = document.getElementById('btn-reset-pin');
+  if (resetPinBtn) resetPinBtn.style.display = pinConfigured ? 'block' : 'none';
+
   try {
     const [meRes, dashRes, balRes, accountRes] = await Promise.all([
       api('GET', '/customer/me'),

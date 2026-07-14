@@ -120,6 +120,8 @@ paths:
     $ref: './paths/auth.yaml#/auth-reset-password'
   /auth/create-pin:
     $ref: './paths/auth.yaml#/auth-create-pin'
+  /auth/reset-pin:
+    $ref: './paths/auth.yaml#/auth-reset-pin'
 
   # Onboarding
   /onboarding/health:

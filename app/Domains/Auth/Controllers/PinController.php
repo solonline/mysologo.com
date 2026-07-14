@@ -3,9 +3,11 @@
 namespace App\Domains\Auth\Controllers;
 
 use App\Domains\Auth\DTOs\CreatePinDTO;
+use App\Domains\Auth\DTOs\ResetPinDTO;
+use App\Domains\Auth\Services\DeviceAuthService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\CreatePinRequest;
-use App\Domains\Auth\Services\DeviceAuthService;
+use App\Http\Requests\Auth\ResetPinRequest;
 
 class PinController extends Controller
 {
@@ -24,5 +26,20 @@ class PinController extends Controller
         $this->deviceAuthService->createPin($request->user(), $dto);
 
         return response()->json(['message' => 'PIN created successfully'], 201);
+    }
+
+    /**
+     * Reset PIN
+     *
+     * Changes the device PIN after verifying the current PIN or account password.
+     *
+     * @tags Authentication
+     */
+    public function reset(ResetPinRequest $request)
+    {
+        $dto = ResetPinDTO::fromArray($request->validated());
+        $this->deviceAuthService->resetPin($request->user(), $dto);
+
+        return response()->json(['message' => 'PIN updated successfully']);
     }
 }

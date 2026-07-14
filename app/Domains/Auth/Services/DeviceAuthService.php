@@ -4,6 +4,7 @@ namespace App\Domains\Auth\Services;
 
 use App\Domains\Auth\Contracts\DeviceRepositoryInterface;
 use App\Domains\Auth\DTOs\CreatePinDTO;
+use App\Domains\Auth\DTOs\ResetPinDTO;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
@@ -27,6 +28,46 @@ class DeviceAuthService
         );
 
         return $this->deviceRepository->upsertPin($customer, $hashedDto);
+    }
+
+    public function resetPin(Customer $customer, ResetPinDTO $dto): CustomerDevice
+    {
+        $device = $this->deviceRepository->findByCustomerAndToken($customer, $dto->deviceToken);
+
+        if (! $device || ! $device->pin) {
+            throw new ApiException(
+                ErrorCode::PIN_NOT_CONFIGURED,
+                422,
+                'Não existe PIN configurado para este dispositivo.',
+            );
+        }
+
+        if ($dto->password !== null) {
+            if (! Hash::check($dto->password, (string) $customer->password)) {
+                throw new ApiException(
+                    ErrorCode::INVALID_CREDENTIALS,
+                    401,
+                    'Password inválida.',
+                );
+            }
+        } else {
+            $this->verifyPin($customer, $dto->deviceToken, (string) $dto->currentPin);
+        }
+
+        if (Hash::check($dto->pin, (string) $device->pin)) {
+            throw new ApiException(
+                ErrorCode::INVALID_PIN,
+                422,
+                'O novo PIN deve ser diferente do PIN actual.',
+            );
+        }
+
+        $device->pin = Hash::make($dto->pin);
+        $this->resetAttempts($device);
+        $device->last_used_at = now();
+        $this->deviceRepository->save($device);
+
+        return $device;
     }
 
     public function registerFailedAttempt(CustomerDevice $device): void
