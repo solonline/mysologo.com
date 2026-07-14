@@ -1606,7 +1606,7 @@ body {
       </div>
       <div class="tx-body">
         <div class="card-preview" id="card-preview">
-          
+
           <div class="card-preview-chip"></div>
           <div style="display:flex; gap:10px;">
 
@@ -1703,17 +1703,6 @@ body {
           <div style="display:flex;gap:8px">
             <input class="form-input" id="p2p-username" type="text" placeholder="@username" style="flex:1" />
             <button class="btn-step primary" style="white-space:nowrap;padding:12px 16px" onclick="findP2PRecipient()">Buscar</button>
-          </div>
-        </div>
-        <div id="p2p-recipient-preview" style="display:none"></div>
-
-        <div id="p2p-balance-card" class="info-card" style="margin-bottom:16px;padding:14px 16px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-            <div>
-              <div class="balance-label" style="color:var(--slate-400);font-size:11px;letter-spacing:.08em;margin-bottom:4px">SALDO WALLESTER</div>
-              <div id="p2p-balance-value" style="font-size:22px;font-weight:700;color:var(--slate-900)">—</div>
-            </div>
-            <button type="button" class="btn-step" id="p2p-sync-btn" onclick="loadP2PBalance()">Actualizar</button>
           </div>
         </div>
 
@@ -2968,50 +2957,6 @@ async function loadTransactionDetail(id) {
 }
 
 // ── P2P ───────────────────────────────────────────────
-function resetP2PScreen() {
-  p2pRecipient = null;
-  document.getElementById('p2p-username').value = '';
-  document.getElementById('p2p-amount').value = '';
-  document.getElementById('p2p-description').value = '';
-  document.getElementById('p2p-recipient-preview').style.display = 'none';
-  document.getElementById('p2p-result').className = 'result-card';
-  closeP2PConfirm();
-  const currency = authSession?.user?.currency || 'EUR';
-  document.getElementById('p2p-currency').value = currency;
-  document.getElementById('p2p-prefix').textContent = currencySymbol(currency);
-  loadP2PBalance();
-}
-
-async function loadP2PBalance() {
-  const valueEl = document.getElementById('p2p-balance-value');
-  const btn = document.getElementById('p2p-sync-btn');
-  if (!valueEl) return;
-
-  const currency = document.getElementById('p2p-currency')?.value || authSession?.user?.currency || 'EUR';
-
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = '...';
-  }
-
-  const { ok, data } = await api('POST', `/wallet/account/wallester/sync?currency=${encodeURIComponent(currency)}`);
-
-  if (btn) {
-    btn.disabled = false;
-    btn.textContent = 'Actualizar';
-  }
-
-  if (!ok) {
-    valueEl.textContent = 'Indisponível';
-    return;
-  }
-
-  const payload = unwrap(data);
-  const wallester = payload?.wallester ?? payload;
-  const availableMinor = Number(wallester?.available_amount ?? wallester?.balance ?? 0);
-  valueEl.textContent = formatMoney(availableMinor, currency);
-}
-
 document.getElementById('p2p-currency')?.addEventListener('change', function() {
   document.getElementById('p2p-prefix').textContent = currencySymbol(this.value);
   loadP2PBalance();
@@ -3094,8 +3039,8 @@ async function doP2PTransfer(pin) {
     result.className = 'result-card show success';
     result.textContent = `Enviado com sucesso!\nDébito: #${unwrap(data)?.debit?.id || '—'}`;
     showToast('Transferência realizada!', 'success');
-    loadP2PBalance();
-    setTimeout(loadHomeData, 1500);
+    await loadP2PBalance();
+    await loadHomeData();
   } else {
     result.className = 'result-card show error';
     result.textContent = data?.message || JSON.stringify(data, null, 2);
@@ -3184,6 +3129,14 @@ async function loadHomeData() {
       if (wallester?.wallester_account_id) {
         const badge = wallesterStatus === 'ACTIVE' ? 'active' : (wallesterStatus === 'PENDING' ? 'pending' : 'inactive');
         el.innerHTML = `<span class="badge ${badge}">${wallesterStatus}</span>`;
+
+        if (wallesterStatus === 'ACTIVE') {
+          const currency = sanitizeCurrency(wallester.currency_code || authSession?.user?.currency || 'EUR');
+          const syncRes = await api('POST', `/wallet/account/wallester/sync?currency=${encodeURIComponent(currency)}`);
+          if (syncRes.ok) {
+            wallester = unwrap(syncRes.data)?.wallester ?? wallester;
+          }
+        }
       } else {
         el.innerHTML = '<span class="badge inactive">Sem conta</span>';
       }
