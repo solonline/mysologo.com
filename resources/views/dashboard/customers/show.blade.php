@@ -256,7 +256,7 @@
                                     class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('doc_status') border-red-400 @enderror">
                                 <option value="">— Não definido —</option>
                                 @foreach ($documentStatuses as $ds)
-                                <option value="{{ $ds->value }}" {{ old('doc_status', $docVal) === $ds->value ? 'selected' : '' }}>
+                                <option value="{{ $ds->value }}" {{ strtoupper((old('doc_status', $docVal) ?? $docVal)) == $ds->value ? 'selected' : '' }}>
                                     {{ $ds->value }}
                                 </option>
                                 @endforeach
@@ -880,7 +880,7 @@
             </div>
         </div>
         @endif
-        
+
         {{-- Conta Wallester --}}
         @if ($customer->wallesterAccount)
         <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5">
@@ -1048,7 +1048,7 @@
             @endcan
         </div>
         @endif
-     
+
         @include('dashboard.partials.customer-activity-timeline', ['activityTimeline' => $activityTimeline])
 
         {{-- Responsáveis (corporate) --}}
