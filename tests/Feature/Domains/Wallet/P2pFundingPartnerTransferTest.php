@@ -44,9 +44,13 @@ class P2pFundingPartnerTransferTest extends TestCase
 
         $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('getAccount')
-            ->once()
+            ->twice()
             ->with('wal_sender', (string) $sender->id)
             ->andReturn(['available_amount' => 100.00]);
+        $gateway->shouldReceive('getAccount')
+            ->once()
+            ->with('wal_recipient', (string) $recipient->id)
+            ->andReturn(['available_amount' => 25.00]);
         $gateway->shouldReceive('accountTransfer')
             ->once()
             ->with(Mockery::on(function (array $payload): bool {

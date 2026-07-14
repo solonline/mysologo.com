@@ -133,6 +133,13 @@ class FundingPartnerMovementService
 
                 $this->markMovementCompleted($outMovement, is_string($partnerExternalId) ? $partnerExternalId : null);
                 $this->markMovementCompleted($inMovement);
+
+                $this->refreshWallesterBalancesAfterTransfer(
+                    driver: $driver,
+                    from: $from,
+                    to: $to,
+                    currency: $routingCurrency,
+                );
             } catch (Throwable $exception) {
                 $reason = $exception->getMessage();
                 $this->markMovementFailed($outMovement, $reason);
@@ -569,5 +576,19 @@ class FundingPartnerMovementService
         if ($status === PartnerFundingStatus::AwaitingLiquidity) {
             $this->fundingLiquidityNotifier->notifyIfNeeded($reference->fresh(), $currency);
         }
+    }
+
+    private function refreshWallesterBalancesAfterTransfer(
+        FundingPartnerTransferInterface $driver,
+        Customer $from,
+        Customer $to,
+        string $currency,
+    ): void {
+        if (! $driver instanceof WallesterFundingTransferDriver) {
+            return;
+        }
+
+        $driver->getAvailableBalance($from, $currency);
+        $driver->getAvailableBalance($to, $currency);
     }
 }

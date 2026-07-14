@@ -7,6 +7,7 @@ use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
+use App\Models\CustomerWallesterAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\Concerns\InteractsWithOnboarding;
@@ -77,9 +78,13 @@ class WallesterBalanceSyncTest extends TestCase
 
         $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('getAccount')
-            ->once()
+            ->twice()
             ->with('wal_sender_sync', (string) $sender->id)
             ->andReturn(['available_amount' => 100.00]);
+        $gateway->shouldReceive('getAccount')
+            ->once()
+            ->with('wal_recipient_sync', (string) $recipient->id)
+            ->andReturn(['available_amount' => 25.00]);
         $gateway->shouldReceive('accountTransfer')
             ->once()
             ->andReturn(['id' => 'pay_sync_1']);
@@ -99,6 +104,11 @@ class WallesterBalanceSyncTest extends TestCase
             ->assertCreated();
 
         $this->assertSame(10_000, (int) $senderAccount->fresh()->available_amount);
+
+        $recipientAccount = CustomerWallesterAccount::query()
+            ->where('wallester_account_id', 'wal_recipient_sync')
+            ->first();
+        $this->assertSame(2_500, (int) $recipientAccount?->available_amount);
     }
 
     private function createActiveCustomer(array $overrides = []): Customer
