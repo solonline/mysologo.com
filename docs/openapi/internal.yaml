@@ -178,6 +178,8 @@ paths:
     $ref: './paths/wallet.yaml#/wallet-account'
   /wallet/account/balance:
     $ref: './paths/wallet.yaml#/wallet-account-balance'
+  /wallet/account/wallester/sync:
+    $ref: './paths/wallet.yaml#/wallet-account-wallester-sync'
   /wallet/transactions:
     $ref: './paths/wallet.yaml#/wallet-transactions-list'
   /wallet/transactions/p2p:

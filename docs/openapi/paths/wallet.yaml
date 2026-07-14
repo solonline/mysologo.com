@@ -99,6 +99,38 @@ wallet-account-balance:
       '403':
         $ref: '../components/responses.yaml#/Forbidden'
 
+wallet-account-wallester-sync:
+  post:
+    tags: [Wallet]
+    summary: Sincronizar saldo Wallester
+    operationId: walletAccountWallesterSync
+    description: |
+      Obtém o saldo actual da conta Wallester via API do parceiro e persiste localmente.
+
+      Útil antes de transferências P2P (o saldo P2P é debitado na Wallester).
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: currency
+        in: query
+        schema:
+          type: string
+          example: EUR
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                wallester:
+                  type: object
+                  additionalProperties: true
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
 wallet-transactions-list:
   get:
     tags: [Wallet]

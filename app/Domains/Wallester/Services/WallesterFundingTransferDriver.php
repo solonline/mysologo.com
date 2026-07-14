@@ -76,6 +76,11 @@ class WallesterFundingTransferDriver implements FundingPartnerTransferInterface
             ->forCurrency($routingCurrency)
             ->getAccount($account->wallester_account_id, (string) $customer->id);
 
+        $account->syncBalancesFromWallesterResponse(
+            $response,
+            fn (float|int|string|null $amount): int => $this->amountToCents($amount),
+        );
+
         return $this->amountToCents($response['available_amount'] ?? $response['balance'] ?? 0);
     }
 

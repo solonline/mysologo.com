@@ -1707,6 +1707,16 @@ body {
         </div>
         <div id="p2p-recipient-preview" style="display:none"></div>
 
+        <div id="p2p-balance-card" class="info-card" style="margin-bottom:16px;padding:14px 16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+            <div>
+              <div class="balance-label" style="color:var(--slate-400);font-size:11px;letter-spacing:.08em;margin-bottom:4px">SALDO WALLESTER</div>
+              <div id="p2p-balance-value" style="font-size:22px;font-weight:700;color:var(--slate-900)">—</div>
+            </div>
+            <button type="button" class="btn-step" id="p2p-sync-btn" onclick="loadP2PBalance()">Actualizar</button>
+          </div>
+        </div>
+
         <div class="amount-field">
           <div class="balance-label" style="color:var(--slate-400);font-size:11px;letter-spacing:.08em;text-align:center;margin-bottom:8px">VALOR</div>
           <div class="amount-input-wrap">
@@ -2969,10 +2979,42 @@ function resetP2PScreen() {
   const currency = authSession?.user?.currency || 'EUR';
   document.getElementById('p2p-currency').value = currency;
   document.getElementById('p2p-prefix').textContent = currencySymbol(currency);
+  loadP2PBalance();
+}
+
+async function loadP2PBalance() {
+  const valueEl = document.getElementById('p2p-balance-value');
+  const btn = document.getElementById('p2p-sync-btn');
+  if (!valueEl) return;
+
+  const currency = document.getElementById('p2p-currency')?.value || authSession?.user?.currency || 'EUR';
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '...';
+  }
+
+  const { ok, data } = await api('POST', `/wallet/account/wallester/sync?currency=${encodeURIComponent(currency)}`);
+
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Actualizar';
+  }
+
+  if (!ok) {
+    valueEl.textContent = 'Indisponível';
+    return;
+  }
+
+  const payload = unwrap(data);
+  const wallester = payload?.wallester ?? payload;
+  const availableMinor = Number(wallester?.available_amount ?? wallester?.balance ?? 0);
+  valueEl.textContent = formatMoney(availableMinor, currency);
 }
 
 document.getElementById('p2p-currency')?.addEventListener('change', function() {
   document.getElementById('p2p-prefix').textContent = currencySymbol(this.value);
+  loadP2PBalance();
 });
 
 async function findP2PRecipient() {
@@ -3052,6 +3094,7 @@ async function doP2PTransfer(pin) {
     result.className = 'result-card show success';
     result.textContent = `Enviado com sucesso!\nDébito: #${unwrap(data)?.debit?.id || '—'}`;
     showToast('Transferência realizada!', 'success');
+    loadP2PBalance();
     setTimeout(loadHomeData, 1500);
   } else {
     result.className = 'result-card show error';

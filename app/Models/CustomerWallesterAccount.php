@@ -79,4 +79,31 @@ class CustomerWallesterAccount extends Model
     {
         return $this->hasMany(CustomerWallesterCard::class);
     }
+
+    /**
+     * @param  callable(float|int|string|null): (?int)  $amountToCents
+     */
+    public function syncBalancesFromWallesterResponse(array $response, callable $amountToCents): void
+    {
+        $this->update([
+            'balance' => $this->nullableMoneyToCents($response['balance'] ?? null, $amountToCents),
+            'available_amount' => $this->nullableMoneyToCents($response['available_amount'] ?? null, $amountToCents),
+            'blocked_amount' => $this->nullableMoneyToCents($response['blocked_amount'] ?? null, $amountToCents),
+            'blocked_credit_amount' => $this->nullableMoneyToCents($response['blocked_credit_amount'] ?? null, $amountToCents),
+            'credit_limit' => $this->nullableMoneyToCents($response['credit_limit'] ?? null, $amountToCents),
+            'used_credit' => $this->nullableMoneyToCents($response['used_credit'] ?? null, $amountToCents),
+        ]);
+    }
+
+    /**
+     * @param  callable(float|int|string|null): (?int)  $amountToCents
+     */
+    private function nullableMoneyToCents(float|int|string|null $amount, callable $amountToCents): ?int
+    {
+        if ($amount === null || $amount === '') {
+            return null;
+        }
+
+        return $amountToCents($amount);
+    }
 }

@@ -7,6 +7,10 @@ use App\Models\CustomerBalance;
 
 class WalletAccountService
 {
+    public function __construct(
+        protected WallesterMainAccountSyncService $wallesterSync,
+    ) {}
+
     /** @return array<string, mixed> */
     public function getDetails(Customer $customer): array
     {
@@ -47,6 +51,18 @@ class WalletAccountService
                 ]
                 : null,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function syncWallesterBalance(Customer $customer, ?string $currency = null): ?array
+    {
+        if (! $this->wallesterSync->syncForCustomer($customer, $currency)) {
+            return null;
+        }
+
+        return $this->getDetails($customer)['wallester'];
     }
 
     /** @return list<array<string, mixed>> */

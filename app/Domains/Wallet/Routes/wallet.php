@@ -23,6 +23,7 @@ Route::middleware([
     Route::prefix('account')->group(function () {
         Route::get('/', [WalletAccountController::class, 'index'])->name('wallet.account');
         Route::get('/balance', [WalletAccountController::class, 'balance'])->name('wallet.account.balance');
+        Route::post('/wallester/sync', [WalletAccountController::class, 'syncWallester'])->name('wallet.account.wallester.sync');
     });
 
     Route::get('/funding-accounts/{id}/movements', [WalletFundingAccountController::class, 'movements'])

@@ -4,6 +4,7 @@ namespace App\Domains\Wallet\Services;
 
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
+use App\Models\Customer;
 use App\Models\CustomerWallesterAccount;
 
 class WallesterMainAccountSyncService
@@ -35,14 +36,34 @@ class WallesterMainAccountSyncService
             ->forCurrency($currency)
             ->getAccount($account->wallester_account_id, 'platform');
 
-        $account->update([
-            'balance' => $this->moneyToCents($response['balance'] ?? null),
-            'available_amount' => $this->moneyToCents($response['available_amount'] ?? null),
-            'blocked_amount' => $this->moneyToCents($response['blocked_amount'] ?? null),
-            'blocked_credit_amount' => $this->moneyToCents($response['blocked_credit_amount'] ?? null),
-            'credit_limit' => $this->moneyToCents($response['credit_limit'] ?? null),
-            'used_credit' => $this->moneyToCents($response['used_credit'] ?? null),
-        ]);
+        $account->syncBalancesFromWallesterResponse(
+            $response,
+            fn (float|int|string|null $amount): ?int => $this->moneyToCents($amount),
+        );
+    }
+
+    public function syncForCustomer(Customer $customer, ?string $currency = null): bool
+    {
+        $account = $currency !== null
+            ? $customer->wallesterAccountFor(strtoupper($currency))
+            : $customer->wallesterAccount;
+
+        if (! $account instanceof CustomerWallesterAccount || ! $account->status->isOperational()) {
+            return false;
+        }
+
+        $routingCurrency = strtoupper((string) ($account->funding_currency ?: $account->currency_code));
+
+        $response = $this->gateway
+            ->forCurrency($routingCurrency)
+            ->getAccount($account->wallester_account_id, (string) $customer->id);
+
+        $account->syncBalancesFromWallesterResponse(
+            $response,
+            fn (float|int|string|null $amount): ?int => $this->moneyToCents($amount),
+        );
+
+        return true;
     }
 
     private function moneyToCents(float|int|string|null $amount): ?int
