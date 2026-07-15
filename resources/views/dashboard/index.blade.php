@@ -151,9 +151,13 @@
     </a>
 
     {{-- Wallester --}}
-    <button type="button"
-            @click="showWallesterFundingModal = true"
-            class="card p-5 text-left w-full transition-all hover:shadow-md hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-300/40 group">
+    @php
+        $wallesterAccounts = $wallesterMainAccounts ?? collect();
+        $wallesterPrimaryAccount = $wallesterAccounts->first();
+    @endphp
+    <a href="#"
+       @click.prevent="showWallesterFundingModal = true"
+       class="card p-5 block transition-all hover:shadow-md hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-300/40 group">
         <div class="flex items-start justify-between mb-4">
             <div class="p-2.5 rounded-xl stat-icon-3">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,24 +174,36 @@
             @endif
         </div>
 
-        @if (($wallesterMainAccounts ?? collect())->isEmpty())
+        @if ($wallesterPrimaryAccount === null)
         <p class="text-3xl font-bold text-slate-400 tracking-tight">—</p>
         @else
-        <div class="space-y-1">
-            @foreach ($wallesterMainAccounts as $mainAccount)
+        @php $primaryCurrency = strtoupper($wallesterPrimaryAccount->funding_currency ?: $wallesterPrimaryAccount->currency_code); @endphp
+        <p class="text-3xl font-bold text-slate-900 tracking-tight">
+            {{ number_format(((int) $wallesterPrimaryAccount->available_amount) / 100, 2, ',', '.') }}
+            <span class="text-sm font-semibold text-slate-500">{{ $primaryCurrency }}</span>
+        </p>
+        @endif
+        <p class="text-sm text-slate-500 mt-1 font-medium">Wallester · Main</p>
+        @if ($wallesterAccounts->count() > 1 || $blockedTopups > 0)
+        <div class="mt-4 space-y-2">
+            @foreach ($wallesterAccounts->skip(1) as $mainAccount)
             @php $currency = strtoupper($mainAccount->funding_currency ?: $mainAccount->currency_code); @endphp
-            <p class="text-xl font-bold text-slate-900 tracking-tight leading-tight">
-                {{ number_format(((int) $mainAccount->available_amount) / 100, 2, ',', '.') }}
-                <span class="text-sm font-semibold text-slate-500">{{ $currency }}</span>
-            </p>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">{{ $currency }}</span>
+                <span class="font-bold text-slate-800">
+                    {{ number_format(((int) $mainAccount->available_amount) / 100, 2, ',', '.') }} {{ $currency }}
+                </span>
+            </div>
             @endforeach
+            @if ($blockedTopups > 0)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">À espera de liquidez</span>
+                <span class="font-bold text-amber-700">{{ $fundingCounts['awaiting_liquidity'] ?? 0 }}</span>
+            </div>
+            @endif
         </div>
         @endif
-        <p class="text-sm text-slate-500 mt-2 font-medium">Wallester · Main</p>
-        @if ($blockedTopups > 0)
-        <p class="text-xs text-amber-600 mt-2">{{ $fundingCounts['awaiting_liquidity'] ?? 0 }} à espera de liquidez</p>
-        @endif
-    </button>
+    </a>
 
     {{-- Receita Platform --}}
     @can('transactions.view')
@@ -218,7 +234,7 @@
             <span class="text-sm font-semibold text-slate-500">{{ $platformRevenuePrimary->currency }}</span>
         </p>
         @endif
-        <p class="text-sm text-slate-500 mt-1 font-medium">Receita Platform · taxas</p>
+        <p class="text-sm text-slate-500 mt-1 font-medium">Receita Yoop · ganhos com taxas</p>
         @if ($platformRevenuePrimary)
         <div class="mt-4 space-y-2">
             <div class="flex items-center justify-between text-xs">
