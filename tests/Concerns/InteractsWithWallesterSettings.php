@@ -51,4 +51,27 @@ trait InteractsWithWallesterSettings
 
         return $gateway;
     }
+
+    /**
+     * @param  array<string, float>  $masterBalance
+     * @param  array<string, float>  $toBalance
+     */
+    protected function expectWallesterBalanceSyncAfterMasterTransfer(
+        MockInterface&WallesterGatewayInterface $gateway,
+        string $masterAccountId,
+        string $toAccountId,
+        int|string $toCustomerId,
+        array $masterBalance = ['balance' => 1000.00, 'available_amount' => 950.00],
+        array $toBalance = ['balance' => 50.00, 'available_amount' => 50.00],
+    ): void {
+        $gateway->shouldReceive('getAccount')
+            ->once()
+            ->with($masterAccountId, 'platform')
+            ->andReturn($masterBalance);
+
+        $gateway->shouldReceive('getAccount')
+            ->once()
+            ->with($toAccountId, (string) $toCustomerId)
+            ->andReturn($toBalance);
+    }
 }

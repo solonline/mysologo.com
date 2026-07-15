@@ -92,6 +92,12 @@ class BankTransferTopupEmailTest extends TestCase
         $gateway->shouldReceive('accountTransfer')
             ->once()
             ->andReturn(['id' => 'pay_bank_topup_1']);
+        $this->expectWallesterBalanceSyncAfterMasterTransfer(
+            gateway: $gateway,
+            masterAccountId: 'master-eur-uuid',
+            toAccountId: 'wal_bank_topup',
+            toCustomerId: $customer->id,
+        );
 
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
 

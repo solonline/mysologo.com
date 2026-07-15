@@ -204,12 +204,12 @@ class StripeTopupWallesterFundingTest extends TestCase
 
         $customer = $this->createActiveCustomer();
         $platform = $this->createPlatformCustomer();
-        $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'master-eur-uuid', [
+        $master = $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'master-eur-uuid', [
             'is_main' => true,
             'currency_code' => 'EUR',
             'funding_currency' => 'EUR',
         ]);
-        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
+        $toAccount = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
 
         $transaction = StripeTransaction::query()->create([
             'customer_id' => $customer->id,
@@ -243,6 +243,14 @@ class StripeTopupWallesterFundingTest extends TestCase
             ->once()
             ->with(Mockery::on(fn (array $payload): bool => ($payload['amount'] ?? null) === 28.75), Mockery::any())
             ->andReturn(['id' => 'pay_topup_1']);
+        $this->expectWallesterBalanceSyncAfterMasterTransfer(
+            gateway: $gateway,
+            masterAccountId: 'master-eur-uuid',
+            toAccountId: 'wal_topup_customer',
+            toCustomerId: $customer->id,
+            masterBalance: ['balance' => 500.00, 'available_amount' => 500.00],
+            toBalance: ['balance' => 28.75, 'available_amount' => 28.75],
+        );
 
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
 
@@ -268,6 +276,11 @@ class StripeTopupWallesterFundingTest extends TestCase
 
         $this->assertSame(2_875, (int) $balance->available);
         $this->assertSame(0, (int) $balance->pending);
+
+        $master->refresh();
+        $toAccount->refresh();
+        $this->assertSame(50_000, (int) $master->available_amount);
+        $this->assertSame(2_875, (int) $toAccount->available_amount);
 
         Bus::assertNotDispatched(SendBankTransferTopupReceivedEmail::class);
     }

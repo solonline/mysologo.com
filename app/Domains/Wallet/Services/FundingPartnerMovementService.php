@@ -37,6 +37,7 @@ class FundingPartnerMovementService
         protected WallesterTransferErrorClassifier $transferErrorClassifier,
         protected FundingLiquidityNotifier $fundingLiquidityNotifier,
         protected LedgerService $ledger,
+        protected WallesterMainAccountSyncService $mainAccountSync,
     ) {}
 
     public function transferBetweenCustomers(
@@ -230,6 +231,12 @@ class FundingPartnerMovementService
 
             $this->markMovementCompleted($outMovement, is_string($partnerExternalId) ? $partnerExternalId : null);
             $this->markMovementCompleted($inMovement);
+
+            $this->refreshBalancesAfterMasterTransfer(
+                masterAccount: $masterAccount,
+                to: $to,
+                currency: $routingCurrency,
+            );
 
             if ($reference instanceof StripeTransaction) {
                 $this->partnerTopupFundingCompleter->complete($reference);
@@ -590,5 +597,14 @@ class FundingPartnerMovementService
 
         $driver->getAvailableBalance($from, $currency);
         $driver->getAvailableBalance($to, $currency);
+    }
+
+    private function refreshBalancesAfterMasterTransfer(
+        CustomerWallesterAccount $masterAccount,
+        Customer $to,
+        string $currency,
+    ): void {
+        $this->mainAccountSync->syncAccount($masterAccount);
+        $this->wallesterDriver->getAvailableBalance($to, $currency);
     }
 }

@@ -136,6 +136,14 @@ class FundingPartnerMovementRetryTest extends TestCase
         $gateway->shouldReceive('accountTransfer')
             ->once()
             ->andReturn(['id' => 'pay_retry_ok']);
+        $this->expectWallesterBalanceSyncAfterMasterTransfer(
+            gateway: $gateway,
+            masterAccountId: 'master-eur-uuid',
+            toAccountId: 'wal_retry_customer',
+            toCustomerId: $customer->id,
+            masterBalance: ['balance' => 800.00, 'available_amount' => 800.00],
+            toBalance: ['balance' => 70.00, 'available_amount' => 70.00],
+        );
 
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
 
@@ -154,5 +162,10 @@ class FundingPartnerMovementRetryTest extends TestCase
             'status' => FundingPartnerMovementStatus::Completed->value,
             'failure_reason' => null,
         ]);
+
+        $master->refresh();
+        $toAccount->refresh();
+        $this->assertSame(80_000, (int) $master->available_amount);
+        $this->assertSame(7_000, (int) $toAccount->available_amount);
     }
 }
