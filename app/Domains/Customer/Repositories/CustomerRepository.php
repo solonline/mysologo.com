@@ -70,7 +70,6 @@ class CustomerRepository implements CustomerRepositoryInterface
             'username' => $dto->username,
             'avatar' => $dto->avatar,
             'email' => $dto->email,
-            'phone' => $dto->phone,
             'referal_email_code' => $dto->referalEmailCode,
             'password' => $dto->password ? Hash::make($dto->password) : null,
         ], fn ($v) => ! is_null($v));

@@ -26,7 +26,6 @@ class UpdateCustomerFromBackofficeActionTest extends TestCase
             new UpdateCustomerFromBackofficeData(
                 name: $customer->name,
                 email: $customer->email,
-                phone: $customer->phone,
                 currency: 'EUR',
                 language: $customer->language,
                 status: CustomerLifecycleStatus::BLOCKED->value,
@@ -53,7 +52,6 @@ class UpdateCustomerFromBackofficeActionTest extends TestCase
             new UpdateCustomerFromBackofficeData(
                 name: 'Novo Nome',
                 email: $customer->email,
-                phone: '+351900000000',
                 currency: 'EUR',
                 language: 'pt',
                 status: CustomerLifecycleStatus::ACTIVE->value,
@@ -64,7 +62,6 @@ class UpdateCustomerFromBackofficeActionTest extends TestCase
         $customer->refresh();
 
         $this->assertSame('Novo Nome', $customer->name);
-        $this->assertSame('+351900000000', $customer->phone);
         $this->assertNull($customer->status_reason);
     }
 }

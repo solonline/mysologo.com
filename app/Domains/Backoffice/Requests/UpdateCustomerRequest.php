@@ -24,7 +24,6 @@ class UpdateCustomerRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:200'],
             'email' => ['required', 'email', 'max:100', Rule::unique('customers', 'email')->ignore($customer?->id)],
-            'phone' => ['nullable', 'string', 'max:20'],
             'currency' => ['nullable', 'string', 'max:3'],
             'language' => ['nullable', 'string', 'max:5'],
             'status' => ['required', 'string', Rule::in($statusValues)],

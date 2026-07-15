@@ -9,7 +9,6 @@ class UpdateCustomerDTO
         public readonly ?string $username = null,
         public readonly ?string $avatar = null,
         public readonly ?string $email = null,
-        public readonly ?string $phone = null,
         public readonly ?string $password = null,
         public readonly ?string $referalEmailCode = null,
     ) {}
@@ -21,7 +20,6 @@ class UpdateCustomerDTO
             username: $data['username'] ?? null,
             avatar: $data['avatar'] ?? null,
             email: $data['email'] ?? null,
-            phone: $data['phone'] ?? null,
             password: $data['password'] ?? null,
             referalEmailCode: $data['referal_email_code'] ?? null,
         );

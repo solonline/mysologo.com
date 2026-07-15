@@ -176,7 +176,7 @@
                         ['label' => 'Idioma',              'value' => strtoupper($customer->language ?? '—')],
                         ['label' => 'Moeda',               'value' => strtoupper($customer->currency ?? '—')],
                         ['label' => 'Email verificado',    'value' => $customer->email_verified_at ? $formatDateTime($customer->email_verified_at, 'Não verificado') : 'Não verificado'],
-                        ['label' => 'Telefone verificado', 'value' => ($phoneVerifiedAt = $customer->phoneVerifications->last()?->verified_at) ? $formatDateTime($phoneVerifiedAt, 'Não verificado') : 'Não verificado'],
+                        ['label' => 'Telefone verificado', 'value' => $currentPhoneVerified ? $formatDateTime($currentPhoneVerifiedAt, 'Não verificado') : 'Não verificado'],
                         ['label' => 'Cadastro',            'value' => $formatDateTime($customer->created_at)],
                     ];
 
@@ -212,13 +212,6 @@
                             <input type="email" name="email" value="{{ old('email', $customer->email) }}" required
                                    class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('email') border-red-400 @enderror">
                             @error('email')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Telefone</label>
-                            <input type="text" name="phone" value="{{ old('phone', $customer->phone) }}"
-                                   class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('phone') border-red-400 @enderror">
-                            @error('phone')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
                         </div>
 
                         <div>
@@ -291,6 +284,101 @@
             </div>
 
         </div>{{-- fim Informações Gerais --}}
+
+        {{-- Telefone --}}
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100">
+                <h2 class="text-sm font-semibold text-slate-900">Telefone</h2>
+                <p class="text-xs text-slate-500 mt-1">
+                    @if ($currentPhoneVerified)
+                        O número actual está confirmado. Alterações exigem confirmação por SMS no novo número.
+                    @else
+                        O número actual ainda não está confirmado e pode ser alterado directamente.
+                    @endif
+                </p>
+            </div>
+
+            <div class="p-5 space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-xs text-slate-400 font-medium mb-0.5">Número actual</p>
+                        <p class="text-sm text-slate-800 font-medium">{{ $customer->phone ?: '—' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400 font-medium mb-0.5">Estado</p>
+                        <p class="text-sm text-slate-800 font-medium">
+                            {{ $currentPhoneVerified ? 'Confirmado' : 'Não confirmado' }}
+                        </p>
+                    </div>
+                </div>
+
+                @can('customers.edit')
+                @if ($pendingPhoneChange)
+                <div class="border-t border-slate-100 pt-5 space-y-4">
+                    <div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                        <p class="text-sm text-amber-900">
+                            Alteração pendente para <span class="font-semibold">{{ $pendingPhoneChange }}</span>.
+                            Introduza o código SMS ou altere o número de destino abaixo.
+                        </p>
+                    </div>
+
+                    <form method="POST" action="{{ route('dashboard.customers.phone.confirm', $customer) }}" class="flex flex-col sm:flex-row gap-3 items-end">
+                        @csrf
+                        <div class="flex-1 w-full">
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Código SMS</label>
+                            <input type="text" name="code" value="{{ old('code') }}" required maxlength="10" autocomplete="one-time-code"
+                                   class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('code') border-red-400 @enderror">
+                            @error('code')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        </div>
+                        <button type="submit"
+                                class="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors shadow-sm shadow-emerald-500/25 whitespace-nowrap">
+                            Confirmar telefone
+                        </button>
+                    </form>
+
+                    <div class="flex flex-wrap gap-2">
+                        <form method="POST" action="{{ route('dashboard.customers.phone.resend', $customer) }}">
+                            @csrf
+                            <button type="submit"
+                                    class="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+                                Reenviar SMS
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ route('dashboard.customers.phone.cancel', $customer) }}"
+                              onsubmit="return confirm('Cancelar a alteração pendente?')">
+                            @csrf
+                            <button type="submit"
+                                    class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
+                                Cancelar pendência
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                @endif
+
+                <form method="POST" action="{{ route('dashboard.customers.phone.request', $customer) }}" class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end {{ $pendingPhoneChange ? 'border-t border-slate-100 pt-5' : '' }}">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                            {{ $pendingPhoneChange ? 'Alterar número de destino' : 'Novo telefone' }}
+                        </label>
+                        <input type="text" name="phone" value="{{ old('phone', $pendingPhoneChange) }}" required
+                               inputmode="numeric" pattern="[0-9]+" maxlength="20" placeholder="351912345678"
+                               class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('phone') border-red-400 @enderror">
+                        @error('phone')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                    </div>
+                    <button type="submit"
+                            class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-500/25">
+                        @if ($currentPhoneVerified)
+                            {{ $pendingPhoneChange ? 'Enviar para novo número' : 'Enviar código SMS' }}
+                        @else
+                            Actualizar telefone
+                        @endif
+                    </button>
+                </form>
+                @endcan
+            </div>
+        </div>
 
         {{-- Sessão Didit --}}
         @if ($latestDiditSession)

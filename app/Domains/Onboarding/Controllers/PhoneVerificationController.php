@@ -3,6 +3,7 @@
 namespace App\Domains\Onboarding\Controllers;
 
 use App\Domains\Onboarding\Services\PhoneVerificationService;
+use App\Domains\Sms\Support\SmsLogger;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SmsValidationResource;
 use App\Models\Customer;
@@ -32,11 +33,11 @@ class PhoneVerificationController extends Controller
 
         $msg = $sent ? 'Verification code sent.' : 'Phone already verified.';
 
-        \Log::info('Phone verification sent', [
+        SmsLogger::info('onboarding_phone_send_endpoint', [
             'customer_id' => $customer->id,
             'phone' => $customer->phone,
             'sent' => $sent,
-            'msg' => $msg,
+            'message' => $msg,
         ]);
 
         return SmsValidationResource::make([

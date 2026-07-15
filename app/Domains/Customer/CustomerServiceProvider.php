@@ -11,6 +11,7 @@ use App\Domains\Customer\Repositories\RetailDocumentRepository;
 use App\Domains\Customer\Services\CorporateDocumentService;
 use App\Domains\Customer\Services\CustomerDocumentService;
 use App\Domains\Customer\Services\CustomerNotificationService;
+use App\Domains\Customer\Services\CustomerPhoneChangeService;
 use App\Domains\Customer\Services\CustomerProfileService;
 use App\Domains\Customer\Services\RetailDocumentService;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,7 @@ class CustomerServiceProvider extends ServiceProvider
     /** @var array<int, class-string> */
     private array $containerSingletons = [
         CustomerProfileService::class,
+        CustomerPhoneChangeService::class,
         CustomerDocumentService::class,
         RetailDocumentService::class,
         CorporateDocumentService::class,

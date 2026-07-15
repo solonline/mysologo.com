@@ -36,6 +36,10 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
     Route::get('/customers', [CustomerController::class, 'index'])->name('.customers')->middleware('can:customers.view');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('.customers.show')->middleware('can:customers.view');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('.customers.update')->middleware('can:customers.edit');
+    Route::post('/customers/{customer}/phone', [CustomerController::class, 'requestPhoneChange'])->name('.customers.phone.request')->middleware('can:customers.edit');
+    Route::post('/customers/{customer}/phone/resend', [CustomerController::class, 'resendPhoneChange'])->name('.customers.phone.resend')->middleware('can:customers.edit');
+    Route::post('/customers/{customer}/phone/cancel', [CustomerController::class, 'cancelPhoneChange'])->name('.customers.phone.cancel')->middleware('can:customers.edit');
+    Route::post('/customers/{customer}/phone/confirm', [CustomerController::class, 'confirmPhoneChange'])->name('.customers.phone.confirm')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/retry-provisioning', [CustomerController::class, 'retryProvisioning'])->name('.customers.retry-provisioning')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/retry-stripe-funding', [CustomerController::class, 'retryStripeFunding'])->name('.customers.retry-stripe-funding')->middleware('can:customers.edit');
     Route::middleware('can:customers.view')->group(function () {

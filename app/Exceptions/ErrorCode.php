@@ -67,4 +67,10 @@ class ErrorCode
     const TPA_ALREADY_LINKED = 'tpa_already_linked';
 
     const CARD_ALREADY_EXISTS = 'card_already_exists';
+
+    const PHONE_SAME_AS_CURRENT = 'phone_same_as_current';
+
+    const PHONE_VERIFICATION_INVALID = 'phone_verification_invalid';
+
+    const PHONE_CHANGE_NOT_PENDING = 'phone_change_not_pending';
 }

@@ -6,6 +6,7 @@ use App\Domains\Onboarding\Contracts\PhoneVerificationRepositoryInterface;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Services\CustomerLifecycleService;
 use App\Domains\Sms\Contracts\SmsGatewayInterface;
+use App\Domains\Sms\Support\SmsLogger;
 use App\Models\Customer;
 use App\Models\PhoneVerification;
 
@@ -46,16 +47,41 @@ class PhoneVerificationService
     public function sendSms(Customer $customer, string $phone): bool
     {
         if ($this->isVerified($customer, $phone)) {
+            SmsLogger::info('phone_verification_sms_skipped_already_verified', [
+                'customer_id' => $customer->id,
+                'phone' => $phone,
+            ]);
+
             return false;
         }
 
         $code = random_int(100000, 999999);
-        $this->createOrUpdate($customer, $phone, (string) $code);
+        $verification = $this->createOrUpdate($customer, $phone, (string) $code);
 
         $message = "Olá! Para concluir sua verificação na Yoop, utilize o código: {$code}. \n";
         $message .= 'Obrigado por escolher a Yoop!';
 
-        $this->smsGateway->send($phone, $message);
+        SmsLogger::info('phone_verification_sms_dispatch', [
+            'customer_id' => $customer->id,
+            'phone' => $phone,
+            'code' => (string) $code,
+        ]);
+
+        $result = $this->smsGateway->send($phone, $message);
+
+        SmsLogger::info('phone_verification_sms_result', [
+            'customer_id' => $customer->id,
+            'phone' => $phone,
+            'provider_status' => $result['status'] ?? 'unknown',
+            'http_code' => $result['http_code'] ?? null,
+            'provider_body' => $result['body'] ?? null,
+        ]);
+
+        if (($result['status'] ?? 'failed') !== 'success') {
+            $verification->delete();
+
+            return false;
+        }
 
         return true;
     }

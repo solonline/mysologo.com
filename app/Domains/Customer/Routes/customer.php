@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\Customer\Controllers\CustomerController;
+use App\Domains\Customer\Controllers\CustomerPhoneController;
 use App\Domains\Customer\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +13,8 @@ Route::get('/health', fn () => response()->json([
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [CustomerController::class, 'me'])->name('customer.me');
     Route::post('/update', [CustomerController::class, 'update'])->name('customer.update');
+    Route::post('/phone', [CustomerPhoneController::class, 'requestChange'])->name('customer.phone.request');
+    Route::post('/phone/confirm', [CustomerPhoneController::class, 'confirmChange'])->name('customer.phone.confirm');
     Route::post('/create-corporate-responsible', [CustomerController::class, 'createResponsible'])->name('customer.create-responsible');
     Route::post('/send-validation-email', [CustomerController::class, 'sendValidationEmail'])->name('customer.send-validation-email');
     Route::post('/upload-avatar', [CustomerController::class, 'uploadAvatar'])->name('customer.upload-avatar');

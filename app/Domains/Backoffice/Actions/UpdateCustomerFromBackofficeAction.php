@@ -18,7 +18,6 @@ class UpdateCustomerFromBackofficeAction
         $customer->fill([
             'name' => $data->name,
             'email' => $data->email,
-            'phone' => $data->phone,
             'currency' => $data->currency,
             'language' => $data->language,
             'doc_status' => $data->docStatus,

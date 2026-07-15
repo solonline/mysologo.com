@@ -5,6 +5,7 @@ namespace App\Domains\Customer\Controllers;
 use App\Domains\Customer\DTOs\CreateResponsibleDTO;
 use App\Domains\Customer\DTOs\UpdateCustomerDTO;
 use App\Domains\Customer\Services\CustomerDocumentService;
+use App\Domains\Customer\Services\CustomerPhoneChangeService;
 use App\Domains\Customer\Services\CustomerProfileService;
 use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Kyc\Services\IdentityVerificationService;
@@ -27,6 +28,7 @@ class CustomerController extends Controller
         protected CustomerProfileService $profile,
         protected CustomerDocumentService $documents,
         protected IdentityVerificationService $identityVerification,
+        protected CustomerPhoneChangeService $phoneChange,
     ) {}
 
     /**
@@ -76,7 +78,7 @@ class CustomerController extends Controller
             'email_verified' => $user->hasVerifiedEmail(),
             'document_verified' => $user->doc_status,
             'didit_session' => $diditSession,
-            'phone_verified' => $user->phoneVerifications()->where('verified_at', '!=', null)->exists(),
+            'phone_verified' => $this->phoneChange->isCurrentPhoneVerified($user),
             'message' => $message,
         ]);
     }

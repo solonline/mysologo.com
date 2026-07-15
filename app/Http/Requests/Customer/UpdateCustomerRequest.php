@@ -29,7 +29,6 @@ class UpdateCustomerRequest extends FormRequest
             'email' => ['sometimes', 'string', 'email', 'max:100', 'unique:customers'],
             'referal_email_code' => ['nullable', 'string', 'max:255'],
             'email_verified_at' => ['nullable', 'date'],
-            'phone' => ['nullable', 'string', 'max:20'],
             'referal_sms_code' => ['nullable', 'string', 'max:255'],
             'pin' => ['nullable', 'string', 'max:255'],
             'password' => ['sometimes', 'string', 'min:8'],
