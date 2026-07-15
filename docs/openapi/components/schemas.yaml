@@ -69,9 +69,12 @@ Customer:
 
 LifecycleStatus:
   type: object
+  description: Estado global da conta na plataforma Yoop (fonte de verdade para routing no app).
   properties:
     status:
       type: string
+      description: |
+        Código do ciclo de vida. Use este campo para decidir o ecrã seguinte no onboarding.
       enum:
         - PENDING_EMAIL_VERIFICATION
         - PENDING_PHONE_VERIFICATION
@@ -87,56 +90,316 @@ LifecycleStatus:
         - BLOCKED
     label:
       type: string
+      description: Texto legível do estado (ex. «Aguardando telefone»).
     is_negative:
       type: boolean
+      description: `true` quando o estado é recusa ou bloqueio (mostrar motivo ao utilizador).
     reason:
       type: string
       nullable: true
+      description: Motivo exposto ao customer quando `is_negative` é `true` ou há bloqueio parcial.
+
+VerificationFlags:
+  type: object
+  description: Flags booleanas/string de verificação — resumo rápido sem abrir sub-objetos.
+  properties:
+    email:
+      type: boolean
+      description: Email confirmado (`email_verified_at` preenchido).
+    phone:
+      type: boolean
+      description: Telefone actual confirmado por SMS.
+    identity:
+      type: string
+      description: |
+        Estado documental/KYC persistido na conta.
+        Valores típicos: `PENDING`, `ANALYSING`, `APPROVED`, `DECLINED`.
+        Corresponde a `customer.doc_status`.
+
+OnboardingHints:
+  type: object
+  description: Dicas de onboarding específicas (ex. corporate sem responsável).
+  properties:
+    requires_responsible:
+      type: boolean
+      description: |
+        `true` em contas corporate quando falta registar o responsável legal
+        antes de iniciar KYC da empresa.
+    message:
+      type: string
+      nullable: true
+      description: Mensagem orientativa para o front (ex. responsável em falta).
+
+IntegrationBlocker:
+  type: object
+  description: Bloqueio parcial ou total que impede certas acções.
+  properties:
+    scope:
+      type: string
+      description: |
+        Âmbito do bloqueio: `platform`, `transactions`, `stripe`, `wallester`, `ebury`.
+    reason:
+      type: string
+      description: Mensagem legível para o utilizador ou logs.
+    source:
+      type: string
+      description: Origem do bloqueio (`yoop`, `stripe`, `wallester`, `ebury`, …).
+    blocked_actions:
+      type: array
+      items:
+        type: string
+      description: |
+        Acções afectadas (ex. `top_up`, `withdraw`, `receive_transfers`, `fx`).
+
+Capabilities:
+  type: object
+  description: |
+    O que o customer pode fazer **neste momento**, derivado de lifecycle + integrações.
+    Preferir estes flags em vez de inferir permissões só pelo `lifecycle.status`.
+  properties:
+    can_use_platform:
+      type: boolean
+      description: Pode aceder à app além do fluxo de onboarding (não está globalmente bloqueado).
+    can_transact:
+      type: boolean
+      description: Pode movimentar valores (wallet, P2P, top-up) — requer `ACTIVE` + parceiros OK.
+    can_top_up_stripe:
+      type: boolean
+      description: Pode carregar saldo via Stripe (cartão / transferência bancária).
+    can_withdraw_wallester:
+      type: boolean
+      description: Pode levantar / usar cartão Wallester.
+    can_receive_ebury:
+      type: boolean
+      description: Pode receber transferências internacionais via Ebury.
+    blockers:
+      type: array
+      items:
+        $ref: '#/IntegrationBlocker'
+      description: Lista de bloqueios activos (pode estar vazia).
+
+IntegrationIbanDetails:
+  type: object
+  nullable: true
+  description: |
+    Dados bancários/IBAN do parceiro quando já provisionados.
+    `null` quando a conta ainda não tem IBAN ou funding instructions.
+  properties:
+    iban:
+      type: string
+      description: IBAN principal para transferências.
+    bic:
+      type: string
+      description: BIC/SWIFT (Stripe funding ou Wallester).
+    account_holder_name:
+      type: string
+      description: Titular da conta bancária.
+    country:
+      type: string
+      description: País do IBAN (Stripe funding).
+    funding_status:
+      type: string
+      description: |
+        Estado do IBAN de funding Stripe (`ACTIVE`, `PENDING`, `FAILED`, …).
+        Apenas presente em `integrations.stripe.iban`.
+    bank_transfer_type:
+      type: string
+      description: Tipo de transferência Stripe (ex. `eu_bank_transfer`).
+    bank_name:
+      type: string
+      description: Nome do banco (Wallester).
+    viban:
+      type: string
+      description: vIBAN alternativo quando diferente do `iban` principal.
+    currency:
+      type: string
+      description: Moeda da conta Ebury.
+
+IntegrationAccountState:
+  type: object
+  description: Estado operacional de um parceiro externo (Stripe, Wallester ou Ebury).
+  properties:
+    provider:
+      type: string
+      enum: [stripe, wallester, ebury]
+    label:
+      type: string
+      description: Nome legível do parceiro.
+    status:
+      type: string
+      nullable: true
+      enum: [PENDING, ACTIVE, RESTRICTED, SUSPENDED, FAILED, CLOSED]
+      description: |
+        `null` — conta ainda não provisionada.
+        `ACTIVE` — operacional.
+        `RESTRICTED` — parcialmente limitada.
+        `FAILED` / `SUSPENDED` / `CLOSED` — bloqueada pelo parceiro.
+    reason:
+      type: string
+      nullable: true
+      description: Último motivo de estado vindo do parceiro ou do backend.
+    source:
+      type: string
+      nullable: true
+      description: Quem alterou o estado (`yoop.onboarding`, `stripe.webhook`, …).
+    updated_at:
+      type: string
+      format: date-time
+      nullable: true
+    blocked_actions:
+      type: array
+      items:
+        type: string
+      description: Acções bloqueadas por este parceiro neste estado.
+    iban:
+      $ref: '#/IntegrationIbanDetails'
+
+IntegrationsMap:
+  type: object
+  description: |
+    Mapa com uma entrada por parceiro. Chaves fixas: `stripe`, `wallester`, `ebury`.
+  properties:
+    stripe:
+      $ref: '#/IntegrationAccountState'
+    wallester:
+      $ref: '#/IntegrationAccountState'
+    ebury:
+      $ref: '#/IntegrationAccountState'
+
+IdentityVerificationSessionMetadata:
+  type: object
+  nullable: true
+  description: Metadados da sessão KYC (provedor).
+  properties:
+    application_id:
+      type: string
+      format: uuid
+      description: ID da aplicação/decision Didit — presente em webhooks `status.updated`.
+    session_id:
+      type: string
+      format: uuid
+      description: ID de sessão alternativo nos webhooks (pode diferir de `external_session_id`).
+
+IdentityVerificationSessionAuth:
+  type: object
+  nullable: true
+  description: |
+    Sessão KYC no formato **AuthSession** (login/registo).
+    Campos renomeados de forma agnóstica: `external_session_id`, `verification_url`.
+
+    ⚠️ `POST /kyc/identity/session` usa nomes legados: `session_id`, `session_url`.
+    Ver guia [AuthSession — identity_verification](/docs/guides/auth-session#identity_verification).
+  required: [status]
+  properties:
+    id:
+      type: integer
+      description: ID interno Yoop (`customer_didit_sessions.id`).
+    customer_id:
+      type: integer
+      description: Customer associado à sessão.
+    status:
+      type: string
+      description: Estado da sessão no provedor (espelha `identity_verification.status`).
+      enum:
+        - Not Started
+        - In Progress
+        - In Review
+        - Approved
+        - Declined
+        - Expired
+        - Abandoned
+    external_session_id:
+      type: string
+      description: ID da sessão no provedor KYC (Didit `session_id`).
+    verification_url:
+      type: string
+      format: uri
+      description: URL para WebView/browser — **campo principal para abrir o fluxo KYC**.
+    callback_url:
+      type: string
+      format: uri
+      nullable: true
+      description: URL de retorno configurada na criação da sessão (front-end).
+    metadata:
+      $ref: '#/IdentityVerificationSessionMetadata'
+    created_at:
+      type: string
+      format: date-time
+      nullable: true
+    updated_at:
+      type: string
+      format: date-time
+      nullable: true
+
+IdentityVerificationAuth:
+  type: object
+  nullable: true
+  description: |
+    Estado KYC em respostas **AuthSession** (login, registo, login-pin).
+
+    📖 [Documentação completa](/docs/guides/auth-session#identity_verification)
+
+    **Presença:**
+    | Valor | Condição |
+    |-------|----------|
+    | `null` | `verification.identity === APPROVED` |
+    | `{ status, session: null }` | In Review, Expired, Abandoned, ou sem URL accionável |
+    | `{ status, session: {...} }` | Utilizador deve abrir `verification_url` |
+
+    **Não confundir** com `verification.identity` (estado persistido `doc_status`).
+  properties:
+    status:
+      type: string
+      description: Estado da sessão no provedor KYC.
+      enum:
+        - Not Started
+        - In Progress
+        - In Review
+        - Approved
+        - Declined
+        - Expired
+        - Abandoned
+    session:
+      $ref: '#/IdentityVerificationSessionAuth'
+  example:
+    status: In Progress
+    session:
+      id: 12
+      customer_id: 3
+      status: In Progress
+      external_session_id: d54203d5-1dee-44c8-bbdb-ebe1fc1418ef
+      verification_url: https://verify.didit.me/en/session/example
+      callback_url: https://yooppayments.eu/verification-pending
+      metadata:
+        application_id: c159a625-9dde-444c-990d-9accf2298448
+        session_id: fdd2191b-ed54-411b-90f7-356265ff865f
 
 AuthSession:
   type: object
-  description: Resposta padrão de login, registo e login-pin
+  description: |
+    Resposta padrão de `POST /auth/login`, `POST /auth/register-retail`,
+    `POST /auth/register-corporate` e `POST /auth/login-pin`.
+
+    📖 Referência completa: [AuthSession — campos JSON](/docs/guides/auth-session)
+  required: [token, user, lifecycle, capabilities, integrations, onboarding, verification]
   properties:
     token:
       type: string
-      description: Token Sanctum para requests autenticados
+      description: Token Sanctum (`Authorization: Bearer {token}`). Expira em ~10 minutos no login por password.
     user:
       $ref: '#/Customer'
     lifecycle:
       $ref: '#/LifecycleStatus'
     capabilities:
-      type: object
-      additionalProperties:
-        type: boolean
-      description: O que o utilizador pode fazer neste momento
+      $ref: '#/Capabilities'
     integrations:
-      type: object
-      description: Estado dos parceiros (Ebury, Wallester, Stripe)
+      $ref: '#/IntegrationsMap'
     onboarding:
-      type: object
-      properties:
-        requires_responsible:
-          type: boolean
-        message:
-          type: string
-          nullable: true
+      $ref: '#/OnboardingHints'
     verification:
-      type: object
-      properties:
-        email:
-          type: boolean
-        phone:
-          type: boolean
-        identity:
-          type: string
+      $ref: '#/VerificationFlags'
     identity_verification:
-      type: object
-      properties:
-        status:
-          type: string
-        session:
-          type: object
-          nullable: true
+      $ref: '#/IdentityVerificationAuth'
 
 MessageResponse:
   type: object
@@ -186,9 +449,8 @@ TerminalPaymentIntent:
     client_secret:
       type: string
       description: Client secret do PaymentIntent para o reader
-    transaction:
-      type: object
-      description: Transação criada na plataforma
+    payment_intent:
+      $ref: '#/StripePaymentIntentSession'
 
 HealthCheck:
   type: object
@@ -258,16 +520,45 @@ PublicCustomer:
 
 IdentitySession:
   type: object
+  description: |
+    Resposta de `POST /kyc/identity/session` (formato **legado** Didit).
+
+    Para o formato usado no **login**, ver `IdentityVerificationSessionAuth`
+    em AuthSession (`external_session_id`, `verification_url`).
+
+    📖 [Comparação de campos](/docs/guides/auth-session#-nomes-diferentes-em-post-kycidentitysession)
   properties:
+    id:
+      type: integer
+    customer_id:
+      type: integer
+    status:
+      type: string
     session_id:
       type: string
+      description: Equivalente a `external_session_id` no AuthSession.
+    workflow_id:
+      type: string
+      description: Workflow Didit (KYC individual ou KYB corporate).
     session_url:
       type: string
       format: uri
-    status:
+      description: Equivalente a `verification_url` no AuthSession.
+    callback:
       type: string
-    workflow_id:
+      format: uri
+      nullable: true
+      description: Equivalente a `callback_url` no AuthSession.
+    metadata:
+      $ref: '#/IdentityVerificationSessionMetadata'
+    created_at:
       type: string
+      format: date-time
+      nullable: true
+    updated_at:
+      type: string
+      format: date-time
+      nullable: true
 
 SmsValidationResult:
   type: object
@@ -382,10 +673,39 @@ FeeEstimate:
 PaymentIntentResult:
   type: object
   properties:
-    transaction:
-      $ref: '#/Transaction'
+    payment_intent:
+      $ref: '#/StripePaymentIntentSession'
     client_secret:
       type: string
+
+StripePaymentIntentSession:
+  type: object
+  description: Checkout session — not a financial transaction until Stripe confirms payment.
+  properties:
+    id:
+      type: integer
+    stripe_payment_intent_id:
+      type: string
+    type:
+      type: string
+    purpose:
+      type: string
+    amount:
+      type: integer
+    currency:
+      type: string
+    payment_method_type:
+      type: string
+    status:
+      type: string
+    stripe_transaction_id:
+      type: integer
+      nullable: true
+    transaction:
+      $ref: '#/Transaction'
+    created_at:
+      type: string
+      format: date-time
 
 Notification:
   type: object

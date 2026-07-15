@@ -78,6 +78,12 @@ class StripeCashBalanceFundingTest extends TestCase
             'data' => ['object' => $this->sampleFundedCashBalancePayload('cus_cash_balance_1')],
         ]);
 
+        $this->assertDatabaseHas('stripe_payment_intents', [
+            'customer_id' => $customer->id,
+            'stripe_payment_intent_id' => 'pi_bank_topup_1',
+            'stripe_cash_balance_transaction_id' => 'ccsbtxn_test_1',
+        ]);
+
         $this->assertDatabaseHas('stripe_transactions', [
             'customer_id' => $customer->id,
             'stripe_payment_intent_id' => 'pi_bank_topup_1',

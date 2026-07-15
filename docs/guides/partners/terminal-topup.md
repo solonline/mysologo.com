@@ -29,7 +29,7 @@ sequenceDiagram
     POS->>Stripe: Inicializa reader (SDK)
     POS->>API: POST /merchant/terminal/create-intent
     Note over POS,API: Idempotency-Key + tpa_serial_number
-    API-->>POS: client_secret + transaction
+    API-->>POS: client_secret + payment_intent
     POS->>Stripe: Apresenta pagamento ao cartão
 ```
 
@@ -63,7 +63,12 @@ Resposta `201`:
 ```json
 {
   "client_secret": "pi_...",
-  "transaction": { "id": 55, ... }
+  "payment_intent": {
+    "id": 55,
+    "stripe_payment_intent_id": "pi_...",
+    "status": "requires_payment_method",
+    "type": "card_present"
+  }
 }
 ```
 
@@ -72,9 +77,11 @@ Resposta `201`:
 Se o pagamento for criado pelo **app do customer** (não merchant key), a captura usa:
 
 ```
-POST /api/stripe/terminal/{transaction_id}/capture
+POST /api/stripe/terminal/{payment_intent_id}/capture
 Authorization: Bearer {token}
 ```
+
+O `{payment_intent_id}` é o **ID interno Yoop** devolvido em `payment_intent.id`.
 
 ## Erros comuns
 

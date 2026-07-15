@@ -10,6 +10,8 @@ interface StripeGatewayInterface
 
     public function createPaymentIntent(array $data): array;
 
+    public function getPaymentIntent(string $paymentIntentId, string $currency = 'eur'): array;
+
     public function attachPaymentMethod(string $paymentMethodId, string $customerId): array;
 
     public function createSubscription(array $data): array;

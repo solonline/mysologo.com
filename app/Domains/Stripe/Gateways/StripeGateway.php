@@ -38,6 +38,12 @@ class StripeGateway implements StripeGatewayInterface
         );
     }
 
+    public function getPaymentIntent(string $paymentIntentId, string $currency = 'eur'): array
+    {
+        return $this->run('getPaymentIntent', fn () => $this->client->forCurrency($currency)->getPaymentIntent($paymentIntentId)
+        );
+    }
+
     public function attachPaymentMethod(string $paymentMethodId, string $customerId): array
     {
         return $this->run('attachPaymentMethod', fn () => $this->client->attachPaymentMethod($paymentMethodId, $customerId)

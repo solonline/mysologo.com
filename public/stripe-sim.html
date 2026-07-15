@@ -1686,7 +1686,7 @@ async function run() {
     });
     if (!res.ok) throw new Error(`API ${res.status}: ${data.message || ''}`);
     const clientSecret = data.client_secret;
-    const piId         = data.transaction?.stripe_payment_intent_id ?? '—';
+    const piId         = data.payment_intent?.stripe_payment_intent_id ?? '—';
     if (!clientSecret) throw new Error('client_secret não encontrado');
     log('ok', `intent criado: ${piId}`);
 

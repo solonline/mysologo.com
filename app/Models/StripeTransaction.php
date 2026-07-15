@@ -131,8 +131,35 @@ class StripeTransaction extends Model
         return $this->belongsTo(StripeTransaction::class, 'related_transaction_id');
     }
 
+    public function stripePaymentIntent()
+    {
+        return $this->hasOne(StripePaymentIntent::class, 'stripe_transaction_id');
+    }
+
     public function topupSettlementRoute(): ?TopupSettlementRoute
     {
         return TopupSettlementRoute::resolve($this);
+    }
+
+    /**
+     * Fees are applied asynchronously via charge.updated after payment_intent.succeeded.
+     * Until then net_amount is stored as 0 in the database but must not be exposed as zero.
+     */
+    public function feesPending(): bool
+    {
+        return $this->amount > 0
+            && $this->net_amount === 0
+            && $this->stripe_fee === 0
+            && $this->platform_fee === 0;
+    }
+
+    public function resolvedNetAmount(): ?int
+    {
+        return $this->feesPending() ? null : $this->net_amount;
+    }
+
+    public function resolvedFeeTotal(): ?int
+    {
+        return $this->feesPending() ? null : $this->stripe_fee + $this->platform_fee;
     }
 }

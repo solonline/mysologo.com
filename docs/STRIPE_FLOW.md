@@ -69,8 +69,8 @@ App do cliente                Yoop API                   Stripe
 É como um "pedido de pagamento" que criamos na Stripe. Ele tem um ID único
 (ex: `pi_3ABC...`) e fica em estado `pending` até o cliente confirmar.
 
-Neste momento ainda não gravamos nada de financeiro. Só criamos o registo
-na Stripe e devolvemos o `client_secret` para o cliente completar o pagamento.
+Neste momento gravamos apenas `stripe_payment_intents` (sessão de checkout).
+A `stripe_transaction` financeira só nasce quando a Stripe confirma via webhook.
 
 ---
 
@@ -312,7 +312,7 @@ ledger_entries — o registo de Ana ao longo do tempo:
 CLIENTE PAGA
      │
      ▼
-PaymentIntent criado na Stripe
+PaymentIntent criado na Stripe + stripe_payment_intents (checkout)
      │
      ▼
 Stripe confirma → webhook chega à Yoop

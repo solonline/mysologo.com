@@ -8,6 +8,9 @@ use App\Domains\Merchant\Contracts\MerchantPaymentRequestRepositoryInterface;
 use App\Domains\Merchant\Jobs\DispatchMerchantCallback;
 use App\Domains\Onboarding\Services\IntegrationAccountService;
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use App\Domains\Stripe\Enums\StripePaymentIntentPurpose;
+use App\Domains\Stripe\Enums\StripePaymentIntentStatus;
+use App\Domains\Stripe\Services\StripePaymentIntentService;
 use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
@@ -18,6 +21,7 @@ use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
 use App\Models\CustomerStripeAccount;
+use App\Models\StripePaymentIntent;
 use App\Models\StripePaymentMethodFee;
 use App\Models\StripeTransaction;
 use Carbon\Carbon;
@@ -45,6 +49,7 @@ class StripeService
         protected IntegrationAccountService $integrationAccounts,
         protected StripePaymentWalletService $stripePaymentWallet,
         protected TopupWallesterFundingPolicy $topupFundingPolicy,
+        protected StripePaymentIntentService $paymentIntents,
     ) {}
 
     public function validatePaymentMethodCurrency(string $paymentMethod, string $currency): void
@@ -309,30 +314,19 @@ class StripeService
         $intent = $result['data'];
 
         try {
-            $transaction = StripeTransaction::create([
-                'customer_id' => $customer->id,
-                'stripe_payment_method_fee_id' => $feeConfig->id,
-                'type' => $isTopup ? TransactionType::TOPUP : TransactionType::from($feeConfig->payment_method),
-                'direction' => TransactionDirection::Credit,
-                'stripe_payment_intent_id' => $intent['id'],
-                'payment_method_type' => $feeConfig->payment_method,
-                'amount' => $amount,
-                'stripe_fee' => 0,
-                'platform_fee' => 0,
-                'net_amount' => 0,
-                'currency' => strtoupper($currency),
-                'status' => 'pending',
-                'description' => $description,
-                'stripe_metadata' => $intent,
-                'stripe_created_at' => isset($intent['created'])
-                    ? Carbon::createFromTimestamp($intent['created'])
-                    : now(),
-            ]);
-
-            if ($isTopup) {
-            }
+            $paymentIntent = $this->paymentIntents->createFromStripeResponse(
+                customer: $customer,
+                intent: $intent,
+                type: $isTopup ? TransactionType::TOPUP : TransactionType::from($feeConfig->payment_method),
+                purpose: StripePaymentIntentPurpose::Topup,
+                amount: $amount,
+                currency: $currency,
+                feeConfig: $feeConfig,
+                paymentMethodType: $feeConfig->payment_method,
+                description: $description,
+            );
         } catch (\Throwable $e) {
-            Log::channel('stripe')->error('stripe_service: transaction_create_failed', [
+            Log::channel('stripe')->error('stripe_service: payment_intent_create_failed', [
                 'customer_id' => $customer->id,
                 'stripe_payment_intent_id' => $intent['id'],
                 'exception' => $e->getMessage(),
@@ -340,12 +334,12 @@ class StripeService
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 502,
-                'Erro ao registrar a transação. Payment intent criado no Stripe: '.$intent['id']
+                'Erro ao registrar a intenção de pagamento. Payment intent criado no Stripe: '.$intent['id']
             );
         }
 
         return [
-            'transaction' => $transaction,
+            'payment_intent' => $paymentIntent,
             'client_secret' => $intent['client_secret'],
         ];
     }
@@ -432,27 +426,19 @@ class StripeService
         $intent = $result['data'];
 
         try {
-            $transaction = StripeTransaction::create([
-                'tpa_id' => $tpa->id,
-                'customer_id' => $customer->id,
-                'type' => TransactionType::CARD_PRESENT,
-                'direction' => TransactionDirection::Credit,
-                'stripe_payment_intent_id' => $intent['id'],
-                'payment_method_type' => 'card_present',
-                'amount' => $amount,
-                'stripe_fee' => 0,
-                'platform_fee' => 0,
-                'net_amount' => 0,
-                'currency' => strtoupper($currency),
-                'status' => 'pending',
-                'description' => $description,
-                'stripe_metadata' => $intent,
-                'stripe_created_at' => isset($intent['created'])
-                    ? Carbon::createFromTimestamp($intent['created'])
-                    : now(),
-            ]);
+            $paymentIntent = $this->paymentIntents->createFromStripeResponse(
+                customer: $customer,
+                intent: $intent,
+                type: TransactionType::CARD_PRESENT,
+                purpose: StripePaymentIntentPurpose::Terminal,
+                amount: $amount,
+                currency: $currency,
+                paymentMethodType: 'card_present',
+                description: $description,
+                tpaId: $tpa?->id,
+            );
         } catch (\Throwable $e) {
-            Log::channel('stripe')->error('stripe_service: terminal_transaction_create_failed', [
+            Log::channel('stripe')->error('stripe_service: terminal_payment_intent_create_failed', [
                 'customer_id' => $customer->id,
                 'stripe_payment_intent_id' => $intent['id'],
                 'exception' => $e->getMessage(),
@@ -460,40 +446,42 @@ class StripeService
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 502,
-                'Erro ao registrar a transação. Payment intent criado no Stripe: '.$intent['id']
+                'Erro ao registrar a intenção de pagamento. Payment intent criado no Stripe: '.$intent['id']
             );
         }
 
         return [
-            'transaction' => $transaction,
+            'payment_intent' => $paymentIntent,
             'client_secret' => $intent['client_secret'],
         ];
     }
 
-    public function captureTerminalPayment(StripeTransaction $transaction): array
+    public function captureTerminalPayment(StripePaymentIntent $paymentIntent): array
     {
-        if ($transaction->payment_method_type !== 'card_present') {
+        if ($paymentIntent->payment_method_type !== 'card_present') {
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 422,
-                'Esta transação não é um pagamento terminal.'
+                'Esta intenção não é um pagamento terminal.'
             );
         }
 
-        if (! \in_array($transaction->status, ['pending', 'requires_capture'])) {
+        $status = $paymentIntent->status;
+
+        if (! $status->isCapturable() && $status !== StripePaymentIntentStatus::RequiresPaymentMethod) {
             throw new ApiException(
                 ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
                 422,
-                'Transação não está num estado capturável.'
+                'Intenção de pagamento não está num estado capturável.'
             );
         }
 
-        $result = $this->stripeGateway->capturePaymentIntent($transaction->stripe_payment_intent_id);
+        $result = $this->stripeGateway->capturePaymentIntent($paymentIntent->stripe_payment_intent_id);
 
         if ($result['status'] !== 'success') {
             Log::channel('stripe')->warning('stripe_service: captureTerminalPayment', [
-                'transaction_id' => $transaction->id,
-                'stripe_payment_intent_id' => $transaction->stripe_payment_intent_id,
+                'payment_intent_id' => $paymentIntent->id,
+                'stripe_payment_intent_id' => $paymentIntent->stripe_payment_intent_id,
                 'message' => $result['message'],
             ]);
             throw new ApiException(
@@ -504,11 +492,26 @@ class StripeService
         }
 
         Log::channel('stripe')->info('stripe_service: captureTerminalPayment — captura solicitada', [
-            'transaction_id' => $transaction->id,
-            'stripe_payment_intent_id' => $transaction->stripe_payment_intent_id,
+            'payment_intent_id' => $paymentIntent->id,
+            'stripe_payment_intent_id' => $paymentIntent->stripe_payment_intent_id,
         ]);
 
         return $result['data'];
+    }
+
+    public function showPaymentIntent(Customer $customer, int $id): StripePaymentIntent
+    {
+        $paymentIntent = $this->paymentIntents->findForCustomer($customer, $id);
+
+        if (! $paymentIntent) {
+            throw new ApiException(
+                ErrorCode::STRIPE_PAYMENT_INTENT_FAILED,
+                404,
+                'Intenção de pagamento não encontrada.'
+            );
+        }
+
+        return $paymentIntent;
     }
 
     public function createSubscription(Customer $customer, string $stripeCustomerId, string $priceId, array $extra = []): array
@@ -568,6 +571,7 @@ class StripeService
         match ($eventType) {
             'payment_intent.succeeded' => $this->handlePaymentIntentSucceeded($object),
             'payment_intent.payment_failed' => $this->handlePaymentIntentFailed($object),
+            'payment_intent.canceled' => $this->handlePaymentIntentCanceled($object),
             'charge.updated' => $this->handleChargeUpdated($object),
             'customer_cash_balance_settings.updated', 'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
             'customer_cash_balance_transaction.created', 'customer.cash_balance_transaction.created' => $this->handleCashBalanceTransactionCreated($object),
@@ -607,6 +611,14 @@ class StripeService
 
         if (! $stripeCustomerId || $currency === '' || $netAmount <= 0 || ! $cashBalanceTransactionId) {
             Log::channel('stripe')->warning('Stripe webhook: cash_balance.funded com dados inválidos', $object);
+
+            return;
+        }
+
+        if ($this->paymentIntents->findByCashBalanceTransactionId($cashBalanceTransactionId)) {
+            Log::channel('stripe')->info('Stripe webhook: cash_balance.funded já processado', [
+                'stripe_cash_balance_transaction_id' => $cashBalanceTransactionId,
+            ]);
 
             return;
         }
@@ -674,32 +686,35 @@ class StripeService
         }
 
         try {
-            $transaction = StripeTransaction::create([
-                'customer_id' => $stripeAccount->customer_id,
-                'stripe_payment_method_fee_id' => $feeConfig?->id,
-                'type' => TransactionType::TOPUP,
-                'direction' => TransactionDirection::Credit,
-                'stripe_payment_intent_id' => $intent['id'],
-                'stripe_cash_balance_transaction_id' => $cashBalanceTransactionId,
-                'payment_method_type' => 'bank_transfer',
-                'amount' => $netAmount,
-                'stripe_fee' => 0,
-                'platform_fee' => 0,
-                'net_amount' => 0,
-                'currency' => $currency,
-                'status' => $intentStatus === 'succeeded' ? 'succeeded' : 'pending',
-                'description' => 'Bank transfer top-up via VIBAN',
-                'bank_transfer_type' => $object['funded']['bank_transfer']['type'] ?? null,
-                'bank_transfer_reference' => $object['funded']['bank_transfer']['reference'] ?? null,
-                'bank_transfer_sender_name' => $object['funded']['bank_transfer']['eu_bank_transfer']['sender_name'] ?? null,
-                'bank_transfer_bic' => $object['funded']['bank_transfer']['eu_bank_transfer']['bic'] ?? null,
-                'bank_transfer_iban_last4' => $object['funded']['bank_transfer']['eu_bank_transfer']['iban_last4'] ?? null,
-                'bank_transfer_amount' => $netAmount,
-                'stripe_metadata' => $object,
-                'stripe_created_at' => isset($object['created'])
-                    ? Carbon::createFromTimestamp($object['created'])
-                    : now(),
-            ]);
+            $customer = Customer::findOrFail($stripeAccount->customer_id);
+
+            $paymentIntentRecord = $this->paymentIntents->createFromStripeResponse(
+                customer: $customer,
+                intent: $intent,
+                type: TransactionType::TOPUP,
+                purpose: StripePaymentIntentPurpose::BankTransferTopup,
+                amount: $netAmount,
+                currency: $currency,
+                feeConfig: $feeConfig,
+                paymentMethodType: 'bank_transfer',
+                description: 'Bank transfer top-up via VIBAN',
+                cashBalanceTransactionId: $cashBalanceTransactionId,
+            );
+
+            $transaction = $this->paymentIntents->resolveOrCreateTransaction(
+                paymentIntent: $paymentIntentRecord,
+                transactionStatus: $intentStatus === 'succeeded' ? 'succeeded' : 'pending',
+                intentPayload: $intent,
+                extraTransactionAttributes: [
+                    'bank_transfer_type' => $object['funded']['bank_transfer']['type'] ?? null,
+                    'bank_transfer_reference' => $object['funded']['bank_transfer']['reference'] ?? null,
+                    'bank_transfer_sender_name' => $object['funded']['bank_transfer']['eu_bank_transfer']['sender_name'] ?? null,
+                    'bank_transfer_bic' => $object['funded']['bank_transfer']['eu_bank_transfer']['bic'] ?? null,
+                    'bank_transfer_iban_last4' => $object['funded']['bank_transfer']['eu_bank_transfer']['iban_last4'] ?? null,
+                    'bank_transfer_amount' => $netAmount,
+                    'stripe_metadata' => $object,
+                ],
+            );
         } catch (\Throwable $e) {
             Log::channel('stripe')->error('Stripe webhook: erro ao registar transação de cash balance', [
                 'stripe_customer_id' => $stripeCustomerId,
@@ -723,13 +738,21 @@ class StripeService
 
     private function handlePaymentIntentSucceeded(array $intent): void
     {
-        $transaction = StripeTransaction::where('stripe_payment_intent_id', $intent['id'])->first();
+        $paymentIntent = $this->paymentIntents->findByStripeId($intent['id']);
 
-        if (! $transaction) {
-            Log::channel('stripe')->warning('Stripe webhook: StripeTransaction não encontrada', ['payment_intent_id' => $intent['id']]);
+        if (! $paymentIntent) {
+            Log::channel('stripe')->warning('Stripe webhook: StripePaymentIntent não encontrada', ['payment_intent_id' => $intent['id']]);
 
             return;
         }
+
+        $this->paymentIntents->syncStatusFromStripePayload($paymentIntent, $intent);
+
+        $transaction = $this->paymentIntents->resolveOrCreateTransaction(
+            paymentIntent: $paymentIntent->fresh(),
+            transactionStatus: 'succeeded',
+            intentPayload: $intent,
+        );
 
         $transaction->update([
             'status' => 'succeeded',
@@ -838,20 +861,27 @@ class StripeService
 
     private function handlePaymentIntentFailed(array $intent): void
     {
-        $transaction = StripeTransaction::where('stripe_payment_intent_id', $intent['id'])->first();
+        $paymentIntent = $this->paymentIntents->findByStripeId($intent['id']);
 
-        if (! $transaction) {
-            Log::channel('stripe')->warning('Stripe webhook: StripeTransaction não encontrada', ['payment_intent_id' => $intent['id']]);
+        if (! $paymentIntent) {
+            Log::channel('stripe')->warning('Stripe webhook: StripePaymentIntent não encontrada', ['payment_intent_id' => $intent['id']]);
 
             return;
         }
+
+        $this->paymentIntents->markFailed($paymentIntent, $intent);
+
+        $transaction = $this->paymentIntents->resolveOrCreateTransaction(
+            paymentIntent: $paymentIntent->fresh(),
+            transactionStatus: 'failed',
+            intentPayload: $intent,
+        );
 
         $transaction->update([
             'status' => 'failed',
             'stripe_metadata' => $intent,
         ]);
 
-        // Reverte crédito aplicado pelo charge.updated (se tiver chegado antes do failed)
         if ($transaction->net_amount > 0) {
             $this->stripePaymentWallet->reverseStripePayment($transaction->fresh());
         }
@@ -867,6 +897,21 @@ class StripeService
         }
     }
 
+    private function handlePaymentIntentCanceled(array $intent): void
+    {
+        $paymentIntent = $this->paymentIntents->findByStripeId($intent['id']);
+
+        if (! $paymentIntent) {
+            Log::channel('stripe')->warning('Stripe webhook: StripePaymentIntent não encontrada', ['payment_intent_id' => $intent['id']]);
+
+            return;
+        }
+
+        $this->paymentIntents->markCanceled($paymentIntent, $intent);
+
+        Log::info('Stripe webhook: payment_intent.canceled', ['pi' => $intent['id'], 'payment_intent_id' => $paymentIntent->id]);
+    }
+
     private function handleChargeUpdated(array $charge): void
     {
         $paymentIntentId = $charge['payment_intent'] ?? null;
@@ -874,6 +919,8 @@ class StripeService
         if (! $paymentIntentId) {
             return;
         }
+
+        $paymentIntentRecord = $this->paymentIntents->findByStripeId($paymentIntentId);
 
         StripeTransaction::where('stripe_payment_intent_id', $paymentIntentId)
             ->update(['stripe_charge_id' => $charge['id']]);
@@ -908,7 +955,18 @@ class StripeService
             ->whereNull('related_transaction_id')
             ->first();
 
+        if (! $transaction && $paymentIntentRecord) {
+            $transaction = $this->paymentIntents->resolveOrCreateTransaction(
+                paymentIntent: $paymentIntentRecord,
+                transactionStatus: 'succeeded',
+            );
+        }
+
         if (! $transaction) {
+            Log::channel('stripe')->warning('stripe_service: charge.updated sem transação resolvida', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+
             return;
         }
 

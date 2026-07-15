@@ -125,11 +125,11 @@ stripe-terminal-capture:
     description: |
       Captura PaymentIntent após leitura do cartão no terminal.
 
-      A transacção deve pertencer ao customer autenticado e estar em estado capturável.
+      A intenção de pagamento deve pertencer ao customer autenticado e estar em estado capturável.
     security:
       - bearerAuth: []
     parameters:
-      - name: transaction
+      - name: paymentIntent
         in: path
         required: true
         schema:
@@ -144,3 +144,28 @@ stripe-terminal-capture:
         $ref: '../components/responses.yaml#/NotFound'
       '429':
         $ref: '../components/responses.yaml#/RateLimited'
+
+stripe-show-payment-intent:
+  get:
+    tags: [Stripe]
+    summary: Consultar intenção de pagamento
+    operationId: stripeShowPaymentIntent
+    description: |
+      Devolve a sessão de checkout criada pelo customer. Quando o pagamento for confirmado na Stripe,
+      inclui a transação financeira associada em `transaction`.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: paymentIntent
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StripePaymentIntentSession'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'

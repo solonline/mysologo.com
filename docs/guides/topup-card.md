@@ -35,7 +35,7 @@ sequenceDiagram
     Note over App,API: Header Idempotency-Key
     API->>Stripe: Cria PaymentIntent
     Stripe-->>API: client_secret
-    API-->>App: transaction + client_secret
+    API-->>App: payment_intent + client_secret
     App->>Stripe: Confirma pagamento (SDK)
     Stripe->>WH: payment_intent.succeeded
     WH->>API: POST /webhooks/stripe
@@ -83,7 +83,14 @@ Resposta `201`:
 
 ```json
 {
-  "transaction": { "id": 42, "status": "pending", ... },
+  "payment_intent": {
+    "id": 42,
+    "stripe_payment_intent_id": "pi_xxx",
+    "status": "requires_payment_method",
+    "type": "topup",
+    "amount": 10000,
+    "currency": "EUR"
+  },
   "client_secret": "pi_xxx_secret_yyy"
 }
 ```
@@ -102,17 +109,20 @@ POST /api/webhooks/stripe
 
 O backend:
 
-1. Encontra a transação pelo `payment_intent` id
-2. Marca como `succeeded`
+1. Encontra a intenção de pagamento pelo `payment_intent` id
+2. Cria a transação financeira (`stripe_transactions`) quando o pagamento é confirmado
 3. Calcula taxas (Stripe + plataforma)
 4. Credita saldo **pendente**
 
 ### 6. Consultar resultado
 
 ```
+GET /api/stripe/payment-intents/{id}
 GET /api/wallet/transactions/{id}
 GET /api/wallet/dashboard
 ```
+
+Poll `GET /api/stripe/payment-intents/{id}` até `stripe_transaction_id` estar preenchido (ou `transaction` no JSON).
 
 ## Headers obrigatórios
 

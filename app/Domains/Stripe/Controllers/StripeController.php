@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domains\Stripe\Controllers;
 
 use App\Domains\Stripe\Services\StripeService;
@@ -8,9 +10,9 @@ use App\Http\Requests\Stripe\CreatePaymentIntentRequest;
 use App\Http\Requests\Stripe\CreateTerminalPaymentIntentRequest;
 use App\Http\Resources\Stripe\FeeEstimateResource;
 use App\Http\Resources\Stripe\PaymentMethodResource;
-use App\Http\Resources\TransactionResource;
+use App\Http\Resources\Stripe\StripePaymentIntentResource;
+use App\Models\StripePaymentIntent;
 use App\Models\StripePaymentMethodFee;
-use App\Models\StripeTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -68,9 +70,27 @@ class StripeController extends Controller
         }
 
         return response()->json([
-            'transaction' => new TransactionResource($result['transaction']),
+            'payment_intent' => new StripePaymentIntentResource($result['payment_intent']),
             'client_secret' => $result['client_secret'],
         ], 201);
+    }
+
+    /**
+     * Show Payment Intent
+     *
+     * Returns a checkout session created by the authenticated customer, including the linked transaction when payment completed.
+     *
+     * @tags Stripe
+     */
+    public function showPaymentIntent(Request $request, int $paymentIntent): StripePaymentIntentResource
+    {
+        try {
+            $record = $this->stripeService->showPaymentIntent($request->user(), $paymentIntent);
+        } catch (ApiException $e) {
+            abort($e->status, $e->getMessage());
+        }
+
+        return StripePaymentIntentResource::make($record);
     }
 
     /**
@@ -110,7 +130,7 @@ class StripeController extends Controller
         }
 
         return response()->json([
-            'transaction' => new TransactionResource($result['transaction']),
+            'payment_intent' => new StripePaymentIntentResource($result['payment_intent']),
             'client_secret' => $result['client_secret'],
         ], 201);
     }
@@ -118,24 +138,24 @@ class StripeController extends Controller
     /**
      * Capture Terminal Payment
      *
-     * Captures a previously created Terminal PaymentIntent after the card has been read. The transaction must belong to the authenticated customer and be in a capturable state.
+     * Captures a previously created Terminal PaymentIntent after the card has been read. The payment intent must belong to the authenticated customer and be in a capturable state.
      *
      * @tags Stripe, Terminal
      */
-    public function captureTerminal(Request $request, int $transactionId): JsonResponse
+    public function captureTerminal(Request $request, int $paymentIntent): JsonResponse
     {
         $customer = $request->user();
 
-        $transaction = StripeTransaction::where('id', $transactionId)
+        $record = StripePaymentIntent::where('id', $paymentIntent)
             ->where('customer_id', $customer->id)
             ->first();
 
-        if (! $transaction) {
-            return response()->json(['message' => 'Transação não encontrada.'], 404);
+        if (! $record) {
+            return response()->json(['message' => 'Intenção de pagamento não encontrada.'], 404);
         }
 
         try {
-            $this->stripeService->captureTerminalPayment($transaction);
+            $this->stripeService->captureTerminalPayment($record);
         } catch (ApiException $e) {
             return response()->json($e->toArray(), $e->status);
         }
