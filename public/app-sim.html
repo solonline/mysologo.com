@@ -370,6 +370,95 @@ body {
 .info-row-value.green { color: var(--emerald); }
 .info-row-value.amber { color: var(--amber); }
 
+/* Account info screen */
+.account-screen {
+  background: var(--slate-50);
+  overflow-y: auto;
+  flex-direction: column;
+}
+
+.account-body {
+  padding: 16px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.account-loading {
+  padding: 32px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--slate-400);
+}
+
+.account-avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 4px;
+}
+
+.account-avatar-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+}
+
+.account-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--indigo), #6366f1);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  overflow: hidden;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+}
+
+.account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-avatar-edit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--indigo);
+  color: #fff;
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+.account-avatar-edit:active { transform: scale(.92); }
+
+.account-avatar-btn {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--indigo);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 4px 8px;
+}
+
+.account-avatar-btn:disabled { opacity: .5; cursor: not-allowed; }
+
 /* ── Transaction screens ──────────────────────────── */
 .tx-screen { background: #fff; }
 
@@ -1351,14 +1440,6 @@ body {
       <div class="home-body">
       <!-- Quick actions -->
       <div class="quick-actions">
-        <button class="action-btn" onclick="navigate('deposit')">
-          <div class="action-icon emerald">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 5v14M5 12l7 7 7-7"/>
-            </svg>
-          </div>
-          <span>Depositar</span>
-        </button>
         <button class="action-btn" onclick="navigate('p2p')">
           <div class="action-icon amber">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1394,6 +1475,15 @@ body {
           </div>
           <span>Notif.</span>
         </button>
+        <button class="action-btn" onclick="navigate('account')">
+          <div class="action-icon indigo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <span>Conta</span>
+        </button>
       </div>
 
       <!-- Recent transactions -->
@@ -1406,45 +1496,6 @@ body {
           <div id="home-tx-list" class="tx-list">
             <div style="padding:14px 16px"><span class="skeleton" style="width:80%;display:inline-block">&nbsp;</span></div>
             <div style="padding:14px 16px"><span class="skeleton" style="width:65%;display:inline-block">&nbsp;</span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Customer info -->
-      <div class="section">
-        <div class="section-title">Conta</div>
-        <div class="info-card" id="home-info">
-          <div class="info-row">
-            <span class="info-row-label">Status</span>
-            <span class="info-row-value" id="info-status">—</span>
-          </div>
-          <div class="info-row">
-            <span class="info-row-label">Tipo</span>
-            <span class="info-row-value" id="info-type">—</span>
-          </div>
-          <div class="info-row">
-            <span class="info-row-label">Documento</span>
-            <span class="info-row-value" id="info-doc">—</span>
-          </div>
-          <div class="info-row">
-            <span class="info-row-label">E-mail verificado</span>
-            <span class="info-row-value" id="info-email">—</span>
-          </div>
-          <div class="info-row">
-            <span class="info-row-label">Wallester</span>
-            <span class="info-row-value" id="info-wallester">—</span>
-          </div>
-        </div>
-        <button class="btn-link" id="btn-reset-pin" style="margin-top:12px;display:none" onclick="openPinReset()">Refazer PIN</button>
-        <button class="btn-logout" onclick="doLogout()">Terminar sessão</button>
-      </div>
-
-      <!-- Payment methods -->
-      <div class="section">
-        <div class="section-title">Métodos de pagamento</div>
-        <div class="info-card" id="pm-list">
-          <div class="info-row">
-            <span class="info-row-label skeleton" style="width:60%">&nbsp;</span>
           </div>
         </div>
       </div>
@@ -1745,6 +1796,21 @@ body {
       </div>
     </div>
 
+    <!-- ── Account info ── -->
+    <div id="screen-account" class="screen account-screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="goBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+        </button>
+        <h2>Informações da conta</h2>
+      </div>
+      <div id="account-body" class="account-body">
+        <div class="account-loading">A carregar...</div>
+      </div>
+    </div>
+
     <!-- ── Notifications ── -->
     <div id="screen-notifications" class="screen">
       <div class="screen-header">
@@ -1827,7 +1893,7 @@ const AUTH_SCREENS = ['welcome', 'login', 'register', 'pin-login'];
 const NO_NAV_SCREENS = [
   'welcome', 'login', 'register', 'pin-login', 'pin-setup', 'pin-reset', 'onboarding', 'kyc',
   'deposit', 'payment', 'notifications', 'card-create', 'card-detail',
-  'movements', 'transaction-detail', 'p2p',
+  'movements', 'transaction-detail', 'p2p', 'account',
 ];
 
 const CURRENCY_SYMBOLS = { eur: '€', usd: '$', gbp: '£', brl: 'R$' };
@@ -1882,6 +1948,7 @@ function navigate(screen) {
   setStatusBarColor(lightScreens.includes(screen));
 
   if (screen === 'home') loadHomeData();
+  if (screen === 'account') loadAccountInfo();
   if (screen === 'notifications') loadNotifications();
   if (screen === 'onboarding' && authSession) {
     renderOnboardingHub(authSession);
@@ -2048,6 +2115,15 @@ function formatMajorMoney(amount, currency) {
   }
 }
 
+/** Prefer net when calculated; fall back to gross while fees_pending or net is unset/zero. */
+function txDisplayAmountMinor(t) {
+  const net = Number(t?.net_amount);
+  const gross = Number(t?.amount);
+  if (Number.isFinite(net) && net > 0) return net;
+  if (Number.isFinite(gross) && gross > 0) return gross;
+  return 0;
+}
+
 function renderHomeBalances(walletBalances, wallester) {
   const primary = walletBalances[0];
   const walletAvailableMinor = Number(primary?.available) || 0;
@@ -2110,7 +2186,7 @@ function renderHomeTransactions(transactions) {
 function renderTxItem(t) {
   const isCredit = t.direction === 'credit';
   const sign = isCredit ? '+' : '−';
-  const amt = ((Number(t.net_amount ?? t.amount) || 0) / 100).toFixed(2);
+  const amt = (txDisplayAmountMinor(t) / 100).toFixed(2);
   const cur = sanitizeCurrency(t.currency);
   const date = t.created_at
     ? new Date(t.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
@@ -2147,14 +2223,6 @@ function integrationStatus(key) {
 function setWallesterReadyFromSession(session) {
   const status = integrationStatus('wallester');
   wallesterReady = status === 'ACTIVE';
-  const el = document.getElementById('info-wallester');
-  if (!el) return;
-  if (!status) {
-    el.innerHTML = '<span class="badge inactive">Sem conta</span>';
-    return;
-  }
-  const badge = status === 'ACTIVE' ? 'active' : (status === 'PENDING' ? 'pending' : 'inactive');
-  el.innerHTML = `<span class="badge ${badge}">${status}</span>`;
 }
 
 function lifecycleStatus(session) {
@@ -2921,7 +2989,7 @@ async function loadTransactionDetail(id) {
   const isCredit = t.direction === 'credit';
   const sign = isCredit ? '+' : '−';
   const cur = sanitizeCurrency(t.currency);
-  amountEl.textContent = sign + formatMoney(t.net_amount ?? t.amount, cur);
+  amountEl.textContent = sign + formatMoney(txDisplayAmountMinor(t), cur);
   amountEl.style.color = isCredit ? '#059669' : '#dc2626';
   typeEl.textContent = String(t.type || 'transação').replace(/_/g, ' ');
 
@@ -2929,8 +2997,8 @@ async function loadTransactionDetail(id) {
     ['Status', `<span class="badge ${String(t.status || 'pending').toLowerCase()}">${t.status || '—'}</span>`],
     ['Direcção', t.direction || '—'],
     ['Montante', formatMoney(t.amount, cur)],
-    ['Taxa', t.fee ? formatMoney(t.fee, cur) : '—'],
-    ['Líquido', formatMoney(t.net_amount ?? t.amount, cur)],
+    ['Taxa', t.fees_pending ? 'A calcular…' : (t.fee ? formatMoney(t.fee, cur) : '—')],
+    ['Líquido', t.fees_pending ? `${formatMoney(t.amount, cur)} (bruto, a calcular)` : formatMoney(txDisplayAmountMinor(t), cur)],
     ['Descrição', t.description || '—'],
     ['Método', t.payment_method_type || '—'],
     ['Data', t.created_at ? new Date(t.created_at).toLocaleString('pt-PT') : '—'],
@@ -3068,11 +3136,187 @@ async function doLogin() {
   btn.textContent = 'Entrar';
 }
 
+// ── Account info ──────────────────────────────────────
+function formatAccountDate(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatPhoneDisplay(phone) {
+  if (!phone) return '—';
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length === 9) {
+    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  }
+  return phone;
+}
+
+function accountInfoCard(rows) {
+  if (!rows.length) {
+    return `<div class="info-card"><div class="info-row"><span class="info-row-label" style="color:var(--slate-400)">Sem dados</span></div></div>`;
+  }
+  return `<div class="info-card">${rows.map(([label, value]) => `
+    <div class="info-row">
+      <span class="info-row-label">${label}</span>
+      <span class="info-row-value">${value ?? '—'}</span>
+    </div>`).join('')}</div>`;
+}
+
+function resolveAvatarUrl(avatar) {
+  if (!avatar) return null;
+  const raw = String(avatar);
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  return window.location.origin + '/storage/' + raw.replace(/^\//, '');
+}
+
+function customerInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
+function renderAccountAvatar(customer) {
+  const url = resolveAvatarUrl(customer.avatar);
+  const initials = customerInitials(customer.name);
+  const inner = url
+    ? `<img src="${url.replace(/"/g, '&quot;')}" alt="" />`
+    : initials;
+  return `
+    <div class="account-avatar-section">
+      <div class="account-avatar-wrap">
+        <div class="account-avatar" id="account-avatar">${inner}</div>
+        <button type="button" class="account-avatar-edit" onclick="triggerAccountAvatarPick()" aria-label="Alterar foto">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+      </div>
+      <button type="button" class="account-avatar-btn" id="account-avatar-btn" onclick="triggerAccountAvatarPick()">Alterar foto de perfil</button>
+      <input type="file" id="account-avatar-input" accept="image/jpeg,image/png,image/webp" hidden onchange="uploadAccountAvatar(this)" />
+    </div>`;
+}
+
+function triggerAccountAvatarPick() {
+  document.getElementById('account-avatar-input')?.click();
+}
+
+function setAccountAvatarDisplay(url, name) {
+  const el = document.getElementById('account-avatar');
+  if (!el) return;
+  if (url) {
+    el.innerHTML = `<img src="${url.replace(/"/g, '&quot;')}" alt="" />`;
+  } else {
+    el.textContent = customerInitials(name);
+  }
+}
+
+async function uploadAccountAvatar(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+
+  const maxBytes = 2 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    showToast('Imagem demasiado grande (máx. 2MB)', 'error');
+    input.value = '';
+    return;
+  }
+
+  const btn = document.getElementById('account-avatar-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'A enviar...';
+  }
+
+  try {
+    const form = new FormData();
+    form.append('avatar', file);
+
+    const headers = { Accept: 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+
+    const res = await fetch(BASE + '/customer/upload-avatar', { method: 'POST', headers, body: form });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 401 && token) {
+      handleUnauthorized();
+      return;
+    }
+
+    if (!res.ok) {
+      const msg = data?.message || data?.errors?.avatar?.[0] || 'Erro ao enviar foto';
+      showToast(msg, 'error');
+      return;
+    }
+
+    const avatarPath = data.avatar ?? null;
+    const avatarUrl = data.avatar_url || resolveAvatarUrl(avatarPath);
+    const name = authSession?.user?.name;
+
+    if (authSession?.user) {
+      authSession.user.avatar = avatarPath || authSession.user.avatar;
+    }
+
+    setAccountAvatarDisplay(avatarUrl, name);
+    showToast('Foto actualizada', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro ao enviar foto', 'error');
+  } finally {
+    input.value = '';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Alterar foto de perfil';
+    }
+  }
+}
+
+async function loadAccountInfo() {
+  const body = document.getElementById('account-body');
+  if (!body) return;
+  body.innerHTML = '<div class="account-loading">A carregar...</div>';
+
+  let customer = { ...(authSession?.user ?? {}) };
+
+  try {
+    const meRes = await api('GET', '/customer/me');
+    if (meRes.ok) {
+      customer = { ...customer, ...unwrap(meRes.data) };
+    }
+  } catch (_) {
+    /* keep session user */
+  }
+
+  const typeLabel = customer.type === 'corporate'
+    ? 'Pessoa Jurídica'
+    : (customer.type === 'responsible' ? 'Responsável legal' : 'Pessoa Física');
+
+  const profileRows = [
+    ['Nome', customer.name || '—'],
+    ['Username', customer.username ? `@${customer.username}` : '—'],
+    ['E-mail', customer.email || '—'],
+    ['Telefone', formatPhoneDisplay(customer.phone)],
+    ['Tipo', typeLabel],
+    ['Idioma', (customer.language || '—').toUpperCase()],
+    ['Moeda', (customer.currency || '—').toUpperCase()],
+    ['Cliente desde', formatAccountDate(customer.created_at)],
+  ];
+
+  body.innerHTML = `
+    ${renderAccountAvatar(customer)}
+    <div>
+      <div class="section-title">Perfil</div>
+      ${accountInfoCard(profileRows)}
+    </div>
+    <button class="btn-logout" onclick="doLogout()">Terminar sessão</button>
+    ${pinConfigured ? '<button class="btn-link" style="margin-top:12px" onclick="openPinReset()">Refazer PIN</button>' : ''}
+  `;
+}
+
 // ── Home data ─────────────────────────────────────────
 async function loadHomeData() {
-  const resetPinBtn = document.getElementById('btn-reset-pin');
-  if (resetPinBtn) resetPinBtn.style.display = pinConfigured ? 'block' : 'none';
-
   try {
     const [meRes, dashRes, balRes, accountRes] = await Promise.all([
       api('GET', '/customer/me'),
@@ -3083,23 +3327,8 @@ async function loadHomeData() {
 
     if (meRes.ok) {
       const c = unwrap(meRes.data);
-      const name = c?.name || 'Usuário';
+      const name = c?.name || authSession?.user?.name || 'Usuário';
       document.getElementById('home-name').textContent = name.split(' ')[0];
-
-      const st = String(c?.status || 'unknown').toLowerCase();
-      const statusMap = { active: 'active', pending: 'pending', inactive: 'inactive', blocked: 'inactive' };
-      document.getElementById('info-status').innerHTML =
-        `<span class="badge ${statusMap[st] || 'inactive'}">${st}</span>`;
-
-      document.getElementById('info-type').textContent =
-        c?.type === 'corporate' ? 'Pessoa Jurídica' : 'Pessoa Física';
-
-      document.getElementById('info-doc').textContent =
-        c?.document_verified ? 'Aprovado' : (c?.kyc_status ? 'Em análise' : 'Pendente');
-
-      const emailV = c?.email_verified_at || c?.email_verified ? '✓ Verificado' : '✗ Pendente';
-      document.getElementById('info-email').innerHTML =
-        `<span style="color:${(c?.email_verified_at || c?.email_verified) ? 'var(--emerald)' : 'var(--amber)'}">${emailV}</span>`;
     }
 
     let walletBalances = [];
@@ -3115,21 +3344,14 @@ async function loadHomeData() {
       wallester = account?.wallester ?? null;
       const wallesterStatus = integrationStatusValue(wallester?.status);
       wallesterReady = !!(wallester?.wallester_account_id && wallesterStatus === 'ACTIVE');
-      const el = document.getElementById('info-wallester');
-      if (wallester?.wallester_account_id) {
-        const badge = wallesterStatus === 'ACTIVE' ? 'active' : (wallesterStatus === 'PENDING' ? 'pending' : 'inactive');
-        el.innerHTML = `<span class="badge ${badge}">${wallesterStatus}</span>`;
 
-        if (wallesterStatus === 'ACTIVE') {
+      if (wallester?.wallester_account_id && wallesterStatus === 'ACTIVE') {
           const currency = sanitizeCurrency(wallester.currency_code || authSession?.user?.currency || 'EUR');
           const syncRes = await api('POST', `/wallet/account/wallester/sync?currency=${encodeURIComponent(currency)}`);
           if (syncRes.ok) {
             wallester = unwrap(syncRes.data)?.wallester ?? wallester;
           }
         }
-      } else {
-        el.innerHTML = '<span class="badge inactive">Sem conta</span>';
-      }
     } else if (authSession) {
       setWallesterReadyFromSession(authSession);
     }
@@ -3149,31 +3371,11 @@ async function loadHomeData() {
       }
     }
 
-    loadHomeExtras();
+    await loadCustomerCard();
   } catch (e) {
     document.getElementById('home-account').textContent = 'Erro ao carregar';
     showToast(e.message || 'Erro ao carregar dados', 'error');
   }
-}
-
-async function loadHomeExtras() {
-  const pmRes = await api('GET', '/stripe/payment-methods?currency=EUR');
-
-  if (pmRes.ok) {
-    const methods = pmRes.data?.data ?? pmRes.data ?? [];
-    const list = document.getElementById('pm-list');
-    if (Array.isArray(methods) && methods.length > 0) {
-      list.innerHTML = methods.map(pm => `
-        <div class="info-row">
-          <span class="info-row-label">${pm.label || pm.payment_method}</span>
-          <span class="info-row-value">${String(pm.currency || 'EUR').toUpperCase()}</span>
-        </div>`).join('');
-    } else {
-      list.innerHTML = `<div class="info-row"><span class="info-row-label" style="color:var(--slate-400)">Nenhum método cadastrado</span></div>`;
-    }
-  }
-
-  await loadCustomerCard();
 }
 
 // ── Deposit (Stripe top-up) ───────────────────────────
@@ -3261,7 +3463,7 @@ async function doDeposit() {
     document.getElementById('deposit-confirm-btn').style.display = 'block';
     document.getElementById('deposit-btn').style.display = 'none';
     result.classList.add('show', 'success');
-    result.textContent = `Intent criada.\nTransaction: ${data.transaction?.id ?? '—'}`;
+    result.textContent = `Intent criada.\nPayment intent: ${data.payment_intent?.id ?? '—'}`;
     showToast('Preencha o cartão e confirme', 'success');
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
@@ -3698,11 +3900,6 @@ async function tryAutoLogin() {
     if (!accOk) return;
     const w = unwrap(accData)?.wallester;
     wallesterReady = !!(w?.wallester_account_id && integrationStatusValue(w?.status) === 'ACTIVE');
-    if (w?.wallester_account_id) {
-      const st = integrationStatusValue(w.status || 'UNKNOWN');
-      const badge = st === 'ACTIVE' ? 'active' : (st === 'PENDING' ? 'pending' : 'inactive');
-      document.getElementById('info-wallester').innerHTML = `<span class="badge ${badge}">${st}</span>`;
-    }
     if (wallesterReady) await loadCustomerCard();
   });
 }
