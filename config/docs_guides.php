@@ -15,6 +15,12 @@ return [
             'file' => 'getting-started.md',
         ],
         [
+            'slug' => 'auth-session',
+            'title' => 'AuthSession — campos JSON',
+            'description' => 'Referência de cada chave em login, registo e login-pin.',
+            'file' => 'auth-session.md',
+        ],
+        [
             'slug' => 'onboarding-lifecycle',
             'title' => 'Ciclo de vida da conta',
             'description' => 'Estados desde o registo até ACTIVE e integrações.',

@@ -18,8 +18,7 @@ class AuthSessionResource extends JsonResource
         /** @var OnboardingStatus $onboarding */
         $onboarding = $this->resource['onboarding_status'];
         $status = $onboarding->toArray();
-
-        $session = $status['identity_verification']['session'] ?? null;
+        $identityVerification = $onboarding->identityVerificationForAuth();
 
         return [
             'token' => $this->resource['token'],
@@ -29,10 +28,10 @@ class AuthSessionResource extends JsonResource
             'integrations' => $status['integrations'],
             'onboarding' => $status['onboarding'],
             'verification' => $status['verification'],
-            'identity_verification' => [
-                'status' => $status['identity_verification']['status'],
-                'session' => $session
-                    ? IdentityVerificationSessionResource::make($session)
+            'identity_verification' => $identityVerification === null ? null : [
+                'status' => $identityVerification['status'],
+                'session' => ($identityVerification['session'] ?? null)
+                    ? IdentityVerificationSessionResource::make($identityVerification['session'])
                     : null,
             ],
         ];

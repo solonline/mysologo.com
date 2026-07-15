@@ -48,7 +48,8 @@ Só fica **BLOCKED** se **ambos** Ebury e Wallester forem rejeitados.
 ### 1. Registo / login
 
 - `POST /api/auth/register-retail` ou `POST /api/auth/login`
-- Ler `lifecycle`, `capabilities`, `integrations` na resposta
+- Ler `lifecycle`, `capabilities`, `integrations` e `identity_verification` na resposta
+- 📖 [Referência de cada campo](/docs/guides/auth-session)
 
 ### 2. Email
 
@@ -99,8 +100,13 @@ Use sempre a resposta de login/registo:
 ```json
 {
   "lifecycle": { "status": "PROVISIONING", "label": "...", "reason": null },
-  "capabilities": { "can_transact": false, ... },
-  "integrations": { "stripe": "...", "ebury": "...", "wallester": "..." }
+  "capabilities": { "can_transact": false, "blockers": [] },
+  "integrations": {
+    "stripe": { "status": "ACTIVE", "iban": { "iban": "DE89…", "bic": "…" } },
+    "wallester": { "status": "PENDING", "iban": null },
+    "ebury": { "status": "PENDING", "iban": null }
+  },
+  "identity_verification": null
 }
 ```
 

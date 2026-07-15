@@ -389,7 +389,83 @@ class IntegrationAccountService
             source: $account->status_source,
             updatedAt: $account->status_changed_at?->toIso8601String(),
             blockedActions: $status ? $status->blockedActionsFor($provider) : [],
+            iban: $this->resolveIbanDetails($provider, $account),
         );
+    }
+
+    private function resolveIbanDetails(
+        IntegrationProvider $provider,
+        CustomerStripeAccount|CustomerWallesterAccount|CustomerEburyAccount $account,
+    ): ?array {
+        return match ($provider) {
+            IntegrationProvider::STRIPE => $account instanceof CustomerStripeAccount
+                ? $this->resolveStripeIban($account)
+                : null,
+            IntegrationProvider::WALLESTER => $account instanceof CustomerWallesterAccount
+                ? $this->resolveWallesterIban($account)
+                : null,
+            IntegrationProvider::EBURY => $account instanceof CustomerEburyAccount
+                ? $this->resolveEburyIban($account)
+                : null,
+        };
+    }
+
+    private function resolveStripeIban(CustomerStripeAccount $account): ?array
+    {
+        $iban = $account->funding_iban ?? $account->viban;
+
+        if (! filled($iban)) {
+            return null;
+        }
+
+        return $this->compactIbanPayload([
+            'iban' => $iban,
+            'bic' => $account->funding_bic,
+            'account_holder_name' => $account->funding_account_holder_name,
+            'country' => $account->funding_country,
+            'funding_status' => $account->funding_status?->value,
+            'bank_transfer_type' => $account->bank_transfer_type,
+        ]);
+    }
+
+    private function resolveWallesterIban(CustomerWallesterAccount $account): ?array
+    {
+        $iban = $account->iban ?? $account->viban;
+
+        if (! filled($iban)) {
+            return null;
+        }
+
+        return $this->compactIbanPayload([
+            'iban' => $iban,
+            'bic' => $account->swift_code,
+            'account_holder_name' => $account->receiver_name,
+            'bank_name' => $account->bank_name,
+            'viban' => filled($account->viban) && $account->viban !== $iban ? $account->viban : null,
+        ]);
+    }
+
+    private function resolveEburyIban(CustomerEburyAccount $account): ?array
+    {
+        if (! filled($account->iban)) {
+            return null;
+        }
+
+        return $this->compactIbanPayload([
+            'iban' => $account->iban,
+            'currency' => $account->currency,
+        ]);
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function compactIbanPayload(array $payload): ?array
+    {
+        $filtered = array_filter(
+            $payload,
+            fn (mixed $value) => filled($value),
+        );
+
+        return $filtered === [] ? null : $filtered;
     }
 
     private function persistStatus(

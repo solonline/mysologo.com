@@ -16,13 +16,17 @@ kyc-identity-session:
     summary: Criar sessão de verificação de identidade
     operationId: kycIdentitySession
     description: |
-      Cria ou reutiliza sessão Didit para KYC individual.
+      Cria ou reutiliza sessão Didit para KYC individual ou KYB corporate.
 
-      **Quando usar:** após email e telefone verificados, quando `identity_verification.status` não está aprovado.
+      **Quando usar:**
+      - `identity_verification.session` é `null` mas o utilizador precisa de verificar
+      - Status `Expired`, `Abandoned` ou `Declined` no login
+      - Após login-pin quando não veio `verification_url`
 
-      **Resposta:** inclui `session_url` para redireccionar o utilizador ao fluxo Didit.
+      **Resposta:** formato legado com `session_url` (não `verification_url`).
+      Ver [AuthSession — identity_verification](/docs/guides/auth-session#identity_verification) para mapeamento de campos.
 
-      O webhook `/api/webhooks/didit` actualiza o estado quando o utilizador conclui.
+      O webhook `POST /api/webhooks/didit` actualiza o estado quando o utilizador conclui.
     security:
       - bearerAuth: []
     responses:

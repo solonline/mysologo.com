@@ -116,6 +116,43 @@ class IntegrationAccountServiceTest extends TestCase
         $this->assertSame('DE', $account->funding_country);
         $this->assertSame('bank_transfer', $account->funding_type);
         $this->assertSame('eu_bank_transfer', $account->bank_transfer_type);
+
+        $states = $this->integrations->resolveStates($customer->fresh());
+        $stripeIban = $states['stripe']->iban;
+
+        $this->assertIsArray($stripeIban);
+        $this->assertSame('DE89370400440532013000', $stripeIban['iban']);
+        $this->assertSame('COBADEFFXXX', $stripeIban['bic']);
+        $this->assertSame('Test User', $stripeIban['account_holder_name']);
+        $this->assertSame('ACTIVE', $stripeIban['funding_status']);
+    }
+
+    public function test_resolve_states_includes_wallester_iban_when_available(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_iban_acc', [
+            'iban' => 'PT50000201231234567890154',
+            'swift_code' => 'BBPIPTPL',
+            'receiver_name' => 'Customer Name',
+        ]);
+
+        $states = $this->integrations->resolveStates($customer->fresh());
+        $wallesterIban = $states['wallester']->iban;
+
+        $this->assertIsArray($wallesterIban);
+        $this->assertSame('PT50000201231234567890154', $wallesterIban['iban']);
+        $this->assertSame('BBPIPTPL', $wallesterIban['bic']);
+        $this->assertSame('Customer Name', $wallesterIban['account_holder_name']);
+    }
+
+    public function test_resolve_states_omits_iban_when_not_provisioned(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE);
+
+        $states = $this->integrations->resolveStates($customer->fresh());
+
+        $this->assertNull($states['stripe']->iban);
     }
 
     public function test_mark_stripe_funding_failed_persists_reason(): void

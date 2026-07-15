@@ -87,6 +87,10 @@ class OnboardingStatusResolver
 
     private function resolveRetailIdentity(Customer $customer): array
     {
+        if ($this->isDocumentApproved($customer)) {
+            return $this->emptyIdentityResult();
+        }
+
         $result = $this->identityVerification->ensureValidIndividualDocument($customer);
 
         return [
@@ -105,6 +109,14 @@ class OnboardingStatusResolver
                 'requires_responsible' => true,
                 'session' => null,
                 'message' => 'A legal representative must be registered before identity verification.',
+            ];
+        }
+
+        if ($this->isDocumentApproved($customer)) {
+            return [
+                'requires_responsible' => false,
+                'session' => null,
+                'message' => null,
             ];
         }
 

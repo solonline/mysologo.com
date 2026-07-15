@@ -13,8 +13,8 @@ Saber quando um customer pode usar wallet, top-up e P2P.
 | Telefone verificado | `verification.phone` ou `phone_verified` |
 | KYC aprovado | `verification.identity` / `kyc_status` |
 | Funding partner | `integrations` — Ebury **ou** Wallester activo |
-| Stripe | `integrations.stripe` pronto |
-| Pode transaccionar | `capabilities` (ex. `can_transact`) |
+| Stripe | `integrations.stripe.status` + `integrations.stripe.iban` quando existir |
+| Pode transaccionar | `capabilities.can_transact` |
 
 ## Regra de negócio
 
@@ -40,7 +40,9 @@ Se falhar → **403** com mensagem no JSON.
 |----------|----------------|
 | `GET /api/customer/me` | Perfil + flags de verificação |
 | `GET /api/wallet/dashboard` | Só funciona se elegível |
-| `GET /api/wallet/account` | Dados Stripe/Wallester (IBAN, vIBAN) |
+| `GET /api/wallet/account` | Dados Stripe/Wallester (legado; preferir `integrations.*.iban` no login) |
+
+📖 **Campos do login:** [AuthSession](/docs/guides/auth-session)
 
 ## Ainda não está pronto?
 

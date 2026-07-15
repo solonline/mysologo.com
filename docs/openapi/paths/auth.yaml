@@ -125,8 +125,13 @@ auth-login:
       Use o token em todos os endpoints protegidos:
       `Authorization: Bearer {token}`
 
-      O objeto `capabilities` indica o que o utilizador pode fazer
-      (ex.: transaccionar, verificar identidade).
+      **Campos principais:**
+      - `lifecycle.status` — ecrã de onboarding
+      - `capabilities` — permissões actuais (`can_transact`, …)
+      - `integrations` — Stripe / Wallester / Ebury + `iban` quando provisionado
+      - `identity_verification` — sessão KYC (condicional; `null` se já aprovado)
+
+      📖 [Referência completa AuthSession](/docs/guides/auth-session)
     requestBody:
       required: true
       content:
@@ -150,6 +155,93 @@ auth-login:
           application/json:
             schema:
               $ref: '../components/schemas.yaml#/AuthSession'
+            examples:
+              accountActive:
+                summary: Conta ACTIVE — KYC aprovado
+                value:
+                  token: '1|example-token'
+                  user:
+                    id: 1
+                    name: John Doe
+                    username: johndoe
+                    type: retail
+                    email: john@example.com
+                    language: pt
+                    currency: EUR
+                    phone: '351912345678'
+                  lifecycle:
+                    status: ACTIVE
+                    label: Ativo
+                    is_negative: false
+                    reason: null
+                  capabilities:
+                    can_use_platform: true
+                    can_transact: true
+                    can_top_up_stripe: true
+                    can_withdraw_wallester: true
+                    can_receive_ebury: false
+                    blockers: []
+                  integrations:
+                    stripe:
+                      provider: stripe
+                      label: Stripe
+                      status: ACTIVE
+                      iban:
+                        iban: DE89370400440532013000
+                        bic: COBADEFFXXX
+                        account_holder_name: John Doe
+                        funding_status: ACTIVE
+                    wallester:
+                      provider: wallester
+                      label: Wallester
+                      status: ACTIVE
+                      iban: null
+                    ebury:
+                      provider: ebury
+                      label: Ebury
+                      status: PENDING
+                      iban: null
+                  onboarding:
+                    requires_responsible: false
+                    message: null
+                  verification:
+                    email: true
+                    phone: true
+                    identity: APPROVED
+                  identity_verification: null
+              kycInProgress:
+                summary: KYC em curso — sessão com verification_url
+                value:
+                  token: '1|example-token'
+                  lifecycle:
+                    status: PENDING_IDENTITY_VERIFICATION
+                    label: Aguardando identidade
+                    is_negative: false
+                  verification:
+                    email: true
+                    phone: true
+                    identity: PENDING
+                  identity_verification:
+                    status: In Progress
+                    session:
+                      id: 12
+                      customer_id: 3
+                      status: In Progress
+                      external_session_id: d54203d5-1dee-44c8-bbdb-ebe1fc1418ef
+                      verification_url: https://verify.didit.me/en/session/example
+                      callback_url: https://yooppayments.eu/verification-pending
+                      metadata:
+                        application_id: c159a625-9dde-444c-990d-9accf2298448
+              kycInReview:
+                summary: Documentos em análise — session null
+                value:
+                  lifecycle:
+                    status: IDENTITY_UNDER_REVIEW
+                  verification:
+                    identity: ANALYSING
+                  identity_verification:
+                    status: In Review
+                    session: null
       '401':
         $ref: '../components/responses.yaml#/Unauthorized'
       '422':

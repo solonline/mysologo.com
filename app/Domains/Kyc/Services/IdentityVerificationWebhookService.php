@@ -412,6 +412,37 @@ class IdentityVerificationWebhookService
         return str_starts_with($url, 'http://') || str_starts_with($url, 'https://');
     }
 
+    private function isSessionLifecycleStatus(string $status): bool
+    {
+        return in_array($status, ['Expired', 'Abandoned'], true);
+    }
+
+    private function hasApprovedDocument(Customer $customer): bool
+    {
+        $docStatus = $customer->doc_status;
+
+        if ($docStatus instanceof DocumentStatus) {
+            return $docStatus === DocumentStatus::APPROVED;
+        }
+
+        return strtolower((string) $docStatus) === strtolower(DocumentStatus::APPROVED->value);
+    }
+
+    private function shouldSendDocumentStatusEmail(string $status): bool
+    {
+        return in_array($status, ['Approved', 'Declined', 'In Review'], true);
+    }
+
+    private function mapStatusForEmail(string $status): string
+    {
+        return match ($status) {
+            'Approved' => 'approved',
+            'Declined' => 'declined',
+            'In Review' => 'pending',
+            default => strtolower($status),
+        };
+    }
+
     private function applyIdentityDecision(Customer $customer, array $decision, ?CustomerDiditSession $diditSession = null): void
     {
         if ($this->isKyBSession($customer, $diditSession)) {
@@ -426,16 +457,15 @@ class IdentityVerificationWebhookService
             return;
         }
 
-        $statusForEmail = match ($status) {
-            'Approved' => 'approved',
-            'Declined' => 'declined',
-            'In Review', 'In Progress' => 'pending',
-            'Not Started' => 'pending',
-            default => strtolower($status),
-        };
+        if ($this->isSessionLifecycleStatus($status) || $this->hasApprovedDocument($customer)) {
+            return;
+        }
 
-        if ($statusForEmail) {
-            SendDocumentStatusEmail::dispatch($customer, $statusForEmail)->onQueue('emails');
+        if ($this->shouldSendDocumentStatusEmail($status)) {
+            SendDocumentStatusEmail::dispatch(
+                $customer,
+                $this->mapStatusForEmail($status),
+            )->onQueue('emails');
         }
 
         if (in_array($status, ['Approved', 'In Review', 'In Progress'], true)) {
@@ -493,16 +523,15 @@ class IdentityVerificationWebhookService
             return;
         }
 
-        $statusForEmail = match ($status) {
-            'Approved' => 'approved',
-            'Declined' => 'declined',
-            'In Review', 'In Progress' => 'pending',
-            'Not Started' => 'pending',
-            default => strtolower($status),
-        };
+        if ($this->isSessionLifecycleStatus($status) || $this->hasApprovedDocument($customer)) {
+            return;
+        }
 
-        if ($statusForEmail) {
-            SendDocumentStatusEmail::dispatch($customer, $statusForEmail)->onQueue('emails');
+        if ($this->shouldSendDocumentStatusEmail($status)) {
+            SendDocumentStatusEmail::dispatch(
+                $customer,
+                $this->mapStatusForEmail($status),
+            )->onQueue('emails');
         }
 
         $corporateDocument = $this->corporateDocumentRepository->latestByCustomer($customer);

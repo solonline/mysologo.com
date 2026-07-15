@@ -48,7 +48,8 @@ info:
     register → email → phone → KYC → provisioning → ACTIVE → wallet
     ```
 
-    Login/registo devolvem `lifecycle`, `capabilities` e `integrations`.
+    Login/registo devolvem `lifecycle`, `capabilities`, `integrations` e `identity_verification`.
+    Referência de cada chave: **[AuthSession](/docs/guides/auth-session)**.
 
     ## Guias conceituais
 
@@ -196,7 +197,9 @@ paths:
     $ref: './paths/stripe.yaml#/stripe-fee-estimates'
   /stripe/create-intent-payment:
     $ref: './paths/stripe.yaml#/stripe-create-intent-payment'
-  /stripe/terminal/{transaction}/capture:
+  /stripe/payment-intents/{paymentIntent}:
+    $ref: './paths/stripe.yaml#/stripe-show-payment-intent'
+  /stripe/terminal/{paymentIntent}/capture:
     $ref: './paths/stripe.yaml#/stripe-terminal-capture'
 
   # Wallester

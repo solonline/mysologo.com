@@ -4,6 +4,7 @@ namespace Tests\Feature\Domains\Kyc;
 
 use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Kyc\Jobs\UploadDocumentMediaJob;
+use App\Domains\Kyc\Mail\DocumentStatusMail;
 use App\Domains\Kyc\Services\IdentityVerificationWebhookService;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Models\CustomerDiditSession;
@@ -258,6 +259,53 @@ class IdentityVerificationWebhookTest extends TestCase
         $this->assertSame(CustomerLifecycleStatus::PENDING_IDENTITY_VERIFICATION, $customer->status);
         $this->assertSame(DocumentStatus::PENDING->value, $customer->doc_status);
         $this->assertSame('Not Started', $session->status);
+        Mail::assertNotSent(DocumentStatusMail::class);
+    }
+
+    public function test_in_progress_session_does_not_send_document_status_email(): void
+    {
+        $applicationId = 'c159a625-9dde-444c-990d-9accf2298448';
+        $sessionId = '1760a174-62c5-40a1-be27-89f81a1accb2';
+
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::PENDING_IDENTITY_VERIFICATION,
+            'doc_status' => DocumentStatus::PENDING->value,
+        ]);
+        $this->createDiditSession($customer, $sessionId);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditStatusUpdatedPayload($applicationId, $sessionId, 'In Progress'),
+        );
+
+        Mail::assertNotSent(DocumentStatusMail::class);
+    }
+
+    public function test_in_review_sends_pending_document_status_email(): void
+    {
+        $applicationId = 'c159a625-9dde-444c-990d-9accf2298448';
+        $sessionId = '9e06e806-4b55-4b79-b7fa-792287ae7ed8';
+
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+            'doc_status' => DocumentStatus::PENDING->value,
+        ]);
+        $this->createDiditSession($customer, $sessionId);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditStatusUpdatedPayload($applicationId, $sessionId, 'In Review', [
+                'id_verifications' => [
+                    [
+                        'document_number' => 'DOC123',
+                        'full_name' => 'Mario Rossi',
+                        'status' => 'In Review',
+                    ],
+                ],
+            ]),
+        );
+
+        Mail::assertSent(DocumentStatusMail::class, function (DocumentStatusMail $mail) use ($customer): bool {
+            return $mail->hasTo($customer->email) && $mail->status === 'pending';
+        });
     }
 
     public function test_status_updated_finds_session_by_application_id_metadata(): void
@@ -499,5 +547,96 @@ class IdentityVerificationWebhookTest extends TestCase
             'document_number' => 'DOC123',
             'full_name' => 'Correct Customer',
         ]);
+    }
+
+    public function test_expired_session_does_not_send_document_status_email(): void
+    {
+        $applicationId = 'c159a625-9dde-444c-990d-9accf2298448';
+        $sessionId = 'd54203d5-1dee-44c8-bbdb-ebe1fc1418ef';
+        $webhookSessionId = 'fdd2191b-ed54-411b-90f7-356265ff865f';
+
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+            'doc_status' => DocumentStatus::ANALYSING->value,
+        ]);
+
+        CustomerDiditSession::query()->create([
+            'customer_id' => $customer->id,
+            'session_id' => $sessionId,
+            'status' => 'In Progress',
+            'workflow_id' => 'wf_test',
+            'session_url' => 'https://didit.test/session-expired',
+            'metadata' => [
+                'application_id' => $applicationId,
+                'session_id' => $webhookSessionId,
+            ],
+        ]);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditStatusUpdatedPayload($applicationId, $webhookSessionId, 'Expired'),
+        );
+
+        $customer->refresh();
+
+        $this->assertSame(DocumentStatus::ANALYSING->value, $customer->doc_status);
+        $this->assertSame(CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW, $customer->status);
+        Mail::assertNotSent(DocumentStatusMail::class);
+    }
+
+    public function test_expired_session_does_not_change_already_approved_customer(): void
+    {
+        $applicationId = 'c159a625-9dde-444c-990d-9accf2298448';
+        $sessionId = 'd54203d5-1dee-44c8-bbdb-ebe1fc1418ef';
+        $webhookSessionId = 'fdd2191b-ed54-411b-90f7-356265ff865f';
+
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'doc_status' => DocumentStatus::APPROVED->value,
+        ]);
+
+        $session = CustomerDiditSession::query()->create([
+            'customer_id' => $customer->id,
+            'session_id' => $sessionId,
+            'status' => 'Approved',
+            'workflow_id' => 'wf_test',
+            'session_url' => 'https://didit.test/session-approved',
+            'metadata' => [
+                'application_id' => $applicationId,
+                'session_id' => $webhookSessionId,
+            ],
+        ]);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditStatusUpdatedPayload($applicationId, $webhookSessionId, 'Expired'),
+        );
+
+        $customer->refresh();
+        $session->refresh();
+
+        $this->assertSame(DocumentStatus::APPROVED->value, $customer->doc_status);
+        $this->assertSame(CustomerLifecycleStatus::ACTIVE, $customer->status);
+        $this->assertSame('Expired', $session->status);
+        Mail::assertNotSent(DocumentStatusMail::class);
+    }
+
+    public function test_abandoned_session_does_not_send_document_status_email(): void
+    {
+        $sessionId = 'sess-abandoned-001';
+
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::PENDING_IDENTITY_VERIFICATION,
+            'doc_status' => DocumentStatus::PENDING->value,
+        ]);
+        $this->createDiditSession($customer, $sessionId);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditUserDataUpdatedPayload($sessionId, 'vendor-abandoned', 'Abandoned'),
+        );
+
+        $customer->refresh();
+
+        $this->assertSame(DocumentStatus::PENDING->value, $customer->doc_status);
+        $this->assertSame(CustomerLifecycleStatus::PENDING_IDENTITY_VERIFICATION, $customer->status);
+        Mail::assertNotSent(DocumentStatusMail::class);
     }
 }

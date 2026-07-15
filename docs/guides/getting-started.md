@@ -43,9 +43,10 @@ A resposta **AuthSession** inclui:
 | `token` | Guardar e enviar em `Authorization: Bearer {token}` |
 | `lifecycle.status` | Ecrã seguinte (email, telefone, KYC…) |
 | `capabilities` | O que está permitido agora |
-| `integrations` | Estado Ebury / Wallester / Stripe |
+| `integrations` | Estado Ebury / Wallester / Stripe + IBAN quando existir |
+| `identity_verification` | Sessão KYC (condicional — ver guia) |
 
-📖 **API:** [Auth](/docs) · [Ciclo de vida](/docs/guides/onboarding-lifecycle)
+📖 **Referência completa:** [AuthSession — campos JSON](/docs/guides/auth-session) · [Ciclo de vida](/docs/guides/onboarding-lifecycle) · [API Auth](/docs)
 
 ## 2. Chamadas autenticadas
 

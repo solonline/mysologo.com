@@ -14,6 +14,7 @@ readonly class IntegrationAccountState
         public ?string $source = null,
         public ?string $updatedAt = null,
         public array $blockedActions = [],
+        public ?array $iban = null,
     ) {}
 
     public function toArray(): array
@@ -26,6 +27,7 @@ readonly class IntegrationAccountState
             'source' => $this->source,
             'updated_at' => $this->updatedAt,
             'blocked_actions' => $this->blockedActions,
+            'iban' => $this->iban,
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domains\Onboarding\DTOs;
 
+use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 
 /**
@@ -51,6 +52,60 @@ readonly class OnboardingStatus
                 'session' => $this->identitySession,
             ],
         ];
+    }
+
+    /**
+     * Payload de identity_verification para respostas de auth (login).
+     * Omite sessão quando o KYC já concluiu ou a sessão não exige acção do utilizador.
+     *
+     * @return array{status: string, session: array<string, mixed>|null}|null
+     */
+    public function identityVerificationForAuth(): ?array
+    {
+        if ($this->isIdentityComplete()) {
+            return null;
+        }
+
+        $sessionStatus = (string) ($this->identitySession['status'] ?? $this->identityStatus);
+
+        if ($this->isTerminalSessionStatus($sessionStatus) || $sessionStatus === 'In Review') {
+            return [
+                'status' => $sessionStatus,
+                'session' => null,
+            ];
+        }
+
+        if (! $this->hasActionableSession()) {
+            return [
+                'status' => $sessionStatus,
+                'session' => null,
+            ];
+        }
+
+        return [
+            'status' => $sessionStatus,
+            'session' => $this->identitySession,
+        ];
+    }
+
+    private function isIdentityComplete(): bool
+    {
+        return strtolower($this->identityStatus) === strtolower(DocumentStatus::APPROVED->value);
+    }
+
+    private function isTerminalSessionStatus(string $status): bool
+    {
+        return in_array($status, ['Approved', 'Expired', 'Abandoned'], true);
+    }
+
+    private function hasActionableSession(): bool
+    {
+        if (! is_array($this->identitySession)) {
+            return false;
+        }
+
+        return filled($this->identitySession['session_id'] ?? null)
+            || filled($this->identitySession['session_url'] ?? null);
     }
 
     /**
