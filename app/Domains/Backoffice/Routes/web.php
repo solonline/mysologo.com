@@ -35,6 +35,7 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('.customers')->middleware('can:customers.view');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('.customers.show')->middleware('can:customers.view');
+    Route::get('/customers/{customer}/transactions', [TransactionController::class, 'customer'])->name('.customers.transactions')->middleware('can:customers.view');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('.customers.update')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/phone', [CustomerController::class, 'requestPhoneChange'])->name('.customers.phone.request')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/phone/resend', [CustomerController::class, 'resendPhoneChange'])->name('.customers.phone.resend')->middleware('can:customers.edit');

@@ -695,6 +695,102 @@
             @endforelse
         </div>
 
+        {{-- Movimentos recentes --}}
+        <div id="transactions" class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            @php
+                $incomingMovements = $recentMovements->filter(function (array $item): bool {
+                    $direction = $item['movement']->direction?->value ?? (string) $item['movement']->direction;
+
+                    return in_array($direction, ['credit', 'in'], true);
+                })->count();
+                $outgoingMovements = $recentMovements->count() - $incomingMovements;
+                $wallesterTypeLabels = [
+                    'account_transfer' => 'Transferência',
+                    'card_purchase' => 'Compra cartão',
+                    'card_refund' => 'Reembolso cartão',
+                    'inbound_payment' => 'Entrada',
+                    'fee' => 'Taxa',
+                ];
+            @endphp
+
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-900">Movimentos</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Entradas e saídas mais recentes</p>
+                </div>
+                <a href="{{ route('dashboard.customers.transactions', $customer) }}"
+                   class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors whitespace-nowrap">
+                    Ver todas
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+
+            @if ($recentMovements->isNotEmpty())
+            <div class="px-5 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/60">
+                <span class="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                    +{{ $incomingMovements }} entradas
+                </span>
+                <span class="text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
+                    −{{ $outgoingMovements }} saídas
+                </span>
+            </div>
+            <div class="divide-y divide-slate-100">
+                @foreach ($recentMovements as $item)
+                @php
+                    $movement = $item['movement'];
+                    $direction = $movement->direction?->value ?? (string) $movement->direction;
+                    $isIncoming = in_array($direction, ['credit', 'in'], true);
+                    $isStripe = $item['source'] === 'stripe';
+                    $typeValue = $movement->type?->value ?? (string) $movement->type;
+                    $typeLabel = $isStripe
+                        ? ($movement->type?->label() ?? ucfirst(str_replace('_', ' ', $typeValue)))
+                        : ($wallesterTypeLabels[$typeValue] ?? ucfirst(str_replace('_', ' ', $typeValue)));
+                    $metadata = $isStripe ? ($movement->stripe_metadata ?? []) : ($movement->metadata ?? []);
+                    $merchantCity = $metadata['merchant_city'] ?? null;
+                    $merchantCategoryCode = $metadata['merchant_category_code'] ?? null;
+                @endphp
+                <div data-customer-movement class="px-5 py-3 flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 {{ $isIncoming ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500' }}">
+                        <svg class="w-4 h-4 {{ $isIncoming ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17L17 7m0 0H7m10 0v10"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm font-semibold text-slate-800 truncate">{{ $movement->description ?: $typeLabel }}</p>
+                            <span class="text-[10px] font-bold uppercase tracking-wide {{ $isStripe ? 'text-indigo-500' : 'text-violet-500' }}">
+                                {{ $isStripe ? 'Stripe' : 'Wallester' }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-400 truncate">
+                            {{ $typeLabel }} · {{ $item['occurred_at']?->format('d/m/Y H:i') ?? '—' }}
+                            @if ($movement->wallesterCard?->name ?? null)
+                                · {{ $movement->wallesterCard->name }}
+                            @endif
+                            @if ($merchantCity)
+                                · {{ $merchantCity }}
+                            @endif
+                            @if ($merchantCategoryCode)
+                                · MCC {{ $merchantCategoryCode }}
+                            @endif
+                        </p>
+                    </div>
+                    <span class="text-sm font-bold whitespace-nowrap {{ $isIncoming ? 'text-emerald-600' : 'text-red-500' }}">
+                        {{ $isIncoming ? '+' : '−' }}{{ number_format(abs($movement->amount) / 100, 2, ',', '.') }}
+                        <span class="text-xs font-medium text-slate-400">{{ strtoupper($movement->currency) }}</span>
+                    </span>
+                </div>
+                @endforeach
+            </div>
+            @else
+            <div class="px-5 py-10 text-center">
+                <p class="text-sm text-slate-400">Nenhum movimento encontrado.</p>
+            </div>
+            @endif
+        </div>
+
         {{-- TPAs --}}
         <div x-data="{
                  showFeeModal: false,

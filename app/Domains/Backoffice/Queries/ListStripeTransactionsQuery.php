@@ -17,6 +17,10 @@ class ListStripeTransactionsQuery
             ->latest('stripe_created_at')
             ->latest('id');
 
+        if ($customerId = $filters['customer_id'] ?? null) {
+            $query->where('customer_id', $customerId);
+        }
+
         if ($search = trim((string) ($filters['search'] ?? ''))) {
             $query->where(function ($q) use ($search) {
                 if (is_numeric($search)) {

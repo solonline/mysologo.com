@@ -1,13 +1,26 @@
 @extends('layouts.dashboard')
 
-@section('title', 'Transações')
-@section('breadcrumb', 'Transações')
+@section('title', $customerContext ? 'Transações de '.$customerContext->name : 'Transações')
+@section('breadcrumb', $customerContext ? 'Clientes / Transações' : 'Transações')
 
 @section('page-header')
-<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+    @if ($customerContext)
+    <a href="{{ route('dashboard.customers.show', $customerContext) }}"
+       class="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+       aria-label="Voltar ao cliente">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+    </a>
+    @endif
     <div>
-        <h1 class="text-2xl font-bold text-slate-900">Transações</h1>
-        <p class="mt-1 text-sm text-slate-500">Pagamentos Stripe e movimentos Wallester — visões separadas por origem.</p>
+        <h1 class="text-2xl font-bold text-slate-900">
+            {{ $customerContext ? 'Transações de '.$customerContext->name : 'Transações' }}
+        </h1>
+        <p class="mt-1 text-sm text-slate-500">
+            {{ $customerContext ? $customerContext->email.' — pagamentos Stripe e movimentos Wallester.' : 'Pagamentos Stripe e movimentos Wallester — visões separadas por origem.' }}
+        </p>
     </div>
 </div>
 @endsection
@@ -15,6 +28,10 @@
 @section('content')
 
 @php
+    $transactionsRoute = $customerContext
+        ? route('dashboard.customers.transactions', $customerContext)
+        : route('dashboard.transactions');
+
     $tabQuery = fn (string $targetTab) => request()->fullUrlWithQuery(array_merge(
         request()->except(['page']),
         ['tab' => $targetTab],
@@ -81,7 +98,7 @@
     @if ($tab === 'stripe')
     {{-- Stripe filters --}}
     <div class="px-5 py-4 border-b border-slate-100">
-        <form method="GET" action="{{ route('dashboard.transactions') }}" class="flex flex-wrap items-center gap-3">
+        <form method="GET" action="{{ $transactionsRoute }}" class="flex flex-wrap items-center gap-3">
             <input type="hidden" name="tab" value="stripe">
 
             <div class="relative flex-1 min-w-48">
@@ -135,7 +152,7 @@
             </button>
 
             @if (request()->hasAny(['search', 'type', 'status', 'partner_funding_status', 'from', 'to', 'with_platform_fee']))
-            <a href="{{ route('dashboard.transactions', ['tab' => 'stripe']) }}"
+            <a href="{{ $transactionsRoute }}?tab=stripe"
                class="px-3 py-2 text-sm text-slate-500 hover:text-slate-700 transition">Limpar</a>
             @endif
         </form>
@@ -306,7 +323,7 @@
     @else
     {{-- Wallester filters --}}
     <div class="px-5 py-4 border-b border-slate-100">
-        <form method="GET" action="{{ route('dashboard.transactions') }}" class="flex flex-wrap items-center gap-3">
+        <form method="GET" action="{{ $transactionsRoute }}" class="flex flex-wrap items-center gap-3">
             <input type="hidden" name="tab" value="wallester">
 
             <div class="relative flex-1 min-w-48">
@@ -368,7 +385,7 @@
             </button>
 
             @if (request()->hasAny(['search', 'movement_type', 'movement_status', 'direction', 'source', 'from', 'to']))
-            <a href="{{ route('dashboard.transactions', ['tab' => 'wallester']) }}"
+            <a href="{{ $transactionsRoute }}?tab=wallester"
                class="px-3 py-2 text-sm text-slate-500 hover:text-slate-700 transition">Limpar</a>
             @endif
         </form>

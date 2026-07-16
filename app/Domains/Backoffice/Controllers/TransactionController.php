@@ -11,7 +11,9 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class TransactionController extends Controller
 {
@@ -20,7 +22,17 @@ class TransactionController extends Controller
         protected ListFundingPartnerMovementsQuery $listFundingPartnerMovements,
     ) {}
 
-    public function index(Request $request)
+    public function index(Request $request): View
+    {
+        return $this->renderIndex($request);
+    }
+
+    public function customer(Request $request, Customer $customer): View
+    {
+        return $this->renderIndex($request, $customer);
+    }
+
+    private function renderIndex(Request $request, ?Customer $customer = null): View
     {
         $tab = in_array($request->query('tab'), ['stripe', 'wallester'], true)
             ? $request->query('tab')
@@ -32,19 +44,26 @@ class TransactionController extends Controller
         $movements = null;
 
         if ($tab === 'wallester') {
+            $filters = $request->only(['search', 'movement_type', 'movement_status', 'direction', 'source', 'from', 'to']);
+            $filters['customer_id'] = $customer?->id;
+
             $movements = $this->listFundingPartnerMovements->execute(
-                $request->only(['search', 'movement_type', 'movement_status', 'direction', 'source', 'from', 'to']),
+                $filters,
                 $perPage,
             )->withQueryString();
         } else {
+            $filters = $request->only(['search', 'type', 'status', 'partner_funding_status', 'from', 'to', 'with_platform_fee']);
+            $filters['customer_id'] = $customer?->id;
+
             $stripeTransactions = $this->listStripeTransactions->execute(
-                $request->only(['search', 'type', 'status', 'partner_funding_status', 'from', 'to', 'with_platform_fee']),
+                $filters,
                 $perPage,
             )->withQueryString();
         }
 
         return view('dashboard.transactions.index', [
             'tab' => $tab,
+            'customerContext' => $customer,
             'stripeTransactions' => $stripeTransactions,
             'movements' => $movements,
             'transactionTypes' => [

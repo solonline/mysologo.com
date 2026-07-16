@@ -8,18 +8,18 @@ use App\Domains\Backoffice\Actions\UpdateCustomerFromBackofficeAction;
 use App\Domains\Backoffice\DTOs\UpdateCustomerFromBackofficeData;
 use App\Domains\Backoffice\Queries\GetCustomerActivityTimelineQuery;
 use App\Domains\Backoffice\Queries\GetCustomerDetailQuery;
+use App\Domains\Backoffice\Queries\GetRecentCustomerMovementsQuery;
 use App\Domains\Backoffice\Queries\ListCustomersQuery;
 use App\Domains\Backoffice\Requests\UpdateCustomerRequest;
 use App\Domains\Customer\Services\CustomerPhoneChangeService;
 use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Stripe\Enums\StripeFundingStatus;
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\ChangeCustomerPhoneRequest;
 use App\Http\Requests\Customer\ConfirmPendingCustomerPhoneRequest;
-use App\Http\Requests\Customer\ConfirmCustomerPhoneRequest;
 use App\Models\Customer;
-use App\Exceptions\ApiException;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
@@ -28,6 +28,7 @@ class CustomerController extends Controller
         protected ListCustomersQuery $listCustomers,
         protected GetCustomerDetailQuery $customerDetail,
         protected GetCustomerActivityTimelineQuery $customerActivityTimeline,
+        protected GetRecentCustomerMovementsQuery $recentCustomerMovements,
         protected UpdateCustomerFromBackofficeAction $updateCustomer,
         protected RetryCustomerProvisioningAction $retryProvisioning,
         protected RetryStripeFundingAction $retryStripeFunding,
@@ -54,6 +55,7 @@ class CustomerController extends Controller
         return view('dashboard.customers.show', [
             'customer' => $customer,
             'activityTimeline' => $this->customerActivityTimeline->execute($customer),
+            'recentMovements' => $this->recentCustomerMovements->execute($customer, 10),
             'customerStatuses' => CustomerLifecycleStatus::cases(),
             'documentStatuses' => DocumentStatus::cases(),
             'currentPhoneVerified' => $this->phoneChange->isCurrentPhoneVerified($customer),

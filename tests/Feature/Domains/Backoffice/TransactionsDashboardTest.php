@@ -93,6 +93,68 @@ class TransactionsDashboardTest extends TestCase
             ->assertRedirect(route('login'));
     }
 
+    public function test_customer_transactions_page_only_lists_selected_customer_movements(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+        $customer = $this->createRetailCustomer(['name' => 'Cliente Selecionado']);
+        $otherCustomer = $this->createRetailCustomer(['name' => 'Outro Cliente']);
+
+        foreach ([
+            [$customer, 'Transação cliente selecionado'],
+            [$otherCustomer, 'Transação outro cliente'],
+        ] as [$transactionCustomer, $description]) {
+            StripeTransaction::query()->create([
+                'customer_id' => $transactionCustomer->id,
+                'type' => TransactionType::TOPUP,
+                'payment_method_type' => 'card',
+                'direction' => 'credit',
+                'amount' => 5_000,
+                'stripe_fee' => 0,
+                'platform_fee' => 0,
+                'net_amount' => 5_000,
+                'currency' => 'EUR',
+                'status' => 'succeeded',
+                'description' => $description,
+            ]);
+        }
+
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal-selected-customer');
+        $otherAccount = $this->createWallesterAccount($otherCustomer, IntegrationAccountStatus::ACTIVE, 'wal-other-customer');
+
+        foreach ([
+            [$account, 'Movimento cliente selecionado'],
+            [$otherAccount, 'Movimento outro cliente'],
+        ] as [$movementAccount, $description]) {
+            FundingPartnerMovement::query()->create([
+                'provider' => 'wallester',
+                'funding_account_type' => $movementAccount::class,
+                'funding_account_id' => $movementAccount->id,
+                'external_account_id' => $movementAccount->wallester_account_id,
+                'direction' => FundingPartnerMovementDirection::In,
+                'type' => FundingPartnerMovementType::AccountTransfer,
+                'amount' => 5_000,
+                'currency' => 'EUR',
+                'status' => FundingPartnerMovementStatus::Completed,
+                'source' => FundingPartnerMovementSource::Api,
+                'idempotency_key' => 'customer-page:'.$movementAccount->id,
+                'description' => $description,
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->get(route('dashboard.customers.transactions', $customer))
+            ->assertOk()
+            ->assertSee('Transações de Cliente Selecionado')
+            ->assertSee('(1)')
+            ->assertDontSee('Outro Cliente');
+
+        $this->actingAs($user)
+            ->get(route('dashboard.customers.transactions', ['customer' => $customer, 'tab' => 'wallester']))
+            ->assertOk()
+            ->assertSee('wal-selected-customer')
+            ->assertDontSee('wal-other-customer');
+    }
+
     private function userWithPermission(string $permission): User
     {
         Permission::findOrCreate($permission);

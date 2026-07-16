@@ -25,6 +25,14 @@ class ListFundingPartnerMovementsQuery
             ])
             ->latest('id');
 
+        if ($customerId = $filters['customer_id'] ?? null) {
+            $query->whereHasMorph(
+                'fundingAccount',
+                [CustomerWallesterAccount::class],
+                fn ($accountQuery) => $accountQuery->where('customer_id', $customerId),
+            );
+        }
+
         if ($search = trim((string) ($filters['search'] ?? ''))) {
             $query->where(function ($q) use ($search) {
                 if (is_numeric($search)) {

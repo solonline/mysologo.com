@@ -200,6 +200,37 @@ class CustomerDashboardShowTest extends TestCase
         $response->assertSee('−1 saídas');
     }
 
+    public function test_customer_show_limits_recent_movements_to_ten_and_links_to_full_list(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+        $customer = $this->createRetailCustomer();
+
+        foreach (range(1, 12) as $number) {
+            StripeTransaction::query()->create([
+                'customer_id' => $customer->id,
+                'type' => TransactionType::TOPUP,
+                'payment_method_type' => 'card',
+                'direction' => 'credit',
+                'amount' => 1_000 + $number,
+                'stripe_fee' => 0,
+                'platform_fee' => 0,
+                'net_amount' => 1_000 + $number,
+                'currency' => 'EUR',
+                'status' => 'succeeded',
+                'description' => sprintf('Movimento resumo %02d', $number),
+                'stripe_created_at' => now()->addMinutes($number),
+            ]);
+        }
+
+        $response = $this->actingAs($user)
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertSee(route('dashboard.customers.transactions', $customer), false);
+        $response->assertSee('Movimento resumo 12');
+        $this->assertSame(10, substr_count($response->getContent(), 'data-customer-movement'));
+    }
+
     private function userWithPermission(string $permission): User
     {
         Permission::findOrCreate($permission);
