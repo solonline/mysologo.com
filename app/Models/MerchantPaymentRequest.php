@@ -46,6 +46,7 @@ class MerchantPaymentRequest extends Model
         'callback_url',
         'metadata',
         'items',
+        'payment_method_types',
         'status',
         'expires_at',
         'paid_at',
@@ -54,6 +55,7 @@ class MerchantPaymentRequest extends Model
     protected $casts = [
         'metadata'   => 'array',
         'items'      => 'array',
+        'payment_method_types' => 'array',
         'expires_at' => 'datetime',
         'paid_at'    => 'datetime',
     ];

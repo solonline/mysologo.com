@@ -34,6 +34,14 @@ info:
     2. Redireccione o pagador para `url`
     3. Opcional: use `callback_url` para notificação
 
+    ### Settlement (fundos)
+
+    Quando o pagamento é concluído (`status=completed`):
+
+    - O valor fica na wallet Yoop do merchant como **pending** até liquidação Stripe (`settlement_status=pending`, `funds_available=false` no callback).
+    - **Não** há funding Wallester imediato (diferente de top-up).
+    - A disponibilização (`settlement_status=available`) ocorre após payout Stripe (fase futura).
+
     ## Fluxo Terminal (POS)
 
     1. `POST /merchant/terminal/connection-token` → `secret` para SDK

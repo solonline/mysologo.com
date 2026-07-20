@@ -38,15 +38,17 @@ POST /api/merchant/payment-requests
   "description": "Order #123",
   "external_reference": "ORD-123",
   "callback_url": "https://loja.com/webhook/yoop",
-  "expires_in": 60
+  "expires_in": 60,
+  "payment_method_types": ["card", "mbway"]
 }
 ```
 
 | Campo | Notas |
 |-------|--------|
 | `amount` | Cêntimos, mínimo 1 |
-| `expires_in` | Minutos (5–1440), opcional |
+| `expires_in` | Minutos (5–1440), opcional. Se omitido, o pedido fica activo por **1 ano**. |
 | `callback_url` | URL para notificação futura, opcional |
+| `payment_method_types` | Opcional. Aceita `card` e/ou `mbway` (também `mb_way`). Também aceita `payment_method_type` singular. Se omitido, o PaymentIntent usa `automatic_payment_methods` e o Stripe mostra a selecção de métodos. |
 
 Resposta `201`:
 

@@ -23,6 +23,7 @@ class GetCustomerActivityTimelineQuery
     {
         $stripeItems = StripeTransaction::query()
             ->where('customer_id', $customer->id)
+            ->where('type', '!=', \App\Domains\Wallet\Enums\TransactionType::MERCHANT_PAYMENT->value)
             ->latest('stripe_created_at')
             ->limit($limit)
             ->get()

@@ -25,6 +25,10 @@ class StripePaymentWalletService
             return false;
         }
 
+        if ($transaction->type === TransactionType::MERCHANT_PAYMENT) {
+            return $this->creditMerchantPaymentAsPending($transaction);
+        }
+
         $netAmount = (int) $transaction->net_amount;
         $platformFee = (int) $transaction->platform_fee;
         $wallesterFundingNet = $this->topupFundingPolicy->wallesterFundingNetAmount($transaction);
@@ -110,6 +114,66 @@ class StripePaymentWalletService
                 'partner_funding_status' => $requiresPartnerFunding
                     ? PartnerFundingStatus::Pending
                     : PartnerFundingStatus::NotRequired,
+            ]);
+        });
+
+        return true;
+    }
+
+    private function creditMerchantPaymentAsPending(StripeTransaction $transaction): bool
+    {
+        $netAmount = (int) $transaction->net_amount;
+        $platformFee = (int) $transaction->platform_fee;
+
+        if ($netAmount <= 0 && $platformFee <= 0) {
+            return false;
+        }
+
+        if ($netAmount > 0 && $this->hasImmediateWalletLedgerEntry($transaction)) {
+            $transaction->update([
+                'partner_funding_status' => PartnerFundingStatus::AwaitingStripePayout,
+            ]);
+
+            return false;
+        }
+
+        DB::transaction(function () use ($transaction, $netAmount, $platformFee): void {
+            if ($netAmount > 0) {
+                $this->ledgerService->recordPendingCredit(
+                    customerId: $transaction->customer_id,
+                    currency: $transaction->currency,
+                    entryType: LedgerEntryType::PAYMENT_RECEIVED,
+                    amount: $netAmount,
+                    reference: $transaction,
+                    description: 'Stripe payment #'.$transaction->id,
+                    metadata: [
+                        'settlement' => 'awaiting_stripe_payout',
+                        'source' => 'merchant_payment',
+                    ],
+                );
+            }
+
+            if ($platformFee > 0) {
+                $platformCustomer = $this->resolvePlatformCustomer();
+
+                if ($platformCustomer !== null) {
+                    $this->ledgerService->record(
+                        customerId: $platformCustomer->id,
+                        currency: $transaction->currency,
+                        entryType: LedgerEntryType::MANUAL_CREDIT,
+                        amount: $platformFee,
+                        reference: $transaction,
+                        description: 'Platform fee from transaction #'.$transaction->id,
+                    );
+                }
+            }
+
+            $transaction->update([
+                'balance_settled_at' => null,
+                'partner_funding_status' => PartnerFundingStatus::AwaitingStripePayout,
+                'wallester_funding_net_amount' => 0,
+                'stripe_deferred_net_amount' => $netAmount,
+                'immediate_gross_amount' => 0,
             ]);
         });
 

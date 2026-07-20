@@ -133,6 +133,7 @@
                 </div>
                 <div class="text-center">
                     <p class="text-sm font-medium text-gray-800">{{ __('pay.status.completed') }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ __('pay.status.completed_hint') }}</p>
                     @if($paymentRequest->paid_at)
                         <p class="text-xs text-gray-400 mt-0.5">{{ $paymentRequest->paid_at->format('d/m/Y H:i') }}</p>
                     @endif
@@ -179,7 +180,7 @@
                 </div>
                 <p class="text-sm font-medium text-gray-700 text-center">{{ __('pay.confirming') }}</p>
             </div>
-            <script>setTimeout(() => location.replace(location.pathname), 30000);</script>
+            <script>setTimeout(() => location.replace(location.pathname), 2500);</script>
 
         @elseif($clientSecret)
             {{-- Stripe Payment Element --}}
@@ -276,7 +277,7 @@
     <div class="border-t border-gray-100 px-6 py-3 flex items-center justify-center">
         <span class="text-xs text-gray-400 mr-1">{{ __('pay.secure') }}</span>
         <a href="https://www.securepay.com" target="_blank" rel="noopener noreferrer">
-            <img src="{{ asset('securepay1.png') }}" alt="SecurePay" class="h-8">
+            <img src="{{ asset('securepay.png') }}" alt="SecurePay" class="h-8">
         </a>
     </div>
 

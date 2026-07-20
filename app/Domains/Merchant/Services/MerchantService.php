@@ -6,13 +6,17 @@ use App\Domains\Merchant\Contracts\MerchantPaymentRequestRepositoryInterface;
 use App\Domains\Merchant\Contracts\MerchantRepositoryInterface;
 use App\Domains\Merchant\DTOs\CreateMerchantPaymentRequestDTO;
 use App\Domains\Merchant\DTOs\RegisterMerchantDTO;
+use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use App\Domains\Stripe\Enums\StripePaymentIntentPurpose;
+use App\Domains\Stripe\Services\StripePaymentIntentService;
+use App\Domains\Wallet\Enums\TransactionType;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\MerchantPaymentRequest;
 use App\Models\Payer;
-use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class MerchantService
@@ -21,6 +25,7 @@ class MerchantService
         protected MerchantRepositoryInterface $merchantRepository,
         protected MerchantPaymentRequestRepositoryInterface $paymentRequestRepository,
         protected StripeGatewayInterface $stripeGateway,
+        protected StripePaymentIntentService $paymentIntents,
     ) {}
 
     /** @return array{merchant: Merchant, api_key: string} */
@@ -48,6 +53,23 @@ class MerchantService
         ];
     }
 
+    /** @return Collection<int, Merchant> */
+    public function listForCustomer(Customer $customer): Collection
+    {
+        return $this->merchantRepository->listForCustomer($customer);
+    }
+
+    public function findOwnedByCustomer(Customer $customer, int $merchantId): ?Merchant
+    {
+        return $this->merchantRepository->findOwnedByCustomer($customer, $merchantId);
+    }
+
+    /** @return Collection<int, MerchantPaymentRequest> */
+    public function listPaymentRequestsForCustomer(Customer $customer, int $limit = 50): Collection
+    {
+        return $this->paymentRequestRepository->listForCustomer($customer, $limit);
+    }
+
     public function createPaymentRequest(Merchant $merchant, array $data): MerchantPaymentRequest
     {
         $currency = $merchant->customer->currency;
@@ -68,18 +90,24 @@ class MerchantService
             callbackUrl: $data['callback_url'] ?? $merchant->webhook_url,
             metadata: $data['metadata'] ?? null,
             items: $data['items'] ?? null,
-            expiresAt: now()->addMinutes($data['expires_in'] ?? 30),
+            expiresAt: isset($data['expires_in'])
+                ? now()->addMinutes((int) $data['expires_in'])
+                : now()->addYear(),
             language: $data['language'] ?? null,
+            paymentMethodTypes: $data['payment_method_types'] ?? null,
         );
 
         return $this->paymentRequestRepository->create($dto);
     }
 
     /** @return array{client_secret: string}|null */
-    public function initializePayment(MerchantPaymentRequest $paymentRequest, array $paymentMethodTypes): ?array
+    public function initializePayment(MerchantPaymentRequest $paymentRequest): ?array
     {
-        $mode = $paymentRequest->merchant->mode;
-        $currency = strtolower($paymentRequest->merchant->customer->currency ?? 'eur');
+        $paymentRequest->loadMissing('merchant.customer');
+        $merchant = $paymentRequest->merchant;
+        $customer = $merchant->customer;
+        $mode = $merchant->mode;
+        $currency = strtolower($customer->currency ?? 'eur');
 
         if ($paymentRequest->stripe_payment_intent_id) {
             $result = $this->stripeGateway->getPaymentIntentWithMode(
@@ -89,17 +117,26 @@ class MerchantService
             );
 
             if ($result['status'] === 'success') {
-                $intentStatus = $result['data']['status'] ?? null;
+                $intent = $result['data'];
+                $intentStatus = $intent['status'] ?? null;
 
-                if (! in_array($intentStatus, ['succeeded', 'canceled'])) {
-                    return ['client_secret' => $result['data']['client_secret']];
+                $this->ensureLocalPaymentIntent($customer, $paymentRequest, $intent, $currency);
+
+                if (! in_array($intentStatus, ['succeeded', 'canceled'], true)) {
+                    return ['client_secret' => $intent['client_secret']];
                 }
 
                 if ($intentStatus === 'succeeded') {
-                    $paymentRequest->update([
-                        'status' => 'completed',
-                        'paid_at' => now(),
-                    ]);
+                    if ($paymentRequest->status !== 'completed') {
+                        $localPi = $this->paymentIntents->findByStripeId($intent['id']);
+                        $transactionId = $localPi?->stripe_transaction_id
+                            ?? $localPi?->stripeTransaction?->id;
+
+                        $this->paymentRequestRepository->complete(
+                            $paymentRequest,
+                            $transactionId ? (int) $transactionId : null,
+                        );
+                    }
                     $paymentRequest->refresh();
 
                     return null;
@@ -113,16 +150,27 @@ class MerchantService
             }
         }
 
-        $result = $this->stripeGateway->createPaymentIntentWithMode([
+        $payload = [
             'amount' => $paymentRequest->amount,
             'currency' => $currency,
-            'payment_method_types' => $paymentMethodTypes,
             'description' => $this->sanitizeDescription($paymentRequest->description),
             'metadata' => [
-                'merchant_payment_request_id' => $paymentRequest->id,
-                'merchant_id' => $paymentRequest->merchant_id,
+                'merchant_payment_request_id' => (string) $paymentRequest->id,
+                'merchant_id' => (string) $paymentRequest->merchant_id,
+                'customer_id' => (string) $customer->id,
+                'purpose' => StripePaymentIntentPurpose::MerchantPayment->value,
             ],
-        ], $mode);
+        ];
+
+        $paymentMethodTypes = $this->resolvePaymentMethodTypes($paymentRequest->payment_method_types);
+
+        if ($paymentMethodTypes === []) {
+            $payload['automatic_payment_methods'] = ['enabled' => true];
+        } else {
+            $payload['payment_method_types'] = $paymentMethodTypes;
+        }
+
+        $result = $this->stripeGateway->createPaymentIntentWithMode($payload, $mode);
 
         if ($result['status'] !== 'success') {
             throw new ApiException(
@@ -132,12 +180,81 @@ class MerchantService
             );
         }
 
+        $intent = $result['data'];
+
+        $this->ensureLocalPaymentIntent($customer, $paymentRequest, $intent, $currency);
+
         $this->paymentRequestRepository->attachStripeIntent(
             $paymentRequest,
-            $result['data']['id'],
+            $intent['id'],
         );
 
-        return ['client_secret' => $result['data']['client_secret']];
+        return ['client_secret' => $intent['client_secret']];
+    }
+
+    /**
+     * @param  array<string, mixed>  $intent
+     */
+    private function ensureLocalPaymentIntent(
+        Customer $customer,
+        MerchantPaymentRequest $paymentRequest,
+        array $intent,
+        string $currency,
+    ): void {
+        $stripeId = (string) ($intent['id'] ?? '');
+
+        if ($stripeId === '') {
+            return;
+        }
+
+        if ($this->paymentIntents->findByStripeId($stripeId)) {
+            return;
+        }
+
+        $this->paymentIntents->createFromStripeResponse(
+            customer: $customer,
+            intent: $intent,
+            type: TransactionType::MERCHANT_PAYMENT,
+            purpose: StripePaymentIntentPurpose::MerchantPayment,
+            amount: (int) $paymentRequest->amount,
+            currency: $currency,
+            feeConfig: null,
+            paymentMethodType: null,
+            description: $paymentRequest->description ?? 'Merchant payment #'.$paymentRequest->id,
+        );
+    }
+
+    /**
+     * @param  list<string>|null  $types
+     * @return list<string>
+     */
+    private function resolvePaymentMethodTypes(?array $types): array
+    {
+        if ($types === null || $types === []) {
+            return [];
+        }
+
+        $blocked = ['bank_transfer', 'card_present'];
+
+        return collect($types)
+            ->filter(fn ($type) => is_string($type) && $type !== '')
+            ->map(function (string $type): string {
+                $type = strtolower(trim($type));
+
+                if (str_starts_with($type, 'card_')) {
+                    return 'card';
+                }
+
+                if (in_array($type, ['mb_way', 'mb-way', 'mb way'], true)) {
+                    return 'mbway';
+                }
+
+                return $type;
+            })
+            ->reject(fn (string $type) => in_array($type, $blocked, true))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function sanitizeDescription(?string $description): ?string
@@ -151,7 +268,7 @@ class MerchantService
         $i = 1;
 
         while ($this->merchantRepository->isSlugTaken($slug)) {
-            $slug = $base . '-' . $i++;
+            $slug = $base.'-'.$i++;
         }
 
         return $slug;

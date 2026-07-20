@@ -9,6 +9,7 @@ return [
 
     'status' => [
         'completed'  => 'Payment completed',
+        'completed_hint' => 'Thank you. Your payment was registered successfully.',
         'failed'     => 'Payment failed. Please try again.',
         'expired'    => 'This link has expired.',
         'cancelled'  => 'This link was cancelled.',

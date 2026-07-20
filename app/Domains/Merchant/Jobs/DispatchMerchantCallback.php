@@ -28,6 +28,8 @@ class DispatchMerchantCallback implements ShouldQueue
         $payload = [
             'uuid' => $this->paymentRequest->uuid,
             'status' => $this->paymentRequest->status,
+            'settlement_status' => $this->paymentRequest->status === 'completed' ? 'pending' : null,
+            'funds_available' => false,
             'external_reference' => $this->paymentRequest->external_reference,
             'amount' => $this->paymentRequest->amount,
             'currency' => $this->paymentRequest->currency,

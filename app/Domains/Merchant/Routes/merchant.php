@@ -11,8 +11,16 @@ Route::get('/health', fn () => response()->json([
 ]))->name('merchant.health');
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/', [CustomerMerchantController::class, 'index'])
+        ->name('merchant.index');
+    Route::get('/payment-requests', [CustomerMerchantController::class, 'paymentRequests'])
+        ->name('merchant.customer.payment-requests.index');
     Route::post('/register', [CustomerMerchantController::class, 'register'])
         ->name('merchant.register');
+    Route::post('/{merchant}/payment-requests', [CustomerMerchantController::class, 'createPaymentRequest'])
+        ->where('merchant', '[0-9]+')
+        ->middleware('throttle:stripe-intent')
+        ->name('merchant.customer.payment-requests');
 });
 
 Route::middleware(['auth.merchant', 'throttle:stripe-intent'])->group(function () {

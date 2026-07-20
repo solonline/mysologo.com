@@ -999,6 +999,12 @@ class StripeService
                 'wallester_funding_net_amount' => $allocation->wallesterFundingNetCents,
                 'stripe_deferred_net_amount' => $allocation->stripeDeferredNetCents,
             ]);
+        } elseif ($transaction->type === TransactionType::MERCHANT_PAYMENT) {
+            $transaction->update([
+                'immediate_gross_amount' => 0,
+                'wallester_funding_net_amount' => 0,
+                'stripe_deferred_net_amount' => max(0, (int) $transaction->net_amount),
+            ]);
         }
 
         // Credit wallet immediately for the quota Wallester; deferred quota waits for Stripe settlement.
@@ -1016,8 +1022,14 @@ class StripeService
             'available_on' => $availableOn,
         ]);
 
-        if ($this->topupFundingPolicy->shouldDispatchPartnerFundingJob($transaction->fresh(), $charge)) {
-            FundWallesterTopupFromStripeJob::dispatch($transaction->id);
+        $freshTransaction = $transaction->fresh();
+
+        if (
+            $freshTransaction
+            && $freshTransaction->type !== TransactionType::MERCHANT_PAYMENT
+            && $this->topupFundingPolicy->shouldDispatchPartnerFundingJob($freshTransaction, $charge)
+        ) {
+            FundWallesterTopupFromStripeJob::dispatch($freshTransaction->id);
         }
     }
 

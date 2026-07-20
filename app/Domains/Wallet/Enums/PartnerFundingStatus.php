@@ -7,6 +7,7 @@ enum PartnerFundingStatus: string
     case NotRequired = 'not_required';
     case Pending = 'pending';
     case AwaitingLiquidity = 'awaiting_liquidity';
+    case AwaitingStripePayout = 'awaiting_stripe_payout';
     case Failed = 'failed';
     case Completed = 'completed';
 
