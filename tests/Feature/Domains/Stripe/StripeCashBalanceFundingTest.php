@@ -169,16 +169,19 @@ class StripeCashBalanceFundingTest extends TestCase
         $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE, 'cus_cash_balance_4');
         $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_bank_topup');
 
-        StripePaymentMethodFee::query()->create([
+        $feeConfig = StripePaymentMethodFee::query()->create([
             'payment_method' => 'bank_transfer',
             'label' => 'Transferência Bancária',
             'stripe_fee_percentage' => 0,
             'stripe_fee_fixed' => 0,
-            'platform_fee_percentage' => 0,
+            'platform_fee_percentage' => 0.005,
             'platform_fee_fixed' => 0,
             'currency' => 'EUR',
             'is_active' => true,
         ]);
+
+        $amount = 5_000;
+        $stripeFeeFromBalance = 3;
 
         StripeTransaction::query()->create([
             'customer_id' => $customer->id,
@@ -187,7 +190,7 @@ class StripeCashBalanceFundingTest extends TestCase
             'stripe_payment_intent_id' => 'pi_bank_topup_2',
             'stripe_cash_balance_transaction_id' => 'ccsbtxn_test_2',
             'payment_method_type' => 'bank_transfer',
-            'amount' => 5_000,
+            'amount' => $amount,
             'stripe_fee' => 0,
             'platform_fee' => 0,
             'net_amount' => 0,
@@ -203,7 +206,7 @@ class StripeCashBalanceFundingTest extends TestCase
             ->andReturn([
                 'status' => 'success',
                 'data' => [
-                    'fee' => 0,
+                    'fee' => $stripeFeeFromBalance,
                     'available_on' => now()->addDays(2)->timestamp,
                 ],
             ]);
@@ -229,9 +232,15 @@ class StripeCashBalanceFundingTest extends TestCase
             return $job->stripeTransactionId === $transaction->id;
         });
 
+        $expectedPlatformFee = $feeConfig->fresh()->calculatePlatformFee($amount);
+        $expectedNetAmount = $amount - $stripeFeeFromBalance - $expectedPlatformFee;
+
         $transaction->refresh();
         $this->assertSame('bank_transfer', $transaction->payment_method_type);
-        $this->assertSame(5_000, (int) $transaction->net_amount);
+        $this->assertSame($stripeFeeFromBalance, (int) $transaction->stripe_fee);
+        $this->assertSame($expectedPlatformFee, (int) $transaction->platform_fee);
+        $this->assertSame($expectedNetAmount, (int) $transaction->net_amount);
+        $this->assertSame($feeConfig->id, (int) $transaction->stripe_payment_method_fee_id);
     }
 
     /** @return array<string, mixed> */

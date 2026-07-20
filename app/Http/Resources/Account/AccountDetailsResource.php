@@ -30,6 +30,7 @@ class AccountDetailsResource extends JsonResource
                 'funding_financial_addresses' => $stripe['funding_financial_addresses'],
             ] : null,
             'wallester' => $wallester ? [
+                'id' => $wallester['id'],
                 'wallester_account_id' => $wallester['wallester_account_id'],
                 'iban' => $wallester['iban'],
                 'viban' => $wallester['viban'],

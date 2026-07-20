@@ -70,8 +70,25 @@
     $wallesterFailed = $wallesterStatus instanceof \App\Domains\Onboarding\Enums\IntegrationAccountStatus
         ? $wallesterStatus === \App\Domains\Onboarding\Enums\IntegrationAccountStatus::FAILED
         : strtoupper((string) $wallesterStatus) === 'FAILED';
+    $wallesterActive = $wallesterStatus instanceof \App\Domains\Onboarding\Enums\IntegrationAccountStatus
+        ? $wallesterStatus === \App\Domains\Onboarding\Enums\IntegrationAccountStatus::ACTIVE
+        : strtoupper((string) $wallesterStatus) === 'ACTIVE';
     $canRetryProvisioning = ($customer->status === \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::PROVISIONING)
         && ($wallesterFailed || $customer->wallesterAccount === null);
+    $canAdjustBalance = $wallesterActive && auth('web')->user()?->hasRole('super-admin', 'web');
+    $pendingBalanceAdjustment = $pendingBalanceAdjustment ?? null;
+    $pendingBalanceAdjustmentPayload = $pendingBalanceAdjustment
+        ? [
+            'id' => $pendingBalanceAdjustment->id,
+            'direction' => $pendingBalanceAdjustment->direction->value,
+            'direction_label' => $pendingBalanceAdjustment->direction->label(),
+            'amount_cents' => $pendingBalanceAdjustment->amount_cents,
+            'amount_formatted' => number_format($pendingBalanceAdjustment->amount_cents / 100, 2, ',', '.'),
+            'currency' => $pendingBalanceAdjustment->currency,
+            'description' => $pendingBalanceAdjustment->description,
+            'status' => $pendingBalanceAdjustment->status->value,
+        ]
+        : null;
     $stripeFundingStatus = $customer->stripeAccount?->funding_status;
     $stripeFundingActive = $stripeFundingStatus === \App\Domains\Stripe\Enums\StripeFundingStatus::ACTIVE;
     $stripeFundingFailed = $stripeFundingStatus === \App\Domains\Stripe\Enums\StripeFundingStatus::FAILED;
@@ -695,102 +712,6 @@
             @endforelse
         </div>
 
-        {{-- Movimentos recentes --}}
-        <div id="transactions" class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            @php
-                $incomingMovements = $recentMovements->filter(function (array $item): bool {
-                    $direction = $item['movement']->direction?->value ?? (string) $item['movement']->direction;
-
-                    return in_array($direction, ['credit', 'in'], true);
-                })->count();
-                $outgoingMovements = $recentMovements->count() - $incomingMovements;
-                $wallesterTypeLabels = [
-                    'account_transfer' => 'Transferência',
-                    'card_purchase' => 'Compra cartão',
-                    'card_refund' => 'Reembolso cartão',
-                    'inbound_payment' => 'Entrada',
-                    'fee' => 'Taxa',
-                ];
-            @endphp
-
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
-                <div>
-                    <h2 class="text-sm font-semibold text-slate-900">Movimentos</h2>
-                    <p class="text-xs text-slate-400 mt-0.5">Entradas e saídas mais recentes</p>
-                </div>
-                <a href="{{ route('dashboard.customers.transactions', $customer) }}"
-                   class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors whitespace-nowrap">
-                    Ver todas
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </a>
-            </div>
-
-            @if ($recentMovements->isNotEmpty())
-            <div class="px-5 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/60">
-                <span class="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
-                    +{{ $incomingMovements }} entradas
-                </span>
-                <span class="text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
-                    −{{ $outgoingMovements }} saídas
-                </span>
-            </div>
-            <div class="divide-y divide-slate-100">
-                @foreach ($recentMovements as $item)
-                @php
-                    $movement = $item['movement'];
-                    $direction = $movement->direction?->value ?? (string) $movement->direction;
-                    $isIncoming = in_array($direction, ['credit', 'in'], true);
-                    $isStripe = $item['source'] === 'stripe';
-                    $typeValue = $movement->type?->value ?? (string) $movement->type;
-                    $typeLabel = $isStripe
-                        ? ($movement->type?->label() ?? ucfirst(str_replace('_', ' ', $typeValue)))
-                        : ($wallesterTypeLabels[$typeValue] ?? ucfirst(str_replace('_', ' ', $typeValue)));
-                    $metadata = $isStripe ? ($movement->stripe_metadata ?? []) : ($movement->metadata ?? []);
-                    $merchantCity = $metadata['merchant_city'] ?? null;
-                    $merchantCategoryCode = $metadata['merchant_category_code'] ?? null;
-                @endphp
-                <div data-customer-movement class="px-5 py-3 flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 {{ $isIncoming ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500' }}">
-                        <svg class="w-4 h-4 {{ $isIncoming ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17L17 7m0 0H7m10 0v10"/>
-                        </svg>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2">
-                            <p class="text-sm font-semibold text-slate-800 truncate">{{ $movement->description ?: $typeLabel }}</p>
-                            <span class="text-[10px] font-bold uppercase tracking-wide {{ $isStripe ? 'text-indigo-500' : 'text-violet-500' }}">
-                                {{ $isStripe ? 'Stripe' : 'Wallester' }}
-                            </span>
-                        </div>
-                        <p class="text-xs text-slate-400 truncate">
-                            {{ $typeLabel }} · {{ $item['occurred_at']?->format('d/m/Y H:i') ?? '—' }}
-                            @if ($movement->wallesterCard?->name ?? null)
-                                · {{ $movement->wallesterCard->name }}
-                            @endif
-                            @if ($merchantCity)
-                                · {{ $merchantCity }}
-                            @endif
-                            @if ($merchantCategoryCode)
-                                · MCC {{ $merchantCategoryCode }}
-                            @endif
-                        </p>
-                    </div>
-                    <span class="text-sm font-bold whitespace-nowrap {{ $isIncoming ? 'text-emerald-600' : 'text-red-500' }}">
-                        {{ $isIncoming ? '+' : '−' }}{{ number_format(abs($movement->amount) / 100, 2, ',', '.') }}
-                        <span class="text-xs font-medium text-slate-400">{{ strtoupper($movement->currency) }}</span>
-                    </span>
-                </div>
-                @endforeach
-            </div>
-            @else
-            <div class="px-5 py-10 text-center">
-                <p class="text-sm text-slate-400">Nenhum movimento encontrado.</p>
-            </div>
-            @endif
-        </div>
-
         {{-- TPAs --}}
         <div x-data="{
                  showFeeModal: false,
@@ -1067,7 +988,121 @@
 
         {{-- Conta Wallester --}}
         @if ($customer->wallesterAccount)
-        <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5">
+        <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5"
+             x-data="{
+                 showBalanceModal: false,
+                 showSmsModal: {{ $pendingBalanceAdjustmentPayload ? 'true' : 'false' }},
+                 balanceDirection: 'credit',
+                 amount: '',
+                 description: '',
+                 smsCode: '',
+                 pendingAdjustment: {{ \Illuminate\Support\Js::from($pendingBalanceAdjustmentPayload) }},
+                 isSubmitting: false,
+                 isConfirming: false,
+                 errorMessage: '',
+                 async postJson(url, payload) {
+                     const response = await fetch(url, {
+                         method: 'POST',
+                         headers: {
+                             'Content-Type': 'application/json',
+                             'Accept': 'application/json',
+                             'X-Requested-With': 'XMLHttpRequest',
+                             'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                         },
+                         body: JSON.stringify(payload),
+                     });
+
+                     const json = await response.json().catch(() => ({}));
+                     if (! response.ok) {
+                         throw new Error(json.message || 'Ocorreu um erro inesperado.');
+                     }
+
+                     return json;
+                 },
+                 resetRequestForm() {
+                     this.amount = '';
+                     this.description = '';
+                     this.smsCode = '';
+                 },
+                 async submitAdjustment() {
+                     this.isSubmitting = true;
+                     this.errorMessage = '';
+
+                     try {
+                         const json = await this.postJson('{{ route('dashboard.customers.balance-adjustments.request', $customer) }}', {
+                             direction: this.balanceDirection,
+                             amount: this.amount,
+                             description: this.description,
+                         });
+
+                         this.pendingAdjustment = json.adjustment;
+                         this.showBalanceModal = false;
+                         this.showSmsModal = true;
+                         this.smsCode = '';
+                         this.resetRequestForm();
+                     } catch (error) {
+                         this.errorMessage = error.message;
+                     } finally {
+                         this.isSubmitting = false;
+                     }
+                 },
+                 async confirmAdjustment() {
+                     if (! this.pendingAdjustment) {
+                         return;
+                     }
+
+                     this.isConfirming = true;
+                     this.errorMessage = '';
+
+                     try {
+                         const json = await this.postJson('{{ route('dashboard.customers.balance-adjustments.confirm', [$customer, '__ADJUSTMENT__']) }}'.replace('__ADJUSTMENT__', this.pendingAdjustment.id), {
+                             code: this.smsCode,
+                         });
+
+                         this.pendingAdjustment = json.adjustment;
+                         this.smsCode = '';
+
+                         if (json.adjustment?.status === 'executed') {
+                             this.showSmsModal = false;
+                             window.location.reload();
+                         }
+                     } catch (error) {
+                         this.errorMessage = error.message;
+                     } finally {
+                         this.isConfirming = false;
+                     }
+                 },
+                 async resendSms() {
+                     if (! this.pendingAdjustment) {
+                         return;
+                     }
+
+                     this.errorMessage = '';
+
+                     try {
+                         const json = await this.postJson('{{ route('dashboard.customers.balance-adjustments.resend', [$customer, '__ADJUSTMENT__']) }}'.replace('__ADJUSTMENT__', this.pendingAdjustment.id), {});
+                         this.pendingAdjustment = json.adjustment;
+                     } catch (error) {
+                         this.errorMessage = error.message;
+                     }
+                 },
+                 async cancelAdjustment() {
+                     if (! this.pendingAdjustment) {
+                         return;
+                     }
+
+                     this.errorMessage = '';
+
+                     try {
+                         await this.postJson('{{ route('dashboard.customers.balance-adjustments.cancel', [$customer, '__ADJUSTMENT__']) }}'.replace('__ADJUSTMENT__', this.pendingAdjustment.id), {});
+                         this.pendingAdjustment = null;
+                         this.showSmsModal = false;
+                         this.smsCode = '';
+                     } catch (error) {
+                         this.errorMessage = error.message;
+                     }
+                 }
+             }">
             <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -1086,6 +1121,39 @@
                 <div class="flex justify-between gap-4">
                     <span class="text-slate-500 flex-shrink-0">Motivo</span>
                     <span class="text-xs text-red-700 text-right">{{ $customer->wallesterAccount->status_reason }}</span>
+                </div>
+                @endif
+
+                @if ($canAdjustBalance)
+                <div class="pt-3 mt-1 border-t border-slate-100 space-y-3">
+                    <div x-show="pendingAdjustment" x-cloak
+                         class="rounded-xl border border-amber-200 bg-amber-50/70 p-3 space-y-3">
+                        <div>
+                            <p class="text-xs font-semibold text-amber-800 uppercase tracking-wider">Confirmação SMS pendente</p>
+                            <p class="text-sm text-amber-900 mt-1">
+                                <span x-text="pendingAdjustment?.direction_label"></span>
+                                de <span x-text="pendingAdjustment?.amount_formatted"></span>
+                                <span x-text="pendingAdjustment?.currency"></span>
+                            </p>
+                            <p class="text-xs text-amber-700 mt-1" x-text="pendingAdjustment?.description"></p>
+                        </div>
+                        <button type="button" @click="showSmsModal = true" class="btn-secondary btn-sm w-full">
+                            Inserir código SMS
+                        </button>
+                    </div>
+
+                    <div class="flex gap-2" x-show="!pendingAdjustment">
+                        <button type="button"
+                                @click="balanceDirection = 'credit'; showBalanceModal = true"
+                                class="btn-secondary btn-sm flex-1">
+                            Creditar
+                        </button>
+                        <button type="button"
+                                @click="balanceDirection = 'debit'; showBalanceModal = true"
+                                class="btn-secondary btn-sm flex-1">
+                            Debitar
+                        </button>
+                    </div>
                 </div>
                 @endif
 
@@ -1131,66 +1199,158 @@
                 </div>
                 @endif
             </div>
+
+            @if ($canAdjustBalance && ! $pendingBalanceAdjustment)
+            <div x-show="showBalanceModal" x-cloak
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0">
+                <div class="fixed inset-0 bg-black/50 backdrop-blur-md" @click="showBalanceModal = false"></div>
+                <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100">
+                    <div class="flex items-center justify-between mb-5">
+                        <h3 class="text-base font-semibold text-slate-900"
+                            x-text="balanceDirection === 'credit' ? 'Creditar cliente' : 'Debitar cliente'"></h3>
+                        <button type="button" @click="showBalanceModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <form @submit.prevent="submitAdjustment()">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Valor</label>
+                                <input type="number" x-model="amount" step="0.01" min="0.01" required
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                       placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moeda</label>
+                                <input type="text" readonly
+                                       value="{{ strtoupper($customer->wallesterAccount->funding_currency ?? $customer->wallesterAccount->currency_code ?? 'EUR') }}"
+                                       class="w-full px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded-xl text-slate-600">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Motivo</label>
+                                <textarea x-model="description" required rows="3" maxlength="500"
+                                          class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                          placeholder="Descreva o motivo do ajuste"></textarea>
+                            </div>
+                            <p class="text-xs text-slate-500">
+                                Será enviado um SMS com código de autenticação para o seu telefone de super-admin.
+                            </p>
+                            <p x-show="errorMessage" x-text="errorMessage" class="text-xs text-red-600"></p>
+                        </div>
+                        <div class="flex gap-3 mt-6">
+                            <button type="button" @click="showBalanceModal = false" class="btn-secondary flex-1">Cancelar</button>
+                            <button type="submit" class="btn-primary flex-1 disabled:opacity-60"
+                                    :disabled="isSubmitting"
+                                    x-text="balanceDirection === 'credit' ? 'Solicitar crédito' : 'Solicitar débito'"></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            @endif
+
+            @if ($canAdjustBalance)
+            <div x-show="showSmsModal" x-cloak
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0">
+                <div class="fixed inset-0 bg-black/50 backdrop-blur-md" @click="showSmsModal = false"></div>
+                <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                    <div class="flex items-center justify-between mb-5">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-900">Confirmar com SMS</h3>
+                            <p class="text-sm text-slate-500 mt-1" x-show="pendingAdjustment">
+                                <span x-text="pendingAdjustment?.direction_label"></span>
+                                de <span x-text="pendingAdjustment?.amount_formatted"></span>
+                                <span x-text="pendingAdjustment?.currency"></span>
+                            </p>
+                        </div>
+                        <button type="button" @click="showSmsModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <template x-if="pendingAdjustment">
+                        <div class="space-y-4">
+                            <div class="rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+                                <p class="text-xs text-amber-800 font-semibold uppercase tracking-wider">Motivo</p>
+                                <p class="text-sm text-amber-900 mt-1" x-text="pendingAdjustment.description"></p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Código SMS</label>
+                                <input type="text" x-model="smsCode" maxlength="6" pattern="[0-9]{6}" inputmode="numeric"
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400"
+                                       placeholder="000000">
+                            </div>
+
+                            <p x-show="errorMessage" x-text="errorMessage" class="text-xs text-red-600"></p>
+
+                            <div class="flex gap-2">
+                                <button type="button" @click="resendSms()" class="btn-secondary btn-sm flex-1">Reenviar SMS</button>
+                                <button type="button" @click="cancelAdjustment()" class="btn-secondary btn-sm flex-1 text-red-600">Cancelar</button>
+                            </div>
+
+                            <div class="flex gap-3">
+                                <button type="button" @click="showSmsModal = false" class="btn-secondary flex-1">Fechar</button>
+                                <button type="button" @click="confirmAdjustment()" class="btn-primary flex-1 disabled:opacity-60"
+                                        :disabled="isConfirming || smsCode.length !== 6">
+                                    Confirmar e executar
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            @endif
         </div>
         @endif
 
         {{-- Conta Stripe --}}
         @if ($customer->stripeAccount)
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
-            <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <h2 class="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
                 <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
                 </svg>
                 Conta Stripe
             </h2>
-            <div class="space-y-3 text-sm">
-                <div class="flex justify-between">
+            <div class="space-y-1.5 text-sm">
+                <div class="flex justify-between items-center gap-4">
                     <span class="text-slate-500">Customer ID</span>
                     <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->stripe_customer_id ?? '—' }}</span>
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-slate-500">Account ID</span>
-                    <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->stripe_account_id ?? '—' }}</span>
-                </div>
-            </div>
-        </div>
-        @endif
-
-        {{-- IBAN de Funding (Stripe) --}}
-        @if ($customer->stripeAccount)
-        <div class="bg-white rounded-2xl border {{ $stripeFundingFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5">
-            <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-                </svg>
-                IBAN de Funding (Stripe)
-                <span class="ml-auto text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border {{ $stripeFundingBadge['badge'] }}">
-                    {{ $stripeFundingBadge['label'] }}
-                </span>
-            </h2>
-
-            <div class="space-y-3 text-sm">
                 @if ($stripeFundingActive && filled($customer->stripeAccount->funding_iban))
-                <div class="flex justify-between gap-4">
+                <div class="flex justify-between items-center gap-4">
                     <span class="text-slate-500 flex-shrink-0">IBAN</span>
                     <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded text-right break-all">{{ $customer->stripeAccount->funding_iban }}</span>
                 </div>
                 @if (filled($customer->stripeAccount->funding_bic))
-                <div class="flex justify-between gap-4">
+                <div class="flex justify-between items-center gap-4">
                     <span class="text-slate-500 flex-shrink-0">BIC</span>
                     <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->funding_bic }}</span>
                 </div>
                 @endif
                 @if (filled($customer->stripeAccount->funding_account_holder_name))
-                <div class="flex justify-between gap-4">
+                <div class="flex justify-between items-center gap-4">
                     <span class="text-slate-500 flex-shrink-0">Titular</span>
                     <span class="text-xs text-slate-700 text-right">{{ $customer->stripeAccount->funding_account_holder_name }}</span>
-                </div>
-                @endif
-                @if (filled($customer->stripeAccount->bank_transfer_type))
-                <div class="flex justify-between gap-4">
-                    <span class="text-slate-500 flex-shrink-0">Tipo</span>
-                    <span class="text-xs text-slate-700 text-right">{{ $customer->stripeAccount->bank_transfer_type }}</span>
                 </div>
                 @endif
                 @else
@@ -1205,15 +1365,14 @@
                         @endif
                     </p>
                     @if (filled($customer->stripeAccount->funding_status_reason))
-                    <p class="text-xs text-red-700 mt-2">{{ $customer->stripeAccount->funding_status_reason }}</p>
+                    <p class="text-xs text-red-700 mt-1">{{ $customer->stripeAccount->funding_status_reason }}</p>
                     @elseif ($stripeFundingPending)
-                    <p class="text-xs text-amber-700 mt-2">Aguarda conclusão do provisioning ou tente criar manualmente.</p>
+                    <p class="text-xs text-amber-700 mt-1">Aguarda conclusão do provisioning ou tente criar manualmente.</p>
                     @endif
                 </div>
                 @endif
-
                 @if ($customer->stripeAccount->funding_status_changed_at)
-                <div class="flex justify-between gap-4">
+                <div class="flex justify-between items-center gap-4">
                     <span class="text-slate-500 flex-shrink-0">Actualizado</span>
                     <span class="text-xs text-slate-600">{{ $formatDateTime($customer->stripeAccount->funding_status_changed_at) }}</span>
                 </div>
@@ -1222,7 +1381,7 @@
 
             @can('customers.edit')
             @if ($canRetryStripeFunding)
-            <form method="POST" action="{{ route('dashboard.customers.retry-stripe-funding', $customer) }}" class="mt-4">
+            <form method="POST" action="{{ route('dashboard.customers.retry-stripe-funding', $customer) }}" class="mt-3">
                 @csrf
                 <button type="submit" class="btn-secondary btn-sm w-full sm:w-auto">
                     {{ $stripeFundingFailed ? 'Repetir criação do IBAN' : 'Criar IBAN' }}
@@ -1260,27 +1419,6 @@
             </div>
         </div>
         @endif
-
-        {{-- Histórico --}}
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-5">
-            <h2 class="text-sm font-semibold text-slate-900 mb-4">Histórico</h2>
-            <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-slate-500">Criado em</span>
-                    <span class="text-slate-700 font-medium">{{ $formatDateTime($customer->created_at) }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-slate-500">Atualizado em</span>
-                    <span class="text-slate-700 font-medium">{{ $formatDateTime($customer->updated_at) }}</span>
-                </div>
-                @if ($customer->email_verified_at)
-                <div class="flex justify-between">
-                    <span class="text-slate-500">Email verificado</span>
-                    <span class="text-emerald-600 font-medium">{{ $formatDateTime($customer->email_verified_at) }}</span>
-                </div>
-                @endif
-            </div>
-        </div>
 
         {{-- Logs de auditoria --}}
         @can('audit_logs.view')

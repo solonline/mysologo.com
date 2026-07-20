@@ -7,8 +7,8 @@
     <div class="px-5 py-4 border-b border-slate-100">
         <div class="flex items-center justify-between gap-3">
             <div>
-                <h2 class="text-sm font-semibold text-slate-900">Movimentos</h2>
-                <p class="text-xs text-slate-500 mt-0.5">Entradas e saídas — Stripe e cartão Wallester</p>
+                <h2 class="text-sm font-semibold text-slate-900">Últimos Movimentos</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Entradas e saídas — Stripe, cartão Wallester e ajustes da plataforma</p>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
                 <span class="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
@@ -17,6 +17,15 @@
                 <span class="text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-full">
                     −{{ $outgoingCount }} saídas
                 </span>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <a href="{{ route('dashboard.customers.transactions', $customer) }}"
+                class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors whitespace-nowrap">
+                 Ver todas
+                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                 </svg>
+             </a>
             </div>
         </div>
     </div>
@@ -47,9 +56,11 @@
                         in_array($status, ['failed', 'canceled', 'cancelled', 'refunded', 'disputed', 'falhou']) => 'bg-red-50 text-red-700 border-red-200',
                         default => 'bg-slate-100 text-slate-500 border-slate-200',
                     };
-                    $sourceBadge = $item->source === 'wallester'
-                        ? 'bg-violet-50 text-violet-700 border-violet-200'
-                        : 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                    $sourceBadge = match ($item->source) {
+                        'wallester' => 'bg-violet-50 text-violet-700 border-violet-200',
+                        'platform' => 'bg-amber-50 text-amber-800 border-amber-200',
+                        default => 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                    };
                 @endphp
                 <div class="relative flex gap-3 {{ $loop->last ? 'pb-0' : 'pb-3' }}">
                     <div class="relative flex-shrink-0 mt-1">

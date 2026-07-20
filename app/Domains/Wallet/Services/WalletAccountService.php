@@ -38,6 +38,7 @@ class WalletAccountService
                 : null,
             'wallester' => $wallesterAccount
                 ? [
+                    'id' => $wallesterAccount->id,
                     'wallester_account_id' => $wallesterAccount->wallester_account_id,
                     'iban' => $wallesterAccount->iban,
                     'viban' => $wallesterAccount->viban,

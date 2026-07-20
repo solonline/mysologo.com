@@ -2,8 +2,12 @@
 
 namespace Tests\Unit\Domains\Backoffice;
 
+use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentDirection;
+use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentStatus;
 use App\Domains\Backoffice\Queries\GetCustomerActivityTimelineQuery;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Models\CustomerBalanceAdjustment;
+use App\Models\User;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
@@ -85,5 +89,34 @@ class GetCustomerActivityTimelineQueryTest extends TestCase
         $this->assertSame('DISTRICT', $timeline->first()->description);
         $this->assertTrue($timeline->last()->isIncoming);
         $this->assertSame('stripe', $timeline->last()->source);
+    }
+
+    public function test_timeline_includes_executed_platform_balance_adjustments(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $user = User::factory()->create();
+
+        CustomerBalanceAdjustment::query()->create([
+            'customer_id' => $customer->id,
+            'direction' => CustomerBalanceAdjustmentDirection::Credit,
+            'amount_cents' => 3_000,
+            'currency' => 'EUR',
+            'description' => 'Crédito de compensação',
+            'status' => CustomerBalanceAdjustmentStatus::Executed,
+            'required_approvals' => 1,
+            'requested_by' => $user->id,
+            'idempotency_key' => 'manual_adj:timeline-credit',
+            'partner_external_id' => 'pay_timeline_credit',
+            'updated_at' => now(),
+        ]);
+
+        $timeline = app(GetCustomerActivityTimelineQuery::class)->execute($customer);
+
+        $this->assertCount(1, $timeline);
+        $this->assertSame('platform', $timeline->first()->source);
+        $this->assertTrue($timeline->first()->isIncoming);
+        $this->assertSame('Crédito manual', $timeline->first()->typeLabel);
+        $this->assertSame('Banco da Plataforma', $timeline->first()->sourceLabel);
+        $this->assertSame('Crédito de compensação', $timeline->first()->description);
     }
 }

@@ -43,6 +43,10 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
     Route::post('/customers/{customer}/phone/confirm', [CustomerController::class, 'confirmPhoneChange'])->name('.customers.phone.confirm')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/retry-provisioning', [CustomerController::class, 'retryProvisioning'])->name('.customers.retry-provisioning')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/retry-stripe-funding', [CustomerController::class, 'retryStripeFunding'])->name('.customers.retry-stripe-funding')->middleware('can:customers.edit');
+    Route::post('/customers/{customer}/balance-adjustments', [CustomerController::class, 'requestBalanceAdjustment'])->name('.customers.balance-adjustments.request');
+    Route::post('/customers/{customer}/balance-adjustments/{adjustment}/confirm', [CustomerController::class, 'confirmBalanceAdjustment'])->name('.customers.balance-adjustments.confirm');
+    Route::post('/customers/{customer}/balance-adjustments/{adjustment}/resend', [CustomerController::class, 'resendBalanceAdjustment'])->name('.customers.balance-adjustments.resend');
+    Route::post('/customers/{customer}/balance-adjustments/{adjustment}/cancel', [CustomerController::class, 'cancelBalanceAdjustment'])->name('.customers.balance-adjustments.cancel');
     Route::middleware('can:customers.view')->group(function () {
         Route::delete('/customers/{customer}/tpas/{tpa}', [CustomerTpaController::class, 'destroy'])->name('.customers.tpas.destroy');
         Route::post('/customers/{customer}/tpas/{tpa}/fees', [CustomerTpaController::class, 'storeFee'])->name('.customers.tpas.fees.store');

@@ -33,12 +33,29 @@
                class="py-2 px-3 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 text-slate-700 transition">
         <input type="date" name="to" value="{{ request('to') }}"
                class="py-2 px-3 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 text-slate-700 transition">
-        <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-xl hover:bg-emerald-700 transition">
-            Filtrar período
-        </button>
-        @if (request()->hasAny(['from', 'to']))
-        <a href="{{ route('dashboard.platform-revenue') }}" class="px-3 py-2 text-sm text-slate-500 hover:text-slate-700 transition">Limpar</a>
-        @endif
+               <div class="flex items-center gap-3">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-gray text-sm font-semibold rounded-lg shadow-md hover:bg-emerald-700 hover:shadow-lg transition-all duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2l-7 7v6l-4-2v-4L3 6V4z" />
+                    </svg>
+                    Filtrar período
+                </button>
+
+                @if (request()->hasAny(['from', 'to']))
+                    <a
+                        href="{{ route('dashboard.platform-revenue') }}"
+                        class="inline-flex items-center gap-2 px-5 py-2.5 text-red border border-slate-300 bg-white text-slate-700 text-sm font-semibold rounded-lg shadow-sm hover:bg-slate-100 hover:border-slate-400 transition-all duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Limpar filtros
+                    </a>
+                @endif
+            </div>
     </form>
 </div>
 

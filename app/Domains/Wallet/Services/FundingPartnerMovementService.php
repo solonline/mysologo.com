@@ -203,7 +203,7 @@ class FundingPartnerMovementService
             return $this->resolveTransferMovementPair(
                 idempotencyKey: $idempotencyKey,
                 provider: $provider,
-                masterAccount: $masterAccount,
+                fromAccount: $masterAccount,
                 toAccount: $toAccount,
                 amountCents: $amountCents,
                 routingCurrency: $routingCurrency,
@@ -251,6 +251,88 @@ class FundingPartnerMovementService
         }
     }
 
+    public function transferFromCustomerToMaster(
+        Customer $from,
+        int $amountCents,
+        string $currency,
+        string $description,
+        string $idempotencyKey,
+        ?object $reference = null,
+    ): void {
+        if ($this->hasCompletedMovement($idempotencyKey)) {
+            return;
+        }
+
+        $routingCurrency = $this->currencyResolver->resolve($currency);
+        $fromAccount = $this->wallesterDriver->requireActiveAccount($from, $routingCurrency);
+        $masterAccount = $this->wallesterDriver->getPlatformMasterAccount($routingCurrency);
+        $provider = IntegrationProvider::WALLESTER;
+
+        $available = $this->wallesterDriver->getAvailableBalance($from, $routingCurrency);
+        if ($available < $amountCents) {
+            throw new ApiException(
+                ErrorCode::INSUFFICIENT_BALANCE,
+                422,
+                "Saldo insuficiente na Wallester. Disponível: {$available} {$routingCurrency}.",
+            );
+        }
+
+        $pair = DB::transaction(function () use (
+            $fromAccount,
+            $masterAccount,
+            $amountCents,
+            $routingCurrency,
+            $description,
+            $idempotencyKey,
+            $provider,
+            $reference,
+        ) {
+            return $this->resolveTransferMovementPair(
+                idempotencyKey: $idempotencyKey,
+                provider: $provider,
+                fromAccount: $fromAccount,
+                toAccount: $masterAccount,
+                amountCents: $amountCents,
+                routingCurrency: $routingCurrency,
+                description: $description,
+                reference: $reference,
+            );
+        });
+
+        if ($pair === null) {
+            return;
+        }
+
+        [$outMovement, $inMovement] = $pair;
+
+        try {
+            $response = $this->wallesterDriver->executeTransfer(
+                fromAccount: $fromAccount,
+                toAccount: $masterAccount,
+                amountCents: $amountCents,
+                description: $description,
+                auditUserId: (string) $from->id,
+            );
+
+            $partnerExternalId = is_array($response) ? ($response['id'] ?? null) : null;
+
+            $this->markMovementCompleted($outMovement, is_string($partnerExternalId) ? $partnerExternalId : null);
+            $this->markMovementCompleted($inMovement);
+
+            $this->refreshBalancesAfterMasterTransfer(
+                masterAccount: $masterAccount,
+                to: $from,
+                currency: $routingCurrency,
+            );
+        } catch (Throwable $exception) {
+            $reason = $exception->getMessage();
+            $this->markMovementFailed($outMovement, $reason);
+            $this->markMovementFailed($inMovement, $reason);
+
+            throw $exception;
+        }
+    }
+
     public function recordCardMovement(
         CustomerWallesterAccount $account,
         FundingPartnerMovementType $type,
@@ -288,6 +370,22 @@ class FundingPartnerMovementService
                 return $existing;
             }
 
+            // Auth + settlement da mesma compra chegam com IDs diferentes.
+            // Se um dos lados já foi registado, não debitar/creditar outra vez.
+            $linked = $this->findLinkedCardMovement(
+                account: $account,
+                type: $type,
+                direction: $direction,
+                partnerExternalId: $partnerExternalId,
+                metadata: $metadata,
+            );
+
+            if ($linked instanceof FundingPartnerMovement) {
+                $this->attachSettlementReference($linked, $partnerExternalId, $metadata);
+
+                return $linked;
+            }
+
             $movement = FundingPartnerMovement::query()->create([
                 'provider' => IntegrationProvider::WALLESTER,
                 'funding_account_type' => $account::class,
@@ -310,6 +408,92 @@ class FundingPartnerMovementService
 
             return $movement;
         });
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $metadata
+     */
+    private function findLinkedCardMovement(
+        CustomerWallesterAccount $account,
+        FundingPartnerMovementType $type,
+        FundingPartnerMovementDirection $direction,
+        string $partnerExternalId,
+        ?array $metadata,
+    ): ?FundingPartnerMovement {
+        $authorizationId = $this->extractAuthorizationId($metadata);
+
+        // Settlement a apontar para uma authorization já ingerida.
+        if ($authorizationId !== null && $authorizationId !== $partnerExternalId) {
+            $byAuth = FundingPartnerMovement::query()
+                ->where('funding_account_type', $account::class)
+                ->where('funding_account_id', $account->id)
+                ->where('type', $type)
+                ->where('direction', $direction)
+                ->where('partner_external_id', $authorizationId)
+                ->first();
+
+            if ($byAuth instanceof FundingPartnerMovement) {
+                return $byAuth;
+            }
+        }
+
+        // Authorization a chegar depois de um settlement que já referencia este ID.
+        return FundingPartnerMovement::query()
+            ->where('funding_account_type', $account::class)
+            ->where('funding_account_id', $account->id)
+            ->where('type', $type)
+            ->where('direction', $direction)
+            ->where(function ($query) use ($partnerExternalId): void {
+                $query->where('metadata->authorization_id', $partnerExternalId)
+                    ->orWhere('metadata->data->authorization_id', $partnerExternalId);
+            })
+            ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $metadata
+     */
+    private function extractAuthorizationId(?array $metadata): ?string
+    {
+        if (! is_array($metadata)) {
+            return null;
+        }
+
+        $authorizationId = $metadata['authorization_id']
+            ?? data_get($metadata, 'data.authorization_id');
+
+        if (! is_string($authorizationId) || $authorizationId === '') {
+            return null;
+        }
+
+        return $authorizationId;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $metadata
+     */
+    private function attachSettlementReference(
+        FundingPartnerMovement $movement,
+        string $settlementExternalId,
+        ?array $metadata,
+    ): void {
+        if ($movement->partner_external_id === $settlementExternalId) {
+            return;
+        }
+
+        $current = is_array($movement->metadata) ? $movement->metadata : [];
+
+        if (($current['settlement_partner_external_id'] ?? null) === $settlementExternalId) {
+            return;
+        }
+
+        $movement->update([
+            'metadata' => array_merge($current, [
+                'settlement_partner_external_id' => $settlementExternalId,
+                'settlement_attached_at' => now()->toIso8601String(),
+                'settlement_metadata' => $metadata,
+            ]),
+        ]);
     }
 
     private function applyCardMovementLedger(
@@ -488,7 +672,7 @@ class FundingPartnerMovementService
     private function resolveTransferMovementPair(
         string $idempotencyKey,
         IntegrationProvider $provider,
-        CustomerWallesterAccount $masterAccount,
+        CustomerWallesterAccount $fromAccount,
         CustomerWallesterAccount $toAccount,
         int $amountCents,
         string $routingCurrency,
@@ -520,8 +704,8 @@ class FundingPartnerMovementService
 
         $outMovement = $this->createMovement(
             provider: $provider,
-            fundingAccount: $masterAccount,
-            externalAccountId: $masterAccount->wallester_account_id,
+            fundingAccount: $fromAccount,
+            externalAccountId: $fromAccount->wallester_account_id,
             direction: FundingPartnerMovementDirection::Out,
             type: FundingPartnerMovementType::AccountTransfer,
             amountCents: $amountCents,
@@ -544,7 +728,7 @@ class FundingPartnerMovementService
             amountCents: $amountCents,
             currency: $routingCurrency,
             transferGroupId: $transferGroupId,
-            counterpartyExternalAccountId: $masterAccount->wallester_account_id,
+            counterpartyExternalAccountId: $fromAccount->wallester_account_id,
             status: FundingPartnerMovementStatus::Pending,
             source: FundingPartnerMovementSource::Api,
             idempotencyKey: $inKey,

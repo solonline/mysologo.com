@@ -167,6 +167,11 @@ class Customer extends Model
         return $this->hasMany(CustomerBalance::class);
     }
 
+    public function balanceAdjustments(): HasMany
+    {
+        return $this->hasMany(CustomerBalanceAdjustment::class);
+    }
+
     public function paymentMethodFees()
     {
         return $this->hasMany(CustomerPaymentMethodFee::class);

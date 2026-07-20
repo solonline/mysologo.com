@@ -970,24 +970,19 @@ class StripeService
             return;
         }
 
-        // Classifica o método de pagamento real (para cartões, pelo país do cartão)
+        // Classifica o método de pagamento real (para cartões, pelo país do cartão).
+        // Recebimentos VIBAN (customer_balance / cash balance) usam sempre a taxa bank_transfer.
         $pmDetails = $charge['payment_method_details'] ?? [];
-        $pmType = $pmDetails['type'] ?? null;
-        $feeMethod = filled($transaction->stripe_cash_balance_transaction_id)
-            ? $transaction->payment_method_type
-            : $this->resolvePaymentMethodCategory($pmType, $pmDetails);
+        $pmType = is_string($pmDetails['type'] ?? null) ? $pmDetails['type'] : null;
+        $feeMethod = $this->resolveFeePaymentMethod($transaction, $pmType, $pmDetails);
 
-        $feeConfig = StripePaymentMethodFee::where('payment_method', $feeMethod)
-            ->where('currency', $transaction->currency)
-            ->where('is_active', true)
-            ->first();
-
-        $platformFee = $feeConfig ? $feeConfig->calculatePlatformFee($transaction->amount) : 0;
-        $realNetAmount = $transaction->amount - $realStripeFee - $platformFee;
+        $feeConfig = $this->resolveActiveFeeConfig($transaction, $feeMethod);
+        $platformFee = $feeConfig ? $feeConfig->calculatePlatformFee((int) $transaction->amount) : 0;
+        $realNetAmount = max(0, (int) $transaction->amount - (int) $realStripeFee - $platformFee);
 
         $transaction->update([
             'stripe_payment_method_fee_id' => $feeConfig?->id,
-            'payment_method_type' => $feeMethod,
+            'payment_method_type' => $feeConfig?->payment_method ?? $feeMethod,
             'stripe_fee' => $realStripeFee,
             'platform_fee' => $platformFee,
             'net_amount' => $realNetAmount,
@@ -1029,6 +1024,47 @@ class StripeService
     private function handleCashBalanceTransactionCreated(array $object): void
     {
         $this->handleCashBalanceFunded($object);
+    }
+
+    /**
+     * @param  array<string, mixed>  $pmDetails
+     */
+    private function resolveFeePaymentMethod(
+        StripeTransaction $transaction,
+        ?string $pmType,
+        array $pmDetails,
+    ): string {
+        if (
+            filled($transaction->stripe_cash_balance_transaction_id)
+            || $transaction->payment_method_type === 'bank_transfer'
+            || $pmType === 'customer_balance'
+            || $pmType === 'bank_transfer'
+        ) {
+            return 'bank_transfer';
+        }
+
+        return $this->resolvePaymentMethodCategory((string) ($pmType ?? ''), $pmDetails);
+    }
+
+    private function resolveActiveFeeConfig(
+        StripeTransaction $transaction,
+        string $feeMethod,
+    ): ?StripePaymentMethodFee {
+        $linked = $transaction->paymentMethodFee;
+
+        if (
+            $linked instanceof StripePaymentMethodFee
+            && $linked->is_active
+            && strtoupper((string) $linked->currency) === strtoupper((string) $transaction->currency)
+        ) {
+            return $linked;
+        }
+
+        return StripePaymentMethodFee::query()
+            ->where('payment_method', $feeMethod)
+            ->where('currency', $transaction->currency)
+            ->where('is_active', true)
+            ->first();
     }
 
     private function resolvePaymentMethodCategory(string $pmType, array $pmDetails): string

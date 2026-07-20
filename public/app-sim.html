@@ -365,10 +365,32 @@ body {
 }
 
 .info-row:last-child { border-bottom: none; }
-.info-row-label { font-size: 13px; color: var(--slate-500); }
-.info-row-value { font-size: 13px; font-weight: 600; color: var(--slate-800); }
+.info-row-label { font-size: 13px; color: var(--slate-500); flex-shrink: 0; }
+.info-row-value { font-size: 13px; font-weight: 600; color: var(--slate-800); text-align: right; max-width: 62%; word-break: break-word; }
+.info-row-value.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 500; }
 .info-row-value.green { color: var(--emerald); }
 .info-row-value.amber { color: var(--amber); }
+.info-row-value.red { color: #ef4444; }
+
+.info-row-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.info-row-copy button {
+  flex-shrink: 0;
+  border: none;
+  background: var(--slate-100);
+  color: var(--indigo);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.info-row-copy button:active { background: var(--slate-200); }
 
 /* Account info screen */
 .account-screen {
@@ -1091,6 +1113,118 @@ body {
 .tx-item.clickable { cursor: pointer; }
 .tx-item.clickable:active { background: var(--slate-50); }
 
+/* Movements history */
+.movements-screen {
+  background: var(--slate-50);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.movements-toolbar {
+  padding: 12px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.movements-filters {
+  display: flex;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--slate-100);
+  border-radius: 14px;
+  padding: 4px;
+}
+
+.movements-filter {
+  flex: 1;
+  border: none;
+  background: transparent;
+  border-radius: 11px;
+  padding: 9px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate-500);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.movements-filter.active {
+  background: var(--slate-900);
+  color: #fff;
+}
+
+.movements-summary {
+  display: flex;
+  gap: 8px;
+}
+
+.movements-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.movements-chip.in {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.movements-chip.out {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.movements-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px 28px;
+}
+
+.movements-day {
+  margin-bottom: 16px;
+}
+
+.movements-day-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--slate-400);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin: 0 0 8px 4px;
+}
+
+.movements-day .info-card .tx-list { gap: 0; }
+
+.tx-source {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.tx-source.wallet {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.tx-source.card {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
 /* ── KYC (Didit real) ───────────────────────────── */
 #screen-kyc {
   background: #fff;
@@ -1705,23 +1839,35 @@ body {
     </div>
 
     <!-- ── Movements ── -->
-    <div id="screen-movements" class="screen">
+    <div id="screen-movements" class="screen movements-screen">
       <div class="screen-header">
         <button class="back-btn" onclick="goBack()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 12H5M12 5l-7 7 7 7"/>
           </svg>
         </button>
-        <h2>Movimentações</h2>
+        <h2>Entradas e saídas</h2>
       </div>
-      <div id="movements-list" class="tx-list"></div>
-      <button class="load-more-btn" id="movements-load-more" onclick="loadMoreMovements()" style="display:none">Carregar mais</button>
+      <div class="movements-toolbar">
+        <div class="movements-filters">
+          <button type="button" class="movements-filter active" data-filter="all" onclick="setMovementsFilter('all')">Todas</button>
+          <button type="button" class="movements-filter" data-filter="in" onclick="setMovementsFilter('in')">Entradas</button>
+          <button type="button" class="movements-filter" data-filter="out" onclick="setMovementsFilter('out')">Saídas</button>
+        </div>
+        <div class="movements-summary">
+          <span class="movements-chip in" id="movements-in-count">+0 entradas</span>
+          <span class="movements-chip out" id="movements-out-count">−0 saídas</span>
+        </div>
+      </div>
+      <div class="movements-body">
+        <div id="movements-list"></div>
+      </div>
     </div>
 
     <!-- ── Transaction detail ── -->
     <div id="screen-transaction-detail" class="screen tx-screen">
       <div class="screen-header">
-        <button class="back-btn" onclick="goBack()">
+        <button class="back-btn" onclick="goBack()" aria-label="Voltar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 12H5M12 5l-7 7 7 7"/>
           </svg>
@@ -1734,6 +1880,7 @@ body {
           <div class="detail-amount-label" id="tx-detail-type">—</div>
         </div>
         <div class="info-card detail-grid" id="tx-detail-info"></div>
+        <button type="button" class="btn-action" style="margin-top:8px" onclick="navigate('home')">Voltar ao início</button>
       </div>
     </div>
 
@@ -1751,9 +1898,10 @@ body {
         <div class="form-field">
           <label class="form-label">Destinatário</label>
           <div style="display:flex;gap:8px">
-            <input class="form-input" id="p2p-username" type="text" placeholder="@username" style="flex:1" />
+            <input class="form-input" id="p2p-username" type="text" placeholder="@username" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();findP2PRecipient();}" />
             <button class="btn-step primary" style="white-space:nowrap;padding:12px 16px" onclick="findP2PRecipient()">Buscar</button>
           </div>
+          <div id="p2p-recipient-preview" style="display:none;margin-top:10px"></div>
         </div>
 
         <div class="amount-field">
@@ -1875,9 +2023,14 @@ let authSession   = null;
 let wallesterReady = false;
 let currentCard   = null;
 let p2pRecipient  = null;
-let movementsPage = 1;
-let movementsHasMore = false;
+let movementsAll = [];
+let homeMovements = [];
+let movementsFilter = 'all';
+let movementsLoading = false;
+const HOME_MOVEMENTS_LIMIT = 8;
 let currentTxId   = null;
+let currentMovementKey = null;
+let txDetailReturnScreen = 'home';
 let currentKycUrl = null;
 let kycPollTimer  = null;
 
@@ -1960,7 +2113,7 @@ function navigate(screen) {
   if (screen === 'pin-login') initPinLoginScreen();
   if (screen === 'pin-setup') initPinSetupScreen();
   if (screen === 'pin-reset') initPinResetScreen();
-  if (screen === 'movements') loadMovements(1);
+  if (screen === 'movements') loadMovements();
   if (screen === 'p2p') resetP2PScreen();
   if (screen === 'deposit') {
     resetDepositScreen();
@@ -1980,7 +2133,10 @@ function navigate(screen) {
     resetDepositScreen();
   }
   if (screen === 'card-detail' && currentCard) renderCardDetail(currentCard);
-  if (screen === 'transaction-detail' && currentTxId) loadTransactionDetail(currentTxId);
+  if (screen === 'transaction-detail') {
+    if (currentMovementKey) loadMovementDetail(currentMovementKey);
+    else if (currentTxId) loadTransactionDetail(currentTxId);
+  }
 
   const showNav = token && !NO_NAV_SCREENS.includes(screen);
   document.getElementById('bottom-nav').className = showNav ? '' : 'hidden';
@@ -1993,7 +2149,14 @@ function goBack() {
     return;
   }
   if (currentScreen === 'transaction-detail') {
-    navigate('movements');
+    const target = ['home', 'movements'].includes(txDetailReturnScreen)
+      ? txDetailReturnScreen
+      : 'home';
+    navigate(target);
+    return;
+  }
+  if (currentScreen === 'movements') {
+    navigate('home');
     return;
   }
   if (currentScreen === 'kyc') {
@@ -2004,7 +2167,11 @@ function goBack() {
     navigate('home');
     return;
   }
-  navigate(prevScreen && prevScreen !== 'welcome' ? prevScreen : 'home');
+  // Evita voltar para ecrãs de detalhe / fluxos que criam loop
+  const target = prevScreen && !['welcome', 'transaction-detail'].includes(prevScreen)
+    ? prevScreen
+    : 'home';
+  navigate(target);
 }
 
 // ── API ───────────────────────────────────────────────
@@ -2171,43 +2338,41 @@ function renderHomeBalances(walletBalances, wallester) {
   }
 }
 
-function renderHomeTransactions(transactions) {
+function sortMovementsByDate(items) {
+  return [...items].sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return tb - ta;
+  });
+}
+
+function buildMovementsList(stripeRaw, wallesterRaw) {
+  return sortMovementsByDate([
+    ...stripeRaw.map(normalizeStripeMovement),
+    ...wallesterRaw.map(normalizeWallesterMovement),
+  ]);
+}
+
+function renderHomeTransactions(items) {
   const list = document.getElementById('home-tx-list');
   if (!list) return;
 
-  if (!transactions.length) {
-    list.innerHTML = `<div class="empty-state" style="padding:24px"><p>Sem transações ainda</p></div>`;
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state" style="padding:24px"><p>Sem movimentações ainda</p></div>`;
     return;
   }
 
-  list.innerHTML = transactions.map(t => renderTxItem(t)).join('');
+  list.innerHTML = items.map((item) => renderMovementItem(item, { clickable: true })).join('');
+}
+
+function txDirectionValue(direction) {
+  if (!direction) return '';
+  if (typeof direction === 'object' && direction.value) return String(direction.value).toLowerCase();
+  return String(direction).toLowerCase();
 }
 
 function renderTxItem(t) {
-  const isCredit = t.direction === 'credit';
-  const sign = isCredit ? '+' : '−';
-  const amt = (txDisplayAmountMinor(t) / 100).toFixed(2);
-  const cur = sanitizeCurrency(t.currency);
-  const date = t.created_at
-    ? new Date(t.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
-    : '—';
-  const icon = isCredit
-    ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`
-    : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
-  const status = String(t.status || 'pending').toLowerCase();
-  const typeLabel = String(t.type || 'transação').replace(/_/g, ' ');
-
-  return `<div class="tx-item">
-    <div class="tx-icon-wrap ${isCredit ? 'credit' : 'debit'}">${icon}</div>
-    <div class="tx-meta">
-      <span class="tx-type">${typeLabel}</span>
-      <span class="tx-date">${date}</span>
-    </div>
-    <div class="tx-right">
-      <span class="tx-amount ${isCredit ? 'credit' : 'debit'}">${sign}${amt} ${cur}</span>
-      <span class="badge ${status}">${status}</span>
-    </div>
-  </div>`;
+  return renderMovementItem(normalizeStripeMovement(t));
 }
 
 function currencySymbol(code) {
@@ -2918,57 +3083,409 @@ function initPinResetScreen() {
 }
 
 // ── Movements ─────────────────────────────────────────
-function renderTxItemClickable(t) {
-  const base = renderTxItem(t);
-  return base.replace('<div class="tx-item">', `<div class="tx-item clickable" onclick="openTransactionDetail(${t.id})">`);
+function movementKey(source, id) {
+  return `${source}:${id}`;
 }
 
-async function loadMovements(page) {
-  const list = document.getElementById('movements-list');
-  const loadMore = document.getElementById('movements-load-more');
-  if (!list) return;
+const PAYMENT_METHOD_LABELS = {
+  card: 'Cartão',
+  credit_card: 'Cartão de crédito',
+  debit_card: 'Cartão de débito',
+  card_present: 'Cartão físico',
+  bank_transfer: 'Transferência bancária',
+  customer_balance: 'Saldo Stripe',
+  sepa_debit: 'SEPA Direct Debit',
+  multibanco: 'Multibanco',
+  mb_way: 'MB WAY',
+  ideal: 'iDEAL',
+  bancontact: 'Bancontact',
+  paypal: 'PayPal',
+  link: 'Link',
+  revolut_pay: 'Revolut Pay',
+  klarna: 'Klarna',
+  p2p: 'P2P',
+};
 
-  if (page === 1) {
-    movementsPage = 1;
-    list.innerHTML = `<div class="empty-state"><div class="spin" style="border-color:var(--slate-200);border-top-color:var(--indigo);width:32px;height:32px"></div></div>`;
+const WALLESTER_TYPE_LABELS = {
+  card_purchase: 'Compra cartão',
+  card_refund: 'Reembolso cartão',
+  account_transfer: 'Transferência',
+  inbound_payment: 'Recebimento',
+  fee: 'Taxa',
+};
+
+function humanizeKey(value) {
+  return String(value || '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function paymentMethodLabel(method) {
+  const key = String(method || '').toLowerCase();
+  if (!key) return '—';
+  return PAYMENT_METHOD_LABELS[key] || humanizeKey(key);
+}
+
+function isBankTransferTransaction(t) {
+  const method = String(t?.payment_method_type || '').toLowerCase();
+  if (method === 'bank_transfer' || method === 'customer_balance') return true;
+  if (t?.bank_transfer) return true;
+  if (t?.bank_transfer_type || t?.bank_transfer_reference || t?.bank_transfer_sender_name) return true;
+  const desc = String(t?.description || '').toLowerCase();
+  return desc.includes('bank transfer') || desc.includes('viban');
+}
+
+function stripeMovementTypeLabel(t) {
+  const type = String(t?.type?.value ?? t?.type ?? '').toLowerCase();
+  const method = String(t?.payment_method_type || '').toLowerCase();
+  const direction = txDirectionValue(t?.direction);
+
+  if (type === 'p2p') {
+    return direction === 'credit' || direction === 'in' ? 'Recebimento P2P' : 'Envio P2P';
   }
 
-  try {
-    const { ok, data } = await api('GET', `/wallet/transactions?per_page=20&page=${page}`);
-    if (!ok) {
-      if (page === 1) list.innerHTML = `<div class="empty-state"><p>Erro ao carregar</p></div>`;
-      return;
-    }
+  // Recebimentos por transferência (VIBAN / SEPA) — mesmo que o type interno seja topup
+  if (isBankTransferTransaction(t) || type === 'bank_transfer') {
+    return 'Transferência bancária';
+  }
+
+  // Top-up real = compra/carregamento na Stripe (cartão, MB WAY, etc.)
+  if (type === 'topup') {
+    return 'Carregamento';
+  }
+
+  if (PAYMENT_METHOD_LABELS[type]) return PAYMENT_METHOD_LABELS[type];
+  if (PAYMENT_METHOD_LABELS[method]) return PAYMENT_METHOD_LABELS[method];
+  return humanizeKey(type || method || 'transação') || 'Transação';
+}
+
+function wallesterMovementTypeLabel(m) {
+  const type = String(m?.type?.value ?? m?.type ?? '').toLowerCase();
+  const direction = txDirectionValue(m?.direction);
+
+  if (type === 'account_transfer') {
+    return direction === 'in' || direction === 'credit' ? 'Transferência recebida' : 'Transferência enviada';
+  }
+  if (type === 'inbound_payment') return 'Recebimento';
+
+  return WALLESTER_TYPE_LABELS[type] || humanizeKey(type || 'movimento') || 'Movimento';
+}
+
+function friendlyMovementDescription(text, { isBankTransfer = false } = {}) {
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+
+  const lower = raw.toLowerCase();
+  if (isBankTransfer || lower.includes('bank transfer top-up') || lower.includes('bank transfer topup')) {
+    return 'Recebimento por transferência bancária';
+  }
+  if (lower.includes('p2p transfer')) return 'Transferência P2P';
+  return raw;
+}
+
+function normalizeStripeMovement(t) {
+  const direction = txDirectionValue(t.direction);
+  const isIn = direction === 'credit' || direction === 'in';
+  const createdAt = t.created_at || t.stripe_created_at || null;
+  const bankTransfer = isBankTransferTransaction(t);
+  return {
+    key: movementKey('wallet', t.id),
+    source: 'wallet',
+    sourceLabel: 'Wallet',
+    id: t.id,
+    isIn,
+    amountMinor: txDisplayAmountMinor(t),
+    grossMinor: Number(t.amount) || 0,
+    feeMinor: Number(t.fee) || 0,
+    feesPending: !!t.fees_pending,
+    currency: sanitizeCurrency(t.currency),
+    status: String(t.status || 'pending').toLowerCase(),
+    type: String(t.type || 'transação'),
+    typeLabel: stripeMovementTypeLabel(t),
+    description: friendlyMovementDescription(t.description, { isBankTransfer: bankTransfer }),
+    paymentMethod: t.payment_method_type || '',
+    paymentMethodLabel: paymentMethodLabel(t.payment_method_type),
+    createdAt,
+    raw: t,
+  };
+}
+
+function normalizeWallesterMovement(m) {
+  const direction = txDirectionValue(m.direction);
+  const isIn = direction === 'in' || direction === 'credit';
+  const type = String(m.type || 'movimento').toLowerCase();
+  const sourceLabel = (type === 'card_purchase' || type === 'card_refund') ? 'Cartão' : 'Wallester';
+  return {
+    key: movementKey('card', m.id),
+    source: 'card',
+    sourceLabel,
+    id: m.id,
+    isIn,
+    amountMinor: Number(m.amount) || 0,
+    grossMinor: Number(m.amount) || 0,
+    feeMinor: 0,
+    feesPending: false,
+    currency: sanitizeCurrency(m.currency),
+    status: String(m.status || 'pending').toLowerCase(),
+    type,
+    typeLabel: wallesterMovementTypeLabel(m),
+    description: friendlyMovementDescription(m.description),
+    paymentMethod: m.source || '',
+    paymentMethodLabel: paymentMethodLabel(m.source),
+    createdAt: m.created_at || null,
+    failureReason: m.failure_reason || '',
+    partnerExternalId: m.partner_external_id || '',
+    raw: m,
+  };
+}
+
+function renderMovementItem(item, { clickable = false } = {}) {
+  const sign = item.isIn ? '+' : '−';
+  const amt = (item.amountMinor / 100).toFixed(2);
+  const date = item.createdAt
+    ? new Date(item.createdAt).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })
+    : '—';
+  const icon = item.isIn
+    ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`
+    : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
+  const sourceClass = item.source === 'card' ? 'card' : 'wallet';
+  const clickAttrs = clickable
+    ? ` class="tx-item clickable" onclick="openMovementDetail('${item.key}')"`
+    : ' class="tx-item"';
+
+  return `<div${clickAttrs}>
+    <div class="tx-icon-wrap ${item.isIn ? 'credit' : 'debit'}">${icon}</div>
+    <div class="tx-meta">
+      <span class="tx-type">${escapeHtml(item.typeLabel)}<span class="tx-source ${sourceClass}">${escapeHtml(item.sourceLabel)}</span></span>
+      <span class="tx-date">${date}${item.description ? ' · ' + escapeHtml(item.description) : ''}</span>
+    </div>
+    <div class="tx-right">
+      <span class="tx-amount ${item.isIn ? 'credit' : 'debit'}">${sign}${amt} ${item.currency}</span>
+      <span class="badge ${item.status}">${escapeHtml(item.status)}</span>
+    </div>
+  </div>`;
+}
+
+async function fetchAllPaginated(pathBuilder, { maxPages = 50 } = {}) {
+  const items = [];
+  let page = 1;
+  let lastPage = 1;
+
+  do {
+    const { ok, data } = await api('GET', pathBuilder(page));
+    if (!ok) break;
 
     const unwrapped = unwrap(data);
-    const items = Array.isArray(unwrapped) ? unwrapped : (unwrapped?.data || []);
-    const meta = data?.meta || unwrapped?.meta || {};
-    movementsHasMore = meta.current_page < meta.last_page;
+    const pageItems = Array.isArray(unwrapped) ? unwrapped : (unwrapped?.data || data?.data || []);
+    if (Array.isArray(pageItems)) items.push(...pageItems);
 
-    if (page === 1 && !items.length) {
-      list.innerHTML = `<div class="empty-state"><p>Sem movimentações</p></div>`;
-      loadMore.style.display = 'none';
-      return;
-    }
+    const meta = data?.meta || (Array.isArray(unwrapped) ? {} : unwrapped?.meta) || {};
+    lastPage = Number(meta.last_page) || page;
+    page += 1;
+  } while (page <= lastPage && page <= maxPages);
 
-    const html = items.map(t => renderTxItemClickable(t)).join('');
-    if (page === 1) list.innerHTML = html;
-    else list.insertAdjacentHTML('beforeend', html);
+  return items;
+}
 
-    movementsPage = page;
-    loadMore.style.display = movementsHasMore ? 'block' : 'none';
+async function loadMovements() {
+  const list = document.getElementById('movements-list');
+  if (!list || movementsLoading) return;
+
+  movementsLoading = true;
+  list.innerHTML = `<div class="empty-state"><div class="spin" style="border-color:var(--slate-200);border-top-color:var(--indigo);width:32px;height:32px"></div></div>`;
+
+  try {
+    const [stripeItems, wallesterItems] = await Promise.all([
+      fetchAllPaginated((page) => `/wallet/transactions?per_page=100&page=${page}`),
+      fetchWallesterMovements(),
+    ]);
+
+    movementsAll = buildMovementsList(stripeItems, wallesterItems);
+
+    renderMovementsList();
   } catch {
-    if (page === 1) list.innerHTML = `<div class="empty-state"><p>Erro ao carregar</p></div>`;
+    list.innerHTML = `<div class="empty-state"><p>Erro ao carregar</p></div>`;
+    updateMovementsSummary([]);
+  } finally {
+    movementsLoading = false;
   }
 }
 
-function loadMoreMovements() {
-  if (movementsHasMore) loadMovements(movementsPage + 1);
+async function fetchWallesterMovements({ maxPages = 50, wallesterAccount = null } = {}) {
+  try {
+    let wallester = wallesterAccount;
+    if (!wallester) {
+      const accountRes = await api('GET', '/wallet/account');
+      if (!accountRes.ok) return [];
+      wallester = unwrap(accountRes.data)?.wallester;
+    }
+
+    const fundingId = wallester?.id;
+    const status = integrationStatusValue(wallester?.status);
+    if (!fundingId || status !== 'ACTIVE') return [];
+
+    return fetchAllPaginated(
+      (page) => `/wallet/funding-accounts/${fundingId}/movements?per_page=100&page=${page}`,
+      { maxPages },
+    );
+  } catch {
+    return [];
+  }
+}
+
+function setMovementsFilter(filter) {
+  movementsFilter = filter;
+  document.querySelectorAll('.movements-filter').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+  renderMovementsList();
+}
+
+function filteredMovements() {
+  if (movementsFilter === 'in') return movementsAll.filter((m) => m.isIn);
+  if (movementsFilter === 'out') return movementsAll.filter((m) => !m.isIn);
+  return movementsAll;
+}
+
+function updateMovementsSummary(items) {
+  const inEl = document.getElementById('movements-in-count');
+  const outEl = document.getElementById('movements-out-count');
+  const incoming = items.filter((m) => m.isIn).length;
+  const outgoing = items.filter((m) => !m.isIn).length;
+  if (inEl) inEl.textContent = `+${incoming} entradas`;
+  if (outEl) outEl.textContent = `−${outgoing} saídas`;
+}
+
+function dayLabel(dateStr) {
+  if (!dateStr) return 'Sem data';
+  const d = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const sameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+
+  if (sameDay(d, today)) return 'Hoje';
+  if (sameDay(d, yesterday)) return 'Ontem';
+  return d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function dayKey(dateStr) {
+  if (!dateStr) return 'unknown';
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function renderMovementsList() {
+  const list = document.getElementById('movements-list');
+  if (!list) return;
+
+  updateMovementsSummary(movementsAll);
+  const items = filteredMovements();
+
+  if (!items.length) {
+    const emptyMsg = movementsFilter === 'in'
+      ? 'Sem entradas'
+      : (movementsFilter === 'out' ? 'Sem saídas' : 'Sem movimentações');
+    list.innerHTML = `<div class="empty-state"><p>${emptyMsg}</p></div>`;
+    return;
+  }
+
+  const groups = new Map();
+  items.forEach((item) => {
+    const key = dayKey(item.createdAt);
+    if (!groups.has(key)) groups.set(key, { label: dayLabel(item.createdAt), items: [] });
+    groups.get(key).items.push(item);
+  });
+
+  list.innerHTML = Array.from(groups.values()).map((group) => `
+    <div class="movements-day">
+      <div class="movements-day-label">${escapeHtml(group.label)}</div>
+      <div class="info-card">
+        <div class="tx-list">
+          ${group.items.map((item) => renderMovementItem(item, { clickable: true })).join('')}
+        </div>
+      </div>
+    </div>
+  `).join('');
 }
 
 function openTransactionDetail(id) {
+  txDetailReturnScreen = currentScreen === 'movements' ? 'movements' : 'home';
   currentTxId = id;
+  currentMovementKey = movementKey('wallet', id);
   navigate('transaction-detail');
+}
+
+function findMovementByKey(key) {
+  return movementsAll.find((m) => m.key === key)
+    || homeMovements.find((m) => m.key === key)
+    || null;
+}
+
+function openMovementDetail(key) {
+  txDetailReturnScreen = currentScreen === 'movements' ? 'movements' : 'home';
+  currentMovementKey = key;
+  const item = findMovementByKey(key);
+  if (item?.source === 'wallet') {
+    currentTxId = item.id;
+  } else if (String(key).startsWith('wallet:')) {
+    currentTxId = Number(String(key).split(':')[1]) || null;
+  } else {
+    currentTxId = null;
+  }
+  navigate('transaction-detail');
+}
+
+function renderDetailRows(rows) {
+  return rows.map(([label, value]) => `
+    <div class="info-row">
+      <span class="info-row-label">${label}</span>
+      <span class="info-row-value" style="text-align:right;max-width:55%;word-break:break-word">${value}</span>
+    </div>`).join('');
+}
+
+async function loadMovementDetail(key) {
+  const item = findMovementByKey(key);
+  if (!item) {
+    if (currentTxId) return loadTransactionDetail(currentTxId);
+    const infoEl = document.getElementById('tx-detail-info');
+    if (infoEl) infoEl.innerHTML = `<div class="info-row"><span class="info-row-label">Movimento não encontrado</span></div>`;
+    return;
+  }
+
+  if (item.source === 'wallet') {
+    return loadTransactionDetail(item.id);
+  }
+
+  const amountEl = document.getElementById('tx-detail-amount');
+  const typeEl = document.getElementById('tx-detail-type');
+  const infoEl = document.getElementById('tx-detail-info');
+  if (!infoEl) return;
+
+  const sign = item.isIn ? '+' : '−';
+  amountEl.textContent = sign + formatMoney(item.amountMinor, item.currency);
+  amountEl.style.color = item.isIn ? '#059669' : '#dc2626';
+  typeEl.textContent = item.typeLabel;
+
+  const rows = [
+    ['Origem', 'Cartão Wallester'],
+    ['Status', `<span class="badge ${item.status}">${escapeHtml(item.status)}</span>`],
+    ['Direcção', item.isIn ? 'Entrada' : 'Saída'],
+    ['Montante', formatMoney(item.amountMinor, item.currency)],
+    ['Tipo', escapeHtml(item.typeLabel)],
+    ['Descrição', escapeHtml(item.description || '—')],
+    ['Fonte', escapeHtml(item.paymentMethod || '—')],
+    ['Data', item.createdAt ? new Date(item.createdAt).toLocaleString('pt-PT') : '—'],
+  ];
+  if (item.partnerExternalId) rows.push(['ID externo', escapeHtml(item.partnerExternalId)]);
+  if (item.failureReason) rows.push(['Falha', escapeHtml(item.failureReason)]);
+
+  infoEl.innerHTML = renderDetailRows(rows);
 }
 
 async function loadTransactionDetail(id) {
@@ -2986,69 +3503,101 @@ async function loadTransactionDetail(id) {
   }
 
   const t = unwrap(data);
-  const isCredit = t.direction === 'credit';
+  const isCredit = txDirectionValue(t.direction) === 'credit';
   const sign = isCredit ? '+' : '−';
   const cur = sanitizeCurrency(t.currency);
+  const typeLabel = stripeMovementTypeLabel(t);
+  const bankTransfer = isBankTransferTransaction(t);
   amountEl.textContent = sign + formatMoney(txDisplayAmountMinor(t), cur);
   amountEl.style.color = isCredit ? '#059669' : '#dc2626';
-  typeEl.textContent = String(t.type || 'transação').replace(/_/g, ' ');
+  typeEl.textContent = typeLabel;
 
   const rows = [
+    ['Origem', 'Wallet'],
     ['Status', `<span class="badge ${String(t.status || 'pending').toLowerCase()}">${t.status || '—'}</span>`],
-    ['Direcção', t.direction || '—'],
+    ['Direcção', isCredit ? 'Entrada' : 'Saída'],
+    ['Tipo', escapeHtml(typeLabel)],
     ['Montante', formatMoney(t.amount, cur)],
     ['Taxa', t.fees_pending ? 'A calcular…' : (t.fee ? formatMoney(t.fee, cur) : '—')],
     ['Líquido', t.fees_pending ? `${formatMoney(t.amount, cur)} (bruto, a calcular)` : formatMoney(txDisplayAmountMinor(t), cur)],
-    ['Descrição', t.description || '—'],
-    ['Método', t.payment_method_type || '—'],
+    ['Descrição', escapeHtml(friendlyMovementDescription(t.description, { isBankTransfer: bankTransfer }) || '—')],
+    ['Método', escapeHtml(paymentMethodLabel(t.payment_method_type))],
     ['Data', t.created_at ? new Date(t.created_at).toLocaleString('pt-PT') : '—'],
   ];
+  if (t.bank_transfer?.sender_name || t.bank_transfer_sender_name) {
+    rows.push(['Remetente', escapeHtml(t.bank_transfer?.sender_name || t.bank_transfer_sender_name)]);
+  }
+  if (t.bank_transfer?.iban_last4 || t.bank_transfer_iban_last4) {
+    rows.push(['IBAN', '····' + escapeHtml(t.bank_transfer?.iban_last4 || t.bank_transfer_iban_last4)]);
+  }
   if (t.stripe_payment_intent_id) rows.push(['Stripe PI', t.stripe_payment_intent_id]);
   if (t.stripe_charge_id) rows.push(['Stripe Charge', t.stripe_charge_id]);
   if (t.partner_funding_status) rows.push(['Funding', t.partner_funding_status]);
 
-  infoEl.innerHTML = rows.map(([label, value]) => `
-    <div class="info-row">
-      <span class="info-row-label">${label}</span>
-      <span class="info-row-value" style="text-align:right;max-width:55%;word-break:break-word">${value}</span>
-    </div>`).join('');
+  infoEl.innerHTML = renderDetailRows(rows);
 }
 
 // ── P2P ───────────────────────────────────────────────
 document.getElementById('p2p-currency')?.addEventListener('change', function() {
   document.getElementById('p2p-prefix').textContent = currencySymbol(this.value);
-  loadP2PBalance();
 });
+
+function resetP2PScreen() {
+  p2pRecipient = null;
+  const preview = document.getElementById('p2p-recipient-preview');
+  if (preview) {
+    preview.style.display = 'none';
+    preview.innerHTML = '';
+  }
+  const result = document.getElementById('p2p-result');
+  if (result) {
+    result.className = 'result-card';
+    result.textContent = '';
+  }
+  document.getElementById('p2p-pin-overlay')?.classList.remove('show');
+}
 
 async function findP2PRecipient() {
   let username = document.getElementById('p2p-username').value.trim().replace(/^@/, '');
   if (!username) { showToast('Informe o username', 'error'); return; }
 
-  const { ok, data } = await api('GET', `/customer/find/${encodeURIComponent(username)}`);
   const preview = document.getElementById('p2p-recipient-preview');
+  const { ok, data } = await api('GET', `/customer/find/${encodeURIComponent(username)}`);
 
   if (!ok) {
     p2pRecipient = null;
-    preview.style.display = 'none';
+    if (preview) {
+      preview.style.display = 'none';
+      preview.innerHTML = '';
+    }
     showToast(data?.message || 'Utilizador não encontrado', 'error');
     return;
   }
 
-  p2pRecipient = unwrap(data);
+  p2pRecipient = unwrap(data) || data;
+  if (!p2pRecipient?.username) {
+    p2pRecipient = null;
+    if (preview) preview.style.display = 'none';
+    showToast('Resposta inválida do servidor', 'error');
+    return;
+  }
+
   const initial = (p2pRecipient.name || p2pRecipient.username || '?')[0].toUpperCase();
   const avatar = p2pRecipient.avatar_url
-    ? `<img src="${p2pRecipient.avatar_url}" alt="" />`
-    : initial;
+    ? `<img src="${escapeHtml(p2pRecipient.avatar_url)}" alt="" />`
+    : escapeHtml(initial);
 
-  preview.innerHTML = `
-    <div class="recipient-preview">
-      <div class="recipient-avatar">${avatar}</div>
-      <div>
-        <div class="recipient-name">${p2pRecipient.name || '—'}</div>
-        <div class="recipient-username">@${p2pRecipient.username}</div>
-      </div>
-    </div>`;
-  preview.style.display = 'block';
+  if (preview) {
+    preview.innerHTML = `
+      <div class="recipient-preview">
+        <div class="recipient-avatar">${avatar}</div>
+        <div>
+          <div class="recipient-name">${escapeHtml(p2pRecipient.name || '—')}</div>
+          <div class="recipient-username">@${escapeHtml(p2pRecipient.username)}</div>
+        </div>
+      </div>`;
+    preview.style.display = 'block';
+  }
   showToast('Destinatário encontrado', 'success');
 }
 
@@ -3097,7 +3646,6 @@ async function doP2PTransfer(pin) {
     result.className = 'result-card show success';
     result.textContent = `Enviado com sucesso!\nDébito: #${unwrap(data)?.debit?.id || '—'}`;
     showToast('Transferência realizada!', 'success');
-    await loadP2PBalance();
     await loadHomeData();
   } else {
     result.className = 'result-card show error';
@@ -3153,15 +3701,128 @@ function formatPhoneDisplay(phone) {
   return phone;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function copyAccountValue(value) {
+  const text = String(value ?? '');
+  if (!text || text === '—') return;
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('Copiado', 'success'))
+    .catch(() => showToast('Não foi possível copiar', 'error'));
+}
+
+function accountInfoValue(value, { mono = false, copyable = false } = {}) {
+  const raw = value == null || value === '' ? '—' : String(value);
+  const display = escapeHtml(raw);
+  const classes = ['info-row-value', mono ? 'mono' : ''].filter(Boolean).join(' ');
+
+  if (!copyable || raw === '—') {
+    return `<span class="${classes}">${display}</span>`;
+  }
+
+  return `<span class="${classes}">
+    <span class="info-row-copy">
+      <span>${display}</span>
+      <button type="button" onclick="copyAccountValue(${JSON.stringify(raw)})">Copiar</button>
+    </span>
+  </span>`;
+}
+
 function accountInfoCard(rows) {
   if (!rows.length) {
     return `<div class="info-card"><div class="info-row"><span class="info-row-label" style="color:var(--slate-400)">Sem dados</span></div></div>`;
   }
-  return `<div class="info-card">${rows.map(([label, value]) => `
+  return `<div class="info-card">${rows.map((row) => {
+    const label = row[0];
+    const value = row[1];
+    const opts = row[2] || {};
+    return `
     <div class="info-row">
-      <span class="info-row-label">${label}</span>
-      <span class="info-row-value">${value ?? '—'}</span>
-    </div>`).join('')}</div>`;
+      <span class="info-row-label">${escapeHtml(label)}</span>
+      ${accountInfoValue(value, opts)}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function fundingStatusLabel(status) {
+  const value = String(status?.value ?? status ?? '').toUpperCase();
+  if (value === 'ACTIVE') return { label: 'Activo', className: 'green' };
+  if (value === 'PENDING') return { label: 'Pendente', className: 'amber' };
+  if (value === 'FAILED') return { label: 'Falhou', className: 'red' };
+  return { label: value || '—', className: '' };
+}
+
+function renderStripeIbanSection(stripe) {
+  if (!stripe) {
+    return `
+      <div>
+        <div class="section-title">IBAN Stripe</div>
+        ${accountInfoCard([['Estado', 'Conta Stripe indisponível']])}
+      </div>`;
+  }
+
+  const status = fundingStatusLabel(stripe.funding_status);
+  const iban = stripe.funding_iban || stripe.viban || null;
+  const bic = stripe.funding_bic || null;
+  const holder = stripe.funding_account_holder_name || null;
+  const country = stripe.funding_country || null;
+
+  let body = `
+    <div class="info-row">
+      <span class="info-row-label">Estado</span>
+      <span class="info-row-value ${status.className}">${escapeHtml(status.label)}</span>
+    </div>`;
+
+  if (iban) {
+    body += `
+      <div class="info-row">
+        <span class="info-row-label">IBAN</span>
+        ${accountInfoValue(iban, { mono: true, copyable: true })}
+      </div>`;
+    if (bic) {
+      body += `
+        <div class="info-row">
+          <span class="info-row-label">BIC / SWIFT</span>
+          ${accountInfoValue(bic, { mono: true, copyable: true })}
+        </div>`;
+    }
+    if (holder) {
+      body += `
+        <div class="info-row">
+          <span class="info-row-label">Titular</span>
+          ${accountInfoValue(holder)}
+        </div>`;
+    }
+    if (country) {
+      body += `
+        <div class="info-row">
+          <span class="info-row-label">País</span>
+          ${accountInfoValue(String(country).toUpperCase())}
+        </div>`;
+    }
+  } else {
+    const message = status.label === 'Falhou'
+      ? (stripe.funding_status_reason || 'A criação do IBAN falhou.')
+      : (status.label === 'Pendente' ? 'Ainda não provisionado' : 'Indisponível');
+    body += `
+      <div class="info-row">
+        <span class="info-row-label">IBAN</span>
+        ${accountInfoValue(message)}
+      </div>`;
+  }
+
+  return `
+    <div>
+      <div class="section-title">IBAN Stripe</div>
+      <div class="info-card">${body}</div>
+    </div>`;
 }
 
 function resolveAvatarUrl(avatar) {
@@ -3279,11 +3940,19 @@ async function loadAccountInfo() {
   body.innerHTML = '<div class="account-loading">A carregar...</div>';
 
   let customer = { ...(authSession?.user ?? {}) };
+  let stripeAccount = null;
 
   try {
-    const meRes = await api('GET', '/customer/me');
+    const [meRes, accountRes] = await Promise.all([
+      api('GET', '/customer/me'),
+      api('GET', '/wallet/account'),
+    ]);
+
     if (meRes.ok) {
       customer = { ...customer, ...unwrap(meRes.data) };
+    }
+    if (accountRes.ok) {
+      stripeAccount = unwrap(accountRes.data)?.stripe ?? null;
     }
   } catch (_) {
     /* keep session user */
@@ -3310,6 +3979,7 @@ async function loadAccountInfo() {
       <div class="section-title">Perfil</div>
       ${accountInfoCard(profileRows)}
     </div>
+    ${renderStripeIbanSection(stripeAccount)}
     <button class="btn-logout" onclick="doLogout()">Terminar sessão</button>
     ${pinConfigured ? '<button class="btn-link" style="margin-top:12px" onclick="openPinReset()">Refazer PIN</button>' : ''}
   `;
@@ -3335,8 +4005,7 @@ async function loadHomeData() {
     if (dashRes.ok) walletBalances = extractBalanceList(dashRes.data);
     if (!walletBalances.length && balRes.ok) walletBalances = extractBalanceList(balRes.data);
 
-    let transactions = [];
-    if (dashRes.ok) transactions = extractTransactionList(dashRes.data);
+    const stripeItems = dashRes.ok ? extractTransactionList(dashRes.data) : [];
 
     let wallester = null;
     if (accountRes.ok) {
@@ -3356,18 +4025,23 @@ async function loadHomeData() {
       setWallesterReadyFromSession(authSession);
     }
 
+    const wallesterItems = wallester
+      ? await fetchWallesterMovements({ maxPages: 1, wallesterAccount: wallester })
+      : [];
+    homeMovements = buildMovementsList(stripeItems, wallesterItems).slice(0, HOME_MOVEMENTS_LIMIT);
+
     renderHomeBalances(walletBalances, wallester);
-    renderHomeTransactions(transactions);
+    renderHomeTransactions(homeMovements);
 
     if (!dashRes.ok && !balRes.ok) {
       document.getElementById('home-account').textContent = 'Erro ao carregar saldo';
       showToast('Não foi possível carregar o saldo', 'error');
     }
 
-    if (!dashRes.ok) {
+    if (!dashRes.ok && !wallesterItems.length) {
       const txList = document.getElementById('home-tx-list');
-      if (txList) {
-        txList.innerHTML = `<div class="empty-state" style="padding:24px"><p>Erro ao carregar transações</p></div>`;
+      if (txList && !homeMovements.length) {
+        txList.innerHTML = `<div class="empty-state" style="padding:24px"><p>Erro ao carregar movimentações</p></div>`;
       }
     }
 

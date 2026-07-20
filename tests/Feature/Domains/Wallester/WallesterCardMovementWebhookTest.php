@@ -215,6 +215,74 @@ class WallesterCardMovementWebhookTest extends TestCase
         ]);
     }
 
+    public function test_webhook_settlement_does_not_double_debit_after_authorization(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_auth_settle');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_auth_settle',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 1000,
+            'pending' => 0,
+        ]);
+
+        $authId = '4dc0e494-c674-47bd-80ed-567e2aa19fdc';
+        $settlementId = 'ba9409c7-42ce-4ee1-bc74-7add3f1abe31';
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => $authId,
+                'card_id' => 'card_auth_settle',
+                'type' => 'payWaveLowValuePurchase',
+                'account_amount' => -0.9,
+                'account_currency_code' => 'EUR',
+                'group' => 'Purchase',
+                'merchant_name' => 'DISTRICT',
+                'response_code' => 'Approved',
+                'is_declined' => false,
+            ],
+        ])->assertOk();
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'transaction',
+            'data' => [
+                'id' => $settlementId,
+                'authorization_id' => $authId,
+                'card_id' => 'card_auth_settle',
+                'account_amount' => -0.9,
+                'account_currency_code' => 'EUR',
+                'group' => 'Purchase',
+                'merchant_name' => 'DISTRICT',
+                'authorization_code' => 'A9IZOT',
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseCount('funding_partner_movements', 1);
+        $this->assertDatabaseCount('ledger_entries', 1);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'funding_account_id' => $account->id,
+            'partner_external_id' => $authId,
+            'amount' => 90,
+        ]);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 910,
+        ]);
+    }
+
     private function createActiveCustomer()
     {
         return $this->createRetailCustomer([

@@ -3,9 +3,12 @@
 namespace App\Domains\Backoffice\Queries;
 
 use App\Domains\Backoffice\DTOs\CustomerActivityItem;
+use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentDirection;
+use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Models\Customer;
+use App\Models\CustomerBalanceAdjustment;
 use App\Models\CustomerWallesterAccount;
 use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
@@ -47,8 +50,17 @@ class GetCustomerActivityTimelineQuery
                 ->map(fn (FundingPartnerMovement $movement): CustomerActivityItem => $this->fromWallesterMovement($movement));
         }
 
+        $platformItems = CustomerBalanceAdjustment::query()
+            ->where('customer_id', $customer->id)
+            ->where('status', CustomerBalanceAdjustmentStatus::Executed)
+            ->latest('updated_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn (CustomerBalanceAdjustment $adjustment): CustomerActivityItem => $this->fromBalanceAdjustment($adjustment));
+
         return $stripeItems
             ->concat($wallesterItems)
+            ->concat($platformItems)
             ->sortByDesc(fn (CustomerActivityItem $item) => $item->occurredAt->getTimestamp())
             ->take($limit)
             ->values();
@@ -108,6 +120,24 @@ class GetCustomerActivityTimelineQuery
             merchantCity: is_string($metadata['merchant_city'] ?? null) ? $metadata['merchant_city'] : null,
             merchantCategoryCode: is_string($metadata['merchant_category_code'] ?? null) ? $metadata['merchant_category_code'] : null,
             sourceLabel: 'Wallester',
+        );
+    }
+
+    private function fromBalanceAdjustment(CustomerBalanceAdjustment $adjustment): CustomerActivityItem
+    {
+        $isCredit = $adjustment->direction === CustomerBalanceAdjustmentDirection::Credit;
+
+        return new CustomerActivityItem(
+            source: 'platform',
+            occurredAt: $adjustment->updated_at,
+            isIncoming: $isCredit,
+            amountCents: (int) $adjustment->amount_cents,
+            netAmountCents: null,
+            currency: strtoupper((string) $adjustment->currency),
+            typeLabel: $isCredit ? 'Crédito manual' : 'Débito manual',
+            status: 'Executado',
+            description: $adjustment->description,
+            sourceLabel: 'Banco da Plataforma',
         );
     }
 }

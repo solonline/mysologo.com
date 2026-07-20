@@ -3,22 +3,40 @@
 namespace App\Domains\Sms\Support;
 
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class SmsLogger
 {
     public static function info(string $event, array $context = []): void
     {
-        Log::channel('sms')->info($event, self::sanitize($context));
+        self::write('info', $event, $context);
     }
 
     public static function warning(string $event, array $context = []): void
     {
-        Log::channel('sms')->warning($event, self::sanitize($context));
+        self::write('warning', $event, $context);
     }
 
     public static function error(string $event, array $context = []): void
     {
-        Log::channel('sms')->error($event, self::sanitize($context));
+        self::write('error', $event, $context);
+    }
+
+    /** @param array<string, mixed> $context */
+    private static function write(string $level, string $event, array $context = []): void
+    {
+        $sanitized = self::sanitize($context);
+
+        try {
+            Log::channel('sms')->{$level}($event, $sanitized);
+        } catch (Throwable $exception) {
+            Log::channel(config('logging.default', 'stack'))->warning('sms_logger_fallback', [
+                'event' => $event,
+                'original_level' => $level,
+                'logging_exception' => $exception->getMessage(),
+                'context' => $sanitized,
+            ]);
+        }
     }
 
     /** @param  array<string, mixed>  $context */
