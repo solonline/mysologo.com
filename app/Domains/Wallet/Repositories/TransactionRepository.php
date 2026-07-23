@@ -23,6 +23,7 @@ class TransactionRepository implements TransactionRepositoryInterface
     {
         return StripeTransaction::where('customer_id', $customer->id)
             ->where('type', '!=', \App\Domains\Wallet\Enums\TransactionType::MERCHANT_PAYMENT->value)
+            ->with('relatedStripeTransaction.customer')
             ->latest()
             ->limit($limit)
             ->get();
@@ -32,6 +33,7 @@ class TransactionRepository implements TransactionRepositoryInterface
     {
         return StripeTransaction::where('customer_id', $customer->id)
             ->where('type', '!=', \App\Domains\Wallet\Enums\TransactionType::MERCHANT_PAYMENT->value)
+            ->with('relatedStripeTransaction.customer')
             ->latest()
             ->paginate($perPage);
     }
@@ -39,6 +41,7 @@ class TransactionRepository implements TransactionRepositoryInterface
     public function findForCustomer(Customer $customer, int $id): ?StripeTransaction
     {
         return StripeTransaction::where('customer_id', $customer->id)
+            ->with('relatedStripeTransaction.customer')
             ->find($id);
     }
 

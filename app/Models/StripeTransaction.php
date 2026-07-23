@@ -131,6 +131,35 @@ class StripeTransaction extends Model
         return $this->belongsTo(StripeTransaction::class, 'related_transaction_id');
     }
 
+    /**
+     * Other customer in a P2P pair (via related_transaction_id).
+     */
+    public function p2pCounterparty(): ?Customer
+    {
+        if ($this->type !== TransactionType::P2P) {
+            return null;
+        }
+
+        return $this->relatedStripeTransaction?->customer;
+    }
+
+    /**
+     * Role of the counterparty relative to this transaction leg.
+     * Debit (send) → recipient; credit (receive) → sender.
+     */
+    public function p2pCounterpartyRole(): ?string
+    {
+        if ($this->type !== TransactionType::P2P) {
+            return null;
+        }
+
+        $direction = $this->direction instanceof TransactionDirection
+            ? $this->direction
+            : TransactionDirection::tryFrom((string) $this->direction);
+
+        return $direction === TransactionDirection::Debit ? 'recipient' : 'sender';
+    }
+
     public function stripePaymentIntent()
     {
         return $this->hasOne(StripePaymentIntent::class, 'stripe_transaction_id');

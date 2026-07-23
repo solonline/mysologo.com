@@ -13,7 +13,7 @@ class ListStripeTransactionsQuery
     public function execute(array $filters, int $perPage = 25): LengthAwarePaginator
     {
         $query = StripeTransaction::query()
-            ->with('customer')
+            ->with(['customer', 'relatedStripeTransaction.customer'])
             ->latest('stripe_created_at')
             ->latest('id');
 

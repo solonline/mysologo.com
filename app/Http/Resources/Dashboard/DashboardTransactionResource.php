@@ -21,6 +21,22 @@ class DashboardTransactionResource extends JsonResource
             'status' => $this->status,
             'payment_method_type' => $this->payment_method_type,
             'description' => $this->description,
+            'counterparty' => $this->when(
+                $this->type === TransactionType::P2P,
+                function () {
+                    $customer = $this->p2pCounterparty();
+                    if (! $customer) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => $customer->id,
+                        'name' => $customer->name,
+                        'username' => $customer->username,
+                        'role' => $this->p2pCounterpartyRole(),
+                    ];
+                }
+            ),
             'partner_funding_status' => $this->when(
                 $this->type === TransactionType::TOPUP,
                 $this->partner_funding_status,

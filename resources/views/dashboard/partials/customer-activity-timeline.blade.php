@@ -3,33 +3,42 @@
     $outgoingCount = $activityTimeline->filter(fn ($item) => ! $item->isIncoming)->count();
 @endphp
 
-<div id="transactions" class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-    <div class="px-5 py-4 border-b border-slate-100">
-        <div class="flex items-center justify-between gap-3">
-            <div>
-                <h2 class="text-sm font-semibold text-slate-900">Últimos Movimentos</h2>
-                <p class="text-xs text-slate-500 mt-0.5">Entradas e saídas — Stripe, cartão Wallester e ajustes da plataforma</p>
+<div id="transactions"
+     x-data="{ sectionOpen: false }"
+     class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+    <div class="px-5 py-4 flex items-center justify-between gap-3"
+         :class="sectionOpen ? 'border-b border-slate-100' : ''">
+        <button type="button"
+                @click="sectionOpen = !sectionOpen"
+                class="flex items-center gap-3 min-w-0 text-left flex-1 hover:opacity-90 transition-opacity">
+            <div class="min-w-0">
+                <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    Últimos Movimentos
+                    <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </h2>
+                <p class="text-xs text-slate-500 mt-0.5 truncate">Entradas e saídas — Stripe, cartão Wallester e ajustes da plataforma</p>
             </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-                <span class="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
-                    +{{ $incomingCount }} entradas
-                </span>
-                <span class="text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-full">
-                    −{{ $outgoingCount }} saídas
-                </span>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-                <a href="{{ route('dashboard.customers.transactions', $customer) }}"
-                class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors whitespace-nowrap">
-                 Ver todas
-                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                 </svg>
-             </a>
-            </div>
+        </button>
+        <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
+                +{{ $incomingCount }} entradas
+            </span>
+            <span class="text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-full">
+                −{{ $outgoingCount }} saídas
+            </span>
+            <a href="{{ route('dashboard.customers.transactions', $customer) }}"
+               class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors whitespace-nowrap">
+                Ver todas
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
         </div>
     </div>
 
+    <div x-show="sectionOpen" x-cloak>
     @if ($activityTimeline->isEmpty())
     <div class="px-5 py-10 text-center">
         <div class="flex flex-col items-center gap-2">
@@ -122,6 +131,18 @@
                                 </p>
                                 @endif
 
+                                @if ($item->p2pCounterpartyName || $item->p2pCounterpartyUsername)
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    {{ $item->p2pCounterpartyRole === 'sender' ? 'De' : 'Para' }}:
+                                    @if ($item->p2pCounterpartyUsername)
+                                        <span class="font-medium text-slate-700">{{ '@'.$item->p2pCounterpartyUsername }}</span>
+                                    @endif
+                                    @if ($item->p2pCounterpartyName)
+                                        <span class="text-slate-400">{{ $item->p2pCounterpartyUsername ? '· '.$item->p2pCounterpartyName : $item->p2pCounterpartyName }}</span>
+                                    @endif
+                                </p>
+                                @endif
+
                                 @if ($item->wallesterMovement?->partner_external_id)
                                 <p class="text-[10px] text-slate-300 mt-0.5 font-mono truncate">
                                     {{ $item->wallesterMovement->partner_external_id }}
@@ -141,4 +162,5 @@
         </div>
     </div>
     @endif
+    </div>{{-- fim sectionOpen --}}
 </div>

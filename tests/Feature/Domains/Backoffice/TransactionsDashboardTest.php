@@ -69,17 +69,18 @@ class TransactionsDashboardTest extends TestCase
             'description' => 'Transferencia teste dashboard',
         ]);
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.transactions'))
             ->assertOk()
             ->assertSee('Stripe')
             ->assertSee('Wallester')
             ->assertSee('Carregamento')
+            ->assertSee('Venda SecurePay')
             ->assertSee('Cliente Teste Transacoes')
             ->assertSee('Ver detalhes')
             ->assertSee('Detalhes da transação');
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.transactions', ['tab' => 'wallester']))
             ->assertOk()
             ->assertSee('Transferência')
@@ -141,26 +142,72 @@ class TransactionsDashboardTest extends TestCase
             ]);
         }
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.transactions', $customer))
             ->assertOk()
             ->assertSee('Transações de Cliente Selecionado')
             ->assertSee('(1)')
             ->assertDontSee('Outro Cliente');
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.transactions', ['customer' => $customer, 'tab' => 'wallester']))
             ->assertOk()
             ->assertSee('wal-selected-customer')
             ->assertDontSee('wal-other-customer');
     }
 
+    public function test_transactions_page_can_filter_by_merchant_payment_type(): void
+    {
+        $user = $this->userWithPermission('transactions.view');
+        $customer = $this->createRetailCustomer(['name' => 'Merchant Filter Customer']);
+
+        StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 1_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 1_000,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'Topup nao deve aparecer',
+        ]);
+
+        StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::MERCHANT_PAYMENT,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 2_500,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 2_500,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'Venda merchant filtro',
+            'partner_funding_status' => 'awaiting_stripe_payout',
+        ]);
+
+        $this->actingAs($user, 'web')
+            ->get(route('dashboard.transactions', [
+                'tab' => 'stripe',
+                'type' => TransactionType::MERCHANT_PAYMENT->value,
+            ]))
+            ->assertOk()
+            ->assertSee('Venda SecurePay')
+            ->assertSee('Venda merchant filtro')
+            ->assertSee('Aguarda payout Stripe')
+            ->assertDontSee('Topup nao deve aparecer');
+    }
+
     private function userWithPermission(string $permission): User
     {
-        Permission::findOrCreate($permission);
+        $permissionModel = Permission::findOrCreate($permission, 'web');
 
         $user = User::factory()->create();
-        $user->givePermissionTo($permission);
+        $user->givePermissionTo($permissionModel);
 
         return $user;
     }
