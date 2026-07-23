@@ -136,6 +136,7 @@
                     ['label' => 'Em análise', 'value' => $stats['analysis_customers'] ?? 0, 'color' => '#0ea5e9'],
                     ['label' => 'Bloqueados', 'value' => $stats['blocked_customers'] ?? 0, 'color' => '#ef4444'],
                     ['label' => 'Docs pendentes', 'value' => $stats['pending_documents'] ?? 0, 'color' => '#64748b'],
+                    ['label' => 'Com SecurePay', 'value' => $stats['merchant_customers'] ?? 0, 'color' => '#0891b2'],
                 ];
             @endphp
             @foreach ($customerBreakdown as $row)

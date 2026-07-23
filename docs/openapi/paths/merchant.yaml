@@ -363,7 +363,62 @@ merchant-payment-requests:
         content:
           application/json:
             schema:
-              $ref: '../components/schemas.yaml#/MerchantPaymentRequest'
+              type: object
+              properties:
+                uuid:
+                  type: string
+                  format: uuid
+                amount:
+                  type: integer
+                  description: Valor em centimos
+                currency:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                external_reference:
+                  type: string
+                  nullable: true
+                payment_method_types:
+                  type: array
+                  nullable: true
+                  items:
+                    type: string
+                status:
+                  type: string
+                settlement_status:
+                  type: string
+                  nullable: true
+                url:
+                  type: string
+                  format: uri
+                paid_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                expires_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                created_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+            example:
+              uuid: "9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8"
+              amount: 5000
+              currency: EUR
+              description: "Order #123"
+              external_reference: ORD-123
+              payment_method_types:
+                - card
+                - mb_way
+              status: pending
+              settlement_status: null
+              url: "https://yooppayments.eu/pay/9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8"
+              paid_at: null
+              expires_at: "2026-07-23T13:00:00+01:00"
+              created_at: "2026-07-23T12:00:00+01:00"
       '401':
         $ref: '../components/responses.yaml#/Unauthorized'
       '422':
