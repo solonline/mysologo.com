@@ -169,4 +169,32 @@ class StripeHttpClient
 
         return Webhook::constructEvent($payload, $sigHeader, $this->webhookSecret);
     }
+
+    public function getTransactionsByIdPayout(string $payoutId): array
+    {
+        $all = [];
+        $startingAfter = null;
+
+        do {
+            $params = ['payout' => $payoutId, 'limit' => 100];
+            if ($startingAfter !== null) {
+                $params['starting_after'] = $startingAfter;
+            }
+
+            $page = $this->client()->balanceTransactions->all($params)->toArray();
+            $data = $page['data'] ?? [];
+            $all = array_merge($all, $data);
+            $hasMore = (bool) ($page['has_more'] ?? false);
+            $startingAfter = $hasMore && $data !== []
+                ? (string) $data[array_key_last($data)]['id']
+                : null;
+        } while ($hasMore && $startingAfter !== null);
+
+        return [
+            'object' => 'list',
+            'data' => $all,
+            'has_more' => false,
+            'url' => '/v1/balance_transactions',
+        ];
+    }
 }

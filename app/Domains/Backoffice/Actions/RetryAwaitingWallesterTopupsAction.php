@@ -27,7 +27,10 @@ class RetryAwaitingWallesterTopupsAction
         $skipped = 0;
 
         StripeTransaction::query()
-            ->where('type', TransactionType::TOPUP->value)
+            ->whereIn('type', [
+                TransactionType::TOPUP->value,
+                TransactionType::MERCHANT_PAYMENT->value,
+            ])
             ->where('status', 'succeeded')
             ->whereIn('partner_funding_status', [
                 PartnerFundingStatus::Pending->value,

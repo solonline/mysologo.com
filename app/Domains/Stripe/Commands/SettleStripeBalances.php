@@ -11,7 +11,7 @@ class SettleStripeBalances extends Command
 {
     protected $signature = 'stripe:settle-balances {--date= : Data de liquidação (Y-m-d). Padrão: hoje}';
 
-    protected $description = 'Executa o pipeline de settlement: settle transações disponíveis, envia para conta master e distribui para IBANs individuais.';
+    protected $description = 'Fallback/retry de funding Wallester após payout.paid (não credita por available_on).';
 
     public function __construct(private readonly SettlementService $settlementService)
     {
@@ -24,11 +24,16 @@ class SettleStripeBalances extends Command
             ? now()->parse($this->option('date'))
             : today();
 
-        $this->info("stripe:settle-balances — a processar liquidações para {$date->toDateString()}...");
+        $this->info("stripe:settle-balances — fallback/retry para {$date->toDateString()}...");
 
         $result = $this->settlementService->runDailySettlement($date);
 
-        $this->info("Concluído — {$result['batches']} batch(es), {$result['transactions']} transação(ões).");
+        $this->info(sprintf(
+            'Concluído — retried=%d skipped=%d awaiting_payout_stale=%d',
+            $result['retried'] ?? 0,
+            $result['skipped'] ?? 0,
+            $result['awaiting_payout_stale'] ?? 0,
+        ));
 
         return self::SUCCESS;
     }

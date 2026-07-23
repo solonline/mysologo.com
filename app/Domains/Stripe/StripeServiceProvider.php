@@ -5,8 +5,10 @@ namespace App\Domains\Stripe;
 use App\Domains\Onboarding\Events\CustomerApproved;
 use App\Domains\Stripe\Clients\StripeHttpClient;
 use App\Domains\Stripe\Commands\MigratePendingToPaymentIntents;
+use App\Domains\Stripe\Commands\PurgeMerchantPaymentsCommand;
 use App\Domains\Stripe\Commands\SettleStripeBalances;
 use App\Domains\Stripe\Jobs\ExpireStaleStripePaymentIntentsJob;
+use App\Domains\Stripe\Services\PurgeMerchantPaymentsService;
 use App\Domains\Stripe\Services\StripePaymentIntentService;
 use App\Domains\Stripe\Contracts\StripeAccountRepositoryInterface;
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
@@ -27,6 +29,7 @@ class StripeServiceProvider extends ServiceProvider
         $this->app->bind(StripeAccountRepositoryInterface::class, StripeAccountRepository::class);
         $this->app->singleton(StripeService::class);
         $this->app->singleton(StripePaymentIntentService::class);
+        $this->app->singleton(PurgeMerchantPaymentsService::class);
     }
 
     public function boot(): void
@@ -35,6 +38,7 @@ class StripeServiceProvider extends ServiceProvider
             $this->commands([
                 SettleStripeBalances::class,
                 MigratePendingToPaymentIntents::class,
+                PurgeMerchantPaymentsCommand::class,
             ]);
         }
 

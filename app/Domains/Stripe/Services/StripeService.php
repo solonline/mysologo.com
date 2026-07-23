@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Domains\Stripe\Services;
 
 use App\Domains\Merchant\Contracts\MerchantPaymentRequestRepositoryInterface;
-use App\Domains\Merchant\Jobs\DispatchMerchantCallback;
+use App\Domains\Merchant\Jobs\DispatchMerchantWebhook;
 use App\Domains\Onboarding\Services\IntegrationAccountService;
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
 use App\Domains\Stripe\Enums\StripePaymentIntentPurpose;
 use App\Domains\Stripe\Enums\StripePaymentIntentStatus;
 use App\Domains\Stripe\Services\StripePaymentIntentService;
+use App\Domains\Stripe\Jobs\ProcessStripePayoutPaidJob;
 use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
@@ -32,7 +33,7 @@ use Illuminate\Support\Facades\Log;
 class StripeService
 {
     private const PAYMENT_METHOD_CURRENCIES = [
-        'mbway' => ['eur'],
+        'mb_way' => ['eur'],
         'twint' => ['chf'],
         'blik' => ['pln'],
         'bancontact' => ['eur'],
@@ -575,8 +576,44 @@ class StripeService
             'charge.updated' => $this->handleChargeUpdated($object),
             'customer_cash_balance_settings.updated', 'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
             'customer_cash_balance_transaction.created', 'customer.cash_balance_transaction.created' => $this->handleCashBalanceTransactionCreated($object),
+            'payout.paid' => $this->handlePayoutPaid($object),
             default => Log::info('Stripe webhook ignorado', ['type' => $eventType]),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $payout
+     */
+    private function handlePayoutPaid(array $payout): void
+    {
+        $payoutId = $payout['id'] ?? null;
+
+        if (! is_string($payoutId) || ! str_starts_with($payoutId, 'po_')) {
+            Log::channel('stripe')->warning('Stripe webhook: payout.paid sem id válido', $payout);
+
+            return;
+        }
+
+        if (($payout['status'] ?? null) !== 'paid') {
+            Log::channel('stripe')->info('Stripe webhook: payout.paid ignorado (status != paid)', [
+                'payout_id' => $payoutId,
+                'status' => $payout['status'] ?? null,
+            ]);
+
+            return;
+        }
+
+        $currency = strtolower((string) ($payout['currency'] ?? 'eur'));
+        $livemode = (bool) ($payout['livemode'] ?? true);
+
+        ProcessStripePayoutPaidJob::dispatch($payoutId, $currency, $livemode);
+
+        Log::channel('stripe')->info('Stripe webhook: payout.paid enfileirado', [
+            'payout_id' => $payoutId,
+            'currency' => $currency,
+            'livemode' => $livemode,
+            'amount' => $payout['amount'] ?? null,
+        ]);
     }
 
     public function getCashBalance(string $customerId): array
@@ -766,7 +803,7 @@ class StripeService
 
         if ($merchantRequest) {
             $this->merchantPaymentRequestRepository->complete($merchantRequest, $transaction->id);
-            DispatchMerchantCallback::dispatch($merchantRequest->fresh())->onQueue('default');
+            DispatchMerchantWebhook::dispatch($merchantRequest->fresh())->onQueue('default');
         }
     }
 
@@ -893,7 +930,7 @@ class StripeService
 
         if ($merchantRequest) {
             $this->merchantPaymentRequestRepository->fail($merchantRequest);
-            DispatchMerchantCallback::dispatch($merchantRequest->fresh())->onQueue('default');
+            DispatchMerchantWebhook::dispatch($merchantRequest->fresh())->onQueue('default');
         }
     }
 
@@ -1023,6 +1060,22 @@ class StripeService
         ]);
 
         $freshTransaction = $transaction->fresh();
+
+        if ($freshTransaction?->type === TransactionType::MERCHANT_PAYMENT) {
+            $merchantRequest = $this->merchantPaymentRequestRepository
+                ->findByStripePaymentIntentId($paymentIntentId);
+
+            if ($merchantRequest) {
+                if ($merchantRequest->transaction_id !== $freshTransaction->id) {
+                    $this->merchantPaymentRequestRepository->complete(
+                        $merchantRequest,
+                        $freshTransaction->id,
+                    );
+                }
+
+                DispatchMerchantWebhook::dispatch($merchantRequest->fresh())->onQueue('default');
+            }
+        }
 
         if (
             $freshTransaction

@@ -26,6 +26,8 @@ interface StripeGatewayInterface
 
     public function getBalanceTransaction(string $balanceTransactionId): array;
 
+    public function getTransactionsByIdPayout(string $payoutId, string $currency = 'eur', string $mode = 'live'): array;
+
     public function createPaymentIntentWithMode(array $data, string $mode): array;
 
     public function getPaymentIntentWithMode(string $paymentIntentId, string $mode, string $currency = 'eur'): array;

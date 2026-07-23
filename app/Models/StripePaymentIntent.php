@@ -98,6 +98,34 @@ class StripePaymentIntent extends Model
         $this->attributes['type'] = $value instanceof TransactionType ? $value->value : $value;
     }
 
+    /**
+     * Tipo efectivo para criar StripeTransaction — nunca null.
+     */
+    public function resolveTransactionType(): TransactionType
+    {
+        if ($this->type instanceof TransactionType) {
+            return $this->type;
+        }
+
+        $raw = $this->getRawOriginal('type')
+            ?? $this->attributes['type']
+            ?? null;
+
+        if (is_string($raw) && $raw !== '') {
+            $fromRaw = TransactionType::tryFrom($raw);
+            if ($fromRaw instanceof TransactionType) {
+                return $fromRaw;
+            }
+        }
+
+        return match ($this->purpose) {
+            StripePaymentIntentPurpose::MerchantPayment => TransactionType::MERCHANT_PAYMENT,
+            StripePaymentIntentPurpose::Terminal => TransactionType::CARD_PRESENT,
+            StripePaymentIntentPurpose::BankTransferTopup => TransactionType::TOPUP,
+            default => TransactionType::TOPUP,
+        };
+    }
+
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);

@@ -159,7 +159,7 @@ class StripePaymentIntentService
             'customer_id' => $paymentIntent->customer_id,
             'stripe_payment_method_fee_id' => $paymentIntent->stripe_payment_method_fee_id,
             'tpa_id' => $paymentIntent->tpa_id,
-            'type' => $paymentIntent->type,
+            'type' => $paymentIntent->resolveTransactionType(),
             'direction' => TransactionDirection::Credit,
             'stripe_payment_intent_id' => $paymentIntent->stripe_payment_intent_id,
             'stripe_cash_balance_transaction_id' => $paymentIntent->stripe_cash_balance_transaction_id,

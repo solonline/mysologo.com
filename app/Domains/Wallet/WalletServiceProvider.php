@@ -15,6 +15,7 @@ use App\Domains\Wallet\Services\PartnerTopupFundingCompleter;
 use App\Domains\Wallet\Services\PlatformRevenueService;
 use App\Domains\Wallet\Services\SettlementService;
 use App\Domains\Wallet\Services\StripePaymentWalletService;
+use App\Domains\Wallet\Services\StripePayoutSettlementService;
 use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
 use App\Domains\Wallet\Services\WallesterMainAccountSyncService;
 use App\Domains\Wallet\Services\WalletAccountService;
@@ -33,6 +34,7 @@ class WalletServiceProvider extends ServiceProvider
         LedgerService::class,
         StripePaymentWalletService::class,
         SettlementService::class,
+        StripePayoutSettlementService::class,
         TopupWallesterFundingPolicy::class,
         PartnerTopupFundingCompleter::class,
         BankTransferTopupNotifier::class,
