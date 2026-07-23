@@ -20,7 +20,7 @@ class MerchantPaymentRequestRepository implements MerchantPaymentRequestReposito
             'currency' => $dto->currency,
             'description' => $dto->description,
             'external_reference' => $dto->externalReference,
-            'callback_url' => $dto->callbackUrl,
+            'webhook_url' => $dto->webhookUrl,
             'metadata' => $dto->metadata,
             'items' => $dto->items,
             'language' => $dto->language ?? 'pt',

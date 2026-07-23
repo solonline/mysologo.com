@@ -74,7 +74,7 @@ enum TransactionType: string
             self::GRABPAY => 'GrabPay',
             self::P2P => 'P2P',
             self::TOPUP => 'Carregamento',
-            self::MERCHANT_PAYMENT => 'Venda merchant',
+            self::MERCHANT_PAYMENT => 'Venda SecurePay',
             self::CUSTOMER_BALANCE => 'Saldo do Cliente',
         };
     }

@@ -2,11 +2,11 @@
 
 ## Objetivo
 
-Top-up presencial via TPA com Stripe Terminal SDK.
+Pagamento presencial via TPA (terminal) no ponto de venda.
 
 ## Autenticação
 
-```
+```http
 X-Merchant-Key: {api_key}
 ```
 
@@ -14,7 +14,7 @@ X-Merchant-Key: {api_key}
 
 - Merchant registado e API key activa
 - TPA com `serial` activo ligado ao merchant
-- Stripe Terminal SDK no dispositivo
+- SDK de terminal no dispositivo POS
 
 ## Fluxo
 
@@ -22,30 +22,30 @@ X-Merchant-Key: {api_key}
 sequenceDiagram
     participant POS
     participant API as Yoop API
-    participant Stripe
+    participant Reader as Terminal / TPA
 
     POS->>API: POST /merchant/terminal/connection-token
     API-->>POS: secret
-    POS->>Stripe: Inicializa reader (SDK)
+    POS->>Reader: Inicializa reader (SDK + secret)
     POS->>API: POST /merchant/terminal/create-intent
     Note over POS,API: Idempotency-Key + tpa_serial_number
     API-->>POS: client_secret + payment_intent
-    POS->>Stripe: Apresenta pagamento ao cartão
+    POS->>Reader: Apresenta pagamento ao cartão
 ```
 
 ## 1. Connection token
 
-```
+```http
 POST /api/merchant/terminal/connection-token
 ```
 
 Body opcional: `{ "currency": "eur" }`
 
-Resposta: `{ "secret": "..." }` → passar ao Terminal SDK.
+Resposta: `{ "secret": "..." }` → passar ao SDK do terminal.
 
-## 2. Criar PaymentIntent
+## 2. Criar intent de pagamento
 
-```
+```http
 POST /api/merchant/terminal/create-intent
 Idempotency-Key: {uuid}
 ```
@@ -62,26 +62,16 @@ Resposta `201`:
 
 ```json
 {
-  "client_secret": "pi_...",
+  "client_secret": "pi_…_secret_…",
   "payment_intent": {
     "id": 55,
-    "stripe_payment_intent_id": "pi_...",
     "status": "requires_payment_method",
     "type": "card_present"
   }
 }
 ```
 
-## 3. Captura (fluxo cliente app)
-
-Se o pagamento for criado pelo **app do customer** (não merchant key), a captura usa:
-
-```
-POST /api/stripe/terminal/{payment_intent_id}/capture
-Authorization: Bearer {token}
-```
-
-O `{payment_intent_id}` é o **ID interno Yoop** devolvido em `payment_intent.id`.
+Use `client_secret` no SDK para apresentar o pagamento no reader. O campo `payment_intent.id` é o **ID interno Yoop**.
 
 ## Erros comuns
 
@@ -91,4 +81,29 @@ O `{payment_intent_id}` é o **ID interno Yoop** devolvido em `payment_intent.id
 | 429 | Rate limit |
 | Falta Idempotency-Key | Header obrigatório no create-intent |
 
-📖 **API:** [referência parceiros](/docs/partners) · [Top-up cartão](/docs/guides/topup-card) (webhook igual)
+## Prompt para IA (copiar / colar)
+
+````markdown
+# Tarefa: integrar Yoop Terminal (POS / TPA)
+
+Implementa pagamentos presenciais com a API Yoop de parceiros.
+
+## Autenticação
+- Header: `X-Merchant-Key: {api_key}`
+- Base URL: `{YOOP_BASE_URL}/api`
+
+## Fluxo
+1. `POST /merchant/terminal/connection-token` (body opcional `{ "currency": "eur" }`) → receber `secret`
+2. Inicializar o SDK de terminal no POS com esse `secret`
+3. `POST /merchant/terminal/create-intent` com header `Idempotency-Key` (UUID único por tentativa)
+   - Body: `{ "tpa_serial_number": "<serial do TPA>", "amount": <cêntimos>, "currency": "EUR" }`
+4. Usar `client_secret` da resposta no SDK para apresentar o cartão no reader
+5. Tratar erros: serial inválido, 401, 422, 429; nunca reutilizar o mesmo Idempotency-Key para intents diferentes
+
+## Restrições
+- Não inventes endpoints
+- Guarda a API key só no backend/POS seguro
+- Documenta env: `YOOP_BASE_URL`, `YOOP_MERCHANT_API_KEY`
+````
+
+📖 **API:** [referência parceiros](/docs/partners) · [Payment requests](/docs/partners/guides/payment-requests)

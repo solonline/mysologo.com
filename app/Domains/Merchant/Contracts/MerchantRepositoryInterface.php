@@ -11,10 +11,19 @@ interface MerchantRepositoryInterface
 {
     public function create(RegisterMerchantDTO $dto): Merchant;
 
-    public function isSlugTaken(string $slug): bool;
+    public function isSlugTaken(string $slug, ?int $exceptMerchantId = null): bool;
 
     /** @return Collection<int, Merchant> */
     public function listForCustomer(Customer $customer): Collection;
 
     public function findOwnedByCustomer(Customer $customer, int $merchantId): ?Merchant;
+
+    /**
+     * @param  array{name?: string, slug?: string, webhook_url?: string|null, mode?: string}  $data
+     */
+    public function update(Merchant $merchant, array $data): Merchant;
+
+    public function updateApiKey(Merchant $merchant, string $hashedApiKey): Merchant;
+
+    public function updateWebhookSecret(Merchant $merchant, string $webhookSecret): Merchant;
 }

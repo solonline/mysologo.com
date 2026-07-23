@@ -54,12 +54,30 @@ class PayController extends Controller
             default => 'PT',
         };
 
+        $isEmbed = $request->boolean('embed')
+            || $request->headers->get('Sec-Fetch-Dest') === 'iframe';
+
+        $returnUrl = null;
+        $candidateReturnUrl = $request->query('return_url');
+        if (is_string($candidateReturnUrl) && $candidateReturnUrl !== '') {
+            $parts = parse_url($candidateReturnUrl);
+            if (
+                is_array($parts)
+                && in_array($parts['scheme'] ?? '', ['http', 'https'], true)
+                && ! empty($parts['host'])
+            ) {
+                $returnUrl = $candidateReturnUrl;
+            }
+        }
+
         return view('pay.show', compact(
             'paymentRequest',
             'clientSecret',
             'publishableKey',
             'billingCountry',
             'awaitingConfirmation',
+            'isEmbed',
+            'returnUrl',
         ));
     }
 }

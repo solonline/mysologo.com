@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
  * @property string|null $description
  * @property string|null $stripe_payment_intent_id
  * @property string|null $external_reference
- * @property string|null $callback_url
+ * @property string|null $webhook_url
  * @property array|null  $metadata
  * @property array|null  $items
  * @property string      $language
@@ -43,7 +43,7 @@ class MerchantPaymentRequest extends Model
         'currency',
         'description',
         'external_reference',
-        'callback_url',
+        'webhook_url',
         'metadata',
         'items',
         'payment_method_types',

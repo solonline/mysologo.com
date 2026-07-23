@@ -26,8 +26,8 @@ return new class extends Migration
             // Referência do lado do merchant (ex: order_id deles) — único por merchant
             $table->string('external_reference')->nullable();
 
-            // URL de retorno por request; se null usa o webhook_url do merchant
-            $table->string('callback_url')->nullable();
+            // URL de webhook por pedido; se null usa o webhook_url do merchant
+            $table->string('webhook_url')->nullable();
 
             //Langua para a interface de pagamento (ex: 'pt', 'en', 'es'); se null usa o default do merchant ou detecta pelo navegador
             $table->string('language', 5)->nullable();

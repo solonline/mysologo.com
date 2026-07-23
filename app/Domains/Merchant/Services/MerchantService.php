@@ -6,6 +6,7 @@ use App\Domains\Merchant\Contracts\MerchantPaymentRequestRepositoryInterface;
 use App\Domains\Merchant\Contracts\MerchantRepositoryInterface;
 use App\Domains\Merchant\DTOs\CreateMerchantPaymentRequestDTO;
 use App\Domains\Merchant\DTOs\RegisterMerchantDTO;
+use App\Domains\Merchant\Jobs\DispatchMerchantWebhook;
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
 use App\Domains\Stripe\Enums\StripePaymentIntentPurpose;
 use App\Domains\Stripe\Services\StripePaymentIntentService;
@@ -28,18 +29,19 @@ class MerchantService
         protected StripePaymentIntentService $paymentIntents,
     ) {}
 
-    /** @return array{merchant: Merchant, api_key: string} */
+    /** @return array{merchant: Merchant, api_key: string, webhook_secret: string} */
     public function register(Customer $customer, array $data): array
     {
         $mode = $data['mode'] ?? 'test';
-        $prefix = $mode === 'live' ? 'yoop_live_' : 'yoop_test_';
-        $rawKey = $prefix . bin2hex(random_bytes(32));
+        $rawKey = $this->generateRawApiKey($mode);
+        $webhookSecret = app(MerchantWebhookSigner::class)->generateRawSecret();
 
         $dto = new RegisterMerchantDTO(
             customerId: $customer->id,
             name: $data['name'],
             slug: $this->uniqueSlug(Str::slug($data['name'])),
             hashedApiKey: hash('sha256', $rawKey),
+            webhookSecret: $webhookSecret,
             mode: $mode,
             webhookUrl: $data['webhook_url'] ?? null,
             allowedCurrencies: isset($data['allowed_currencies'])
@@ -50,7 +52,84 @@ class MerchantService
         return [
             'merchant' => $this->merchantRepository->create($dto),
             'api_key' => $rawKey,
+            'webhook_secret' => $webhookSecret,
         ];
+    }
+
+    /**
+     * @param  array{name?: string, slug?: string, webhook_url?: string|null, mode?: string}  $data
+     */
+    public function update(Merchant $merchant, array $data): Merchant
+    {
+        $payload = [];
+
+        if (array_key_exists('name', $data)) {
+            $payload['name'] = $data['name'];
+        }
+
+        if (array_key_exists('slug', $data)) {
+            $payload['slug'] = $data['slug'];
+        }
+
+        if (array_key_exists('webhook_url', $data)) {
+            $payload['webhook_url'] = $data['webhook_url'];
+        }
+
+        if (array_key_exists('mode', $data)) {
+            $payload['mode'] = $data['mode'];
+        }
+
+        return $this->merchantRepository->update($merchant, $payload);
+    }
+
+    /**
+     * A api_key é hashed — não é recuperável. O webhook_secret é encrypted e pode ser mostrado.
+     *
+     * @return array{merchant: Merchant, api_key_retrievable: false, webhook_secret: string|null}
+     */
+    public function getCredentials(Merchant $merchant): array
+    {
+        return [
+            'merchant' => $merchant,
+            'api_key_retrievable' => false,
+            'webhook_secret' => app(MerchantWebhookSigner::class)->resolveRawSecret($merchant),
+        ];
+    }
+
+    /**
+     * @param  array{api_key?: bool, webhook_secret?: bool}  $options
+     * @return array{merchant: Merchant, api_key: string|null, webhook_secret: string|null}
+     */
+    public function rotateCredentials(Merchant $merchant, array $options): array
+    {
+        $rotateApiKey = (bool) ($options['api_key'] ?? false);
+        $rotateWebhookSecret = (bool) ($options['webhook_secret'] ?? false);
+
+        $rawKey = null;
+        $webhookSecret = null;
+
+        if ($rotateApiKey) {
+            $rawKey = $this->generateRawApiKey((string) $merchant->mode);
+            $merchant = $this->merchantRepository->updateApiKey($merchant, hash('sha256', $rawKey));
+        }
+
+        if ($rotateWebhookSecret) {
+            $webhookSecret = app(MerchantWebhookSigner::class)->generateRawSecret();
+            $merchant = $this->merchantRepository->updateWebhookSecret($merchant, $webhookSecret);
+        }
+
+        return [
+            'merchant' => $merchant,
+            'api_key' => $rawKey,
+            'webhook_secret' => $webhookSecret,
+        ];
+    }
+
+    private function generateRawApiKey(string $mode): string
+    {
+        $prefix = $mode === 'live' ? 'yoop_live_' : 'yoop_test_';
+
+        return $prefix.bin2hex(random_bytes(32));
     }
 
     /** @return Collection<int, Merchant> */
@@ -87,7 +166,7 @@ class MerchantService
             currency: $currency,
             description: $data['description'] ?? null,
             externalReference: $data['external_reference'] ?? null,
-            callbackUrl: $data['callback_url'] ?? $merchant->webhook_url,
+            webhookUrl: $data['webhook_url'] ?? $merchant->webhook_url,
             metadata: $data['metadata'] ?? null,
             items: $data['items'] ?? null,
             expiresAt: isset($data['expires_in'])
@@ -136,6 +215,8 @@ class MerchantService
                             $paymentRequest,
                             $transactionId ? (int) $transactionId : null,
                         );
+
+                        DispatchMerchantWebhook::dispatch($paymentRequest->fresh())->onQueue('default');
                     }
                     $paymentRequest->refresh();
 
@@ -245,8 +326,8 @@ class MerchantService
                     return 'card';
                 }
 
-                if (in_array($type, ['mb_way', 'mb-way', 'mb way'], true)) {
-                    return 'mbway';
+                if (in_array($type, ['mbway', 'mb_way', 'mb-way', 'mb way'], true)) {
+                    return 'mb_way';
                 }
 
                 return $type;

@@ -152,10 +152,10 @@ class CustomerMerchantTest extends TestCase
         $this->withToken($token)
             ->postJson('/api/merchant/'.$merchant->id.'/payment-requests', [
                 'amount' => 1800,
-                'payment_method_types' => ['card', 'mbway'],
+                'payment_method_types' => ['card', 'mb_way'],
             ])
             ->assertCreated()
-            ->assertJsonPath('data.payment_method_types', ['card', 'mbway']);
+            ->assertJsonPath('data.payment_method_types', ['card', 'mb_way']);
 
         $this->assertDatabaseHas('merchant_payment_requests', [
             'merchant_id' => $merchant->id,
@@ -181,6 +181,152 @@ class CustomerMerchantTest extends TestCase
         $this->withToken($token)
             ->postJson('/api/merchant/'.$merchant->id.'/payment-requests', [
                 'amount' => 1000,
+            ])
+            ->assertNotFound();
+    }
+
+    public function test_customer_can_view_and_rotate_merchant_credentials(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $secret = 'whsec_'.str_repeat('11', 32);
+
+        $merchant = Merchant::query()->create([
+            'customer_id' => $customer->id,
+            'name' => 'Loja Creds',
+            'slug' => 'loja-creds',
+            'api_key' => hash('sha256', 'yoop_test_old_key'),
+            'webhook_secret' => $secret,
+            'mode' => 'test',
+            'is_active' => true,
+        ]);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->getJson('/api/merchant/'.$merchant->id.'/credentials')
+            ->assertOk()
+            ->assertJsonPath('api_key_retrievable', false)
+            ->assertJsonPath('webhook_secret', $secret)
+            ->assertJsonMissingPath('api_key');
+
+        $rotateKey = $this->withToken($token)
+            ->postJson('/api/merchant/'.$merchant->id.'/credentials/rotate', [
+                'api_key' => true,
+            ])
+            ->assertOk()
+            ->assertJsonStructure(['api_key', 'data' => ['id', 'name']])
+            ->assertJsonMissingPath('webhook_secret');
+
+        $newApiKey = $rotateKey->json('api_key');
+        $this->assertNotSame('yoop_test_old_key', $newApiKey);
+        $this->assertStringStartsWith('yoop_test_', $newApiKey);
+
+        $merchant->refresh();
+        $this->assertSame(hash('sha256', $newApiKey), $merchant->api_key);
+        $this->assertSame($secret, $merchant->webhook_secret);
+
+        $rotateSecret = $this->withToken($token)
+            ->postJson('/api/merchant/'.$merchant->id.'/credentials/rotate', [
+                'webhook_secret' => true,
+            ])
+            ->assertOk()
+            ->assertJsonStructure(['webhook_secret', 'data' => ['id', 'name']])
+            ->assertJsonMissingPath('api_key');
+
+        $newWebhookSecret = $rotateSecret->json('webhook_secret');
+        $this->assertNotSame($secret, $newWebhookSecret);
+        $this->assertStringStartsWith('whsec_', $newWebhookSecret);
+
+        $merchant->refresh();
+        $this->assertSame($newWebhookSecret, $merchant->webhook_secret);
+
+        $this->withToken($token)
+            ->postJson('/api/merchant/'.$merchant->id.'/credentials/rotate', [])
+            ->assertUnprocessable();
+
+        $this->withToken($token)
+            ->postJson('/api/merchant/'.$merchant->id.'/credentials/rotate', [
+                'api_key' => true,
+                'webhook_secret' => true,
+            ])
+            ->assertUnprocessable();
+    }
+
+    public function test_customer_can_update_own_merchant(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $other = $this->createActiveCustomer();
+
+        $merchant = Merchant::query()->create([
+            'customer_id' => $customer->id,
+            'name' => 'Loja Antiga',
+            'slug' => 'loja-antiga',
+            'api_key' => hash('sha256', 'yoop_test_update'),
+            'webhook_url' => 'https://old.test/hook',
+            'mode' => 'test',
+            'is_active' => true,
+        ]);
+
+        Merchant::query()->create([
+            'customer_id' => $other->id,
+            'name' => 'Loja Alheia',
+            'slug' => 'loja-alheia-slug',
+            'api_key' => hash('sha256', 'yoop_test_other_slug'),
+            'mode' => 'test',
+            'is_active' => true,
+        ]);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->patchJson('/api/merchant/'.$merchant->id, [
+                'name' => 'Loja Nova',
+                'slug' => 'loja-nova',
+                'webhook_url' => 'https://nova.test/webhook',
+                'mode' => 'live',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Loja Nova')
+            ->assertJsonPath('data.slug', 'loja-nova')
+            ->assertJsonPath('data.webhook_url', 'https://nova.test/webhook')
+            ->assertJsonPath('data.mode', 'live');
+
+        $merchant->refresh();
+        $this->assertSame('Loja Nova', $merchant->name);
+        $this->assertSame('loja-nova', $merchant->slug);
+        $this->assertSame('https://nova.test/webhook', $merchant->webhook_url);
+        $this->assertSame('live', $merchant->mode);
+
+        $this->withToken($token)
+            ->patchJson('/api/merchant/'.$merchant->id, [
+                'slug' => 'loja-alheia-slug',
+            ])
+            ->assertUnprocessable();
+
+        $this->withToken($token)
+            ->patchJson('/api/merchant/'.$merchant->id, [])
+            ->assertUnprocessable();
+    }
+
+    public function test_customer_cannot_update_other_merchant(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $other = $this->createActiveCustomer();
+
+        $merchant = Merchant::query()->create([
+            'customer_id' => $other->id,
+            'name' => 'Loja Alheia',
+            'slug' => 'loja-alheia-edit',
+            'api_key' => hash('sha256', 'yoop_test_edit_other'),
+            'mode' => 'test',
+            'is_active' => true,
+        ]);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->patchJson('/api/merchant/'.$merchant->id, [
+                'name' => 'Hack',
             ])
             ->assertNotFound();
     }

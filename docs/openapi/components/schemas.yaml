@@ -439,7 +439,7 @@ MerchantPaymentRequest:
       enum: [pending, available]
       description: |
         Presente quando `status=completed`.
-        `pending` = pago pelo cliente, fundos ainda a aguardar liquidação Stripe (não disponíveis / não Wallester).
+        `pending` = pago pelo cliente, fundos ainda a aguardar liquidação (ainda não disponíveis).
         `available` = liquidado e disponível na wallet (fase futura de payout).
     url:
       type: string
@@ -463,7 +463,7 @@ TerminalConnectionToken:
   properties:
     secret:
       type: string
-      description: Secret para o Stripe Terminal SDK
+      description: Secret para inicializar o SDK do terminal no POS
 
 TerminalPaymentIntent:
   type: object

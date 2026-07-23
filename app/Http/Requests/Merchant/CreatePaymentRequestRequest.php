@@ -10,7 +10,7 @@ class CreatePaymentRequestRequest extends FormRequest
     /** @var list<string> */
     public const ALLOWED_PAYMENT_METHOD_TYPES = [
         'card',
-        'mbway',
+        'mb_way',
     ];
 
     public function authorize(): bool
@@ -39,8 +39,8 @@ class CreatePaymentRequestRequest extends FormRequest
                     return 'card';
                 }
 
-                if (in_array($type, ['mb_way', 'mb-way', 'mb way'], true)) {
-                    return 'mbway';
+                if (in_array($type, ['mbway', 'mb_way', 'mb-way', 'mb way'], true)) {
+                    return 'mb_way';
                 }
 
                 return $type;
@@ -61,7 +61,7 @@ class CreatePaymentRequestRequest extends FormRequest
             'payer_name'         => ['nullable', 'string', 'max:255'],
             'payer_email'        => ['nullable', 'email', 'max:255'],
             'payer_phone'        => ['nullable', 'string', 'max:50'],
-            'callback_url'       => ['nullable', 'url', 'max:500'],
+            'webhook_url'        => ['nullable', 'url', 'max:500'],
             'metadata'           => ['nullable', 'array'],
             'items'              => ['nullable', 'array'],
             'expires_in'         => ['nullable', 'integer', 'min:5', 'max:1440'],

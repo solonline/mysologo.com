@@ -17,6 +17,15 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('merchant.customer.payment-requests.index');
     Route::post('/register', [CustomerMerchantController::class, 'register'])
         ->name('merchant.register');
+    Route::patch('/{merchant}', [CustomerMerchantController::class, 'update'])
+        ->where('merchant', '[0-9]+')
+        ->name('merchant.customer.update');
+    Route::get('/{merchant}/credentials', [CustomerMerchantController::class, 'credentials'])
+        ->where('merchant', '[0-9]+')
+        ->name('merchant.customer.credentials.show');
+    Route::post('/{merchant}/credentials/rotate', [CustomerMerchantController::class, 'rotateCredentials'])
+        ->where('merchant', '[0-9]+')
+        ->name('merchant.customer.credentials.rotate');
     Route::post('/{merchant}/payment-requests', [CustomerMerchantController::class, 'createPaymentRequest'])
         ->where('merchant', '[0-9]+')
         ->middleware('throttle:stripe-intent')

@@ -47,14 +47,14 @@ class MerchantPayPageTest extends TestCase
     public function test_pay_page_uses_explicit_payment_method_types_when_set(): void
     {
         $paymentRequest = $this->makePaymentRequest([
-            'payment_method_types' => ['card', 'mbway'],
+            'payment_method_types' => ['card', 'mb_way'],
         ]);
 
         $this->mock(\App\Domains\Stripe\Contracts\StripeGatewayInterface::class, function ($mock) {
             $mock->shouldReceive('createPaymentIntentWithMode')
                 ->once()
                 ->withArgs(function (array $payload) {
-                    return ($payload['payment_method_types'] ?? null) === ['card', 'mbway']
+                    return ($payload['payment_method_types'] ?? null) === ['card', 'mb_way']
                         && ! array_key_exists('automatic_payment_methods', $payload);
                 })
                 ->andReturn([
@@ -122,7 +122,80 @@ class MerchantPayPageTest extends TestCase
         $this->get(route('pay.show', $paymentRequest->uuid))
             ->assertOk()
             ->assertSee('Pagamento concluído')
-            ->assertSee('Obrigado. O pagamento foi registado com sucesso.');
+            ->assertSee('Obrigado. O pagamento foi registado com sucesso.')
+            ->assertSee('payment_request.completed', false)
+            ->assertSee('YoopPay', false);
+    }
+
+    public function test_pay_page_embed_mode_exposes_post_message_helpers(): void
+    {
+        $paymentRequest = $this->makePaymentRequest([
+            'status' => 'completed',
+            'paid_at' => now(),
+        ]);
+
+        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+            $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
+        });
+
+        $this->get(route('pay.show', [
+            'uuid' => $paymentRequest->uuid,
+            'embed' => '1',
+            'return_url' => 'https://loja.exemplo.com/obrigado',
+        ]))
+            ->assertOk()
+            ->assertSee('isEmbedHint: true', false)
+            ->assertSee('payment_request.completed', false)
+            ->assertSee('loja.exemplo.com', false)
+            ->assertSee('maybeRedirectReturnUrl', false);
+    }
+
+    public function test_pay_page_embed_checkout_uses_redirect_if_required(): void
+    {
+        $paymentRequest = $this->makePaymentRequest();
+
+        $this->mock(\App\Domains\Stripe\Contracts\StripeGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('createPaymentIntentWithMode')
+                ->once()
+                ->andReturn([
+                    'status' => 'success',
+                    'data' => [
+                        'id' => 'pi_test_embed',
+                        'client_secret' => 'pi_test_embed_secret',
+                    ],
+                ]);
+        });
+
+        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+            $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
+        });
+
+        $this->get(route('pay.show', [
+            'uuid' => $paymentRequest->uuid,
+            'embed' => '1',
+        ]))
+            ->assertOk()
+            ->assertSee('isEmbedHint: true', false)
+            ->assertSee('if_required', false);
+    }
+
+    public function test_pay_page_rejects_invalid_return_url(): void
+    {
+        $paymentRequest = $this->makePaymentRequest([
+            'status' => 'completed',
+            'paid_at' => now(),
+        ]);
+
+        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+            $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
+        });
+
+        $this->get(route('pay.show', [
+            'uuid' => $paymentRequest->uuid,
+            'return_url' => 'javascript:alert(1)',
+        ]))
+            ->assertOk()
+            ->assertDontSee('javascript:alert(1)', false);
     }
 
     /** @param array<string, mixed> $attributes */

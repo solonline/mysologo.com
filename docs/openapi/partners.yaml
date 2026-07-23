@@ -3,50 +3,55 @@ openapi: 3.1.0
 info:
   title: Yoop API — Parceiros
   version: 1.0.0
-  description: |
-    # API para integradores externos
+    description: |
+      # API para integradores externos
 
-    Documentação pública dos endpoints que merchants e parceiros podem consumir.
+      Documentação pública dos endpoints que merchants e parceiros podem consumir.
 
-    ## Autenticação
+      ## Autenticação
 
-    Todos os endpoints desta documentação usam:
+      Todos os endpoints desta documentação usam:
 
-    ```
-    X-Merchant-Key: {sua_api_key}
-    ```
+      ```
+      X-Merchant-Key: {sua_api_key}
+      ```
 
-    A API key é fornecida pela equipa Yoop após activação do merchant.
+      A API key é fornecida pela equipa Yoop após activação do merchant.
 
-    ## Base URL
+      ## Base URL
 
-    ```
-    https://api.seudominio.com/api
-    ```
+      ```
+      https://api.seudominio.com/api
+      ```
 
-    ## Suporte
+      ## Suporte
 
-    Para novos endpoints ou ambientes de sandbox, contacte a equipa Yoop.
+      Para novos endpoints ou ambientes de sandbox, contacte a equipa Yoop.
+      Guias: payment requests, terminal POS e prompt para IA em `/docs/partners/guides`.
 
-    ## Fluxo Payment Request
+      ## Fluxo Payment Request
 
-    1. `POST /merchant/payment-requests` → recebe `url`
-    2. Redireccione o pagador para `url`
-    3. Opcional: use `callback_url` para notificação
+      1. `POST /merchant/payment-requests` → recebe `url`
+      2. Redireccione o pagador para `url` (browser ou iframe)
+      3. Opcional: use `webhook_url` para notificação HMAC
 
-    ### Settlement (fundos)
+      ### Embutir (iframe)
 
-    Quando o pagamento é concluído (`status=completed`):
+      Card de pagamento: largura máx. **384px**. Iframe sugerido: `width=400`, `height=720`
+      (altura dinâmica — aumentar com muitos `items`).
 
-    - O valor fica na wallet Yoop do merchant como **pending** até liquidação Stripe (`settlement_status=pending`, `funds_available=false` no callback).
-    - **Não** há funding Wallester imediato (diferente de top-up).
-    - A disponibilização (`settlement_status=available`) ocorre após payout Stripe (fase futura).
+      ### Settlement (fundos)
 
-    ## Fluxo Terminal (POS)
+      Quando o pagamento é concluído (`status=completed`):
 
-    1. `POST /merchant/terminal/connection-token` → `secret` para SDK
-    2. `POST /merchant/terminal/create-intent` com `Idempotency-Key`
-    3. Passar `client_secret` ao Stripe Terminal reader
+      - O valor fica na wallet Yoop do merchant como **pending** até liquidação (`settlement_status=pending`, `funds_available=false` no webhook).
+      - A disponibilização (`settlement_status=available`) ocorre após liquidação (fase futura).
+
+      ## Fluxo Terminal (POS)
+
+      1. `POST /merchant/terminal/connection-token` → `secret` para o SDK do terminal
+      2. `POST /merchant/terminal/create-intent` com `Idempotency-Key`
+      3. Passar `client_secret` ao reader no POS
 
 servers:
   - url: /api

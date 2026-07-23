@@ -14,6 +14,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string      $name
  * @property string      $slug
  * @property string      $api_key
+ * @property string|null $webhook_secret
  * @property string      $mode
  * @property string|null $webhook_url
  * @property array|null  $allowed_currencies
@@ -27,7 +28,7 @@ class Merchant extends Model
     {
         return LogOptions::defaults()
             ->logFillable()
-            ->logExcept(['api_key'])
+            ->logExcept(['api_key', 'webhook_secret'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('merchants');
@@ -38,6 +39,7 @@ class Merchant extends Model
         'name',
         'slug',
         'api_key',
+        'webhook_secret',
         'webhook_url',
         'allowed_currencies',
         'mode',
@@ -47,9 +49,10 @@ class Merchant extends Model
     protected $casts = [
         'allowed_currencies' => 'array',
         'is_active'          => 'boolean',
+        'webhook_secret'     => 'encrypted',
     ];
 
-    protected $hidden = ['api_key'];
+    protected $hidden = ['api_key', 'webhook_secret'];
 
     public static function findByRawKey(string $rawKey): ?self
     {

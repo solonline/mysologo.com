@@ -30,7 +30,7 @@ merchant-customer-payment-requests:
     operationId: merchantCustomerPaymentRequests
     description: |
       Lista vendas/pedidos dos merchants do customer autenticado.
-      Pedidos `completed` incluem `settlement_status` (`pending` até liquidação Stripe).
+      Pedidos `completed` incluem `settlement_status` (`pending` até liquidação dos fundos).
       Não misturar com movimentos/wallet — usar esta lista para vendas.
     security:
       - bearerAuth: []
@@ -64,7 +64,8 @@ merchant-register:
     operationId: merchantRegister
     description: |
       Converte o customer autenticado em merchant (uso interno / app).
-      Após registo, a API key é gerida no backoffice.
+      Devolve `api_key` e `webhook_secret` **uma vez** no corpo da resposta
+      (`additional` / root) — guardar com segurança; o secret assina webhooks HMAC.
     security:
       - bearerAuth: []
     requestBody:
@@ -97,9 +98,157 @@ merchant-register:
             mode: test
     responses:
       '201':
-        description: Merchant criado
+        description: |
+          Merchant criado. Inclui `api_key` e `webhook_secret` (mostrar só nesta resposta).
+          Webhooks usam HMAC (`X-Yoop-Signature`) com o `webhook_secret`.
       '401':
         $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+merchant-customer-update:
+  patch:
+    tags: [Merchant]
+    summary: Actualizar merchant
+    operationId: merchantCustomerUpdate
+    description: |
+      Actualiza campos do merchant do customer autenticado.
+      Envie pelo menos um de: `name`, `slug`, `webhook_url`, `mode`.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: merchant
+        in: path
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                maxLength: 150
+              slug:
+                type: string
+                maxLength: 150
+                description: Único (letras, números, hífen e underscore)
+              webhook_url:
+                type: string
+                format: uri
+                nullable: true
+              mode:
+                type: string
+                enum: [test, live]
+          example:
+            name: Loja Nova
+            slug: loja-nova
+            webhook_url: https://loja.com/webhook/yoop
+            mode: live
+    responses:
+      '200':
+        description: Merchant actualizado
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/Merchant'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+merchant-customer-credentials:
+  get:
+    tags: [Merchant]
+    summary: Ver credenciais do merchant
+    operationId: merchantCustomerCredentials
+    description: |
+      Devolve o `webhook_secret` actual. A `api_key` é hashed e **não** é recuperável
+      (`api_key_retrievable: false`). Para obter uma nova key, use rotate.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: merchant
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Credenciais (sem api_key em claro)
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                api_key_retrievable:
+                  type: boolean
+                  enum: [false]
+                webhook_secret:
+                  type: string
+                  nullable: true
+                data:
+                  $ref: '../components/schemas.yaml#/Merchant'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+  post:
+    tags: [Merchant]
+    summary: Rodar api_key ou webhook_secret
+    operationId: merchantCustomerCredentialsRotate
+    description: |
+      Gera um novo valor — exactamente um de `api_key` ou `webhook_secret` por pedido.
+      O valor novo é devolvido **uma vez**. Se rodar a key, a antiga deixa de funcionar.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: merchant
+        in: path
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              api_key:
+                type: boolean
+                description: Gerar nova API key (mutuamente exclusivo com webhook_secret)
+              webhook_secret:
+                type: boolean
+                description: Gerar novo webhook secret (mutuamente exclusivo com api_key)
+          example:
+            api_key: true
+    responses:
+      '200':
+        description: Novo segredo rodado
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                api_key:
+                  type: string
+                webhook_secret:
+                  type: string
+                data:
+                  $ref: '../components/schemas.yaml#/Merchant'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
       '422':
         $ref: '../components/responses.yaml#/ValidationError'
 
@@ -118,11 +267,14 @@ merchant-payment-requests:
 
       **Fluxo típico:**
       1. Criar payment request → receber `url`
-      2. Redirecionar cliente para `url`
+      2. Redirecionar cliente para `url` (browser ou iframe)
       3. Cliente paga na página Yoop
 
-      **Settlement:** após pagamento, o callback inclui `settlement_status=pending` e
-      `funds_available=false` até liquidação Stripe (sem Wallester imediato).
+      **Iframe:** card com largura máx. 384px; sugerido `width=400`, `height=720`
+      (altura dinâmica — ver guia payment-requests).
+
+      **Settlement:** após pagamento, o webhook inclui `settlement_status=pending` e
+      `funds_available=false` até liquidação dos fundos.
     security:
       - merchantKey: []
     requestBody:
@@ -151,16 +303,36 @@ merchant-payment-requests:
                 format: email
               payer_phone:
                 type: string
-              callback_url:
+              webhook_url:
                 type: string
                 format: uri
+                description: URL do webhook deste pedido (opcional; fallback = webhook_url do merchant)
               metadata:
                 type: object
                 additionalProperties: true
               items:
                 type: array
+                description: |
+                  Opcional. Lista de artigos a exibir na página de pagamento (`/pay/{uuid}`).
+                  Se omitido, a secção de artigos não aparece no checkout.
                 items:
                   type: object
+                  required: [name, quantity, unit_price]
+                  properties:
+                    name:
+                      type: string
+                      description: Nome do artigo
+                    quantity:
+                      type: number
+                      description: Quantidade
+                    unit_price:
+                      type: integer
+                      minimum: 0
+                      description: Preço unitário em cêntimos
+                  example:
+                    name: Café
+                    quantity: 2
+                    unit_price: 150
               expires_in:
                 type: integer
                 minimum: 5
@@ -173,12 +345,18 @@ merchant-payment-requests:
                 type: array
                 items:
                   type: string
-                  enum: [card, mbway]
+                  enum: [card, mb_way]
           example:
             amount: 5000
-            currency: EUR
             description: 'Order #123'
             external_reference: ORD-123
+            items:
+              - name: Café
+                quantity: 2
+                unit_price: 150
+              - name: Croissant
+                quantity: 1
+                unit_price: 200
     responses:
       '201':
         description: Payment request criado
@@ -197,10 +375,10 @@ merchant-terminal-connection-token:
   post:
     tags: [Merchant]
     x-partners: true
-    summary: Token de ligação Stripe Terminal
+    summary: Token de ligação do terminal
     operationId: merchantTerminalConnectionToken
     description: |
-      Obtém `secret` para inicializar o Stripe Terminal SDK no POS.
+      Obtém `secret` para inicializar o SDK do terminal no POS.
 
       Enviar `currency` opcional (default `eur`).
     security:

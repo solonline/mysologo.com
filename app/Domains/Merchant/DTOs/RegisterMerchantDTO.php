@@ -9,6 +9,7 @@ class RegisterMerchantDTO
         public readonly string $name,
         public readonly string $slug,
         public readonly string $hashedApiKey,
+        public readonly string $webhookSecret,
         public readonly string $mode,
         public readonly ?string $webhookUrl,
         public readonly ?array $allowedCurrencies,
