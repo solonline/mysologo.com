@@ -31,7 +31,10 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background: radial-gradient(ellipse at 30% 20%, #1e1b4b 0%, #0f172a 60%);
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 10%, rgba(99, 102, 241, 0.35), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 90% 90%, rgba(14, 165, 233, 0.18), transparent 50%),
+    linear-gradient(165deg, #0b1224 0%, #0f172a 55%, #111827 100%);
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -45,7 +48,11 @@ body {
   height: 780px;
   background: #fff;
   border-radius: 48px;
-  box-shadow: 0 0 0 10px #1e293b, 0 0 0 12px #334155, 0 40px 80px rgba(0,0,0,.6);
+  box-shadow:
+    0 0 0 10px #1e293b,
+    0 0 0 12px #475569,
+    0 30px 60px rgba(0,0,0,.45),
+    0 60px 120px rgba(15,23,42,.55);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -120,15 +127,17 @@ body {
 
 /* ── Bottom Nav ───────────────────────────────────── */
 #bottom-nav {
-  height: 72px;
-  background: #fff;
+  height: 74px;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(16px);
   border-top: 1px solid var(--slate-100);
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 0 8px 8px;
+  padding: 4px 6px 10px;
   flex-shrink: 0;
   transition: opacity .2s;
+  z-index: 20;
 }
 
 #bottom-nav.hidden { opacity: 0; pointer-events: none; }
@@ -138,21 +147,22 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 8px 16px;
+  padding: 8px 12px;
   border-radius: 14px;
   cursor: pointer;
-  transition: background .15s;
+  transition: background .15s, color .15s, transform .12s;
   border: none;
   background: none;
   color: var(--slate-400);
   font-family: 'Inter', sans-serif;
+  min-width: 64px;
 }
 
 .nav-item span { font-size: 10px; font-weight: 500; }
 .nav-item svg  { width: 22px; height: 22px; }
-.nav-item.active { color: var(--indigo); }
+.nav-item.active { color: var(--indigo); background: #eef2ff; }
 .nav-item.active span { font-weight: 600; }
-.nav-item:active { background: var(--slate-50); }
+.nav-item:active { background: var(--slate-50); transform: scale(.96); }
 
 /* ── Login screen ─────────────────────────────────── */
 #screen-login {
@@ -230,8 +240,8 @@ body {
 }
 
 .home-header {
-  background: linear-gradient(135deg, var(--indigo) 0%, var(--violet) 100%);
-  padding: 20px 24px 40px;
+  background: linear-gradient(145deg, #312e81 0%, var(--indigo) 48%, #6366f1 100%);
+  padding: 18px 22px 36px;
   color: #fff;
   position: relative;
   flex-shrink: 0;
@@ -239,11 +249,22 @@ body {
   isolation: isolate;
 }
 
+.home-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 85% 20%, rgba(255,255,255,.18), transparent 40%),
+    radial-gradient(circle at 10% 80%, rgba(56,189,248,.2), transparent 35%);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .home-header::after {
   content: '';
   position: absolute;
-  bottom: -30px; left: -20px; right: -20px;
-  height: 60px;
+  bottom: -28px; left: -20px; right: -20px;
+  height: 56px;
   background: var(--slate-50);
   border-radius: 50% 50% 0 0;
   z-index: 0;
@@ -255,6 +276,37 @@ body {
   z-index: 1;
 }
 
+.home-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.home-top-text { min-width: 0; }
+
+.home-avatar-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255,255,255,.35);
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  backdrop-filter: blur(8px);
+  transition: transform .12s, background .15s;
+}
+
+.home-avatar-btn:active {
+  transform: scale(.94);
+  background: rgba(255,255,255,.25);
+}
+
 .home-body {
   flex: 1;
   min-height: 0;
@@ -262,18 +314,20 @@ body {
   overflow-x: hidden;
   position: relative;
   z-index: 1;
+  padding-bottom: 8px;
 }
 
-.home-greeting { font-size: 13px; color: rgba(255,255,255,.7); margin-bottom: 2px; }
-.home-name     { font-size: 20px; font-weight: 700; }
+.home-greeting { font-size: 13px; color: rgba(255,255,255,.72); margin-bottom: 2px; }
+.home-name     { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
 
 .balance-card {
-  background: rgba(255,255,255,.15);
-  border: 1px solid rgba(255,255,255,.2);
-  border-radius: 20px;
-  padding: 20px;
-  margin-top: 20px;
-  backdrop-filter: blur(8px);
+  background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 22px;
+  padding: 18px 20px;
+  margin-top: 18px;
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
 }
 
 .balance-label { font-size: 11px; color: rgba(255,255,255,.75); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
@@ -285,8 +339,11 @@ body {
 .tx-list { display: flex; flex-direction: column; }
 .tx-item {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px; border-bottom: 1px solid var(--slate-50);
+  padding: 13px 16px; border-bottom: 1px solid var(--slate-50);
+  transition: background .12s;
+  cursor: pointer;
 }
+.tx-item:hover { background: #f8fafc; }
 .tx-item:last-child { border-bottom: none; }
 .tx-icon-wrap {
   width: 40px; height: 40px; border-radius: 14px; flex-shrink: 0;
@@ -488,13 +545,14 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 20px 12px;
+  padding: 14px 20px 12px;
   border-bottom: 1px solid var(--slate-100);
+  background: #fff;
 }
 
 .back-btn {
   width: 36px; height: 36px;
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--slate-50);
   border: none;
   cursor: pointer;
@@ -503,9 +561,10 @@ body {
   justify-content: center;
   color: var(--slate-700);
   flex-shrink: 0;
+  transition: background .12s, transform .12s;
 }
 
-.back-btn:active { background: var(--slate-100); }
+.back-btn:active { background: var(--slate-100); transform: scale(.94); }
 .screen-header h2 { font-size: 17px; font-weight: 700; color: var(--slate-900); }
 
 .tx-body { padding: 24px 20px; flex: 1; display: flex; flex-direction: column; gap: 20px; }
@@ -695,21 +754,25 @@ body {
 
 /* ── Toast ────────────────────────────────────────── */
 #toast {
-  position: fixed;
-  bottom: 100px;
+  position: absolute;
+  bottom: 96px;
   left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  background: var(--slate-900);
+  transform: translateX(-50%) translateY(16px);
+  background: rgba(15, 23, 42, 0.94);
   color: #fff;
-  padding: 10px 20px;
+  padding: 11px 18px;
   border-radius: 100px;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
+  max-width: calc(100% - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
   opacity: 0;
   pointer-events: none;
   transition: opacity .2s, transform .2s;
   z-index: 999;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
 }
 
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -1027,19 +1090,114 @@ body {
 .pin-key.empty { background: transparent; cursor: default; }
 .pin-key.action { font-size: 14px; font-weight: 600; color: var(--slate-500); }
 
-/* ── Quick actions scroll ─────────────────────────── */
+/* ── Quick actions grid ───────────────────────────── */
 .quick-actions {
-  display: flex;
-  justify-content: flex-start;
-  gap: 8px;
-  padding: 28px 16px 16px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 8px;
+  padding: 24px 18px 8px;
 }
 
-.quick-actions::-webkit-scrollbar { display: none; }
+.quick-actions .action-btn {
+  width: 100%;
+  min-width: 0;
+}
 
-.quick-actions .action-btn { flex-shrink: 0; min-width: 64px; }
+.quick-actions .action-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.action-icon.securepay {
+  background: #ecfeff;
+  color: #0e7490;
+  padding: 0;
+  overflow: hidden;
+}
+
+.action-icon.securepay img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* SecurePay — card full width */
+.securepay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  width: calc(100% - 36px);
+  margin: 4px 18px 12px;
+  padding: 0;
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  text-align: left;
+  font-family: 'Inter', sans-serif;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(14, 116, 144, 0.12);
+  border: 1px solid #e0f2fe;
+  transition: transform .12s, box-shadow .15s;
+}
+
+.securepay-card:active {
+  transform: scale(.985);
+  box-shadow: 0 2px 10px rgba(14, 116, 144, 0.1);
+}
+
+.securepay-card__img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  background: linear-gradient(135deg, #ecfeff 0%, #e0f2fe 55%, #f0f9ff 100%);
+}
+
+.securepay-card__body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  background: linear-gradient(180deg, #f8fcff 0%, #fff 100%);
+}
+
+.securepay-card__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.securepay-card__text strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--slate-900);
+  letter-spacing: -.01em;
+}
+
+.securepay-card__text span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--slate-500);
+  line-height: 1.35;
+}
+
+.securepay-card__arrow {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ecfeff;
+  color: #0e7490;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 
 .section-header-row {
   display: flex;
@@ -1056,6 +1214,246 @@ body {
   border: none;
   cursor: pointer;
   font-family: 'Inter', sans-serif;
+  padding: 4px 0;
+}
+
+/* ── SecurePay screen ─────────────────────────────── */
+#screen-merchant {
+  background: var(--slate-50);
+}
+
+#screen-merchant .screen-header {
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+#screen-merchant .screen-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sp-brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(14, 116, 144, 0.25);
+}
+
+#merchant-body {
+  gap: 14px;
+  padding: 16px 16px 36px;
+}
+
+.sp-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e0f2fe;
+}
+
+.sp-hero img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  background: linear-gradient(135deg, #ecfeff, #e0f2fe);
+}
+
+.sp-hero__copy {
+  padding: 0 14px 14px;
+}
+
+.sp-hero h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin-bottom: 4px;
+}
+
+.sp-hero p {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--slate-500);
+}
+
+.sp-panel {
+  background: #fff;
+  border: 1px solid var(--slate-100);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sp-panel .section-title { margin-bottom: 0; }
+.sp-panel .btn-action { margin-top: 4px; }
+
+.sp-endpoint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: #0e7490;
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+  border-radius: 8px;
+  padding: 5px 8px;
+  word-break: break-all;
+  line-height: 1.35;
+}
+
+.sp-endpoint .sp-verb {
+  color: #fff;
+  background: #0891b2;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 9px;
+  letter-spacing: .04em;
+  flex-shrink: 0;
+}
+
+.sp-endpoint .sp-verb.patch { background: #d97706; }
+.sp-endpoint .sp-verb.get { background: #059669; }
+.sp-endpoint-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-step-note {
+  font-size: 12px;
+  color: var(--slate-500);
+  line-height: 1.45;
+}
+
+.sp-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid var(--slate-100);
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+
+.sp-status__meta { flex: 1; min-width: 0; }
+.sp-status__name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--slate-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-status__sub {
+  font-size: 11px;
+  color: var(--slate-500);
+  margin-top: 2px;
+}
+
+.sp-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: #fff;
+  border: 1px solid var(--slate-100);
+  border-radius: 14px;
+  padding: 6px;
+}
+
+.sp-tab {
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 8px 4px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--slate-500);
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background .15s, color .15s;
+}
+
+.sp-tab small {
+  display: block;
+  font-size: 9px;
+  font-weight: 500;
+  opacity: .7;
+  margin-top: 2px;
+}
+
+.sp-tab.active {
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+.sp-tab-panel { display: none; }
+.sp-tab-panel.active { display: flex; flex-direction: column; gap: 12px; }
+
+.sp-actions-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sp-actions-row .btn-step {
+  flex: 1;
+  min-width: 100px;
+}
+
+.sp-link-box {
+  margin-top: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--slate-50);
+  border: 1px dashed var(--slate-200);
+  word-break: break-all;
+  font-size: 12px;
+  color: var(--slate-700);
+}
+
+.sp-cred-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--slate-50);
+}
+
+.sp-cred-row:last-of-type { border-bottom: none; }
+
+.sp-cred-row label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--slate-500);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.sp-cred-row code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: var(--slate-800);
+  word-break: break-all;
 }
 
 /* ── P2P ──────────────────────────────────────────── */
@@ -1388,44 +1786,48 @@ body {
   .kyc-header {
     padding-top: max(12px, env(safe-area-inset-top));
   }
-
-  .card-preview{
-    position: relative;
 }
 
-.copy-card-btn{
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 34px;
-    height: 34px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    background: rgba(255,255,255,.15);
-    color: #fff;
-    font-size: 16px;
-    transition: .2s;
+.card-preview {
+  position: relative;
 }
 
-.copy-card-btn:hover{
-    background: rgba(255,255,255,.25);
+.copy-card-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  font-size: 16px;
+  transition: background .2s, transform .12s;
 }
 
-.copy-card-btn:disabled{
-    opacity: .4;
-    cursor: not-allowed;
+.copy-card-btn:hover {
+  background: rgba(255,255,255,.25);
 }
+
+.copy-card-btn:active {
+  transform: scale(.94);
+}
+
+.copy-card-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
 }
 </style>
 </head>
 <body>
 
-<!-- ── Toast ── -->
-<div id="toast"></div>
-
 <!-- ── Phone ── -->
 <div id="phone">
+
+  <!-- Toast (dentro do frame) -->
+  <div id="toast"></div>
 
   <!-- Status bar -->
   <div id="status-bar">
@@ -1602,8 +2004,18 @@ body {
     <!-- ── Home ── -->
     <div id="screen-home" class="screen">
       <div class="home-header">
-        <div class="home-greeting">Bom dia,</div>
-        <div class="home-name" id="home-name">—</div>
+        <div class="home-top">
+          <div class="home-top-text">
+            <div class="home-greeting">Bom dia,</div>
+            <div class="home-name" id="home-name">—</div>
+          </div>
+          <button class="home-avatar-btn" onclick="navigate('account')" aria-label="Abrir conta">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </button>
+        </div>
 
         <div class="balance-card">
           <div class="balance-label">Saldo disponível</div>
@@ -1660,17 +2072,22 @@ body {
           </div>
           <span>Conta</span>
         </button>
-        <button class="action-btn" onclick="navigate('merchant')">
-          <div class="action-icon amber">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 9l1-4h16l1 4"/>
-              <path d="M4 9v10a1 1 0 0 0 1 1h4V14h6v6h4a1 1 0 0 0 1-1V9"/>
-              <path d="M10 13h4"/>
+      </div>
+
+      <button class="securepay-card" onclick="navigate('merchant')" type="button">
+        <img class="securepay-card__img" src="securepay.png" alt="SecurePay" />
+        <div class="securepay-card__body">
+          <div class="securepay-card__text">
+            <strong>SecurePay</strong>
+            <span>Aceita pagamentos e cria links</span>
+          </div>
+          <div class="securepay-card__arrow" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18l6-6-6-6"/>
             </svg>
           </div>
-          <span>Merchant</span>
-        </button>
-      </div>
+        </div>
+      </button>
 
       <!-- Recent transactions -->
       <div class="section">
@@ -1996,7 +2413,7 @@ body {
       </div>
     </div>
 
-    <!-- ── Merchant ── -->
+    <!-- ── SecurePay ── -->
     <div id="screen-merchant" class="screen tx-screen">
       <div class="screen-header">
         <button class="back-btn" onclick="goBack()">
@@ -2004,126 +2421,234 @@ body {
             <path d="M19 12H5M12 5l-7 7 7 7"/>
           </svg>
         </button>
-        <h2>Merchant</h2>
+        <h2>SecurePay</h2>
       </div>
       <div class="tx-body" id="merchant-body">
+
+        <!-- Setup: registo -->
         <div id="merchant-register-panel">
-          <p style="font-size:13px;color:var(--slate-500);line-height:1.45;margin-bottom:16px">
-            Regista um merchant para gerar API key e criar links de pagamento.
-          </p>
-          <div class="form-field">
-            <label class="form-label">Nome do merchant</label>
-            <input class="form-input" id="merchant-name" type="text" placeholder="Ex: Loja Demo" maxlength="150" />
+          <div class="sp-hero">
+            <img src="securepay.png" alt="SecurePay" />
+            <div class="sp-hero__copy">
+              <h3>Demo didática da API</h3>
+              <p>Fluxo em 4 passos: registar → credenciais → cobrar → ver vendas.</p>
+            </div>
           </div>
-          <div class="form-field">
-            <label class="form-label">Modo</label>
-            <select class="form-input form-select" id="merchant-mode">
-              <option value="test" selected>Test</option>
-              <option value="live">Live</option>
-            </select>
+          <div class="sp-panel">
+            <div class="section-title">1 · Registar SecurePay</div>
+            <div class="sp-endpoint"><span class="sp-verb">POST</span> /api/merchant/register</div>
+            <p class="sp-step-note">Cria o merchant e devolve <strong>api_key</strong> + <strong>webhook_secret</strong> (guarda já — a key só aparece uma vez).</p>
+            <div class="form-field">
+              <label class="form-label">Nome</label>
+              <input class="form-input" id="merchant-name" type="text" placeholder="Ex: Loja Demo" maxlength="150" />
+            </div>
+            <div class="form-field">
+              <label class="form-label">Modo</label>
+              <select class="form-input form-select" id="merchant-mode">
+                <option value="test" selected>Test</option>
+                <option value="live">Live</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="form-label">Webhook URL (opcional)</label>
+              <input class="form-input" id="merchant-webhook" type="url" placeholder="https://…" />
+            </div>
+            <div id="merchant-register-result" class="result-card"></div>
+            <button class="btn-action" id="merchant-register-btn" onclick="registerMerchant()">
+              Registar SecurePay
+            </button>
+            <button class="btn-link" style="margin-top:4px;color:var(--slate-500)" onclick="showMerchantKeyImport()">
+              Já tenho API key →
+            </button>
           </div>
-          <div class="form-field">
-            <label class="form-label">Webhook URL (opcional)</label>
-            <input class="form-input" id="merchant-webhook" type="url" placeholder="https://…" />
-          </div>
-          <div id="merchant-register-result" class="result-card"></div>
-          <button class="btn-action" id="merchant-register-btn" onclick="registerMerchant()">
-            Registar merchant
-          </button>
-          <button class="btn-link" style="margin-top:12px;color:var(--slate-500)" onclick="showMerchantKeyImport()">
-            Já tenho API key
-          </button>
         </div>
 
+        <!-- Setup: import key -->
         <div id="merchant-key-import-panel" style="display:none">
-          <p style="font-size:13px;color:var(--slate-500);line-height:1.45;margin-bottom:16px">
-            Cola uma API key existente para criar payment requests neste simulador.
-          </p>
-          <div class="form-field">
-            <label class="form-label">API key</label>
-            <input class="form-input" id="merchant-import-key" type="text" placeholder="yoop_test_…" autocomplete="off" />
+          <div class="sp-panel">
+            <div class="section-title">Colar API key</div>
+            <div class="sp-endpoint"><span class="sp-verb">LOCAL</span> header X-Merchant-Key</div>
+            <p class="sp-step-note">Guarda a key neste simulador para autenticar pedidos de merchant (ex.: criar payment requests).</p>
+            <div class="form-field">
+              <label class="form-label">API key</label>
+              <input class="form-input" id="merchant-import-key" type="text" placeholder="yoop_test_…" autocomplete="off" />
+            </div>
+            <div class="form-field">
+              <label class="form-label">Nome (opcional)</label>
+              <input class="form-input" id="merchant-import-name" type="text" placeholder="Meu SecurePay" />
+            </div>
+            <button class="btn-action" onclick="importMerchantKey()">Guardar API key</button>
+            <button class="btn-link" style="margin-top:4px;color:var(--slate-500)" onclick="showMerchantRegisterFromActive()">
+              ← Voltar
+            </button>
           </div>
-          <div class="form-field">
-            <label class="form-label">Nome (opcional)</label>
-            <input class="form-input" id="merchant-import-name" type="text" placeholder="Meu merchant" />
-          </div>
-          <button class="btn-action" onclick="importMerchantKey()">Guardar API key</button>
-          <button class="btn-link" style="margin-top:12px;color:var(--slate-500)" onclick="showMerchantRegisterFromActive()">
-            Voltar
-          </button>
         </div>
 
+        <!-- Activo: tabs por endpoint -->
         <div id="merchant-active-panel" style="display:none">
-          <div class="info-card" style="margin-bottom:16px">
-            <div class="info-row">
-              <span class="info-row-label">Merchant</span>
-              <span class="info-row-value" id="merchant-info-name">—</span>
-            </div>
-            <div class="info-row">
-              <span class="info-row-label">Slug</span>
-              <span class="info-row-value" id="merchant-info-slug">—</span>
-            </div>
-            <div class="info-row">
-              <span class="info-row-label">Modo</span>
-              <span class="info-row-value" id="merchant-info-mode">—</span>
-            </div>
-            <div class="info-row">
-              <span class="info-row-label">Estado</span>
-              <span class="info-row-value" id="merchant-info-status">—</span>
-            </div>
-            <div class="info-row">
-              <span class="info-row-label">API key (local)</span>
-              <span class="info-row-value" id="merchant-info-key" style="font-family:ui-monospace,monospace;font-size:11px">—</span>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
-            <button class="btn-step primary" style="flex:1;min-width:120px" id="merchant-copy-key-btn" onclick="copyMerchantApiKey()">Copiar key</button>
-            <button class="btn-step" style="flex:1;min-width:120px" onclick="showMerchantKeyImport()">Colar key</button>
-          </div>
-
-          <div class="section-title" style="margin-bottom:12px">Novo payment request</div>
-          <div class="form-field">
-            <label class="form-label">Valor (<span id="merchant-pr-currency-label">EUR</span>)</label>
-            <input class="form-input" id="merchant-pr-amount" type="number" min="0.01" step="0.01" placeholder="10.00" />
-          </div>
-          <div class="form-field">
-            <label class="form-label">Descrição</label>
-            <input class="form-input" id="merchant-pr-description" type="text" placeholder="Order #123" maxlength="500" />
-          </div>
-          <div class="form-field">
-            <label class="form-label">Referência externa</label>
-            <input class="form-input" id="merchant-pr-ref" type="text" placeholder="ORD-123" maxlength="255" />
-          </div>
-          <div class="form-field">
-            <label class="form-label">Expira em (minutos)</label>
-            <input class="form-input" id="merchant-pr-expires" type="number" min="5" max="1440" placeholder="Vazio = 1 ano" />
-            <p class="method-hint">Deixa vazio para manter o link activo durante 1 ano.</p>
-          </div>
-          <div class="form-field">
-            <label class="form-label">Métodos de pagamento</label>
-            <p class="method-hint">Sem selecção = Stripe mostra a lista automática. Com selecção = só esses métodos.</p>
-            <div class="method-grid" id="merchant-pr-methods">
-              <label class="method-option"><input type="checkbox" value="card"> Cartão</label>
-              <label class="method-option"><input type="checkbox" value="mbway"> MB WAY</label>
-            </div>
-          </div>
-          <div id="merchant-pr-result" class="result-card"></div>
-          <button class="btn-action" id="merchant-pr-btn" onclick="createMerchantPaymentRequest()">
-            Criar link de pagamento
-          </button>
-          <div id="merchant-pr-link-box" style="display:none;margin-top:16px">
-            <div class="section-title" style="margin-bottom:8px">Link</div>
-            <div class="info-card" style="padding:12px;word-break:break-all;font-size:12px;color:var(--slate-700)" id="merchant-pr-url"></div>
-            <div style="display:flex;gap:8px;margin-top:10px">
-              <button class="btn-step primary" style="flex:1" onclick="copyMerchantPaymentUrl()">Copiar</button>
-              <button class="btn-step" style="flex:1" onclick="openMerchantPaymentUrl()">Abrir</button>
+          <div class="sp-status">
+            <div class="sp-status__meta">
+              <div class="sp-status__name" id="merchant-info-name">—</div>
+              <div class="sp-status__sub">
+                <span id="merchant-info-slug">—</span>
+                · <span id="merchant-info-mode">—</span>
+                · <span id="merchant-info-status">—</span>
+              </div>
             </div>
           </div>
 
-          <div class="section-title" style="margin:24px 0 8px">Vendas</div>
-          <p class="method-hint" style="margin-bottom:10px">Separadas dos movimentos. Pago · Pendente até liquidação Stripe.</p>
-          <div id="merchant-sales-list" class="info-card" style="padding:0;overflow:hidden">
-            <div class="empty-state" style="padding:20px"><p>A carregar…</p></div>
+          <div class="sp-tabs" role="tablist">
+            <button type="button" class="sp-tab active" data-sp-tab="conta" onclick="showSecurePayTab('conta')">
+              Conta<small>GET · PATCH</small>
+            </button>
+            <button type="button" class="sp-tab" data-sp-tab="creds" onclick="showSecurePayTab('creds')">
+              Keys<small>credenciais</small>
+            </button>
+            <button type="button" class="sp-tab" data-sp-tab="cobrar" onclick="showSecurePayTab('cobrar')">
+              Cobrar<small>POST link</small>
+            </button>
+            <button type="button" class="sp-tab" data-sp-tab="vendas" onclick="showSecurePayTab('vendas')">
+              Vendas<small>GET lista</small>
+            </button>
+          </div>
+
+          <!-- Tab 1: Conta -->
+          <div class="sp-tab-panel active" id="sp-tab-conta">
+            <div class="sp-panel">
+              <div class="section-title">Conta SecurePay</div>
+              <div class="sp-endpoint-stack">
+                <div class="sp-endpoint"><span class="sp-verb get">GET</span> /api/merchant</div>
+                <div class="sp-endpoint"><span class="sp-verb patch">PATCH</span> /api/merchant/{id}</div>
+              </div>
+              <p class="sp-step-note">Lista o teu merchant e actualiza nome, slug, modo ou webhook.</p>
+              <div class="info-card" style="margin:0">
+                <div class="info-row">
+                  <span class="info-row-label">Webhook URL</span>
+                  <span class="info-row-value" id="merchant-info-webhook-url" style="font-size:11px;word-break:break-all">—</span>
+                </div>
+              </div>
+            </div>
+            <div class="sp-panel">
+              <div class="section-title">Editar</div>
+              <div class="form-field">
+                <label class="form-label">Nome</label>
+                <input class="form-input" id="merchant-edit-name" type="text" maxlength="150" placeholder="Nome comercial" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">Slug</label>
+                <input class="form-input" id="merchant-edit-slug" type="text" maxlength="150" placeholder="loja-demo" />
+                <p class="method-hint">Único: letras, números, hífen e underscore.</p>
+              </div>
+              <div class="form-field">
+                <label class="form-label">Webhook URL</label>
+                <input class="form-input" id="merchant-edit-webhook" type="url" placeholder="https://…" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">Modo</label>
+                <select class="form-input form-select" id="merchant-edit-mode">
+                  <option value="test">Test</option>
+                  <option value="live">Live</option>
+                </select>
+              </div>
+              <div id="merchant-edit-result" class="result-card"></div>
+              <button class="btn-action" id="merchant-edit-btn" onclick="updateMerchant()">
+                Guardar alterações
+              </button>
+            </div>
+          </div>
+
+          <!-- Tab 2: Credenciais -->
+          <div class="sp-tab-panel" id="sp-tab-creds">
+            <div class="sp-panel">
+              <div class="section-title">Credenciais</div>
+              <div class="sp-endpoint-stack">
+                <div class="sp-endpoint"><span class="sp-verb get">GET</span> /api/merchant/{id}/credentials</div>
+                <div class="sp-endpoint"><span class="sp-verb">POST</span> /api/merchant/{id}/credentials/rotate</div>
+              </div>
+              <p class="sp-step-note" id="merchant-creds-hint">
+                A API key em claro só existe neste dispositivo. O webhook secret pode ser lido de novo via GET.
+              </p>
+              <div class="sp-cred-row">
+                <div>
+                  <label>API key</label>
+                  <code id="merchant-info-key">—</code>
+                </div>
+              </div>
+              <div class="sp-actions-row">
+                <button class="btn-step primary" id="merchant-copy-key-btn" onclick="copyMerchantApiKey()">Copiar</button>
+                <button class="btn-step" id="merchant-rotate-key-btn" onclick="rotateMerchantCredential('api_key')">Nova key</button>
+                <button class="btn-step" onclick="showMerchantKeyImport()">Colar</button>
+              </div>
+              <div class="sp-cred-row">
+                <div>
+                  <label>Webhook secret</label>
+                  <code id="merchant-info-webhook-secret">—</code>
+                </div>
+              </div>
+              <div class="sp-actions-row">
+                <button class="btn-step primary" id="merchant-copy-secret-btn" onclick="copyMerchantWebhookSecret()">Copiar</button>
+                <button class="btn-step" id="merchant-rotate-secret-btn" onclick="rotateMerchantCredential('webhook_secret')">Novo secret</button>
+              </div>
+              <div id="merchant-creds-result" class="result-card"></div>
+            </div>
+          </div>
+
+          <!-- Tab 3: Cobrar -->
+          <div class="sp-tab-panel" id="sp-tab-cobrar">
+            <div class="sp-panel">
+              <div class="section-title">Criar link de pagamento</div>
+              <div class="sp-endpoint"><span class="sp-verb">POST</span> /api/merchant/{id}/payment-requests</div>
+              <p class="sp-step-note">Gera um payment request e devolve o URL de checkout para o cliente pagar.</p>
+              <div class="form-field">
+                <label class="form-label">Valor (<span id="merchant-pr-currency-label">EUR</span>)</label>
+                <input class="form-input" id="merchant-pr-amount" type="number" min="0.01" step="0.01" placeholder="10.00" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">Descrição</label>
+                <input class="form-input" id="merchant-pr-description" type="text" placeholder="Order #123" maxlength="500" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">Referência externa</label>
+                <input class="form-input" id="merchant-pr-ref" type="text" placeholder="ORD-123" maxlength="255" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">Expira em (minutos)</label>
+                <input class="form-input" id="merchant-pr-expires" type="number" min="5" max="1440" placeholder="Vazio = 1 ano" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">Métodos</label>
+                <p class="method-hint">Sem selecção = Stripe decide. Com selecção = só esses.</p>
+                <div class="method-grid" id="merchant-pr-methods">
+                  <label class="method-option"><input type="checkbox" value="card"> Cartão</label>
+                  <label class="method-option"><input type="checkbox" value="mb_way"> MB WAY</label>
+                </div>
+              </div>
+              <div id="merchant-pr-result" class="result-card"></div>
+              <button class="btn-action" id="merchant-pr-btn" onclick="createMerchantPaymentRequest()">
+                Criar link
+              </button>
+              <div id="merchant-pr-link-box" style="display:none">
+                <div class="section-title">Link gerado</div>
+                <div class="sp-link-box" id="merchant-pr-url"></div>
+                <div class="sp-actions-row" style="margin-top:10px">
+                  <button class="btn-step primary" onclick="copyMerchantPaymentUrl()">Copiar</button>
+                  <button class="btn-step" onclick="openMerchantPaymentUrl()">Abrir</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 4: Vendas -->
+          <div class="sp-tab-panel" id="sp-tab-vendas">
+            <div class="sp-panel">
+              <div class="section-title">Vendas</div>
+              <div class="sp-endpoint"><span class="sp-verb get">GET</span> /api/merchant/payment-requests</div>
+              <p class="sp-step-note">Lista payment requests. Separado dos movimentos da wallet.</p>
+              <button class="btn-step" style="align-self:flex-start" onclick="loadMerchantSales()">Actualizar</button>
+              <div id="merchant-sales-list" class="info-card" style="padding:0;overflow:hidden;margin:0">
+                <div class="empty-state" style="padding:20px"><p>A carregar…</p></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2644,15 +3169,22 @@ async function doLogout() {
   setTimeout(() => { handlingUnauthorized = false; }, 500);
 }
 
-// ── Merchant ──────────────────────────────────────────
+// ── SecurePay ─────────────────────────────────────────
 const MERCHANT_KEY_STORAGE = 'yoop_sim_merchant_key';
+const MERCHANT_SECRET_STORAGE = 'yoop_sim_merchant_webhook_secret';
 const MERCHANT_META_STORAGE = 'yoop_sim_merchant_meta';
 let merchantPaymentUrl = null;
 let currentMerchant = null;
+let currentWebhookSecret = null;
 let merchantHadAccountBeforeImport = false;
+let merchantCredsLoading = false;
 
 function getStoredMerchantKey() {
   return localStorage.getItem(MERCHANT_KEY_STORAGE) || '';
+}
+
+function getStoredMerchantWebhookSecret() {
+  return localStorage.getItem(MERCHANT_SECRET_STORAGE) || '';
 }
 
 function getStoredMerchantMeta() {
@@ -2663,8 +3195,12 @@ function getStoredMerchantMeta() {
   }
 }
 
-function saveMerchantSession(apiKey, meta = {}) {
+function saveMerchantSession(apiKey, meta = {}, webhookSecret = null) {
   if (apiKey) localStorage.setItem(MERCHANT_KEY_STORAGE, apiKey);
+  if (webhookSecret) {
+    localStorage.setItem(MERCHANT_SECRET_STORAGE, webhookSecret);
+    currentWebhookSecret = webhookSecret;
+  }
   localStorage.setItem(MERCHANT_META_STORAGE, JSON.stringify(meta));
 }
 
@@ -2678,6 +3214,39 @@ function maskMerchantKey(key) {
   return `${raw.slice(0, 10)}…${raw.slice(-4)}`;
 }
 
+async function copyTextToClipboard(text) {
+  const value = String(text ?? '');
+  if (!value) return false;
+
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      // fallback below (HTTP / permissões)
+    }
+  }
+
+  const ta = document.createElement('textarea');
+  ta.value = value;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '-9999px';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, value.length);
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(ta);
+  return ok;
+}
+
 function setMerchantPanel(panel) {
   const registerEl = document.getElementById('merchant-register-panel');
   const importEl = document.getElementById('merchant-key-import-panel');
@@ -2685,6 +3254,21 @@ function setMerchantPanel(panel) {
   if (registerEl) registerEl.style.display = panel === 'register' ? '' : 'none';
   if (importEl) importEl.style.display = panel === 'import' ? '' : 'none';
   if (activeEl) activeEl.style.display = panel === 'active' ? '' : 'none';
+}
+
+function showSecurePayTab(tab) {
+  const allowed = ['conta', 'creds', 'cobrar', 'vendas'];
+  const next = allowed.includes(tab) ? tab : 'conta';
+
+  document.querySelectorAll('.sp-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.spTab === next);
+  });
+  document.querySelectorAll('.sp-tab-panel').forEach((panel) => {
+    panel.classList.toggle('active', panel.id === `sp-tab-${next}`);
+  });
+
+  if (next === 'creds') loadMerchantCredentials();
+  if (next === 'vendas') loadMerchantSales();
 }
 
 function showMerchantRegister() {
@@ -2704,35 +3288,277 @@ function showMerchantKeyImport() {
   setMerchantPanel('import');
 }
 
+function renderMerchantCredentialsUi() {
+  const key = getStoredMerchantKey();
+  const secret = currentWebhookSecret || getStoredMerchantWebhookSecret();
+  const keyEl = document.getElementById('merchant-info-key');
+  const secretEl = document.getElementById('merchant-info-webhook-secret');
+  const rotateKeyBtn = document.getElementById('merchant-rotate-key-btn');
+  const rotateSecretBtn = document.getElementById('merchant-rotate-secret-btn');
+  const merchantId = currentMerchant?.id || getStoredMerchantMeta()?.id;
+
+  if (keyEl) {
+    keyEl.textContent = key
+      ? maskMerchantKey(key)
+      : 'Não guardada — gera uma nova ou cola';
+  }
+  if (secretEl) {
+    secretEl.textContent = secret
+      ? maskMerchantKey(secret)
+      : (merchantCredsLoading ? 'A carregar…' : 'Indisponível — gera um novo');
+  }
+  if (rotateKeyBtn) rotateKeyBtn.disabled = !merchantId || merchantCredsLoading;
+  if (rotateSecretBtn) rotateSecretBtn.disabled = !merchantId || merchantCredsLoading;
+}
+
+function fillMerchantEditForm(merchant) {
+  const nameInput = document.getElementById('merchant-edit-name');
+  const slugInput = document.getElementById('merchant-edit-slug');
+  const webhookInput = document.getElementById('merchant-edit-webhook');
+  const modeInput = document.getElementById('merchant-edit-mode');
+  const editResult = document.getElementById('merchant-edit-result');
+
+  if (nameInput) nameInput.value = merchant?.name || '';
+  if (slugInput) slugInput.value = merchant?.slug || '';
+  if (webhookInput) webhookInput.value = merchant?.webhook_url || '';
+  if (modeInput) modeInput.value = merchant?.mode === 'live' ? 'live' : 'test';
+  if (editResult) editResult.className = 'result-card';
+}
+
 function renderMerchantActivePanel(merchant) {
   currentMerchant = merchant || null;
   setMerchantPanel('active');
 
-  const key = getStoredMerchantKey();
   const nameEl = document.getElementById('merchant-info-name');
   const slugEl = document.getElementById('merchant-info-slug');
   const modeEl = document.getElementById('merchant-info-mode');
   const statusEl = document.getElementById('merchant-info-status');
-  const keyEl = document.getElementById('merchant-info-key');
-  const copyBtn = document.getElementById('merchant-copy-key-btn');
+  const webhookUrlEl = document.getElementById('merchant-info-webhook-url');
+  const credsResult = document.getElementById('merchant-creds-result');
 
-  if (nameEl) nameEl.textContent = merchant?.name || 'Merchant';
+  if (nameEl) nameEl.textContent = merchant?.name || 'SecurePay';
   if (slugEl) slugEl.textContent = merchant?.slug || '—';
   if (modeEl) modeEl.textContent = String(merchant?.mode || 'test').toUpperCase();
   if (statusEl) statusEl.textContent = merchant?.is_active === false ? 'Inactivo' : 'Activo';
-  if (keyEl) {
-    keyEl.textContent = key
-      ? maskMerchantKey(key)
-      : 'Não guardada neste dispositivo';
+  if (webhookUrlEl) webhookUrlEl.textContent = merchant?.webhook_url || '—';
+  if (credsResult) credsResult.className = 'result-card';
+
+  fillMerchantEditForm(merchant);
+
+  if (!currentWebhookSecret) {
+    currentWebhookSecret = getStoredMerchantWebhookSecret() || null;
   }
-  if (copyBtn) copyBtn.disabled = !key;
+  renderMerchantCredentialsUi();
 
   const currencyLabel = document.getElementById('merchant-pr-currency-label');
   if (currencyLabel) {
     currencyLabel.textContent = sanitizeCurrency(authSession?.user?.currency || 'EUR');
   }
 
-  loadMerchantSales();
+  showSecurePayTab('conta');
+  loadMerchantCredentials();
+}
+
+async function updateMerchant() {
+  const merchantId = currentMerchant?.id || getStoredMerchantMeta()?.id;
+  if (!merchantId) {
+    showToast('Sem SecurePay activo', 'error');
+    return;
+  }
+
+  const name = document.getElementById('merchant-edit-name')?.value.trim() || '';
+  const slug = document.getElementById('merchant-edit-slug')?.value.trim() || '';
+  const webhook = document.getElementById('merchant-edit-webhook')?.value.trim() || '';
+  const mode = document.getElementById('merchant-edit-mode')?.value || 'test';
+  const btn = document.getElementById('merchant-edit-btn');
+  const result = document.getElementById('merchant-edit-result');
+
+  const current = currentMerchant || getStoredMerchantMeta() || {};
+  const body = {};
+
+  if (name && name !== (current.name || '')) body.name = name;
+  if (slug && slug !== (current.slug || '')) body.slug = slug;
+  if (mode && mode !== (current.mode || 'test')) body.mode = mode;
+
+  const currentWebhook = current.webhook_url || '';
+  if (webhook !== currentWebhook) {
+    body.webhook_url = webhook || null;
+  }
+
+  if (!Object.keys(body).length) {
+    showToast('Nada para guardar', 'error');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spin"></div> A guardar...';
+  }
+  if (result) result.className = 'result-card';
+
+  try {
+    const { ok, data, status } = await api('PATCH', `/merchant/${merchantId}`, body);
+    if (!ok) {
+      const msg = data?.message
+        || Object.values(data?.errors || {}).flat()?.[0]
+        || `Erro (${status})`;
+      if (result) {
+        result.className = 'result-card show error';
+        result.textContent = msg;
+      }
+      showToast(msg, 'error');
+      return;
+    }
+
+    const payload = unwrap(data) || {};
+    const updated = {
+      id: payload.id || merchantId,
+      name: payload.name || name || current.name,
+      slug: payload.slug || slug || current.slug,
+      mode: payload.mode || mode || current.mode,
+      webhook_url: payload.webhook_url ?? (Object.prototype.hasOwnProperty.call(body, 'webhook_url') ? body.webhook_url : current.webhook_url),
+      is_active: payload.is_active !== false,
+    };
+
+    currentMerchant = { ...currentMerchant, ...updated };
+    saveMerchantMeta(updated);
+    renderMerchantActivePanel(currentMerchant);
+    showToast('SecurePay actualizado', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro ao actualizar', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Guardar alterações';
+    }
+  }
+}
+
+async function loadMerchantCredentials() {
+  const merchantId = currentMerchant?.id || getStoredMerchantMeta()?.id;
+  if (!merchantId) {
+    renderMerchantCredentialsUi();
+    return null;
+  }
+
+  merchantCredsLoading = true;
+  renderMerchantCredentialsUi();
+
+  try {
+    const { ok, data } = await api('GET', `/merchant/${merchantId}/credentials`);
+    if (!ok) {
+      renderMerchantCredentialsUi();
+      return null;
+    }
+
+    const secret = data?.webhook_secret ?? null;
+    if (typeof secret === 'string' && secret !== '') {
+      currentWebhookSecret = secret;
+      localStorage.setItem(MERCHANT_SECRET_STORAGE, secret);
+    }
+
+    const payload = unwrap(data);
+    if (payload?.id) {
+      currentMerchant = { ...currentMerchant, ...payload };
+      saveMerchantMeta({
+        id: payload.id,
+        name: payload.name,
+        slug: payload.slug,
+        mode: payload.mode,
+        webhook_url: payload.webhook_url || null,
+        is_active: payload.is_active,
+      });
+      fillMerchantEditForm(currentMerchant);
+      const webhookUrlEl = document.getElementById('merchant-info-webhook-url');
+      if (webhookUrlEl) webhookUrlEl.textContent = payload.webhook_url || '—';
+      const nameEl = document.getElementById('merchant-info-name');
+      const slugEl = document.getElementById('merchant-info-slug');
+      const modeEl = document.getElementById('merchant-info-mode');
+      if (nameEl) nameEl.textContent = payload.name || 'SecurePay';
+      if (slugEl) slugEl.textContent = payload.slug || '—';
+      if (modeEl) modeEl.textContent = String(payload.mode || 'test').toUpperCase();
+    }
+
+    return secret || currentWebhookSecret || getStoredMerchantWebhookSecret() || null;
+  } catch {
+    return currentWebhookSecret || getStoredMerchantWebhookSecret() || null;
+  } finally {
+    merchantCredsLoading = false;
+    renderMerchantCredentialsUi();
+  }
+}
+
+async function rotateMerchantCredential(kind) {
+  const merchantId = currentMerchant?.id || getStoredMerchantMeta()?.id;
+  if (!merchantId) {
+    showToast('Sem SecurePay activo', 'error');
+    return;
+  }
+  if (kind !== 'api_key' && kind !== 'webhook_secret') return;
+
+  const label = kind === 'api_key' ? 'API key' : 'webhook secret';
+  if (!confirm(`Gerar um novo ${label}? O valor actual deixa de funcionar.`)) return;
+
+  const result = document.getElementById('merchant-creds-result');
+  const rotateKeyBtn = document.getElementById('merchant-rotate-key-btn');
+  const rotateSecretBtn = document.getElementById('merchant-rotate-secret-btn');
+  if (rotateKeyBtn) rotateKeyBtn.disabled = true;
+  if (rotateSecretBtn) rotateSecretBtn.disabled = true;
+  if (result) result.className = 'result-card';
+
+  try {
+    const body = kind === 'api_key' ? { api_key: true } : { webhook_secret: true };
+    const { ok, data, status } = await api('POST', `/merchant/${merchantId}/credentials/rotate`, body);
+    if (!ok) {
+      const msg = data?.message
+        || Object.values(data?.errors || {}).flat()?.[0]
+        || `Erro (${status})`;
+      if (result) {
+        result.className = 'result-card show error';
+        result.textContent = msg;
+      }
+      showToast(msg, 'error');
+      return;
+    }
+
+    const payload = unwrap(data) || {};
+    if (payload?.id) {
+      currentMerchant = { ...currentMerchant, ...payload };
+      saveMerchantMeta({
+        id: payload.id,
+        name: payload.name,
+        slug: payload.slug,
+        mode: payload.mode,
+        webhook_url: payload.webhook_url || null,
+        is_active: payload.is_active,
+      });
+    }
+
+    if (kind === 'api_key' && data?.api_key) {
+      localStorage.setItem(MERCHANT_KEY_STORAGE, data.api_key);
+      if (result) {
+        result.className = 'result-card show success';
+        result.textContent = `Nova API key: ${data.api_key}`;
+      }
+      showToast('Nova API key gerada — copia e guarda', 'success');
+    }
+
+    if (kind === 'webhook_secret' && data?.webhook_secret) {
+      currentWebhookSecret = data.webhook_secret;
+      localStorage.setItem(MERCHANT_SECRET_STORAGE, data.webhook_secret);
+      if (result) {
+        result.className = 'result-card show success';
+        result.textContent = `Novo webhook secret: ${data.webhook_secret}`;
+      }
+      showToast('Novo webhook secret gerado — copia e guarda', 'success');
+    }
+
+    renderMerchantCredentialsUi();
+  } catch (e) {
+    showToast(e.message || 'Erro ao rodar credencial', 'error');
+  } finally {
+    renderMerchantCredentialsUi();
+  }
 }
 
 async function loadMerchantSales() {
@@ -2755,8 +3581,8 @@ async function loadMerchantSales() {
     }
 
     listEl.innerHTML = rows.map((row) => {
-      const amount = Number(row.amount || 0).toFixed(2);
       const currency = sanitizeCurrency(row.currency || 'EUR');
+      const amount = formatMoney(row.amount || 0, currency);
       const status = String(row.status || '').toLowerCase();
       const settlement = String(row.settlement_status || '').toLowerCase();
       let badge = status;
@@ -2791,7 +3617,7 @@ async function loadMerchantSales() {
           <div style="font-size:11px;color:var(--slate-500);margin-top:2px">${escapeHtml(whenLabel)}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:10px">
-          <div style="font-weight:700;font-size:13px">${amount} ${currency}</div>
+          <div style="font-weight:700;font-size:13px">${escapeHtml(amount)}</div>
           <span class="${badgeClass}" style="margin-top:4px;display:inline-block">${escapeHtml(badge)}</span>
         </div>
       </div>`;
@@ -2804,11 +3630,13 @@ async function loadMerchantSales() {
 async function loadMerchantScreen() {
   const resultEl = document.getElementById('merchant-register-result');
   const prResult = document.getElementById('merchant-pr-result');
+  const editResult = document.getElementById('merchant-edit-result');
   const linkBox = document.getElementById('merchant-pr-link-box');
   const body = document.getElementById('merchant-body');
 
   if (resultEl) resultEl.className = 'result-card';
   if (prResult) prResult.className = 'result-card';
+  if (editResult) editResult.className = 'result-card';
   if (linkBox) linkBox.style.display = 'none';
   merchantPaymentUrl = null;
 
@@ -2845,7 +3673,7 @@ async function loadMerchantScreen() {
     currentMerchant = null;
     setMerchantPanel('register');
   } catch (e) {
-    showToast(e.message || 'Erro ao carregar merchant', 'error');
+    showToast(e.message || 'Erro ao carregar SecurePay', 'error');
     const localMeta = getStoredMerchantMeta();
     if (localMeta?.id || getStoredMerchantKey()) {
       renderMerchantActivePanel(localMeta);
@@ -2865,7 +3693,7 @@ async function registerMerchant() {
   const result = document.getElementById('merchant-register-result');
 
   if (!name) {
-    showToast('Indica o nome do merchant', 'error');
+    showToast('Indica o nome do SecurePay', 'error');
     return;
   }
 
@@ -2894,7 +3722,8 @@ async function registerMerchant() {
 
     const payload = unwrap(data) || {};
     const apiKey = data?.api_key || payload.api_key;
-    if (apiKey) {
+    const webhookSecret = data?.webhook_secret || payload.webhook_secret;
+    if (apiKey || webhookSecret) {
       saveMerchantSession(apiKey, {
         id: payload.id,
         name: payload.name || name,
@@ -2902,17 +3731,28 @@ async function registerMerchant() {
         mode: payload.mode || mode,
         webhook_url: payload.webhook_url || webhook || null,
         is_active: payload.is_active !== false,
-      });
+      }, webhookSecret || null);
     }
 
-    showToast('Merchant registado', 'success');
+    if (apiKey || webhookSecret) {
+      const resultLines = [];
+      if (apiKey) resultLines.push(`API key: ${apiKey}`);
+      if (webhookSecret) resultLines.push(`Webhook secret: ${webhookSecret}`);
+      if (result) {
+        result.className = 'result-card show success';
+        result.textContent = resultLines.join('\n');
+      }
+    }
+
+    showToast('SecurePay registado — guarda a key e o secret', 'success');
     await loadMerchantScreen();
+    showSecurePayTab('creds');
   } catch (e) {
     showToast(e.message || 'Erro ao registar', 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = 'Registar merchant';
+      btn.textContent = 'Registar SecurePay';
     }
   }
 }
@@ -2929,7 +3769,7 @@ function importMerchantKey() {
   const mode = key.includes('live') ? 'live' : (existing.mode || 'test');
   saveMerchantSession(key, {
     ...existing,
-    name: name || existing.name || 'Merchant',
+    name: name || existing.name || 'SecurePay',
     mode,
   });
   showToast('API key guardada', 'success');
@@ -2939,15 +3779,24 @@ function importMerchantKey() {
 async function copyMerchantApiKey() {
   const key = getStoredMerchantKey();
   if (!key) {
-    showToast('Sem API key neste dispositivo — cola uma ou regista de novo', 'error');
+    showToast('A API key não está neste dispositivo. Clica em «Nova key» (ou cola uma).', 'error');
     return;
   }
-  try {
-    await navigator.clipboard.writeText(key);
-    showToast('API key copiada', 'success');
-  } catch {
-    showToast('Não foi possível copiar', 'error');
+  const ok = await copyTextToClipboard(key);
+  showToast(ok ? 'API key copiada' : 'Não foi possível copiar', ok ? 'success' : 'error');
+}
+
+async function copyMerchantWebhookSecret() {
+  let secret = currentWebhookSecret || getStoredMerchantWebhookSecret();
+  if (!secret) {
+    secret = await loadMerchantCredentials();
   }
+  if (!secret) {
+    showToast('Sem webhook secret. Clica em «Novo secret» para gerar.', 'error');
+    return;
+  }
+  const ok = await copyTextToClipboard(secret);
+  showToast(ok ? 'Webhook secret copiado' : 'Não foi possível copiar', ok ? 'success' : 'error');
 }
 
 async function apiMerchant(method, path, body) {
@@ -2977,6 +3826,7 @@ function merchantPaymentMethodsLabel(types) {
   if (!Array.isArray(types) || !types.length) return 'Automático (Stripe)';
   const labels = {
     card: 'Cartão',
+    mb_way: 'MB WAY',
     mbway: 'MB WAY',
     mb_way: 'MB WAY',
   };
@@ -2997,7 +3847,7 @@ async function createMerchantPaymentRequest() {
 
   const merchantId = currentMerchant?.id || getStoredMerchantMeta()?.id;
   if (!merchantId && !getStoredMerchantKey()) {
-    showToast('Sem merchant activo', 'error');
+    showToast('Sem SecurePay activo', 'error');
     return;
   }
   if (!amountMajor || amountMajor <= 0) {
@@ -3060,13 +3910,12 @@ async function createMerchantPaymentRequest() {
       linkBox.style.display = '';
     }
     showToast('Link de pagamento criado', 'success');
-    loadMerchantSales();
   } catch (e) {
     showToast(e.message || 'Erro ao criar pedido', 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = 'Criar link de pagamento';
+      btn.textContent = 'Criar link';
     }
   }
 }
@@ -3816,11 +4665,27 @@ function friendlyMovementDescription(text, { isBankTransfer = false } = {}) {
   return raw;
 }
 
+function p2pCounterpartyLabel(t) {
+  const cp = t?.counterparty;
+  if (!cp) return '';
+  const handle = cp.username ? `@${cp.username}` : '';
+  const name = String(cp.name || '').trim();
+  const who = [handle, name].filter(Boolean).join(' · ');
+  if (!who) return '';
+  const prefix = cp.role === 'sender' ? 'De' : 'Para';
+  return `${prefix} ${who}`;
+}
+
 function normalizeStripeMovement(t) {
   const direction = txDirectionValue(t.direction);
   const isIn = direction === 'credit' || direction === 'in';
   const createdAt = t.created_at || t.stripe_created_at || null;
   const bankTransfer = isBankTransferTransaction(t);
+  const p2pLabel = p2pCounterpartyLabel(t);
+  const baseDescription = friendlyMovementDescription(t.description, { isBankTransfer: bankTransfer });
+  // Preferir contraparte P2P; se a descrição for só o default, não duplicar
+  const description = p2pLabel
+    || (baseDescription && baseDescription.toLowerCase() !== 'transferência p2p' ? baseDescription : '');
   return {
     key: movementKey('wallet', t.id),
     source: 'wallet',
@@ -3835,7 +4700,8 @@ function normalizeStripeMovement(t) {
     status: String(t.status || 'pending').toLowerCase(),
     type: String(t.type || 'transação'),
     typeLabel: stripeMovementTypeLabel(t),
-    description: friendlyMovementDescription(t.description, { isBankTransfer: bankTransfer }),
+    description,
+    counterpartyLabel: p2pLabel,
     paymentMethod: t.payment_method_type || '',
     paymentMethodLabel: paymentMethodLabel(t.payment_method_type),
     createdAt,
@@ -4156,6 +5022,11 @@ async function loadTransactionDetail(id) {
     ['Método', escapeHtml(paymentMethodLabel(t.payment_method_type))],
     ['Data', t.created_at ? new Date(t.created_at).toLocaleString('pt-PT') : '—'],
   ];
+  if (t.counterparty) {
+    const cp = t.counterparty;
+    const who = [cp.username ? `@${cp.username}` : '', cp.name || ''].filter(Boolean).join(' · ') || '—';
+    rows.splice(4, 0, [cp.role === 'sender' ? 'De' : 'Para', escapeHtml(who)]);
+  }
   if (t.bank_transfer?.sender_name || t.bank_transfer_sender_name) {
     rows.push(['Remetente', escapeHtml(t.bank_transfer?.sender_name || t.bank_transfer_sender_name)]);
   }
