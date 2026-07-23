@@ -51,8 +51,6 @@
         return Storage::url($path);
     };
 
-    $latestDiditSession = $customer->diditSessions->first();
-
     $formatDateTime = function ($value, string $fallback = '—'): string {
         if ($value === null || $value === '') {
             return $fallback;
@@ -303,19 +301,32 @@
         </div>{{-- fim Informações Gerais --}}
 
         {{-- Telefone --}}
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100">
-                <h2 class="text-sm font-semibold text-slate-900">Telefone</h2>
-                <p class="text-xs text-slate-500 mt-1">
+        <div x-data="{ sectionOpen: false }"
+             class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <button type="button"
+                    @click="sectionOpen = !sectionOpen"
+                    class="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors"
+                    :class="sectionOpen ? 'border-b border-slate-100' : ''">
+                <div class="min-w-0">
+                    <h2 class="text-sm font-semibold text-slate-900">Telefone</h2>
+                    <p class="text-xs text-slate-500 mt-0.5 truncate">
+                        {{ $customer->phone ?: '—' }}
+                        · {{ $currentPhoneVerified ? 'Confirmado' : 'Não confirmado' }}
+                    </p>
+                </div>
+                <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            <div x-show="sectionOpen" x-cloak class="p-5 space-y-5">
+                <p class="text-xs text-slate-500">
                     @if ($currentPhoneVerified)
                         O número actual está confirmado. Alterações exigem confirmação por SMS no novo número.
                     @else
                         O número actual ainda não está confirmado e pode ser alterado directamente.
                     @endif
                 </p>
-            </div>
-
-            <div class="p-5 space-y-5">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <p class="text-xs text-slate-400 font-medium mb-0.5">Número actual</p>
@@ -394,71 +405,25 @@
                     </button>
                 </form>
                 @endcan
-            </div>
+            </div>{{-- fim sectionOpen --}}
         </div>
-
-        {{-- Sessão Didit --}}
-        @if ($latestDiditSession)
-        @php
-            $diditStatus = $latestDiditSession->status ?? '—';
-            $diditBadge = match (strtolower(str_replace(' ', '', $diditStatus))) {
-                'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Aprovado'],
-                'declined' => ['badge' => 'bg-red-50 text-red-700 border-red-200', 'dot' => 'bg-red-500', 'label' => 'Recusado'],
-                'inreview' => ['badge' => 'bg-sky-50 text-sky-700 border-sky-200', 'dot' => 'bg-sky-500', 'label' => 'Em análise'],
-                'inprogress', 'notfinished' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Em progresso'],
-                'notstarted' => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'dot' => 'bg-slate-400', 'label' => 'Não iniciado'],
-                default => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'dot' => 'bg-slate-400', 'label' => $diditStatus],
-            };
-            $diditMetadata = is_array($latestDiditSession->metadata) ? $latestDiditSession->metadata : [];
-        @endphp
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-900">Verificação Didit</h2>
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border {{ $diditBadge['badge'] }}">
-                    <span class="w-1.5 h-1.5 rounded-full mr-1.5 {{ $diditBadge['dot'] }}"></span>
-                    {{ $diditBadge['label'] }}
-                </span>
-            </div>
-            <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                <div>
-                    <p class="text-xs text-slate-400 font-medium mb-0.5">Session ID</p>
-                    <p class="font-mono text-xs text-slate-700 break-all">{{ $latestDiditSession->session_id }}</p>
-                </div>
-                @if (!empty($diditMetadata['application_id']))
-                <div>
-                    <p class="text-xs text-slate-400 font-medium mb-0.5">Application ID</p>
-                    <p class="font-mono text-xs text-slate-700 break-all">{{ $diditMetadata['application_id'] }}</p>
-                </div>
-                @endif
-                <div>
-                    <p class="text-xs text-slate-400 font-medium mb-0.5">Workflow</p>
-                    <p class="text-slate-800 font-medium">{{ $latestDiditSession->workflow_id ?? '—' }}</p>
-                </div>
-                <div>
-                    <p class="text-xs text-slate-400 font-medium mb-0.5">Última actualização</p>
-                    <p class="text-slate-800 font-medium">{{ $formatDateTime($latestDiditSession->updated_at) }}</p>
-                </div>
-                @if (filled($latestDiditSession->session_url))
-                <div class="sm:col-span-2">
-                    <a href="{{ $latestDiditSession->session_url }}" target="_blank" rel="noopener"
-                       class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                        Abrir sessão Didit
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                        </svg>
-                    </a>
-                </div>
-                @endif
-            </div>
-        </div>
-        @endif
 
         {{-- Documentos --}}
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-900">Documentos KYC</h2>
-                <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->documents->count() }}</span>
-            </div>
+        <div x-data="{ sectionOpen: false }"
+             class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <button type="button"
+                    @click="sectionOpen = !sectionOpen"
+                    class="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors"
+                    :class="sectionOpen ? 'border-b border-slate-100' : ''">
+                <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    Documentos KYC
+                    <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->documents->count() }}</span>
+                </h2>
+                <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div x-show="sectionOpen" x-cloak>
             @forelse ($customer->documents as $doc)
             @php
                 $extraFields = is_array($doc->extra_fields) ? $doc->extra_fields : [];
@@ -710,26 +675,35 @@
                 <p class="text-sm text-slate-400">Nenhum documento cadastrado.</p>
             </div>
             @endforelse
+            </div>{{-- fim sectionOpen --}}
         </div>
 
         {{-- TPAs --}}
         <div x-data="{
+                 sectionOpen: false,
                  showFeeModal: false,
                  activeTpaId: null,
                  expandedTpa: null,
              }">
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
 
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <button type="button"
+                    @click="sectionOpen = !sectionOpen"
+                    class="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors"
+                    :class="sectionOpen ? 'border-b border-slate-100' : ''">
                 <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                     </svg>
                     TPAs
+                    <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->tpas->count() }}</span>
                 </h2>
-                <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->tpas->count() }}</span>
-            </div>
+                <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
 
+            <div x-show="sectionOpen" x-cloak>
             @forelse ($customer->tpas as $tpa)
             @php
                 $tpaBadge = match($tpa->status) {
@@ -845,6 +819,7 @@
                 <p class="text-sm text-slate-400">Nenhum TPA vinculado.</p>
             </div>
             @endforelse
+            </div>{{-- fim sectionOpen --}}
 
         </div>{{-- fim card --}}
 
@@ -929,6 +904,180 @@
             </div>
 
         </div>{{-- fim wrapper x-data TPAs --}}
+
+        {{-- SecurePay --}}
+        <div x-data="{ sectionOpen: false }"
+             class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <button type="button"
+                    @click="sectionOpen = !sectionOpen"
+                    class="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors"
+                    :class="sectionOpen ? 'border-b border-slate-100' : ''">
+                <div class="flex items-center gap-2 min-w-0">
+                    <h2 class="text-sm font-semibold text-slate-900">SecurePay</h2>
+                    <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->merchants->count() }}</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <img src="{{ asset('securepay.png') }}" alt="SecurePay" class="h-7">
+                    <svg class="w-4 h-4 text-slate-400 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+            </button>
+
+            <div x-show="sectionOpen" x-cloak>
+            @forelse ($customer->merchants as $merchant)
+            @php
+                $modeBadge = $merchant->mode === 'live'
+                    ? ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Live']
+                    : ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Test'];
+                $activeBadge = $merchant->is_active
+                    ? ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Activo']
+                    : ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'dot' => 'bg-slate-400', 'label' => 'Inactivo'];
+                $currencies = collect($merchant->allowed_currencies ?? [])->filter()->map(fn ($c) => strtoupper($c))->implode(', ');
+            @endphp
+            <div class="border-b border-slate-50 last:border-0">
+                <div class="px-5 py-4 space-y-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-slate-900 truncate">{{ $merchant->name }}</p>
+                            <p class="text-xs text-slate-400 font-mono mt-0.5 truncate">{{ $merchant->slug }}</p>
+                        </div>
+                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border {{ $modeBadge['badge'] }}">
+                                <span class="w-1.5 h-1.5 rounded-full mr-1 {{ $modeBadge['dot'] }}"></span>
+                                {{ $modeBadge['label'] }}
+                            </span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border {{ $activeBadge['badge'] }}">
+                                <span class="w-1.5 h-1.5 rounded-full mr-1 {{ $activeBadge['dot'] }}"></span>
+                                {{ $activeBadge['label'] }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                        <div>
+                            <p class="text-xs text-slate-400 font-medium mb-0.5">ID</p>
+                            <p class="text-sm text-slate-800 font-mono">{{ $merchant->id }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 font-medium mb-0.5">Criado</p>
+                            <p class="text-sm text-slate-800">{{ $formatDateTime($merchant->created_at) }}</p>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <p class="text-xs text-slate-400 font-medium mb-0.5">Webhook URL</p>
+                            <p class="text-sm text-slate-800 break-all">{{ $merchant->webhook_url ?: '—' }}</p>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <p class="text-xs text-slate-400 font-medium mb-0.5">Moedas permitidas</p>
+                            <p class="text-sm text-slate-800">{{ $currencies !== '' ? $currencies : 'Todas' }}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Transações</p>
+                            <span class="text-xs text-slate-400">{{ $merchant->paymentRequests->count() }} recentes</span>
+                        </div>
+
+                        @if ($merchant->paymentRequests->isEmpty())
+                        <p class="text-xs text-slate-400 py-2">Nenhuma transação SecurePay.</p>
+                        @else
+                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                            <table class="w-full text-xs">
+                                <thead>
+                                    <tr class="bg-slate-100 border-b border-slate-200">
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Data</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">UUID</th>
+                                        <th class="text-right font-semibold text-slate-500 px-3 py-2">Valor</th>
+                                        <th class="text-right font-semibold text-slate-500 px-3 py-2">Taxas</th>
+                                        <th class="text-right font-semibold text-slate-500 px-3 py-2">Líquido</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Estado</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Liquidação</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Ref.</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    @foreach ($merchant->paymentRequests as $pr)
+                                    @php
+                                        $prStatus = match ($pr->status) {
+                                            'completed'  => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'label' => 'Pago'],
+                                            'processing' => ['badge' => 'bg-sky-50 text-sky-700 border-sky-200', 'label' => 'A processar'],
+                                            'pending'    => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'label' => 'Pendente'],
+                                            'failed'     => ['badge' => 'bg-red-50 text-red-700 border-red-200', 'label' => 'Falhou'],
+                                            'expired'    => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'label' => 'Expirado'],
+                                            'cancelled'  => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'label' => 'Cancelado'],
+                                            default      => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'label' => $pr->status],
+                                        };
+                                        $funding = $pr->stripeTransaction?->partner_funding_status;
+                                        $settlement = match (true) {
+                                            $pr->status !== 'completed' => ['label' => '—', 'class' => 'text-slate-400'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::Completed => ['label' => 'Disponível', 'class' => 'text-emerald-700'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::Failed => ['label' => 'Falhou', 'class' => 'text-red-700'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::AwaitingStripePayout => ['label' => 'A aguardar payout', 'class' => 'text-amber-700'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::AwaitingLiquidity => ['label' => 'A aguardar liquidez', 'class' => 'text-amber-700'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::Pending => ['label' => 'Pendente', 'class' => 'text-amber-700'],
+                                            default => ['label' => 'Pendente', 'class' => 'text-amber-700'],
+                                        };
+                                        $feeTotal = $pr->stripeTransaction?->resolvedFeeTotal();
+                                        $netAmount = $pr->stripeTransaction?->resolvedNetAmount();
+                                    @endphp
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                            {{ $formatDateTime($pr->paid_at ?? $pr->created_at) }}
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <a href="{{ url('/pay/'.$pr->uuid) }}" target="_blank" rel="noopener"
+                                               class="font-mono text-indigo-600 hover:underline">
+                                                {{ \Illuminate\Support\Str::limit($pr->uuid, 8, '') }}…
+                                            </a>
+                                        </td>
+                                        <td class="px-3 py-2 text-right font-medium text-slate-800 whitespace-nowrap">
+                                            {{ number_format($pr->amount / 100, 2, ',', '.') }}
+                                            <span class="text-slate-400 font-normal">{{ strtoupper($pr->currency) }}</span>
+                                        </td>
+                                        <td class="px-3 py-2 text-right text-slate-600 whitespace-nowrap">
+                                            @if ($feeTotal === null && $pr->status === 'completed')
+                                                —
+                                            @elseif ($feeTotal === null)
+                                                —
+                                            @else
+                                                {{ number_format($feeTotal / 100, 2, ',', '.') }}
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2 text-right text-slate-700 whitespace-nowrap">
+                                            @if ($netAmount === null)
+                                                —
+                                            @else
+                                                {{ number_format($netAmount / 100, 2, ',', '.') }}
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border {{ $prStatus['badge'] }}">
+                                                {{ $prStatus['label'] }}
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2 {{ $settlement['class'] }} font-medium whitespace-nowrap">
+                                            {{ $settlement['label'] }}
+                                        </td>
+                                        <td class="px-3 py-2 text-slate-500 max-w-[8rem] truncate" title="{{ $pr->external_reference }}">
+                                            {{ $pr->external_reference ?: '—' }}
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @empty
+            <div class="px-5 py-10 text-center">
+                <p class="text-sm text-slate-400">Nenhum SecurePay registado.</p>
+            </div>
+            @endforelse
+            </div>{{-- fim sectionOpen --}}
+        </div>
 
     </div>{{-- fim LEFT COLUMN --}}
 

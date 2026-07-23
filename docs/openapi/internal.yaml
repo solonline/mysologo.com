@@ -235,6 +235,12 @@ paths:
     $ref: './paths/merchant.yaml#/merchant-index'
   /merchant/register:
     $ref: './paths/merchant.yaml#/merchant-register'
+  /merchant/{merchant}:
+    $ref: './paths/merchant.yaml#/merchant-customer-update'
+  /merchant/{merchant}/credentials:
+    $ref: './paths/merchant.yaml#/merchant-customer-credentials/get'
+  /merchant/{merchant}/credentials/rotate:
+    $ref: './paths/merchant.yaml#/merchant-customer-credentials/post'
   /merchant/payment-requests:
     get:
       $ref: './paths/merchant.yaml#/merchant-customer-payment-requests/get'

@@ -19,6 +19,16 @@ class GetCustomerDetailQuery
             'eburyAccount',
             'phoneVerifications',
             'tpas.paymentMethodFees',
+            'merchants' => fn ($q) => $q->orderByDesc('id'),
+            'merchants.paymentRequests' => fn ($q) => $q
+                ->where(function ($requests): void {
+                    $requests
+                        ->whereHas('stripeTransaction')
+                        ->orWhereIn('status', ['pending', 'processing']);
+                })
+                ->with('stripeTransaction')
+                ->latest()
+                ->limit(50),
         ]);
     }
 }
