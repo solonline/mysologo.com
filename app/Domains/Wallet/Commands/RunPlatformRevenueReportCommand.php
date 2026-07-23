@@ -59,6 +59,8 @@ class RunPlatformRevenueReportCommand extends Command
 
             $rows = [
                 ['Stripe (platform_fee)', $this->formatMoney($row['accrued_cents'], $row['currency'])],
+                ['Settled', $this->formatMoney($row['settled_cents'], $row['currency'])],
+                ['Pending settlement', $this->formatMoney($row['pending_cents'], $row['currency'])],
                 ['Ledger (manual_credit)', $this->formatMoney($row['ledger_cents'], $row['currency'])],
                 ['Delta', $this->formatMoney($row['accrued_cents'] - $row['ledger_cents'], $row['currency'])],
                 ['This month', $this->formatMoney($row['month_accrued_cents'], $row['currency'])],
