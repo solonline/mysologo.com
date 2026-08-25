@@ -233,7 +233,7 @@ customers.type
                  Agrupa por currency
                            │
               ┌────────────▼────────────┐
-              │  settlement_batches      │
+              │  settlement_batches     │
               │  ┌──────────────────┐   │
               │  │ id               │   │
               │  │ currency         │   │
