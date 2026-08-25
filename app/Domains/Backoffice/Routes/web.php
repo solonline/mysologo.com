@@ -110,6 +110,9 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('.settings')->middleware('can:settings.view');
     Route::post('/settings', [SettingsController::class, 'update'])->name('.settings.update')->middleware('can:settings.edit');
+    Route::post('/settings/test-mail', [SettingsController::class, 'testMail'])
+        ->name('.settings.test-mail')
+        ->middleware('can:settings.edit');
     Route::post('/operations/retry-wallester-topups', [OperationsController::class, 'retryWallesterTopups'])
         ->name('.operations.retry-wallester-topups')
         ->middleware('can:settings.edit');

@@ -50,6 +50,15 @@ class SettingsSeeder extends Seeder
             ['key' => 'stripe.chf.public_key',     'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
             ['key' => 'stripe.chf.secret_key',     'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
             ['key' => 'stripe.chf.webhook_secret', 'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => ''],
+            // Email SMTP (emails enviados aos clientes)
+            ['key' => 'mail.host',          'label' => 'Host SMTP',        'type' => 'text',     'value' => env('MAIL_HOST', '')],
+            ['key' => 'mail.port',          'label' => 'Porta SMTP',       'type' => 'number',   'value' => (string) env('MAIL_PORT', '587')],
+            ['key' => 'mail.encryption',    'label' => 'Encriptação',      'type' => 'select',   'value' => env('MAIL_ENCRYPTION', 'tls')],
+            ['key' => 'mail.username',      'label' => 'Utilizador SMTP',  'type' => 'text',     'value' => env('MAIL_USERNAME', '')],
+            ['key' => 'mail.password',      'label' => 'Palavra-passe SMTP', 'type' => 'secret', 'value' => env('MAIL_PASSWORD', '')],
+            ['key' => 'mail.from_address',  'label' => 'Email remetente',  'type' => 'email',    'value' => env('MAIL_FROM_ADDRESS', '')],
+            ['key' => 'mail.from_name',     'label' => 'Nome remetente',   'type' => 'text',     'value' => env('MAIL_FROM_NAME', env('APP_NAME', 'Yoop'))],
+            ['key' => 'mail.verify_peer',   'label' => 'Verificar certificado SSL', 'type' => 'toggle', 'value' => 'false'],
             // sms
             ['key' => 'sms.base_url',    'label' => 'URL Base',   'type' => 'url',    'value' => 'https://messaging.gatewayapi.com'],
             ['key' => 'sms.auth_token',  'label' => 'Auth Token', 'type' => 'secret', 'value' => ''],
