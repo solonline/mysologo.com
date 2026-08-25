@@ -13,6 +13,7 @@ use App\Domains\Wallet\Jobs\SendBankTransferTopupReceivedEmail;
 use App\Domains\Wallet\Mail\BankTransferTopupReceivedMail;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
+use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
 use App\Models\Customer;
 use App\Models\StripeTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -102,7 +103,7 @@ class BankTransferTopupEmailTest extends TestCase
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
 
         (new FundWallesterTopupFromStripeJob($transaction->id))
-            ->handle(app(FundingPartnerMovementService::class));
+            ->handle(app(FundingPartnerMovementService::class), app(TopupWallesterFundingPolicy::class));
 
         Bus::assertDispatched(SendBankTransferTopupReceivedEmail::class, function (SendBankTransferTopupReceivedEmail $job) use ($transaction): bool {
             return $job->stripeTransactionId === $transaction->id;

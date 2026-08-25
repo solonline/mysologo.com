@@ -17,6 +17,10 @@ class LedgerEntry extends Model
         'currency',
         'direction',
         'amount',
+        'available_before',
+        'available_after',
+        'pending_before',
+        'pending_after',
         'balance_after',
         'entry_type',
         'reference_type',
@@ -26,11 +30,15 @@ class LedgerEntry extends Model
     ];
 
     protected $casts = [
-        'direction'  => TransactionDirection::class,
+        'direction' => TransactionDirection::class,
         'entry_type' => LedgerEntryType::class,
-        'amount'     => 'integer',
+        'amount' => 'integer',
+        'available_before' => 'integer',
+        'available_after' => 'integer',
+        'pending_before' => 'integer',
+        'pending_after' => 'integer',
         'balance_after' => 'integer',
-        'metadata'   => 'array',
+        'metadata' => 'array',
     ];
 
     public function customer(): BelongsTo

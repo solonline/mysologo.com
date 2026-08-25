@@ -130,10 +130,7 @@ class FundingPartnerMovementService
                     idempotencyKey: $idempotencyKey,
                 );
 
-                $partnerExternalId = is_array($response) ? ($response['id'] ?? null) : null;
-
-                $this->markMovementCompleted($outMovement, is_string($partnerExternalId) ? $partnerExternalId : null);
-                $this->markMovementCompleted($inMovement);
+                $this->completeTransferPair($outMovement, $inMovement, $response);
 
                 $this->refreshWallesterBalancesAfterTransfer(
                     driver: $driver,
@@ -227,10 +224,7 @@ class FundingPartnerMovementService
                 auditUserId: 'platform',
             );
 
-            $partnerExternalId = is_array($response) ? ($response['id'] ?? null) : null;
-
-            $this->markMovementCompleted($outMovement, is_string($partnerExternalId) ? $partnerExternalId : null);
-            $this->markMovementCompleted($inMovement);
+            $this->completeTransferPair($outMovement, $inMovement, $response);
 
             $this->refreshBalancesAfterMasterTransfer(
                 masterAccount: $masterAccount,
@@ -314,10 +308,7 @@ class FundingPartnerMovementService
                 auditUserId: (string) $from->id,
             );
 
-            $partnerExternalId = is_array($response) ? ($response['id'] ?? null) : null;
-
-            $this->markMovementCompleted($outMovement, is_string($partnerExternalId) ? $partnerExternalId : null);
-            $this->markMovementCompleted($inMovement);
+            $this->completeTransferPair($outMovement, $inMovement, $response);
 
             $this->refreshBalancesAfterMasterTransfer(
                 masterAccount: $masterAccount,
@@ -344,6 +335,8 @@ class FundingPartnerMovementService
         ?CustomerWallesterCard $card = null,
         ?string $description = null,
         ?array $metadata = null,
+        FundingPartnerMovementStatus $status = FundingPartnerMovementStatus::Completed,
+        ?string $failureReason = null,
     ): FundingPartnerMovement {
         $idempotencyKey = 'card:'.$partnerExternalId.':'.$direction->value;
 
@@ -359,20 +352,10 @@ class FundingPartnerMovementService
             $description,
             $metadata,
             $idempotencyKey,
+            $status,
+            $failureReason,
         ): FundingPartnerMovement {
-            $existing = FundingPartnerMovement::query()
-                ->where('idempotency_key', $idempotencyKey)
-                ->first();
-
-            if ($existing instanceof FundingPartnerMovement) {
-                $this->applyCardMovementLedger($existing, $account);
-
-                return $existing;
-            }
-
-            // Auth + settlement da mesma compra chegam com IDs diferentes.
-            // Se um dos lados já foi registado, não debitar/creditar outra vez.
-            $linked = $this->findLinkedCardMovement(
+            $existing = $this->findExistingCardMovement(
                 account: $account,
                 type: $type,
                 direction: $direction,
@@ -380,10 +363,11 @@ class FundingPartnerMovementService
                 metadata: $metadata,
             );
 
-            if ($linked instanceof FundingPartnerMovement) {
-                $this->attachSettlementReference($linked, $partnerExternalId, $metadata);
+            if ($existing instanceof FundingPartnerMovement) {
+                $this->attachSettlementReference($existing, $partnerExternalId, $metadata);
+                $this->applyCardMovementLedger($existing, $account);
 
-                return $linked;
+                return $existing;
             }
 
             $movement = FundingPartnerMovement::query()->create([
@@ -397,9 +381,10 @@ class FundingPartnerMovementService
                 'currency' => strtoupper($currency),
                 'customer_wallester_card_id' => $card?->id,
                 'partner_external_id' => $partnerExternalId,
-                'status' => FundingPartnerMovementStatus::Completed,
+                'status' => $status,
                 'source' => $source,
                 'idempotency_key' => $idempotencyKey,
+                'failure_reason' => $failureReason,
                 'description' => $description,
                 'metadata' => $metadata,
             ]);
@@ -408,6 +393,47 @@ class FundingPartnerMovementService
 
             return $movement;
         });
+    }
+
+    /**
+     * Localiza um movimento de cartão já registado (mesmo ID, autorização ligada ou settlement anexado).
+     *
+     * @param  array<string, mixed>|null  $metadata
+     */
+    public function findExistingCardMovement(
+        CustomerWallesterAccount $account,
+        FundingPartnerMovementType $type,
+        FundingPartnerMovementDirection $direction,
+        string $partnerExternalId,
+        ?array $metadata = null,
+    ): ?FundingPartnerMovement {
+        $idempotencyKey = 'card:'.$partnerExternalId.':'.$direction->value;
+
+        $existing = FundingPartnerMovement::query()
+            ->where('idempotency_key', $idempotencyKey)
+            ->first();
+
+        if ($existing instanceof FundingPartnerMovement) {
+            return $existing;
+        }
+
+        $byPartnerId = FundingPartnerMovement::query()
+            ->where('funding_account_type', $account::class)
+            ->where('funding_account_id', $account->id)
+            ->where('partner_external_id', $partnerExternalId)
+            ->first();
+
+        if ($byPartnerId instanceof FundingPartnerMovement) {
+            return $byPartnerId;
+        }
+
+        return $this->findLinkedCardMovement(
+            account: $account,
+            type: $type,
+            direction: $direction,
+            partnerExternalId: $partnerExternalId,
+            metadata: $metadata,
+        );
     }
 
     /**
@@ -438,6 +464,7 @@ class FundingPartnerMovementService
         }
 
         // Authorization a chegar depois de um settlement que já referencia este ID.
+        // Ou settlement da list API cujo ID já ficou em settlement_partner_external_id.
         return FundingPartnerMovement::query()
             ->where('funding_account_type', $account::class)
             ->where('funding_account_id', $account->id)
@@ -445,7 +472,10 @@ class FundingPartnerMovementService
             ->where('direction', $direction)
             ->where(function ($query) use ($partnerExternalId): void {
                 $query->where('metadata->authorization_id', $partnerExternalId)
-                    ->orWhere('metadata->data->authorization_id', $partnerExternalId);
+                    ->orWhere('metadata->data->authorization_id', $partnerExternalId)
+                    ->orWhere('metadata->settlement_partner_external_id', $partnerExternalId)
+                    ->orWhere('metadata->settlement_metadata->id', $partnerExternalId)
+                    ->orWhere('metadata->settlement_metadata->data->id', $partnerExternalId);
             })
             ->first();
     }
@@ -460,7 +490,9 @@ class FundingPartnerMovementService
         }
 
         $authorizationId = $metadata['authorization_id']
-            ?? data_get($metadata, 'data.authorization_id');
+            ?? $metadata['original_authorization_id']
+            ?? data_get($metadata, 'data.authorization_id')
+            ?? data_get($metadata, 'data.original_authorization_id');
 
         if (! is_string($authorizationId) || $authorizationId === '') {
             return null;
@@ -506,7 +538,7 @@ class FundingPartnerMovementService
             default => null,
         };
 
-        if ($entryType === null) {
+        if ($entryType === null || $movement->status !== FundingPartnerMovementStatus::Completed) {
             return;
         }
 
@@ -650,12 +682,64 @@ class FundingPartnerMovementService
         ]);
     }
 
-    private function markMovementCompleted(FundingPartnerMovement $movement, ?string $partnerExternalId = null): void
-    {
-        $movement->update([
+    /**
+     * @param  array<string, mixed>|null  $response
+     */
+    private function completeTransferPair(
+        FundingPartnerMovement $outMovement,
+        FundingPartnerMovement $inMovement,
+        mixed $response,
+    ): void {
+        $partnerExternalId = $this->extractPartnerExternalId($response);
+        $payload = is_array($response) ? $response : null;
+
+        $this->markMovementCompleted($outMovement, $partnerExternalId, $payload);
+        $this->markMovementCompleted($inMovement, $partnerExternalId, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $response
+     */
+    private function markMovementCompleted(
+        FundingPartnerMovement $movement,
+        ?string $partnerExternalId = null,
+        ?array $response = null,
+    ): void {
+        $metadata = is_array($movement->metadata) ? $movement->metadata : [];
+
+        if (is_array($response)) {
+            $metadata['wallester_payment'] = $response;
+        }
+
+        $updates = [
             'status' => FundingPartnerMovementStatus::Completed,
             'partner_external_id' => $partnerExternalId,
-        ]);
+        ];
+
+        if ($metadata !== []) {
+            $updates['metadata'] = $metadata;
+        }
+
+        $movement->update($updates);
+    }
+
+    private function extractPartnerExternalId(mixed $response): ?string
+    {
+        if (! is_array($response)) {
+            return null;
+        }
+
+        foreach (['id', 'payment_id'] as $key) {
+            $value = $response[$key] ?? null;
+
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        $nested = $response['payment']['id'] ?? null;
+
+        return is_string($nested) && $nested !== '' ? $nested : null;
     }
 
     private function markMovementFailed(FundingPartnerMovement $movement, string $reason): void

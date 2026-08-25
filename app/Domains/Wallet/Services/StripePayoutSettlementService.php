@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class StripePayoutSettlementService
 {
+    private bool $dispatchPartnerFunding = true;
+
     public function __construct(
         protected StripeGatewayInterface $stripeGateway,
         protected StripePaymentWalletService $stripePaymentWallet,
@@ -22,8 +24,9 @@ class StripePayoutSettlementService
      *
      * @return array{matched: int, deferred_credited: int, wallester_dispatched: int, missing: int, skipped: int}
      */
-    public function settlePayout(string $payoutId, string $currency = 'eur', bool $livemode = true): array
+    public function settlePayout(string $payoutId, string $currency = 'eur', bool $livemode = true, bool $dispatchPartnerFunding = true): array
     {
+        $this->dispatchPartnerFunding = $dispatchPartnerFunding;
         $mode = $livemode ? 'live' : 'test';
         $result = $this->stripeGateway->getTransactionsByIdPayout($payoutId, strtolower($currency), $mode);
 
@@ -151,6 +154,10 @@ class StripePayoutSettlementService
             return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
         }
 
+        if (! $this->dispatchPartnerFunding) {
+            return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
+        }
+
         FundWallesterTopupFromStripeJob::dispatch($transaction->id);
 
         Log::channel('stripe')->info('stripe_payout_settlement: merchant armed for Wallester funding', [
@@ -177,7 +184,8 @@ class StripePayoutSettlementService
         $fresh = $transaction->fresh();
 
         if (
-            $fresh
+            $this->dispatchPartnerFunding
+            && $fresh
             && $this->topupFundingPolicy->requiresPartnerFunding($fresh)
             && $this->topupFundingPolicy->isRetriable($fresh)
             && ! $this->topupFundingPolicy->hasPendingMovement($fresh)

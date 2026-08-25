@@ -21,6 +21,7 @@ class WalletTransactionController extends Controller
      * List Transactions
      *
      * @tags Transactions
+     *
      * @queryParam per_page integer optional Results per page (max 100). Defaults to 15.
      */
     public function index(Request $request): AnonymousResourceCollection
@@ -60,6 +61,7 @@ class WalletTransactionController extends Controller
                 deviceToken: $data['device_token'],
                 pin: $data['pin'],
                 description: $data['description'] ?? null,
+                idempotencyKey: (string) $request->header('Idempotency-Key'),
             );
         } catch (ApiException $e) {
             return response()->json($e->toArray(), $e->status);

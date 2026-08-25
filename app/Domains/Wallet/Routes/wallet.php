@@ -33,6 +33,8 @@ Route::middleware([
     Route::prefix('transactions')->group(function () {
         Route::get('/', [WalletTransactionController::class, 'index'])->name('wallet.transactions.index');
         Route::get('/{id}', [WalletTransactionController::class, 'show'])->where('id', '[0-9]+')->name('wallet.transactions.show');
-        Route::post('/p2p', [WalletTransactionController::class, 'p2p'])->name('wallet.transactions.p2p');
+        Route::post('/p2p', [WalletTransactionController::class, 'p2p'])
+            ->middleware('idempotency')
+            ->name('wallet.transactions.p2p');
     });
 });

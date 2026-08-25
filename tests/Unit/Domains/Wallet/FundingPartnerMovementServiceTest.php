@@ -44,7 +44,7 @@ class FundingPartnerMovementServiceTest extends TestCase
         $this->createWallesterAccount($to, IntegrationAccountStatus::ACTIVE, 'wal_to');
 
         $gateway = $this->mockWallesterGateway();
-        $gateway->shouldReceive('getAccount')->once()->andReturn(['available_amount' => 50.00]);
+        $gateway->shouldReceive('getAccount')->andReturn(['available_amount' => 50.00]);
         $gateway->shouldReceive('accountTransfer')->once()->andReturn(['id' => 'pay_once']);
 
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
@@ -73,6 +73,49 @@ class FundingPartnerMovementServiceTest extends TestCase
         $this->assertDatabaseHas('funding_partner_movements', [
             'idempotency_key' => 'transfer:test:1:out',
             'status' => FundingPartnerMovementStatus::Completed->value,
+            'partner_external_id' => 'pay_once',
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'idempotency_key' => 'transfer:test:1:in',
+            'partner_external_id' => 'pay_once',
+        ]);
+    }
+
+    public function test_transfer_persists_nested_payment_id_on_both_movements(): void
+    {
+        $from = $this->createRetailCustomer(['username' => 'from_nested']);
+        $to = $this->createRetailCustomer(['username' => 'to_nested']);
+
+        $this->createWallesterAccount($from, IntegrationAccountStatus::ACTIVE, 'wal_from_nested');
+        $this->createWallesterAccount($to, IntegrationAccountStatus::ACTIVE, 'wal_to_nested');
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')->andReturn(['available_amount' => 50.00]);
+        $gateway->shouldReceive('accountTransfer')->once()->andReturn([
+            'payment' => [
+                'id' => 'pay_nested',
+                'status' => 'completed',
+            ],
+        ]);
+
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        app(FundingPartnerMovementService::class)->transferBetweenCustomers(
+            from: $from,
+            to: $to,
+            amountCents: 1000,
+            currency: 'EUR',
+            description: 'Nested',
+            idempotencyKey: 'transfer:nested:1',
+        );
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'idempotency_key' => 'transfer:nested:1:out',
+            'partner_external_id' => 'pay_nested',
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'idempotency_key' => 'transfer:nested:1:in',
+            'partner_external_id' => 'pay_nested',
         ]);
     }
 

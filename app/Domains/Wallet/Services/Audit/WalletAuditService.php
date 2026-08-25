@@ -376,11 +376,23 @@ class WalletAuditService
     }
 
     /**
-     * Pending that is expected: open PAYMENT_RECEIVED in pending bucket
+     * Pending that is expected: last snapshot's pending_after when present,
+     * otherwise open PAYMENT_RECEIVED in pending bucket
      * (merchant awaiting Stripe payout, or top-up awaiting Wallester release).
      */
     private function explainedPendingCents(int $customerId, string $currency): int
     {
+        $latestPendingAfter = LedgerEntry::query()
+            ->where('customer_id', $customerId)
+            ->where('currency', $currency)
+            ->whereNotNull('pending_after')
+            ->orderByDesc('id')
+            ->value('pending_after');
+
+        if ($latestPendingAfter !== null) {
+            return max(0, (int) $latestPendingAfter);
+        }
+
         $pendingCredits = (int) LedgerEntry::query()
             ->where('customer_id', $customerId)
             ->where('currency', $currency)

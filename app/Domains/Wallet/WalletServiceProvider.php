@@ -7,6 +7,7 @@ use App\Domains\Wallet\Commands\RunWalletAuditCommand;
 use App\Domains\Wallet\Contracts\TransactionRepositoryInterface;
 use App\Domains\Wallet\Repositories\TransactionRepository;
 use App\Domains\Wallet\Services\Audit\WalletAuditService;
+use App\Domains\Wallet\Services\BankTransferTopupNotifier;
 use App\Domains\Wallet\Services\FundingLiquidityNotifier;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\FundingPartnerTransferResolver;
