@@ -6,6 +6,8 @@ REST API built with Laravel 12, Sanctum, Stripe and Didit KYC.
 
 ## Requirements
 
+Levantamento completo (runtime, env, filas, webhooks e checklist): [docs/INSTALL.md](docs/INSTALL.md)
+
 - [Docker](https://docs.docker.com/get-docker/) + Docker Compose
 - [Stripe CLI](https://stripe.com/docs/stripe-cli) _(for webhook forwarding in local dev)_
 
