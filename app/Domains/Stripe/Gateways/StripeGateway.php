@@ -127,6 +127,76 @@ class StripeGateway implements StripeGatewayInterface
         );
     }
 
+    public function listEvents(int $createdGte, int $createdLte, array $types, string $currency = 'eur'): array
+    {
+        $params = [
+            'created' => [
+                'gte' => $createdGte,
+                'lte' => $createdLte,
+            ],
+        ];
+
+        if ($types !== []) {
+            $params['types'] = $types;
+        }
+
+        return $this->run(
+            'listEvents',
+            fn () => $this->client->forCurrency($currency)->listEvents($params)
+        );
+    }
+
+    public function listPaymentIntents(int $createdGte, int $createdLte, string $currency = 'eur'): array
+    {
+        return $this->run(
+            'listPaymentIntents',
+            fn () => $this->client->forCurrency($currency)->listPaymentIntents([
+                'created' => [
+                    'gte' => $createdGte,
+                    'lte' => $createdLte,
+                ],
+            ])
+        );
+    }
+
+    public function listCharges(int $createdGte, int $createdLte, string $currency = 'eur'): array
+    {
+        return $this->run(
+            'listCharges',
+            fn () => $this->client->forCurrency($currency)->listCharges([
+                'created' => [
+                    'gte' => $createdGte,
+                    'lte' => $createdLte,
+                ],
+            ])
+        );
+    }
+
+    public function listCashBalanceTransactions(string $stripeCustomerId, int $createdGte, int $createdLte, string $currency = 'eur'): array
+    {
+        $result = $this->run(
+            'listCashBalanceTransactions',
+            fn () => $this->client->forCurrency($currency)->listCashBalanceTransactions($stripeCustomerId)
+        );
+
+        if (($result['status'] ?? null) !== 'success' || ! is_array($result['data']['data'] ?? null)) {
+            return $result;
+        }
+
+        $filtered = array_values(array_filter(
+            $result['data']['data'],
+            function (array $transaction) use ($createdGte, $createdLte): bool {
+                $created = (int) ($transaction['created'] ?? 0);
+
+                return $created >= $createdGte && $created <= $createdLte;
+            }
+        ));
+
+        $result['data']['data'] = $filtered;
+
+        return $result;
+    }
+
     private function run(string $operation, callable $fn): array
     {
         try {

@@ -10,7 +10,6 @@ use App\Domains\Onboarding\Services\IntegrationAccountService;
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
 use App\Domains\Stripe\Enums\StripePaymentIntentPurpose;
 use App\Domains\Stripe\Enums\StripePaymentIntentStatus;
-use App\Domains\Stripe\Services\StripePaymentIntentService;
 use App\Domains\Stripe\Jobs\ProcessStripePayoutPaidJob;
 use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
 use App\Domains\Wallet\Enums\TransactionDirection;
@@ -21,6 +20,7 @@ use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
+use App\Models\CustomerPaymentMethodFee;
 use App\Models\CustomerStripeAccount;
 use App\Models\StripePaymentIntent;
 use App\Models\StripePaymentMethodFee;
@@ -32,6 +32,8 @@ use Illuminate\Support\Facades\Log;
 
 class StripeService
 {
+    private bool $dispatchPartnerFunding = true;
+
     private const PAYMENT_METHOD_CURRENCIES = [
         'mb_way' => ['eur'],
         'twint' => ['chf'],
@@ -564,8 +566,10 @@ class StripeService
         return $result['data'];
     }
 
-    public function handleWebhook(array $payload): void
+    public function handleWebhook(array $payload, bool $dispatchPartnerFunding = true): void
     {
+        $this->dispatchPartnerFunding = $dispatchPartnerFunding;
+
         $eventType = $payload['type'] ?? null;
         $object = $payload['data']['object'] ?? [];
 
@@ -1014,7 +1018,12 @@ class StripeService
         $feeMethod = $this->resolveFeePaymentMethod($transaction, $pmType, $pmDetails);
 
         $feeConfig = $this->resolveActiveFeeConfig($transaction, $feeMethod);
-        $platformFee = $feeConfig ? $feeConfig->calculatePlatformFee((int) $transaction->amount) : 0;
+        $platformFee = $this->resolvePlatformFeeAmount(
+            $transaction,
+            $feeConfig,
+            $paymentIntentId,
+            (int) $realStripeFee,
+        );
         $realNetAmount = max(0, (int) $transaction->amount - (int) $realStripeFee - $platformFee);
 
         $transaction->update([
@@ -1078,7 +1087,8 @@ class StripeService
         }
 
         if (
-            $freshTransaction
+            $this->dispatchPartnerFunding
+            && $freshTransaction
             && $freshTransaction->type !== TransactionType::MERCHANT_PAYMENT
             && $this->topupFundingPolicy->shouldDispatchPartnerFundingJob($freshTransaction, $charge)
         ) {
@@ -1109,6 +1119,57 @@ class StripeService
         }
 
         return $this->resolvePaymentMethodCategory((string) ($pmType ?? ''), $pmDetails);
+    }
+
+    private function resolvePlatformFeeAmount(
+        StripeTransaction $transaction,
+        ?StripePaymentMethodFee $feeConfig,
+        string $paymentIntentId,
+        int $stripeFee,
+    ): int {
+        $merchantFee = $this->resolveCustomerMerchantPlatformFee($transaction, $paymentIntentId);
+
+        if ($merchantFee !== null) {
+            $grossFee = (int) $merchantFee->calculateFee((int) $transaction->amount)['fee'];
+
+            if ($grossFee >= $stripeFee) {
+                return $grossFee - $stripeFee;
+            }
+
+            Log::channel('stripe')->warning('stripe_service: taxa personalizada inferior à taxa Stripe — a usar config global', [
+                'transaction_id' => $transaction->id,
+                'payment_intent_id' => $paymentIntentId,
+                'customer_payment_method_fee_id' => $merchantFee->id,
+                'custom_fee_gross' => $grossFee,
+                'stripe_fee' => $stripeFee,
+            ]);
+        }
+
+        return $feeConfig ? $feeConfig->calculatePlatformFee((int) $transaction->amount) : 0;
+    }
+
+    private function resolveCustomerMerchantPlatformFee(
+        StripeTransaction $transaction,
+        string $paymentIntentId,
+    ): ?CustomerPaymentMethodFee {
+        if ($transaction->type !== TransactionType::MERCHANT_PAYMENT) {
+            return null;
+        }
+
+        $merchantRequest = $this->merchantPaymentRequestRepository
+            ->findByStripePaymentIntentId($paymentIntentId);
+
+        if ($merchantRequest === null || $merchantRequest->merchant_id === null) {
+            return null;
+        }
+
+        return CustomerPaymentMethodFee::query()
+            ->active()
+            ->forMerchant((int) $merchantRequest->merchant_id)
+            ->where('customer_id', $transaction->customer_id)
+            ->whereNotNull('merchant_id')
+            ->where('currency', strtoupper((string) $transaction->currency))
+            ->first();
     }
 
     private function resolveActiveFeeConfig(

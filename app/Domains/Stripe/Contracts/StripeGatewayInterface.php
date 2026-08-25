@@ -37,4 +37,15 @@ interface StripeGatewayInterface
     public function createTerminalConnectionToken(string $currency = 'eur'): array;
 
     public function applyCustomerBalance(string $paymentIntentId, array $params = []): array;
+
+    /**
+     * @param  list<string>  $types
+     */
+    public function listEvents(int $createdGte, int $createdLte, array $types, string $currency = 'eur'): array;
+
+    public function listPaymentIntents(int $createdGte, int $createdLte, string $currency = 'eur'): array;
+
+    public function listCharges(int $createdGte, int $createdLte, string $currency = 'eur'): array;
+
+    public function listCashBalanceTransactions(string $stripeCustomerId, int $createdGte, int $createdLte, string $currency = 'eur'): array;
 }
