@@ -25,7 +25,7 @@ class SmsHttpClient
         $this->authToken = (string) $this->settingsService->getByKey('sms.auth_token');
     }
 
-  /** @return array<string, mixed>|list<array<string, mixed>> */
+    /** @return array<string, mixed>|list<array<string, mixed>> */
     public function sendSms(array $to, string $from, string $message): array
     {
         $results = [];
@@ -82,6 +82,7 @@ class SmsHttpClient
                     'http_code' => $result['http_code'],
                     'provider_status' => $result['status'],
                     'provider_body' => $result['body'],
+                    'result' => $result,
                 ];
 
                 if ($response->successful()) {
