@@ -335,4 +335,40 @@ class WallesterGatewayTest extends TestCase
         $this->assertSame('pay_123', $result['id']);
         $this->assertSame('completed', $result['status']);
     }
+
+    public function test_account_transfer_logs_empty_response_payload(): void
+    {
+        $logged = [];
+        Log::listen(function (MessageLogged $event) use (&$logged): void {
+            $logged[] = [
+                'level' => $event->level,
+                'message' => $event->message,
+                'context' => $event->context,
+            ];
+        });
+
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('accountTransfer')
+            ->once()
+            ->andReturn([]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->accountTransfer([
+            'from_account_id' => 'wal_from',
+            'to_account_id' => 'wal_to',
+            'amount' => 1.0,
+        ], '42');
+
+        $this->assertSame([], $result);
+        $this->assertTrue(
+            collect($logged)->contains(
+                fn (array $entry) => $entry['level'] === 'info'
+                    && $entry['message'] === 'wallester_api: accountTransfer'
+                    && array_key_exists('response', $entry['context'])
+                    && $entry['context']['response'] === [],
+            ),
+        );
+    }
 }

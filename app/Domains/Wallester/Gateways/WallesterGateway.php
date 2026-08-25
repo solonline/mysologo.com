@@ -301,7 +301,7 @@ class WallesterGateway implements WallesterGatewayInterface
         try {
             $result = $fn();
 
-            Log::channel('wallester')->info("wallester_api: {$operation}", array_filter([
+            Log::channel('wallester')->info("wallester_api: {$operation}", $this->logContext([
                 ...$context,
                 'response' => $result,
             ]));
@@ -312,7 +312,7 @@ class WallesterGateway implements WallesterGatewayInterface
 
             throw $e;
         } catch (\Throwable $e) {
-            Log::channel('wallester')->error("wallester_unexpected: {$operation}", array_filter([
+            Log::channel('wallester')->error("wallester_unexpected: {$operation}", $this->logContext([
                 ...$context,
                 'exception' => $e::class,
                 'message' => $e->getMessage(),
@@ -329,11 +329,23 @@ class WallesterGateway implements WallesterGatewayInterface
     {
         $response = $e->getResponse();
 
-        Log::channel('wallester')->error("wallester_error: {$operation}", array_filter([
+        Log::channel('wallester')->error("wallester_error: {$operation}", $this->logContext([
             ...$context,
             'http_status' => $response?->getStatusCode(),
             'response_body' => $response !== null ? (string) $response->getBody() : null,
             'message' => $e->getMessage(),
         ]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function logContext(array $context): array
+    {
+        return array_filter(
+            $context,
+            static fn (mixed $value): bool => $value !== null,
+        );
     }
 }

@@ -106,6 +106,10 @@ class WallesterCardMovementWebhookTest extends TestCase
             'currency' => 'EUR',
             'direction' => TransactionDirection::Debit->value,
             'amount' => 90,
+            'available_before' => 10000,
+            'available_after' => 9910,
+            'pending_before' => 0,
+            'pending_after' => 0,
             'balance_after' => 9910,
             'entry_type' => LedgerEntryType::CARD_PURCHASE->value,
             'description' => 'DISTRICT',
@@ -152,17 +156,24 @@ class WallesterCardMovementWebhookTest extends TestCase
         ]);
     }
 
-    public function test_webhook_ignores_declined_authorizations(): void
+    public function test_webhook_records_declined_authorizations_without_ledger(): void
     {
         $customer = $this->createActiveCustomer();
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_declined');
 
-        CustomerWallesterCard::query()->create([
+        $card = CustomerWallesterCard::query()->create([
             'customer_wallester_account_id' => $account->id,
             'wallester_card_id' => 'card_declined',
             'type' => 'Virtual',
             'status' => 'Active',
             'name' => 'Main Card',
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 1000,
+            'pending' => 0,
         ]);
 
         $this->postJson('/api/webhooks/wallester', [
@@ -174,13 +185,28 @@ class WallesterCardMovementWebhookTest extends TestCase
                 'account_id' => 'wal_declined',
                 'account_amount' => -5.00,
                 'account_currency_code' => 'EUR',
-                'response_code' => 'Declined',
+                'merchant_name' => 'MesConvenienciaE',
+                'response_code' => 'NotSufficientFunds',
                 'is_declined' => true,
             ],
         ])->assertOk();
 
-        $this->assertDatabaseCount('funding_partner_movements', 0);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'funding_account_id' => $account->id,
+            'customer_wallester_card_id' => $card->id,
+            'type' => FundingPartnerMovementType::CardPurchase->value,
+            'amount' => 500,
+            'status' => FundingPartnerMovementStatus::Failed->value,
+            'partner_external_id' => 'txn_declined',
+            'failure_reason' => 'NotSufficientFunds',
+            'description' => 'MesConvenienciaE',
+        ]);
         $this->assertDatabaseCount('ledger_entries', 0);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 1000,
+        ]);
     }
 
     public function test_webhook_card_movement_is_idempotent(): void

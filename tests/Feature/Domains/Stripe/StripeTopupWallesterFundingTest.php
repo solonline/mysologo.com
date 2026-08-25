@@ -15,6 +15,7 @@ use App\Domains\Wallet\Enums\TransactionType;
 use App\Domains\Wallet\Jobs\SendBankTransferTopupReceivedEmail;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
+use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
 use App\Models\LedgerEntry;
@@ -255,8 +256,8 @@ class StripeTopupWallesterFundingTest extends TestCase
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
 
         $job = new FundWallesterTopupFromStripeJob($transaction->id);
-        $job->handle(app(FundingPartnerMovementService::class));
-        $job->handle(app(FundingPartnerMovementService::class));
+        $job->handle(app(FundingPartnerMovementService::class), app(TopupWallesterFundingPolicy::class));
+        $job->handle(app(FundingPartnerMovementService::class), app(TopupWallesterFundingPolicy::class));
 
         $this->assertDatabaseCount('funding_partner_movements', 2);
         $this->assertDatabaseHas('funding_partner_movements', [
@@ -332,7 +333,7 @@ class StripeTopupWallesterFundingTest extends TestCase
 
         try {
             (new FundWallesterTopupFromStripeJob($transaction->id))
-                ->handle(app(FundingPartnerMovementService::class));
+                ->handle(app(FundingPartnerMovementService::class), app(TopupWallesterFundingPolicy::class));
             $this->fail('Expected transfer exception.');
         } catch (\Throwable) {
             // expected

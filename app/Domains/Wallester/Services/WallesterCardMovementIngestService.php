@@ -5,6 +5,7 @@ namespace App\Domains\Wallester\Services;
 use App\Domains\Onboarding\Services\IntegrationAccountService;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
+use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Models\CustomerWallesterAccount;
@@ -27,7 +28,7 @@ class WallesterCardMovementIngestService
     ): void {
         $payload = $this->normalizePayload($payload);
 
-        if (! $this->isCardSpendEvent($payload) || $this->isDeclined($payload)) {
+        if (! $this->isCardSpendEvent($payload)) {
             return;
         }
 
@@ -43,11 +44,12 @@ class WallesterCardMovementIngestService
             return;
         }
 
+        $declined = $this->isDeclined($payload);
         $amountCents = $this->wallesterDriver->absoluteAmountToCents(
-            $payload['account_amount'] ?? $payload['amount'] ?? $payload['authorization_amount'] ?? 0,
+            $payload['account_amount'] ?? $payload['amount'] ?? $payload['authorization_amount'] ?? $payload['transaction_amount'] ?? 0,
         );
 
-        if ($amountCents <= 0) {
+        if ($amountCents <= 0 && ! $declined) {
             return;
         }
 
@@ -72,6 +74,8 @@ class WallesterCardMovementIngestService
             card: $card,
             description: is_string($payload['merchant_name'] ?? null) ? $payload['merchant_name'] : null,
             metadata: $payload,
+            status: $declined ? FundingPartnerMovementStatus::Failed : FundingPartnerMovementStatus::Completed,
+            failureReason: $declined ? $this->declineReason($payload) : null,
         );
     }
 
@@ -162,6 +166,22 @@ class WallesterCardMovementIngestService
         $status = strtolower((string) ($payload['status'] ?? ''));
 
         return in_array($status, ['declined', 'failed', 'rejected'], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function declineReason(array $payload): string
+    {
+        $responseCode = trim((string) ($payload['response_code'] ?? ''));
+
+        if ($responseCode !== '') {
+            return $responseCode;
+        }
+
+        $status = trim((string) ($payload['status'] ?? ''));
+
+        return $status !== '' ? $status : 'declined';
     }
 
     /**
