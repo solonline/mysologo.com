@@ -3,8 +3,9 @@
 namespace App\Domains\Merchant\Controllers;
 
 use App\Domains\Merchant\Services\MerchantService;
-use App\Models\MerchantPaymentRequest;
 use App\Domains\Settings\Services\SettingsService;
+use App\Domains\Stripe\Enums\StripePaymentIntentStatus;
+use App\Models\MerchantPaymentRequest;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\App;
@@ -19,7 +20,7 @@ class PayController extends Controller
     public function show(Request $request, string $uuid)
     {
         $paymentRequest = MerchantPaymentRequest::where('uuid', $uuid)
-            ->with(['merchant.customer', 'payer'])
+            ->with(['merchant.customer', 'payer', 'stripePaymentIntent'])
             ->firstOrFail();
 
         App::setLocale($paymentRequest->language ?? 'pt');
@@ -36,8 +37,30 @@ class PayController extends Controller
         $publishableKey = $this->settingsService->getByKey("stripe.{$customerCurrency}.public_key");
 
         $redirectStatus = $request->query('redirect_status');
+        $piStatus = $paymentRequest->stripePaymentIntent?->status;
 
         if ($redirectStatus === 'succeeded' && $paymentRequest->isProcessing()) {
+            $awaitingConfirmation = true;
+        } elseif ($piStatus === StripePaymentIntentStatus::Succeeded) {
+            if ($paymentRequest->status !== 'completed') {
+                $paymentRequest->update([
+                    'status' => 'completed',
+                    'paid_at' => $paymentRequest->paid_at ?? now(),
+                ]);
+                $paymentRequest->refresh();
+            }
+        } elseif ($piStatus === StripePaymentIntentStatus::Canceled) {
+            if ($paymentRequest->status !== 'cancelled') {
+                $paymentRequest->update(['status' => 'cancelled']);
+                $paymentRequest->refresh();
+            }
+        } elseif ($piStatus === StripePaymentIntentStatus::Failed) {
+            if ($paymentRequest->status !== 'failed') {
+                $paymentRequest->update(['status' => 'failed']);
+                $paymentRequest->refresh();
+            }
+        } elseif ($piStatus === StripePaymentIntentStatus::Processing
+            || $piStatus === StripePaymentIntentStatus::RequiresCapture) {
             $awaitingConfirmation = true;
         } elseif ($paymentRequest->isPayable()) {
             $result = $this->merchantService->initializePayment($paymentRequest);

@@ -20,6 +20,7 @@ class GetCustomerDetailQuery
             'phoneVerifications',
             'tpas.paymentMethodFees',
             'merchants' => fn ($q) => $q->orderByDesc('id'),
+            'merchants.paymentMethodFees',
             'merchants.paymentRequests' => fn ($q) => $q
                 ->where(function ($requests): void {
                     $requests

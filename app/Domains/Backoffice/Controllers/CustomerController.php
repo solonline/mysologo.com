@@ -104,16 +104,12 @@ class CustomerController extends Controller
     public function requestPhoneChange(ChangeCustomerPhoneRequest $request, Customer $customer)
     {
         try {
-            $result = $this->phoneChange->requestChange($customer, $request->validated('phone'));
+            $this->phoneChange->requestChange($customer, $request->validated('phone'));
         } catch (ApiException $exception) {
             return back()->withInput()->with('error', $exception->getMessage());
         }
 
-        $message = $result['status'] === 'pending_verification'
-            ? 'Código SMS enviado para o novo número. Confirme abaixo.'
-            : 'Telefone atualizado com sucesso.';
-
-        return back()->with('success', $message);
+        return back()->with('success', 'Código SMS enviado para o novo número. Confirme abaixo para aplicar a alteração.');
     }
 
     public function resendPhoneChange(Customer $customer)

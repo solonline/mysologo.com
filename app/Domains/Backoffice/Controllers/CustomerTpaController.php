@@ -5,8 +5,8 @@ namespace App\Domains\Backoffice\Controllers;
 use App\Domains\Backoffice\Actions\DeleteTpaPaymentMethodFeeAction;
 use App\Domains\Backoffice\Actions\UnlinkCustomerTpaAction;
 use App\Domains\Backoffice\Actions\UpsertTpaPaymentMethodFeeAction;
-use App\Domains\Backoffice\DTOs\TpaPaymentMethodFeeData;
-use App\Domains\Backoffice\Requests\StoreTpaPaymentMethodFeeRequest;
+use App\Domains\Backoffice\DTOs\CustomerPaymentMethodFeeData;
+use App\Domains\Backoffice\Requests\StoreCustomerPaymentMethodFeeRequest;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\CustomerPaymentMethodFee;
@@ -27,12 +27,12 @@ class CustomerTpaController extends Controller
         return back()->with('success', 'TPA removido.');
     }
 
-    public function storeFee(StoreTpaPaymentMethodFeeRequest $request, Customer $customer, Tpa $tpa)
+    public function storeFee(StoreCustomerPaymentMethodFeeRequest $request, Customer $customer, Tpa $tpa)
     {
         $this->upsertFee->execute(
             $customer,
             $tpa,
-            TpaPaymentMethodFeeData::fromValidated(
+            CustomerPaymentMethodFeeData::fromValidated(
                 $request->validated(),
                 $request->boolean('is_active', true),
             ),

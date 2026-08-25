@@ -3,8 +3,12 @@
 namespace Tests\Feature\Domains\Merchant;
 
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
+use App\Domains\Settings\Services\SettingsService;
+use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Merchant;
 use App\Models\MerchantPaymentRequest;
+use App\Models\StripePaymentIntent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
@@ -18,7 +22,7 @@ class MerchantPayPageTest extends TestCase
     {
         $paymentRequest = $this->makePaymentRequest();
 
-        $this->mock(\App\Domains\Stripe\Contracts\StripeGatewayInterface::class, function ($mock) {
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
             $mock->shouldReceive('createPaymentIntentWithMode')
                 ->once()
                 ->withArgs(function (array $payload) {
@@ -35,7 +39,7 @@ class MerchantPayPageTest extends TestCase
                 ]);
         });
 
-        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+        $this->mock(SettingsService::class, function ($mock) {
             $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
         });
 
@@ -50,7 +54,7 @@ class MerchantPayPageTest extends TestCase
             'payment_method_types' => ['card', 'mb_way'],
         ]);
 
-        $this->mock(\App\Domains\Stripe\Contracts\StripeGatewayInterface::class, function ($mock) {
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
             $mock->shouldReceive('createPaymentIntentWithMode')
                 ->once()
                 ->withArgs(function (array $payload) {
@@ -66,7 +70,7 @@ class MerchantPayPageTest extends TestCase
                 ]);
         });
 
-        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+        $this->mock(SettingsService::class, function ($mock) {
             $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
         });
 
@@ -79,7 +83,7 @@ class MerchantPayPageTest extends TestCase
     {
         $paymentRequest = $this->makePaymentRequest();
 
-        $this->mock(\App\Domains\Stripe\Contracts\StripeGatewayInterface::class, function ($mock) {
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
             $mock->shouldReceive('createPaymentIntentWithMode')
                 ->once()
                 ->andReturn([
@@ -94,7 +98,7 @@ class MerchantPayPageTest extends TestCase
                 ]);
         });
 
-        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+        $this->mock(SettingsService::class, function ($mock) {
             $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
         });
 
@@ -103,7 +107,7 @@ class MerchantPayPageTest extends TestCase
 
         $this->assertDatabaseHas('stripe_payment_intents', [
             'stripe_payment_intent_id' => 'pi_test_local_mp',
-            'type' => \App\Domains\Wallet\Enums\TransactionType::MERCHANT_PAYMENT->value,
+            'type' => TransactionType::MERCHANT_PAYMENT->value,
             'purpose' => 'merchant_payment',
         ]);
     }
@@ -115,7 +119,7 @@ class MerchantPayPageTest extends TestCase
             'paid_at' => now(),
         ]);
 
-        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+        $this->mock(SettingsService::class, function ($mock) {
             $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
         });
 
@@ -134,7 +138,7 @@ class MerchantPayPageTest extends TestCase
             'paid_at' => now(),
         ]);
 
-        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+        $this->mock(SettingsService::class, function ($mock) {
             $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
         });
 
@@ -154,7 +158,7 @@ class MerchantPayPageTest extends TestCase
     {
         $paymentRequest = $this->makePaymentRequest();
 
-        $this->mock(\App\Domains\Stripe\Contracts\StripeGatewayInterface::class, function ($mock) {
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
             $mock->shouldReceive('createPaymentIntentWithMode')
                 ->once()
                 ->andReturn([
@@ -166,7 +170,7 @@ class MerchantPayPageTest extends TestCase
                 ]);
         });
 
-        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+        $this->mock(SettingsService::class, function ($mock) {
             $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
         });
 
@@ -186,7 +190,7 @@ class MerchantPayPageTest extends TestCase
             'paid_at' => now(),
         ]);
 
-        $this->mock(\App\Domains\Settings\Services\SettingsService::class, function ($mock) {
+        $this->mock(SettingsService::class, function ($mock) {
             $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
         });
 
@@ -196,6 +200,102 @@ class MerchantPayPageTest extends TestCase
         ]))
             ->assertOk()
             ->assertDontSee('javascript:alert(1)', false);
+    }
+
+    public function test_pay_page_inhibits_new_payment_when_local_intent_is_processing(): void
+    {
+        $paymentRequest = $this->makePaymentRequest(['status' => 'processing']);
+        $this->attachLocalPaymentIntent($paymentRequest, 'processing');
+
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('createPaymentIntentWithMode')->never();
+            $mock->shouldReceive('getPaymentIntentWithMode')->never();
+        });
+
+        $this->mock(SettingsService::class, function ($mock) {
+            $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
+        });
+
+        $this->get(route('pay.show', $paymentRequest->uuid))
+            ->assertOk()
+            ->assertSee('A confirmar pagamento')
+            ->assertDontSee('id="payment-form"', false)
+            ->assertDontSee('Pagar 15,00 EUR');
+    }
+
+    public function test_pay_page_marks_request_cancelled_when_local_intent_is_canceled(): void
+    {
+        $paymentRequest = $this->makePaymentRequest(['status' => 'processing']);
+        $this->attachLocalPaymentIntent($paymentRequest, 'canceled');
+
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('createPaymentIntentWithMode')->never();
+            $mock->shouldReceive('getPaymentIntentWithMode')->never();
+        });
+
+        $this->mock(SettingsService::class, function ($mock) {
+            $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
+        });
+
+        $this->get(route('pay.show', $paymentRequest->uuid))
+            ->assertOk()
+            ->assertSee('Este link foi cancelado.')
+            ->assertDontSee('id="payment-form"', false);
+
+        $this->assertDatabaseHas('merchant_payment_requests', [
+            'id' => $paymentRequest->id,
+            'status' => 'cancelled',
+        ]);
+    }
+
+    public function test_pay_page_marks_request_failed_when_local_intent_failed(): void
+    {
+        $paymentRequest = $this->makePaymentRequest(['status' => 'processing']);
+        $this->attachLocalPaymentIntent($paymentRequest, 'failed');
+
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('createPaymentIntentWithMode')->never();
+            $mock->shouldReceive('getPaymentIntentWithMode')->never();
+        });
+
+        $this->mock(SettingsService::class, function ($mock) {
+            $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
+        });
+
+        $this->get(route('pay.show', $paymentRequest->uuid))
+            ->assertOk()
+            ->assertSee('Pagamento falhado')
+            ->assertDontSee('id="payment-form"', false);
+
+        $this->assertDatabaseHas('merchant_payment_requests', [
+            'id' => $paymentRequest->id,
+            'status' => 'failed',
+        ]);
+    }
+
+    public function test_pay_page_completes_request_when_local_intent_already_succeeded(): void
+    {
+        $paymentRequest = $this->makePaymentRequest(['status' => 'processing']);
+        $this->attachLocalPaymentIntent($paymentRequest, 'succeeded');
+
+        $this->mock(StripeGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('createPaymentIntentWithMode')->never();
+            $mock->shouldReceive('getPaymentIntentWithMode')->never();
+        });
+
+        $this->mock(SettingsService::class, function ($mock) {
+            $mock->shouldReceive('getByKey')->andReturn('pk_test_dummy');
+        });
+
+        $this->get(route('pay.show', $paymentRequest->uuid))
+            ->assertOk()
+            ->assertSee('Pagamento concluído')
+            ->assertDontSee('id="payment-form"', false);
+
+        $this->assertDatabaseHas('merchant_payment_requests', [
+            'id' => $paymentRequest->id,
+            'status' => 'completed',
+        ]);
     }
 
     /** @param array<string, mixed> $attributes */
@@ -226,5 +326,29 @@ class MerchantPayPageTest extends TestCase
             'expires_at' => now()->addHour(),
             'language' => 'pt',
         ], $attributes));
+    }
+
+    private function attachLocalPaymentIntent(MerchantPaymentRequest $paymentRequest, string $status): void
+    {
+        $piId = 'pi_local_'.$status.'_'.uniqid();
+
+        $paymentRequest->update([
+            'stripe_payment_intent_id' => $piId,
+        ]);
+
+        StripePaymentIntent::query()->create([
+            'customer_id' => $paymentRequest->merchant->customer_id,
+            'stripe_payment_intent_id' => $piId,
+            'amount' => $paymentRequest->amount,
+            'currency' => $paymentRequest->currency,
+            'status' => $status,
+            'type' => TransactionType::MERCHANT_PAYMENT->value,
+            'purpose' => 'merchant_payment',
+            'stripe_metadata' => [
+                'id' => $piId,
+                'client_secret' => $piId.'_secret',
+                'status' => $status,
+            ],
+        ]);
     }
 }

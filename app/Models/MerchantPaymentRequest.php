@@ -2,29 +2,31 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
- * @property int         $id
- * @property string      $uuid
- * @property int         $merchant_id
- * @property int|null    $payer_id
- * @property int|null    $transaction_id
- * @property int         $amount
- * @property string      $currency
+ * @property int $id
+ * @property string $uuid
+ * @property int $merchant_id
+ * @property int|null $payer_id
+ * @property int|null $transaction_id
+ * @property int $amount
+ * @property string $currency
  * @property string|null $description
  * @property string|null $stripe_payment_intent_id
  * @property string|null $external_reference
  * @property string|null $webhook_url
- * @property array|null  $metadata
- * @property array|null  $items
- * @property string      $language
- * @property string      $status
- * @property \Carbon\Carbon      $created_at
- * @property \Carbon\Carbon|null $expires_at
- * @property \Carbon\Carbon|null $paid_at
+ * @property array|null $metadata
+ * @property array|null $items
+ * @property string $language
+ * @property string $status
+ * @property Carbon $created_at
+ * @property Carbon|null $expires_at
+ * @property Carbon|null $paid_at
+ * @property-read StripePaymentIntent|null $stripePaymentIntent
  */
 class MerchantPaymentRequest extends Model
 {
@@ -53,11 +55,11 @@ class MerchantPaymentRequest extends Model
     ];
 
     protected $casts = [
-        'metadata'   => 'array',
-        'items'      => 'array',
+        'metadata' => 'array',
+        'items' => 'array',
         'payment_method_types' => 'array',
         'expires_at' => 'datetime',
-        'paid_at'    => 'datetime',
+        'paid_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -90,6 +92,11 @@ class MerchantPaymentRequest extends Model
     public function merchant()
     {
         return $this->belongsTo(Merchant::class);
+    }
+
+    public function stripePaymentIntent()
+    {
+        return $this->belongsTo(StripePaymentIntent::class, 'stripe_payment_intent_id', 'stripe_payment_intent_id');
     }
 
     public function payer()

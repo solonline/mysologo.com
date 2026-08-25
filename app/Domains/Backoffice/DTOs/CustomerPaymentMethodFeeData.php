@@ -2,7 +2,7 @@
 
 namespace App\Domains\Backoffice\DTOs;
 
-readonly class TpaPaymentMethodFeeData
+readonly class CustomerPaymentMethodFeeData
 {
     public function __construct(
         public string $paymentMethod,
