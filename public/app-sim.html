@@ -3117,6 +3117,28 @@ function normalizeStatus(status) {
   return String(status).toUpperCase();
 }
 
+function isEmailVerified(session) {
+  return !!(session?.verification?.email || session?.user?.email_verified || session?.user?.email_verified_at);
+}
+
+function isPhoneVerified(session) {
+  return !!(session?.verification?.phone || session?.user?.phone_verified);
+}
+
+/** Conta pronta para dashboard: lifecycle ACTIVE + email + telefone verificados. */
+function isAccountReady(session) {
+  return lifecycleStatus(session) === 'ACTIVE'
+    && isEmailVerified(session)
+    && isPhoneVerified(session);
+}
+
+function needsOnboarding(session) {
+  const status = lifecycleStatus(session);
+  if (['BLOCKED', 'SUSPENDED', 'IDENTITY_REJECTED', 'EBURY_REJECTED'].includes(status)) return true;
+  if (!isEmailVerified(session) || !isPhoneVerified(session)) return true;
+  return status !== 'ACTIVE';
+}
+
 function saveAuthSession(session) {
   authSession = session;
   token = session.token;
@@ -3131,17 +3153,11 @@ function saveAuthSession(session) {
 
 function routePostAuth(session) {
   saveAuthSession(session);
-  const status = lifecycleStatus(session);
 
-  if (['BLOCKED', 'SUSPENDED', 'IDENTITY_REJECTED'].includes(status)) {
+  if (needsOnboarding(session)) {
     renderOnboardingHub(session);
     navigate('onboarding');
-    return;
-  }
-
-  if (status !== 'ACTIVE') {
-    renderOnboardingHub(session);
-    navigate('onboarding');
+    startOnboardingPolling();
     return;
   }
 
@@ -3978,24 +3994,26 @@ async function doRegister() {
 function onboardingStepState(session, step) {
   const status = lifecycleStatus(session);
   const verification = session?.verification || {};
+  const emailOk = isEmailVerified(session);
+  const phoneOk = isPhoneVerified(session);
 
   switch (step) {
     case 'email':
-      if (verification.email || session?.user?.email_verified) return 'done';
-      if (status === 'PENDING_EMAIL_VERIFICATION') return 'active';
-      return 'pending';
+      if (emailOk) return 'done';
+      return 'active';
     case 'phone':
-      if (verification.phone || session?.user?.phone_verified) return 'done';
-      if (status === 'PENDING_PHONE_VERIFICATION') return 'active';
-      return 'pending';
+      if (phoneOk) return 'done';
+      if (!emailOk) return 'pending';
+      return 'active';
     case 'identity':
-      if (isDocApproved(verification.identity) || isDocApproved(session?.user?.kyc_status) || ['ACTIVE', 'PROVISIONING'].includes(status)) return 'done';
+      if (isDocApproved(verification.identity) || isDocApproved(session?.user?.kyc_status) || isDocApproved(session?.user?.document_verified) || ['ACTIVE', 'PROVISIONING'].includes(status)) return 'done';
+      if (!emailOk || !phoneOk) return 'pending';
       if (status === 'IDENTITY_UNDER_REVIEW') return 'active';
       if (['PENDING_IDENTITY_VERIFICATION'].includes(status)) return 'active';
       return 'pending';
     case 'provisioning':
-      if (status === 'ACTIVE') return 'done';
-      if (status === 'PROVISIONING') return 'active';
+      if (status === 'ACTIVE' && emailOk && phoneOk) return 'done';
+      if (status === 'PROVISIONING' && emailOk && phoneOk) return 'active';
       return 'pending';
     default:
       return 'pending';
@@ -4102,8 +4120,7 @@ async function refreshOnboarding() {
       authSession.identity_verification.session = customer.didit_session;
     }
   }
-  const status = lifecycleStatus(authSession);
-  if (status === 'ACTIVE') {
+  if (isAccountReady(authSession)) {
     stopOnboardingPolling();
     showToast('Conta activa!', 'success');
     routePostAuth(authSession);
@@ -4337,12 +4354,12 @@ async function pollKycStatus(manual) {
 
   if (currentScreen === 'onboarding') {
     renderOnboardingHub(authSession);
-    if (kycDone === true || lifecycle === 'ACTIVE') {
+    if (isAccountReady(authSession)) {
       stopOnboardingPolling();
-      if (manual || lifecycle === 'PROVISIONING' || lifecycle === 'ACTIVE') {
-        showToast('Estado actualizado', 'success');
-        if (lifecycle === 'ACTIVE') routePostAuth(authSession);
-      }
+      showToast('Estado actualizado', 'success');
+      routePostAuth(authSession);
+    } else if (kycDone === true || lifecycle === 'PROVISIONING') {
+      if (manual) showToast('Estado actualizado', 'success');
     }
   }
 }
@@ -6058,10 +6075,10 @@ async function tryAutoLogin() {
     identity: isDocApproved(customer.document_verified),
   };
 
-  const lifecycle = lifecycleStatus(authSession);
-  if (lifecycle !== 'ACTIVE') {
+  if (needsOnboarding(authSession)) {
     renderOnboardingHub(authSession);
     navigate('onboarding');
+    startOnboardingPolling();
     return;
   }
 
