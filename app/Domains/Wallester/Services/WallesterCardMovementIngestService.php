@@ -15,7 +15,7 @@ class WallesterCardMovementIngestService
     public function __construct(
         protected IntegrationAccountService $integrationAccounts,
         protected FundingPartnerMovementService $movements,
-        protected WallesterFundingTransferDriver $wallesterDriver,
+        protected WallesterCardMovementPayloadMapper $payloadMapper,
     ) {}
 
     /**
@@ -26,6 +26,10 @@ class WallesterCardMovementIngestService
         FundingPartnerMovementSource $source = FundingPartnerMovementSource::Webhook,
     ): void {
         $payload = $this->normalizePayload($payload);
+
+        if ($this->payloadMapper->isFxFeeEvent($payload)) {
+            return;
+        }
 
         if (! $this->isCardSpendEvent($payload) || $this->isDeclined($payload)) {
             return;
@@ -43,11 +47,9 @@ class WallesterCardMovementIngestService
             return;
         }
 
-        $amountCents = $this->wallesterDriver->absoluteAmountToCents(
-            $payload['account_amount'] ?? $payload['amount'] ?? $payload['authorization_amount'] ?? 0,
-        );
+        $amounts = $this->payloadMapper->mapAmounts($payload);
 
-        if ($amountCents <= 0) {
+        if ($amounts['amount_cents'] <= 0) {
             return;
         }
 
@@ -65,13 +67,16 @@ class WallesterCardMovementIngestService
             account: $account,
             type: $movementType,
             direction: $direction,
-            amountCents: $amountCents,
-            currency: (string) ($payload['account_currency_code'] ?? $payload['currency_code'] ?? 'EUR'),
+            amountCents: $amounts['amount_cents'],
+            currency: $amounts['currency'],
             partnerExternalId: $externalId,
             source: $source,
             card: $card,
             description: is_string($payload['merchant_name'] ?? null) ? $payload['merchant_name'] : null,
             metadata: $payload,
+            originalAmountCents: $amounts['original_amount_cents'],
+            originalCurrency: $amounts['original_currency'],
+            feesAmountCents: $amounts['fees_amount_cents'],
         );
     }
 

@@ -131,6 +131,47 @@ wallet-account-wallester-sync:
       '403':
         $ref: '../components/responses.yaml#/Forbidden'
 
+wallet-funding-account-movements:
+  get:
+    tags: [Wallet]
+    summary: Movimentos da conta de funding (Wallester)
+    operationId: walletFundingAccountMovements
+    description: |
+      Lista paginada de `funding_partner_movements` da conta Wallester local.
+
+      Compras com câmbio vêm **unificadas**: `amount` é o total debitado na moeda da conta
+      (`account_amount + fees_amount`). `original_amount` / `original_currency` são a compra
+      no comerciante; `fees_amount` é o valor do câmbio (moeda da conta).
+
+      **Não confundir** com `GET /wallester/transactions` (passthrough da API Wallester).
+
+      Guia: [Compras Wallester e câmbio](/docs/guides/wallester-card-movements).
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: ID local de `customer_wallester_accounts`
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Lista de movimentos
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/FundingPartnerMovement'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+
 wallet-transactions-list:
   get:
     tags: [Wallet]
@@ -152,6 +193,7 @@ wallet-transactions-list:
           default: 15
     responses:
       '200':
+        description: Lista paginada de transacções
         content:
           application/json:
             schema:
@@ -179,6 +221,7 @@ wallet-transactions-show:
           type: integer
     responses:
       '200':
+        description: Detalhe da transacção
         content:
           application/json:
             schema:

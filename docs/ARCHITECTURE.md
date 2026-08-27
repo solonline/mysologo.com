@@ -34,6 +34,7 @@
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                     WEBHOOKS (incoming)                      │   │
 │  │      /webhooks/stripe          /webhooks/didit               │   │
+│  │      /webhooks/ebury           /webhooks/wallester           │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────┬───────────────────────────────────┘
                                   │
@@ -356,6 +357,7 @@ customers
      │
      ├──▶ customer_wallester_accounts (conta cartão/IBAN Wallester)
      │      └── iban, swift_code, receiver_name, viban
+     │      └──▶ customer_wallester_cards
      │
      ├──▶ customer_balances           (saldo actual — cache)
      │      └── currency, available, pending
@@ -383,8 +385,18 @@ stripe_transactions                   (todas as ops financeiras Stripe)
 ledger_entries                        (fonte da verdade — append-only)
 ├── customer_id → customers
 ├── currency, direction, amount, balance_after
-├── entry_type: payment_received | p2p_send | settlement | ...
-└── reference_type / reference_id    (morph → stripe_transactions, etc.)
+├── entry_type: payment_received | p2p_send | card_purchase | settlement | ...
+└── reference_type / reference_id    (morph → stripe_transactions, funding_partner_movements, …)
+
+funding_partner_movements             (entradas/saídas Wallester — cartão, P2P, top-up)
+├── provider, funding_account_type/id (morph → customer_wallester_accounts)
+├── direction: in | out
+├── type: card_purchase | card_refund | account_transfer | fee | …
+├── amount, currency                  (total na moeda da conta, cêntimos)
+├── original_amount, original_currency (compra no comerciante, se FX)
+├── fees_amount                       (valor do câmbio na moeda da conta)
+├── partner_external_id, idempotency_key
+└── metadata                          (payload Wallester normalizado)
 
 customer_balances                     (cache derivado do ledger)
 └── customer_id + currency → available, pending
@@ -428,6 +440,8 @@ idempotency_keys                      (previne duplicação de requests)
 | `LedgerService` | Registo imutável + actualização de saldo |
 | `TransactionService` | P2P transfers, listagem |
 | `WallesterService` | Criação de contas e cartões Wallester |
+| `WallesterCardMovementIngestService` | Webhook/sync de gastos de cartão → `funding_partner_movements` + ledger |
+| `NormalizeSwallowedWallesterFxPurchasesService` | Unifica linhas antigas que gravaram só a taxa FX |
 | `KycService` | Orquestração do fluxo KYC (Didit + docs) |
 | `DiditService` | Integração com Didit para verificação de identidade |
 | `DeviceAuthService` | Verificação de PIN por dispositivo |
@@ -442,6 +456,8 @@ idempotency_keys                      (previne duplicação de requests)
 | Comando | Schedule | O que faz |
 |---|---|---|
 | `stripe:settle-balances` | Diariamente às 01:00 | Executa o pipeline completo de settlement |
+| `wallester:sync-card-movements` | 00:00 e 12:00 | Importa transacções de cartão Wallester em falta |
+| `wallester:normalize-fx-fee-purchases` | manual | Converte movimentos só-taxa FX no total unificado |
 
 ---
 

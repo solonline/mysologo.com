@@ -22,6 +22,9 @@ class FundingPartnerMovement extends Model
         'type',
         'amount',
         'currency',
+        'original_amount',
+        'original_currency',
+        'fees_amount',
         'transfer_group_id',
         'counterparty_external_account_id',
         'customer_wallester_card_id',
@@ -45,6 +48,8 @@ class FundingPartnerMovement extends Model
             'status' => FundingPartnerMovementStatus::class,
             'source' => FundingPartnerMovementSource::class,
             'amount' => 'integer',
+            'original_amount' => 'integer',
+            'fees_amount' => 'integer',
             'metadata' => 'array',
         ];
     }
@@ -62,5 +67,38 @@ class FundingPartnerMovement extends Model
     public function wallesterCard(): BelongsTo
     {
         return $this->belongsTo(CustomerWallesterCard::class, 'customer_wallester_card_id');
+    }
+
+    public function fxDetailLabel(): ?string
+    {
+        if ($this->fees_amount === null || (int) $this->fees_amount <= 0) {
+            return null;
+        }
+
+        $parts = [];
+
+        if ($this->original_amount && $this->original_currency) {
+            $parts[] = number_format(((int) $this->original_amount) / 100, 2, ',', '.').' '.strtoupper((string) $this->original_currency);
+        }
+
+        $parts[] = 'câmbio '.number_format(((int) $this->fees_amount) / 100, 2, ',', '.').' '.strtoupper((string) $this->currency);
+
+        return implode(' · ', $parts);
+    }
+
+    public function isWallesterFxFee(): bool
+    {
+        $metadata = is_array($this->metadata) ? $this->metadata : [];
+        $envelopeType = strtolower((string) ($metadata['wallester_event_type'] ?? ''));
+
+        if ($envelopeType === 'fee') {
+            return true;
+        }
+
+        $transactionType = strtolower((string) ($metadata['transaction_type'] ?? $metadata['type'] ?? ''));
+
+        return str_contains($transactionType, 'foreignexchange')
+            || str_contains($transactionType, 'foreign_exchange')
+            || str_contains($transactionType, 'fee');
     }
 }

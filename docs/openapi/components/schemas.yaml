@@ -93,7 +93,7 @@ LifecycleStatus:
       description: Texto legível do estado (ex. «Aguardando telefone»).
     is_negative:
       type: boolean
-      description: `true` quando o estado é recusa ou bloqueio (mostrar motivo ao utilizador).
+      description: '`true` quando o estado é recusa ou bloqueio (mostrar motivo ao utilizador).'
     reason:
       type: string
       nullable: true
@@ -625,6 +625,72 @@ Transaction:
     created_at:
       type: string
       format: date-time
+
+FundingPartnerMovement:
+  type: object
+  description: |
+    Movimento local Wallester (`funding_partner_movements`).
+    Compras com câmbio são unificadas: `amount` = total na moeda da conta.
+  properties:
+    id:
+      type: integer
+    provider:
+      type: string
+      example: wallester
+    external_account_id:
+      type: string
+    direction:
+      type: string
+      enum: [in, out]
+    type:
+      type: string
+      enum: [card_purchase, card_refund, account_transfer, inbound_payment, fee]
+    amount:
+      type: integer
+      description: Total debitado/creditado na moeda da conta (cêntimos). Compra FX = compra convertida + taxa.
+    currency:
+      type: string
+      minLength: 3
+      maxLength: 3
+      description: Moeda da conta / conversão
+    original_amount:
+      type: integer
+      nullable: true
+      description: Valor da compra na moeda do comerciante (cêntimos)
+    original_currency:
+      type: string
+      nullable: true
+      minLength: 3
+      maxLength: 3
+      description: Moeda da compra no comerciante
+    fees_amount:
+      type: integer
+      nullable: true
+      description: Valor do câmbio na moeda da conta (cêntimos). Não é o rácio FX.
+    transfer_group_id:
+      type: string
+      nullable: true
+    counterparty_external_account_id:
+      type: string
+      nullable: true
+    partner_external_id:
+      type: string
+      nullable: true
+    status:
+      type: string
+    source:
+      type: string
+      enum: [webhook, sync, api]
+    description:
+      type: string
+      nullable: true
+    failure_reason:
+      type: string
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+      nullable: true
 
 P2PTransferResult:
   type: object

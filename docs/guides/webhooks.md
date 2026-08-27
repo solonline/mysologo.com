@@ -47,14 +47,20 @@ Ver [Top-up com cartão](/docs/guides/topup-card).
 - Aprovado → pode activar conta se Stripe + (outro partner) OK
 - Rejeitado → `EBURY_REJECTED` — **não bloqueia** se Wallester estiver activo
 
-## Wallester — funding partner
+## Wallester — funding partner e gastos de cartão
 
-**Quando:** conta cartão/IBAN provisionada ou alteração de estado.
+**Quando:** conta cartão/IBAN provisionada, alteração de estado, autorização/transacção de cartão, ou taxa FX.
 
-**Efeito:**
+**Efeito — conta:**
 
 - `active` → contribui para activação com Stripe
 - `rejected` → se Ebury também rejeitado → `BLOCKED`
+
+**Efeito — cartão:** o ingest grava compras/reembolsos em `funding_partner_movements` e debita o ledger.
+
+Numa compra com câmbio chegam **dois** webhooks; a Yoop unifica-os num só movimento (total = compra convertida + taxa). O webhook `type=fee` (`AuthorizationForeignExchangePercentageFee`) **não** cria linha.
+
+Ver [Compras Wallester e câmbio](/docs/guides/wallester-card-movements).
 
 ## Diagrama simplificado
 
@@ -85,4 +91,4 @@ flowchart TB
 - Em local, usar Stripe CLI / túneis para testar
 - Não documentar webhooks na API pública de parceiros — só uso interno
 
-📖 **Relacionado:** [Ciclo de vida](/docs/guides/onboarding-lifecycle)
+📖 **Relacionado:** [Ciclo de vida](/docs/guides/onboarding-lifecycle) · [Compras Wallester e câmbio](/docs/guides/wallester-card-movements)

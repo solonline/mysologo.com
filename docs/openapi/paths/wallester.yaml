@@ -400,7 +400,11 @@ wallester-transactions-index:
     summary: Listar transacções do cartão (Wallester)
     operationId: wallesterTransactionsIndex
     description: |
-      Lista transacções da API Wallester (passthrough). **Não confundir** com `GET /wallet/transactions` (ledger interno).
+      Lista transacções da API Wallester (passthrough). **Não confundir** com:
+      - `GET /wallet/transactions` — ledger interno Stripe/P2P
+      - `GET /wallet/funding-accounts/{id}/movements` — movimentos locais Wallester (compras unificadas, incluindo câmbio)
+
+      Detalhe: [Compras Wallester e câmbio](/docs/guides/wallester-card-movements).
 
       **Paginação Wallester:** `from_record` + `records_count` (default 0 e 15, máx. 100).
 

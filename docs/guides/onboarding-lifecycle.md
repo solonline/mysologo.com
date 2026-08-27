@@ -82,9 +82,9 @@ Webhooks:
 Quando `lifecycle.status === 'ACTIVE'` e `capabilities` permitirem:
 
 - `GET /api/wallet/dashboard`
-- Top-up, P2P, etc.
+- Top-up, P2P, gastos de cartão Wallester
 
-📖 **Relacionado:** [Conta pronta](/docs/guides/account-ready) · [Webhooks](/docs/guides/webhooks)
+📖 **Relacionado:** [Conta pronta](/docs/guides/account-ready) · [Webhooks](/docs/guides/webhooks) · [Compras Wallester e câmbio](/docs/guides/wallester-card-movements)
 
 ## Corporate
 

@@ -344,6 +344,9 @@ class FundingPartnerMovementService
         ?CustomerWallesterCard $card = null,
         ?string $description = null,
         ?array $metadata = null,
+        ?int $originalAmountCents = null,
+        ?string $originalCurrency = null,
+        ?int $feesAmountCents = null,
     ): FundingPartnerMovement {
         $idempotencyKey = 'card:'.$partnerExternalId.':'.$direction->value;
 
@@ -359,6 +362,9 @@ class FundingPartnerMovementService
             $description,
             $metadata,
             $idempotencyKey,
+            $originalAmountCents,
+            $originalCurrency,
+            $feesAmountCents,
         ): FundingPartnerMovement {
             $existing = FundingPartnerMovement::query()
                 ->where('idempotency_key', $idempotencyKey)
@@ -395,6 +401,9 @@ class FundingPartnerMovementService
                 'type' => $type,
                 'amount' => $amountCents,
                 'currency' => strtoupper($currency),
+                'original_amount' => $originalAmountCents,
+                'original_currency' => $originalCurrency !== null ? strtoupper($originalCurrency) : null,
+                'fees_amount' => $feesAmountCents,
                 'customer_wallester_card_id' => $card?->id,
                 'partner_external_id' => $partnerExternalId,
                 'status' => FundingPartnerMovementStatus::Completed,
@@ -433,21 +442,31 @@ class FundingPartnerMovementService
                 ->first();
 
             if ($byAuth instanceof FundingPartnerMovement) {
-                return $byAuth;
+                return $byAuth->isWallesterFxFee() ? null : $byAuth;
             }
         }
 
         // Authorization a chegar depois de um settlement que já referencia este ID.
-        return FundingPartnerMovement::query()
+        // Ou settlement da list API cujo ID já ficou em settlement_partner_external_id.
+        $linked = FundingPartnerMovement::query()
             ->where('funding_account_type', $account::class)
             ->where('funding_account_id', $account->id)
             ->where('type', $type)
             ->where('direction', $direction)
             ->where(function ($query) use ($partnerExternalId): void {
                 $query->where('metadata->authorization_id', $partnerExternalId)
-                    ->orWhere('metadata->data->authorization_id', $partnerExternalId);
+                    ->orWhere('metadata->data->authorization_id', $partnerExternalId)
+                    ->orWhere('metadata->settlement_partner_external_id', $partnerExternalId)
+                    ->orWhere('metadata->settlement_metadata->id', $partnerExternalId)
+                    ->orWhere('metadata->settlement_metadata->data->id', $partnerExternalId);
             })
             ->first();
+
+        if ($linked instanceof FundingPartnerMovement && $linked->isWallesterFxFee()) {
+            return null;
+        }
+
+        return $linked;
     }
 
     /**
@@ -506,7 +525,7 @@ class FundingPartnerMovementService
             default => null,
         };
 
-        if ($entryType === null) {
+        if ($entryType === null || $movement->status !== FundingPartnerMovementStatus::Completed) {
             return;
         }
 

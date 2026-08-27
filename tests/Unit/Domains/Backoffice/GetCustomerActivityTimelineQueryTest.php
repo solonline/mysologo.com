@@ -6,15 +6,15 @@ use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentDirection;
 use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentStatus;
 use App\Domains\Backoffice\Queries\GetCustomerActivityTimelineQuery;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
-use App\Models\CustomerBalanceAdjustment;
-use App\Models\User;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\TransactionType;
+use App\Models\CustomerBalanceAdjustment;
 use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
@@ -118,5 +118,37 @@ class GetCustomerActivityTimelineQueryTest extends TestCase
         $this->assertSame('Crédito manual', $timeline->first()->typeLabel);
         $this->assertSame('Banco da Plataforma', $timeline->first()->sourceLabel);
         $this->assertSame('Crédito de compensação', $timeline->first()->description);
+    }
+
+    public function test_timeline_includes_fx_detail_for_foreign_card_purchase(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_timeline_fx');
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::CardPurchase,
+            'amount' => 463,
+            'currency' => 'EUR',
+            'original_amount' => 388,
+            'original_currency' => 'GBP',
+            'fees_amount' => 9,
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Webhook,
+            'idempotency_key' => 'card:timeline-fx:out',
+            'partner_external_id' => 'timeline-fx',
+            'description' => 'LidlGB',
+        ]);
+
+        $timeline = app(GetCustomerActivityTimelineQuery::class)->execute($customer);
+
+        $this->assertCount(1, $timeline);
+        $this->assertSame(463, $timeline->first()->amountCents);
+        $this->assertSame('EUR', $timeline->first()->currency);
+        $this->assertSame('3,88 GBP · câmbio 0,09 EUR', $timeline->first()->fxDetailLabel);
     }
 }

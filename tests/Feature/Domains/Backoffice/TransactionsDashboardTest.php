@@ -69,7 +69,7 @@ class TransactionsDashboardTest extends TestCase
             'description' => 'Transferencia teste dashboard',
         ]);
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.transactions'))
             ->assertOk()
             ->assertSee('Stripe')
@@ -79,12 +79,47 @@ class TransactionsDashboardTest extends TestCase
             ->assertSee('Ver detalhes')
             ->assertSee('Detalhes da transação');
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.transactions', ['tab' => 'wallester']))
             ->assertOk()
             ->assertSee('Transferência')
             ->assertSee('wal-dashboard-test')
             ->assertSee('Ver detalhes');
+    }
+
+    public function test_wallester_tab_shows_unified_fx_purchase(): void
+    {
+        $user = $this->userWithPermission('transactions.view');
+        $customer = $this->createRetailCustomer(['name' => 'Cliente Lidl']);
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal-fx-dashboard');
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::CardPurchase,
+            'amount' => 463,
+            'currency' => 'EUR',
+            'original_amount' => 388,
+            'original_currency' => 'GBP',
+            'fees_amount' => 9,
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Webhook,
+            'idempotency_key' => 'card:dashboard-fx:out',
+            'partner_external_id' => 'dashboard-fx',
+            'description' => 'LidlGB',
+        ]);
+
+        $this->actingAs($user, 'web')
+            ->get(route('dashboard.transactions', ['tab' => 'wallester']))
+            ->assertOk()
+            ->assertSee('LidlGB')
+            ->assertSee('4,63')
+            ->assertSee('3,88 GBP')
+            ->assertSee('câmbio 0,09 EUR')
+            ->assertSee('Compra');
     }
 
     public function test_guest_cannot_access_transactions_page(): void
@@ -141,14 +176,14 @@ class TransactionsDashboardTest extends TestCase
             ]);
         }
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.transactions', $customer))
             ->assertOk()
             ->assertSee('Transações de Cliente Selecionado')
             ->assertSee('(1)')
             ->assertDontSee('Outro Cliente');
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.transactions', ['customer' => $customer, 'tab' => 'wallester']))
             ->assertOk()
             ->assertSee('wal-selected-customer')
@@ -157,10 +192,10 @@ class TransactionsDashboardTest extends TestCase
 
     private function userWithPermission(string $permission): User
     {
-        Permission::findOrCreate($permission);
+        $permissionModel = Permission::findOrCreate($permission, 'web');
 
         $user = User::factory()->create();
-        $user->givePermissionTo($permission);
+        $user->givePermissionTo($permissionModel);
 
         return $user;
     }

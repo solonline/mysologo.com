@@ -4,7 +4,7 @@ namespace App\Domains\Wallester\Jobs;
 
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
-use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
+use App\Domains\Wallester\Services\WallesterCardMovementPayloadMapper;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
@@ -34,7 +34,7 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
     public function handle(
         WallesterGatewayInterface $gateway,
         FundingPartnerMovementService $movements,
-        WallesterFundingTransferDriver $wallesterDriver,
+        WallesterCardMovementPayloadMapper $payloadMapper,
     ): void {
         $query = CustomerWallesterAccount::query()
             ->where('status', IntegrationAccountStatus::ACTIVE);
@@ -43,8 +43,8 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
             $query->whereKey($this->customerWallesterAccountId);
         }
 
-        $query->each(function (CustomerWallesterAccount $account) use ($gateway, $movements, $wallesterDriver): void {
-            $this->syncAccount($account, $gateway, $movements, $wallesterDriver);
+        $query->each(function (CustomerWallesterAccount $account) use ($gateway, $movements, $payloadMapper): void {
+            $this->syncAccount($account, $gateway, $movements, $payloadMapper);
         });
     }
 
@@ -52,7 +52,7 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
         CustomerWallesterAccount $account,
         WallesterGatewayInterface $gateway,
         FundingPartnerMovementService $movements,
-        WallesterFundingTransferDriver $wallesterDriver,
+        WallesterCardMovementPayloadMapper $payloadMapper,
     ): void {
         $response = $gateway->forCurrency((string) ($account->funding_currency ?? 'EUR'))->listAccountTransactions($account->wallester_account_id, [
             'from_record' => 0,
@@ -60,7 +60,7 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
         ], (string) $account->customer_id);
 
         foreach ($response['transactions'] as $transaction) {
-            $this->importTransaction($account, $transaction, $movements, $wallesterDriver);
+            $this->importTransaction($account, $transaction, $movements, $payloadMapper);
         }
     }
 
@@ -71,11 +71,15 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
         CustomerWallesterAccount $account,
         array $transaction,
         FundingPartnerMovementService $movements,
-        WallesterFundingTransferDriver $wallesterDriver,
+        WallesterCardMovementPayloadMapper $payloadMapper,
     ): void {
         $externalId = (string) ($transaction['id'] ?? '');
 
         if ($externalId === '') {
+            return;
+        }
+
+        if ($payloadMapper->isFxFeeEvent($transaction)) {
             return;
         }
 
@@ -86,9 +90,9 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
             return;
         }
 
-        $amountCents = $wallesterDriver->absoluteAmountToCents($transaction['account_amount'] ?? $transaction['amount'] ?? 0);
+        $amounts = $payloadMapper->mapAmounts($transaction);
 
-        if ($amountCents <= 0) {
+        if ($amounts['amount_cents'] <= 0) {
             return;
         }
 
@@ -119,13 +123,16 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
                 account: $account,
                 type: $movementType,
                 direction: $direction,
-                amountCents: $amountCents,
-                currency: (string) ($transaction['account_currency_code'] ?? $transaction['currency_code'] ?? 'EUR'),
+                amountCents: $amounts['amount_cents'],
+                currency: $amounts['currency'],
                 partnerExternalId: $externalId,
                 source: FundingPartnerMovementSource::Sync,
                 card: $card,
                 description: is_string($transaction['merchant_name'] ?? null) ? $transaction['merchant_name'] : null,
                 metadata: $transaction,
+                originalAmountCents: $amounts['original_amount_cents'],
+                originalCurrency: $amounts['original_currency'],
+                feesAmountCents: $amounts['fees_amount_cents'],
             );
         } catch (\Throwable $exception) {
             Log::channel('wallester')->warning('wallester_sync_movement_import_failed', [

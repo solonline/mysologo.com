@@ -415,6 +415,7 @@
                     $direction = $movement->direction?->value;
                     $isIn = $direction === 'in';
                     $card = $movement->wallesterCard;
+                    $fxDetailLabel = $movement->fxDetailLabel();
 
                     $wallesterFields = array_values(array_filter([
                         ['label' => 'Data', 'value' => $movement->created_at?->format('d/m/Y H:i')],
@@ -432,6 +433,12 @@
                         $movement->counterparty_external_account_id ? ['label' => 'Contraparte', 'value' => $movement->counterparty_external_account_id, 'mono' => true, 'full' => true] : null,
                         $movement->failure_reason ? ['label' => 'Motivo falha', 'value' => $movement->failure_reason, 'full' => true] : null,
                         $movement->description ? ['label' => 'Descrição', 'value' => $movement->description, 'full' => true] : null,
+                        $movement->original_amount && $movement->original_currency
+                            ? ['label' => 'Compra', 'value' => number_format($movement->original_amount / 100, 2, ',', '.').' '.strtoupper($movement->original_currency)]
+                            : null,
+                        $movement->fees_amount
+                            ? ['label' => 'Câmbio', 'value' => number_format($movement->fees_amount / 100, 2, ',', '.').' '.strtoupper($movement->currency)]
+                            : null,
                         $movement->reference instanceof \App\Models\StripeTransaction
                             ? ['label' => 'Referência Stripe', 'value' => 'Transação #'.$movement->reference->id, 'link' => route('dashboard.transactions', ['tab' => 'stripe', 'search' => $movement->reference->id])]
                             : null,
@@ -477,6 +484,9 @@
                         <span class="font-semibold {{ $isIn ? 'text-emerald-600' : 'text-red-500' }}">
                             {{ $isIn ? '+' : '−' }}{{ number_format($movement->amount / 100, 2, ',', '.') }} {{ strtoupper($movement->currency) }}
                         </span>
+                        @if ($fxDetailLabel)
+                        <span class="text-[11px] text-slate-400 block">{{ $fxDetailLabel }}</span>
+                        @endif
                     </td>
                     <td>
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border {{ match ($movement->status?->value) {

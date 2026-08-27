@@ -120,6 +120,7 @@ class GetCustomerActivityTimelineQuery
             merchantCity: is_string($metadata['merchant_city'] ?? null) ? $metadata['merchant_city'] : null,
             merchantCategoryCode: is_string($metadata['merchant_category_code'] ?? null) ? $metadata['merchant_category_code'] : null,
             sourceLabel: 'Wallester',
+            fxDetailLabel: $movement->fxDetailLabel(),
         );
     }
 

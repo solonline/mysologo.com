@@ -81,6 +81,9 @@
                                     <span class="text-xs text-slate-400">(líq. {{ number_format($item->netAmountCents / 100, 2, ',', '.') }})</span>
                                     @endif
                                 </div>
+                                @if ($item->fxDetailLabel)
+                                <p class="text-[11px] text-slate-400 mt-0.5">{{ $item->fxDetailLabel }}</p>
+                                @endif
 
                                 <p class="text-xs font-medium text-slate-700">{{ $item->typeLabel }}</p>
 

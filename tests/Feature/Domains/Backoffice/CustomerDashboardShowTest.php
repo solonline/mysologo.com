@@ -32,8 +32,8 @@ class CustomerDashboardShowTest extends TestCase
         parent::setUp();
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
-        Permission::findOrCreate('customers.view');
-        Permission::findOrCreate('customers.edit');
+        Permission::findOrCreate('customers.view', 'web');
+        Permission::findOrCreate('customers.edit', 'web');
     }
 
     public function test_customer_show_displays_didit_session_and_kyc_warnings(): void
@@ -200,6 +200,41 @@ class CustomerDashboardShowTest extends TestCase
         $response->assertSee('−1 saídas');
     }
 
+    public function test_customer_show_displays_unified_fx_card_purchase(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+        $customer = $this->createRetailCustomer(['name' => 'Cliente FX']);
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_show_fx');
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::CardPurchase,
+            'amount' => 463,
+            'currency' => 'EUR',
+            'original_amount' => 388,
+            'original_currency' => 'GBP',
+            'fees_amount' => 9,
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Webhook,
+            'idempotency_key' => 'card:show-fx:out',
+            'partner_external_id' => 'show-fx',
+            'description' => 'LidlGB',
+        ]);
+
+        $response = $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertSee('LidlGB');
+        $response->assertSee('4,63');
+        $response->assertSee('3,88 GBP');
+        $response->assertSee('câmbio 0,09 EUR');
+    }
+
     public function test_customer_show_limits_recent_movements_to_ten_and_links_to_full_list(): void
     {
         $user = $this->userWithPermission('customers.view');
@@ -233,10 +268,10 @@ class CustomerDashboardShowTest extends TestCase
 
     private function userWithPermission(string $permission): User
     {
-        Permission::findOrCreate($permission);
+        $permissionModel = Permission::findOrCreate($permission, 'web');
 
         $user = User::factory()->create();
-        $user->givePermissionTo($permission);
+        $user->givePermissionTo($permissionModel);
 
         return $user;
     }

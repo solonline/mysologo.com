@@ -26,5 +26,6 @@ readonly class CustomerActivityItem
         public ?string $merchantCity = null,
         public ?string $merchantCategoryCode = null,
         public ?string $sourceLabel = null,
+        public ?string $fxDetailLabel = null,
     ) {}
 }

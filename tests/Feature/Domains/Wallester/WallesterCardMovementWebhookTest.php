@@ -283,6 +283,194 @@ class WallesterCardMovementWebhookTest extends TestCase
         ]);
     }
 
+    public function test_fx_fee_webhook_is_ignored_and_authorization_unifies_total(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, '50b270f8-31f8-463b-981f-67cc69591854');
+
+        $card = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 10000,
+            'pending' => 0,
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', $this->lidlFxFeePayload())->assertOk();
+        $this->assertDatabaseCount('funding_partner_movements', 0);
+        $this->assertDatabaseCount('ledger_entries', 0);
+
+        $this->postJson('/api/webhooks/wallester', $this->lidlAuthorizationPayload())->assertOk();
+
+        $this->assertDatabaseCount('funding_partner_movements', 1);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'funding_account_id' => $account->id,
+            'customer_wallester_card_id' => $card->id,
+            'type' => FundingPartnerMovementType::CardPurchase->value,
+            'direction' => 'out',
+            'amount' => 463,
+            'currency' => 'EUR',
+            'original_amount' => 388,
+            'original_currency' => 'GBP',
+            'fees_amount' => 9,
+            'partner_external_id' => '0aa86719-5a62-4ce7-abf5-577d2918db20',
+            'description' => 'LidlGB',
+        ]);
+
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'direction' => TransactionDirection::Debit->value,
+            'amount' => 463,
+            'entry_type' => LedgerEntryType::CARD_PURCHASE->value,
+        ]);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 9537,
+        ]);
+    }
+
+    public function test_fx_authorization_alone_unifies_fee_from_payload(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, '50b270f8-31f8-463b-981f-67cc69591854');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', $this->lidlAuthorizationPayload())->assertOk();
+
+        $this->assertDatabaseCount('funding_partner_movements', 1);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'funding_account_id' => $account->id,
+            'amount' => 463,
+            'original_amount' => 388,
+            'original_currency' => 'GBP',
+            'fees_amount' => 9,
+        ]);
+    }
+
+    public function test_same_currency_purchase_does_not_store_fx_fee(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_same_ccy');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_same_ccy',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => 'txn_same_ccy',
+                'card_id' => 'card_same_ccy',
+                'account_id' => 'wal_same_ccy',
+                'type' => 'payWaveLowValuePurchase',
+                'account_amount' => -12.34,
+                'account_currency_code' => 'EUR',
+                'transaction_amount' => -12.34,
+                'transaction_currency_code' => 'EUR',
+                'merchant_name' => 'Cafe',
+                'response_code' => 'Approved',
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'funding_account_id' => $account->id,
+            'amount' => 1234,
+            'currency' => 'EUR',
+            'original_amount' => 1234,
+            'original_currency' => 'EUR',
+            'fees_amount' => null,
+            'partner_external_id' => 'txn_same_ccy',
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function lidlFxFeePayload(): array
+    {
+        return [
+            'event' => 'create',
+            'type' => 'fee',
+            'data' => [
+                'id' => '2c4a1e9f-3145-4c00-bbf4-71adfd0ed934',
+                'type' => 'AuthorizationForeignExchangePercentageFee',
+                'status' => 'WaitingForClearing',
+                'amount' => -0.09,
+                'currency_code' => 'EUR',
+                'company_id' => '1d299458-b005-4f5f-bd5c-ad42640ddcea',
+                'account_id' => '50b270f8-31f8-463b-981f-67cc69591854',
+                'card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+                'authorization_id' => '0aa86719-5a62-4ce7-abf5-577d2918db20',
+                'created_at' => '2026-08-26T16:21:07Z',
+                'completed_at' => null,
+                'updated_at' => null,
+                'canceled_at' => null,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function lidlAuthorizationPayload(): array
+    {
+        return [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => '0aa86719-5a62-4ce7-abf5-577d2918db20',
+                'card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+                'date' => '2026-08-26T17:21:00Z',
+                'type' => 'payWaveLowValuePurchase',
+                'account_amount' => -4.54,
+                'account_currency_code' => 'EUR',
+                'acquiring_institution_id' => '425518',
+                'acquiring_institution_country_code' => 'GBR',
+                'group' => 'Purchase',
+                'is_contactless' => true,
+                'is_mass_transit' => false,
+                'merchant_category_code' => '5411',
+                'merchant_city' => 'BRISTOL',
+                'merchant_country_code' => 'GBR',
+                'merchant_id' => '000100800348809',
+                'merchant_name' => 'LidlGB',
+                'response_code' => 'Approved',
+                'retrieval_reference_number' => '623817826362',
+                'terminal_id' => '35366232',
+                'transaction_amount' => -3.88,
+                'transaction_currency_code' => 'GBP',
+                'fees_amount' => 0.09,
+                'is_reversal' => false,
+                'is_declined' => false,
+                'does_terminal_support_partial_approvals' => false,
+                'approval_code' => '9M768E',
+                'approved_amount' => -4.54,
+                'created_at' => '2026-08-26T16:21:07Z',
+            ],
+        ];
+    }
+
     private function createActiveCustomer()
     {
         return $this->createRetailCustomer([

@@ -53,7 +53,7 @@ info:
 
     ## Guias conceituais
 
-    Fluxos de negócio passo a passo: **[Guias](/docs/guides)** (onboarding, top-up, P2P, webhooks).
+    Fluxos de negócio passo a passo: **[Guias](/docs/guides)** (onboarding, top-up, P2P, webhooks, compras Wallester).
 
     Parceiros: **[Guias parceiros](/docs/partners/guides)**.
 
@@ -89,7 +89,7 @@ tags:
   - name: Customer
     description: Perfil, documentos corporate, notificações.
   - name: Wallet
-    description: Dashboard, conta, transacções e P2P.
+    description: Dashboard, conta, transacções, P2P e movimentos de funding (Wallester).
   - name: Stripe
     description: Top-up via Stripe (cliente autenticado).
   - name: Wallester
@@ -187,6 +187,8 @@ paths:
     $ref: './paths/wallet.yaml#/wallet-transactions-p2p'
   /wallet/transactions/{id}:
     $ref: './paths/wallet.yaml#/wallet-transactions-show'
+  /wallet/funding-accounts/{id}/movements:
+    $ref: './paths/wallet.yaml#/wallet-funding-account-movements'
 
   # Stripe
   /stripe/health:
@@ -286,6 +288,8 @@ components:
       $ref: './components/schemas.yaml#/AccountDetails'
     Transaction:
       $ref: './components/schemas.yaml#/Transaction'
+    FundingPartnerMovement:
+      $ref: './components/schemas.yaml#/FundingPartnerMovement'
     P2PTransferResult:
       $ref: './components/schemas.yaml#/P2PTransferResult'
     PaymentMethod:

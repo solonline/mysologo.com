@@ -50,6 +50,12 @@ return [
             'description' => 'Didit, Stripe, Ebury e Wallester — o que cada um altera.',
             'file' => 'webhooks.md',
         ],
+        [
+            'slug' => 'wallester-card-movements',
+            'title' => 'Compras Wallester e câmbio',
+            'description' => 'Um movimento por compra: total na conta, valor original e taxa FX.',
+            'file' => 'wallester-card-movements.md',
+        ],
     ],
 
     'partners' => [

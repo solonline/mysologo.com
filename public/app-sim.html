@@ -301,6 +301,7 @@ body {
 .tx-amount { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
 .tx-amount.credit { color: #059669; }
 .tx-amount.debit  { color: #dc2626; }
+.tx-fx { font-size: 10px; color: var(--slate-400); font-weight: 500; text-align: right; max-width: 160px; line-height: 1.3; }
 
 /* Quick actions — see extended styles below */
 
@@ -1877,6 +1878,7 @@ body {
       <div class="tx-body" id="transaction-detail-body">
         <div class="detail-amount">
           <div class="detail-amount-value" id="tx-detail-amount">—</div>
+          <div class="detail-amount-fx" id="tx-detail-fx" hidden></div>
           <div class="detail-amount-label" id="tx-detail-type">—</div>
         </div>
         <div class="info-card detail-grid" id="tx-detail-info"></div>
@@ -3211,6 +3213,30 @@ function normalizeStripeMovement(t) {
   };
 }
 
+function wallesterFxDetailLabel(item) {
+  const fees = Number(item?.feesAmountMinor) || 0;
+  if (fees <= 0) return '';
+
+  const parts = [];
+  if (item.originalAmountMinor && item.originalCurrency) {
+    parts.push(formatMoney(item.originalAmountMinor, item.originalCurrency));
+  }
+  parts.push('câmbio ' + formatMoney(fees, item.currency));
+  return parts.join(' · ');
+}
+
+function setTxDetailFx(text) {
+  const fxEl = document.getElementById('tx-detail-fx');
+  if (!fxEl) return;
+  if (text) {
+    fxEl.hidden = false;
+    fxEl.textContent = text;
+  } else {
+    fxEl.hidden = true;
+    fxEl.textContent = '';
+  }
+}
+
 function normalizeWallesterMovement(m) {
   const direction = txDirectionValue(m.direction);
   const isIn = direction === 'in' || direction === 'credit';
@@ -3224,7 +3250,10 @@ function normalizeWallesterMovement(m) {
     isIn,
     amountMinor: Number(m.amount) || 0,
     grossMinor: Number(m.amount) || 0,
-    feeMinor: 0,
+    feeMinor: Number(m.fees_amount) || 0,
+    feesAmountMinor: Number(m.fees_amount) || 0,
+    originalAmountMinor: Number(m.original_amount) || 0,
+    originalCurrency: m.original_currency ? sanitizeCurrency(m.original_currency) : '',
     feesPending: false,
     currency: sanitizeCurrency(m.currency),
     status: String(m.status || 'pending').toLowerCase(),
@@ -3250,6 +3279,7 @@ function renderMovementItem(item, { clickable = false } = {}) {
     ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`
     : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`;
   const sourceClass = item.source === 'card' ? 'card' : 'wallet';
+  const fxLabel = wallesterFxDetailLabel(item);
   const clickAttrs = clickable
     ? ` class="tx-item clickable" onclick="openMovementDetail('${item.key}')"`
     : ' class="tx-item"';
@@ -3262,6 +3292,7 @@ function renderMovementItem(item, { clickable = false } = {}) {
     </div>
     <div class="tx-right">
       <span class="tx-amount ${item.isIn ? 'credit' : 'debit'}">${sign}${amt} ${item.currency}</span>
+      ${fxLabel ? `<span class="tx-fx">${escapeHtml(fxLabel)}</span>` : ''}
       <span class="badge ${item.status}">${escapeHtml(item.status)}</span>
     </div>
   </div>`;
@@ -3468,20 +3499,30 @@ async function loadMovementDetail(key) {
   if (!infoEl) return;
 
   const sign = item.isIn ? '+' : '−';
+  const fxLabel = wallesterFxDetailLabel(item);
   amountEl.textContent = sign + formatMoney(item.amountMinor, item.currency);
   amountEl.style.color = item.isIn ? '#059669' : '#dc2626';
   typeEl.textContent = item.typeLabel;
+  setTxDetailFx(fxLabel);
 
   const rows = [
     ['Origem', 'Cartão Wallester'],
     ['Status', `<span class="badge ${item.status}">${escapeHtml(item.status)}</span>`],
     ['Direcção', item.isIn ? 'Entrada' : 'Saída'],
     ['Montante', formatMoney(item.amountMinor, item.currency)],
+  ];
+  if (item.originalAmountMinor && item.originalCurrency) {
+    rows.push(['Compra', formatMoney(item.originalAmountMinor, item.originalCurrency)]);
+  }
+  if (item.feesAmountMinor > 0) {
+    rows.push(['Câmbio', formatMoney(item.feesAmountMinor, item.currency)]);
+  }
+  rows.push(
     ['Tipo', escapeHtml(item.typeLabel)],
     ['Descrição', escapeHtml(item.description || '—')],
     ['Fonte', escapeHtml(item.paymentMethod || '—')],
     ['Data', item.createdAt ? new Date(item.createdAt).toLocaleString('pt-PT') : '—'],
-  ];
+  );
   if (item.partnerExternalId) rows.push(['ID externo', escapeHtml(item.partnerExternalId)]);
   if (item.failureReason) rows.push(['Falha', escapeHtml(item.failureReason)]);
 
@@ -3511,6 +3552,7 @@ async function loadTransactionDetail(id) {
   amountEl.textContent = sign + formatMoney(txDisplayAmountMinor(t), cur);
   amountEl.style.color = isCredit ? '#059669' : '#dc2626';
   typeEl.textContent = typeLabel;
+  setTxDetailFx('');
 
   const rows = [
     ['Origem', 'Wallet'],
