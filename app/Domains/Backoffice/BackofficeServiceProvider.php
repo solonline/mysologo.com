@@ -4,6 +4,7 @@ namespace App\Domains\Backoffice;
 
 use App\Domains\Backoffice\Actions\CancelAccountPayableAction;
 use App\Domains\Backoffice\Actions\CreateAccountPayableAction;
+use App\Domains\Backoffice\Actions\CreateCustomerFromBackofficeAction;
 use App\Domains\Backoffice\Actions\CreateRoleAction;
 use App\Domains\Backoffice\Actions\CreateStaffUserAction;
 use App\Domains\Backoffice\Actions\CreateStripeFeeAction;
@@ -66,6 +67,7 @@ class BackofficeServiceProvider extends ServiceProvider
         ListStripeTransactionsQuery::class,
         ListFundingPartnerMovementsQuery::class,
         GetAuditLogDetailQuery::class,
+        CreateCustomerFromBackofficeAction::class,
         UpdateCustomerFromBackofficeAction::class,
         RetryCustomerProvisioningAction::class,
         RetryStripeFundingAction::class,

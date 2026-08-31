@@ -9,9 +9,11 @@ use Illuminate\Support\Carbon;
 
 class PhoneVerificationRepository implements PhoneVerificationRepositoryInterface
 {
+    public const CODE_TTL_MINUTES = 10;
+
     public function createOrUpdate(Customer $customer, string $phone, string $code): PhoneVerification
     {
-        return PhoneVerification::updateOrCreate(
+        $verification = PhoneVerification::updateOrCreate(
             [
                 'customer_id' => $customer->id,
                 'phone' => $phone,
@@ -21,17 +23,25 @@ class PhoneVerificationRepository implements PhoneVerificationRepositoryInterfac
                 'verified_at' => null,
             ],
         );
+
+        $verification->updated_at = now();
+        $verification->save();
+
+        return $verification;
     }
 
     public function verify(Customer $customer, string $phone, string $code): bool
     {
+        $code = trim($code);
+
         $verification = PhoneVerification::where('customer_id', $customer->id)
             ->where('phone', $phone)
             ->whereNull('verified_at')
             ->first();
 
         if ($verification) {
-            $expiresAt = $verification->created_at->copy()->addMinutes(2);
+            $issuedAt = $verification->updated_at ?? $verification->created_at;
+            $expiresAt = $issuedAt->copy()->addMinutes(self::CODE_TTL_MINUTES);
             if (now()->greaterThan($expiresAt)) {
                 return false;
             }

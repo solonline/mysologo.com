@@ -170,6 +170,90 @@ class CustomerPhoneChangeService
         ];
     }
 
+    public function pendingCurrentPhoneVerification(Customer $customer): ?PhoneVerification
+    {
+        $phone = $this->normalizePhone((string) $customer->phone);
+
+        if ($phone === '') {
+            return null;
+        }
+
+        return PhoneVerification::query()
+            ->where('customer_id', $customer->id)
+            ->where('phone', $phone)
+            ->whereNull('verified_at')
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * @return array{status: string, phone: string, phone_verified: bool, message: string}
+     */
+    public function sendCurrentPhoneVerification(Customer $customer): array
+    {
+        $phone = $this->normalizePhone((string) $customer->phone);
+
+        if ($phone === '') {
+            throw new ApiException(ErrorCode::INTERNAL_ERROR, 422, 'Phone number is required.');
+        }
+
+        if ($this->isCurrentPhoneVerified($customer)) {
+            throw new ApiException(ErrorCode::PHONE_SAME_AS_CURRENT, 422, 'The current phone number is already verified.');
+        }
+
+        SmsLogger::info('current_phone_sms_requested', [
+            'customer_id' => $customer->id,
+            'phone' => $phone,
+        ]);
+
+        $sent = $this->phoneVerification->sendSms($customer, $phone);
+
+        if (! $sent) {
+            SmsLogger::warning('current_phone_sms_not_sent', [
+                'customer_id' => $customer->id,
+                'phone' => $phone,
+            ]);
+
+            throw new ApiException(
+                ErrorCode::INTERNAL_ERROR,
+                502,
+                'Unable to send SMS verification code. Check SMS provider configuration and logs.',
+            );
+        }
+
+        return [
+            'status' => 'pending_verification',
+            'phone' => $phone,
+            'phone_verified' => false,
+            'message' => 'Verification code sent to the current phone number.',
+        ];
+    }
+
+    public function confirmCurrentPhone(Customer $customer, string $code): Customer
+    {
+        $phone = $this->normalizePhone((string) $customer->phone);
+
+        if ($phone === '') {
+            throw new ApiException(ErrorCode::INTERNAL_ERROR, 422, 'Phone number is required.');
+        }
+
+        if (! $this->phoneVerification->verify($customer, $phone, $code)) {
+            SmsLogger::warning('current_phone_confirm_failed', [
+                'customer_id' => $customer->id,
+                'phone' => $phone,
+            ]);
+
+            throw new ApiException(ErrorCode::PHONE_VERIFICATION_INVALID, 422, 'Invalid or expired verification code.');
+        }
+
+        SmsLogger::info('current_phone_confirmed', [
+            'customer_id' => $customer->id,
+            'phone' => $phone,
+        ]);
+
+        return $customer->fresh();
+    }
+
     public function cancelPendingChange(Customer $customer): void
     {
         $pendingPhone = $this->pendingChangePhone($customer);

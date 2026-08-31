@@ -35,9 +35,13 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
     Route::get('/', [DashboardController::class, 'index'])->name('');
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('.customers')->middleware('can:customers.view');
+    Route::get('/customers/create', [CustomerController::class, 'create'])->name('.customers.create')->middleware('can:customers.create');
+    Route::post('/customers', [CustomerController::class, 'store'])->name('.customers.store')->middleware('can:customers.create');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('.customers.show')->middleware('can:customers.view');
     Route::get('/customers/{customer}/transactions', [TransactionController::class, 'customer'])->name('.customers.transactions')->middleware('can:customers.view');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('.customers.update')->middleware('can:customers.edit');
+    Route::post('/customers/{customer}/phone/verify', [CustomerController::class, 'sendCurrentPhoneVerification'])->name('.customers.phone.verify.send')->middleware('can:customers.edit');
+    Route::post('/customers/{customer}/phone/verify/confirm', [CustomerController::class, 'confirmCurrentPhoneVerification'])->name('.customers.phone.verify.confirm')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/phone', [CustomerController::class, 'requestPhoneChange'])->name('.customers.phone.request')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/phone/resend', [CustomerController::class, 'resendPhoneChange'])->name('.customers.phone.resend')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/phone/cancel', [CustomerController::class, 'cancelPhoneChange'])->name('.customers.phone.cancel')->middleware('can:customers.edit');

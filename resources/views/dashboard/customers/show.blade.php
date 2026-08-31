@@ -33,6 +33,15 @@
             <p class="text-sm text-slate-500">{{ $customer->email }}</p>
         </div>
     </div>
+    @can('customers.create')
+    <a href="{{ route('dashboard.customers.create') }}"
+       class="ml-auto inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition shadow-sm shadow-indigo-500/25">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Novo cliente
+    </a>
+    @endcan
 </div>
 @endsection
 
@@ -358,6 +367,43 @@
                 </div>
 
                 @can('customers.edit')
+                @if (! $currentPhoneVerified && $customer->phone && ! $pendingPhoneChange)
+                <div class="border-t border-slate-100 pt-5 space-y-4">
+                    @if ($pendingCurrentPhoneVerification)
+                    <form method="POST" action="{{ route('dashboard.customers.phone.verify.confirm', $customer) }}" class="flex flex-col sm:flex-row gap-3 items-end">
+                        @csrf
+                        <div class="flex-1 w-full">
+                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Código SMS</label>
+                            <input type="text" name="code" value="{{ old('code') }}" required maxlength="10" autocomplete="one-time-code"
+                                   class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('code') border-red-400 @enderror">
+                            @error('code')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
+                        </div>
+                        <button type="submit"
+                                class="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors shadow-sm shadow-emerald-500/25 whitespace-nowrap">
+                            Confirmar telefone
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ route('dashboard.customers.phone.verify.send', $customer) }}">
+                        @csrf
+                        <button type="submit"
+                                class="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+                            Reenviar SMS
+                        </button>
+                    </form>
+                    @else
+                    <form method="POST" action="{{ route('dashboard.customers.phone.verify.send', $customer) }}">
+                        @csrf
+                        <button type="submit"
+                                class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-500/25">
+                            Enviar SMS
+                        </button>
+                    </form>
+                    @endif
+                </div>
+                @endif
+                @endcan
+
+                @can('customers.edit')
                 @if ($pendingPhoneChange)
                 <div class="border-t border-slate-100 pt-5 space-y-4">
                     <div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
@@ -414,7 +460,7 @@
                     </div>
                     <button type="submit"
                             class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-500/25">
-                        {{ $pendingPhoneChange ? 'Enviar para novo número' : 'Enviar código SMS' }}
+                        {{ $pendingPhoneChange ? 'Enviar para novo número' : 'Pedir código de alteração' }}
                     </button>
                 </form>
                 @endcan

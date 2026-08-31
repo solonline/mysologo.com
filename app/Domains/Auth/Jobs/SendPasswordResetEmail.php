@@ -3,6 +3,7 @@
 namespace App\Domains\Auth\Jobs;
 
 use App\Models\Customer;
+use App\Domains\Auth\Services\PasswordResetService;
 use App\Domains\Settings\Services\SettingsService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -33,6 +34,7 @@ class SendPasswordResetEmail implements ShouldQueue
                 'token' => $this->token,
                 'customer' => $customer,
                 'infoSystem' => $infoSystem,
+                'resetUrl' => app(PasswordResetService::class)->resetUrl($customer->email, $this->token),
             ], function ($message) use ($customer) {
                 $message->to($customer->email);
                 $message->subject('Password Reset Request');

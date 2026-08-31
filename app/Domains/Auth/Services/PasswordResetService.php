@@ -55,4 +55,12 @@ class PasswordResetService
 
         return true;
     }
+
+    public function resetUrl(string $email, string $token): string
+    {
+        return route('password.reset', [
+            'email' => $email,
+            'token' => $token,
+        ]);
+    }
 }

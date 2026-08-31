@@ -4,11 +4,13 @@ namespace App\Domains\Backoffice\Controllers;
 
 use App\Domains\Backoffice\Actions\CancelCustomerBalanceAdjustmentAction;
 use App\Domains\Backoffice\Actions\ConfirmCustomerBalanceAdjustmentAction;
+use App\Domains\Backoffice\Actions\CreateCustomerFromBackofficeAction;
 use App\Domains\Backoffice\Actions\RequestCustomerBalanceAdjustmentAction;
 use App\Domains\Backoffice\Actions\ResendCustomerBalanceAdjustmentOtpAction;
 use App\Domains\Backoffice\Actions\RetryCustomerProvisioningAction;
 use App\Domains\Backoffice\Actions\RetryStripeFundingAction;
 use App\Domains\Backoffice\Actions\UpdateCustomerFromBackofficeAction;
+use App\Domains\Backoffice\DTOs\CreateCustomerFromBackofficeData;
 use App\Domains\Backoffice\DTOs\UpdateCustomerFromBackofficeData;
 use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentStatus;
 use App\Domains\Backoffice\Queries\GetCustomerActivityTimelineQuery;
@@ -17,6 +19,7 @@ use App\Domains\Backoffice\Queries\GetRecentCustomerMovementsQuery;
 use App\Domains\Backoffice\Queries\ListCustomersQuery;
 use App\Domains\Backoffice\Requests\ConfirmCustomerBalanceAdjustmentRequest;
 use App\Domains\Backoffice\Requests\RequestCustomerBalanceAdjustmentRequest;
+use App\Domains\Backoffice\Requests\StoreCustomerRequest;
 use App\Domains\Backoffice\Requests\UpdateCustomerRequest;
 use App\Domains\Customer\Services\CustomerPhoneChangeService;
 use App\Domains\Kyc\Enums\DocumentStatus;
@@ -39,6 +42,7 @@ class CustomerController extends Controller
         protected GetCustomerDetailQuery $customerDetail,
         protected GetCustomerActivityTimelineQuery $customerActivityTimeline,
         protected GetRecentCustomerMovementsQuery $recentCustomerMovements,
+        protected CreateCustomerFromBackofficeAction $createCustomer,
         protected UpdateCustomerFromBackofficeAction $updateCustomer,
         protected RetryCustomerProvisioningAction $retryProvisioning,
         protected RetryStripeFundingAction $retryStripeFunding,
@@ -80,6 +84,7 @@ class CustomerController extends Controller
             'documentStatuses' => DocumentStatus::cases(),
             'currentPhoneVerified' => $this->phoneChange->isCurrentPhoneVerified($customer),
             'pendingPhoneChange' => $this->phoneChange->pendingChangePhone($customer),
+            'pendingCurrentPhoneVerification' => $this->phoneChange->pendingCurrentPhoneVerification($customer),
             'pendingBalanceAdjustment' => $pendingBalanceAdjustment,
             'currentPhoneVerifiedAt' => $customer->phone
                 ? $customer->phoneVerifications()
@@ -91,6 +96,21 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function create()
+    {
+        return view('dashboard.customers.create');
+    }
+
+    public function store(StoreCustomerRequest $request)
+    {
+        $customer = $this->createCustomer->execute(
+            CreateCustomerFromBackofficeData::fromValidated($request->validated()),
+        );
+
+        return redirect()->route('dashboard.customers.show', $customer)
+            ->with('success', 'Cliente criado. Foi enviado um email de verificação.');
+    }
+
     public function update(UpdateCustomerRequest $request, Customer $customer)
     {
         $this->updateCustomer->execute(
@@ -99,6 +119,28 @@ class CustomerController extends Controller
         );
 
         return back()->with('success', 'Cliente atualizado com sucesso.');
+    }
+
+    public function sendCurrentPhoneVerification(Customer $customer)
+    {
+        try {
+            $this->phoneChange->sendCurrentPhoneVerification($customer);
+        } catch (ApiException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'Código SMS enviado para o número actual. Confirme abaixo.');
+    }
+
+    public function confirmCurrentPhoneVerification(ConfirmPendingCustomerPhoneRequest $request, Customer $customer)
+    {
+        try {
+            $this->phoneChange->confirmCurrentPhone($customer, $request->validated('code'));
+        } catch (ApiException $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'Telefone confirmado com sucesso.');
     }
 
     public function requestPhoneChange(ChangeCustomerPhoneRequest $request, Customer $customer)

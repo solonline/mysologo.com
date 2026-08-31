@@ -9,6 +9,15 @@
         <h1 class="text-2xl font-bold text-slate-900">Clientes</h1>
         <p class="mt-1 text-sm text-slate-500">Gerencie todos os clientes cadastrados no sistema.</p>
     </div>
+    @can('customers.create')
+    <a href="{{ route('dashboard.customers.create') }}"
+       class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition shadow-sm shadow-indigo-500/25">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Novo cliente
+    </a>
+    @endcan
 </div>
 @endsection
 

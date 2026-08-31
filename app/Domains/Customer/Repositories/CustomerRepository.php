@@ -22,6 +22,8 @@ class CustomerRepository implements CustomerRepositoryInterface
             'name' => $dto->name,
             'username' => $dto->username,
             'phone' => $dto->phone,
+            'language' => $dto->language,
+            'currency' => $dto->currency,
             'status' => CustomerLifecycleStatus::PENDING_EMAIL_VERIFICATION,
         ], fn ($v) => ! is_null($v)));
     }
