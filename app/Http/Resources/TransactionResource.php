@@ -23,6 +23,24 @@ class TransactionResource extends JsonResource
             'payment_method_type' => $this->payment_method_type,
             'description' => $this->description,
 
+            'counterparty' => $this->when(
+                $this->type === TransactionType::P2P,
+                function () {
+                    $customer = $this->p2pCounterparty();
+                    if (! $customer) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => $customer->id,
+                        'name' => $customer->name,
+                        'username' => $customer->username,
+                        'avatar_url' => $customer->avatar ? asset('storage/'.$customer->avatar) : null,
+                        'role' => $this->p2pCounterpartyRole(),
+                    ];
+                }
+            ),
+
             'bank_transfer' => $this->when(
                 $this->bank_transfer_type !== null,
                 fn () => [

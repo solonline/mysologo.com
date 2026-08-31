@@ -88,7 +88,7 @@ class DocsController extends Controller
 
         return response(File::get($full), 200, [
             'Content-Type' => 'text/yaml; charset=utf-8',
-            'Cache-Control' => 'public, max-age=300',
+            'Cache-Control' => 'no-store, max-age=0',
         ]);
     }
 

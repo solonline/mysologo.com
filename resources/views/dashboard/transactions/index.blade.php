@@ -41,6 +41,7 @@
         'not_required' => 'N/A',
         'pending' => 'Pendente',
         'awaiting_liquidity' => 'Aguarda liquidez',
+        'awaiting_stripe_payout' => 'Aguarda payout Stripe',
         'failed' => 'Falhou',
         'completed' => 'Concluído',
     ];
@@ -179,6 +180,15 @@
                     $isCredit = $tx->direction?->value === 'credit' || $tx->direction === 'credit';
                     $txDate = $tx->stripe_created_at ?? $tx->created_at;
                     $settlementRoute = $tx->topupSettlementRoute();
+                    $p2pCounterparty = $tx->p2pCounterparty();
+                    $p2pRole = $tx->p2pCounterpartyRole();
+                    $p2pHandle = $p2pCounterparty?->username ? '@'.$p2pCounterparty->username : null;
+                    $p2pParty = $p2pCounterparty
+                        ? trim(($p2pHandle ?: '').($p2pHandle && $p2pCounterparty->name ? ' · ' : '').($p2pCounterparty->name ?? ''))
+                        : null;
+                    $p2pLabel = $p2pParty
+                        ? (($p2pRole === 'sender' ? 'De' : 'Para').': '.$p2pParty)
+                        : null;
 
                     $stripeFields = array_values(array_filter([
                         ['label' => 'Data', 'value' => $txDate?->format('d/m/Y H:i')],
@@ -186,6 +196,8 @@
                         $tx->customer?->email ? ['label' => 'Email', 'value' => $tx->customer->email] : null,
                         ['label' => 'Tipo', 'value' => $tx->type?->label() ?? '—'],
                         ['label' => 'Direção', 'value' => $isCredit ? 'Crédito' : 'Débito'],
+                        $p2pParty ? ['label' => $p2pRole === 'sender' ? 'Remetente (P2P)' : 'Destinatário (P2P)', 'value' => $p2pParty, 'link' => route('dashboard.customers.show', $p2pCounterparty)] : null,
+                        $p2pCounterparty?->email ? ['label' => 'Email contraparte', 'value' => $p2pCounterparty->email] : null,
                         ['label' => 'Status', 'value' => $tx->status ?? '—'],
                         ['label' => 'Método pagamento', 'value' => $tx->payment_method_type ?? null],
                         $tx->stripe_payment_intent_id ? ['label' => 'PaymentIntent', 'value' => $tx->stripe_payment_intent_id, 'mono' => true, 'full' => true] : null,
@@ -241,6 +253,9 @@
                     </td>
                     <td>
                         <span class="text-sm text-slate-700">{{ $tx->type?->label() ?? '—' }}</span>
+                        @if ($p2pLabel)
+                        <span class="text-xs text-slate-500 block max-w-[200px] truncate" title="{{ $p2pLabel }}">{{ $p2pLabel }}</span>
+                        @endif
                         <span class="text-xs text-slate-400 block">#{{ $tx->id }}</span>
                     </td>
                     <td class="whitespace-nowrap">

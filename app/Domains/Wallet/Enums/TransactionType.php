@@ -36,6 +36,7 @@ enum TransactionType: string
     case GRABPAY = 'grabpay';
     case P2P = 'p2p';
     case TOPUP = 'topup';
+    case MERCHANT_PAYMENT = 'merchant_payment';
     case CUSTOMER_BALANCE = 'customer_balance';
 
     public function label(): string
@@ -73,6 +74,7 @@ enum TransactionType: string
             self::GRABPAY => 'GrabPay',
             self::P2P => 'P2P',
             self::TOPUP => 'Carregamento',
+            self::MERCHANT_PAYMENT => 'Venda SecurePay',
             self::CUSTOMER_BALANCE => 'Saldo do Cliente',
         };
     }

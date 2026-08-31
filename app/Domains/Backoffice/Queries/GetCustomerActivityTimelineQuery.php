@@ -23,6 +23,8 @@ class GetCustomerActivityTimelineQuery
     {
         $stripeItems = StripeTransaction::query()
             ->where('customer_id', $customer->id)
+            ->where('type', '!=', \App\Domains\Wallet\Enums\TransactionType::MERCHANT_PAYMENT->value)
+            ->with('relatedStripeTransaction.customer')
             ->latest('stripe_created_at')
             ->limit($limit)
             ->get()
@@ -69,6 +71,7 @@ class GetCustomerActivityTimelineQuery
     private function fromStripeTransaction(StripeTransaction $transaction): CustomerActivityItem
     {
         $direction = $transaction->direction?->value ?? (string) $transaction->direction;
+        $counterparty = $transaction->p2pCounterparty();
 
         return new CustomerActivityItem(
             source: 'stripe',
@@ -82,6 +85,9 @@ class GetCustomerActivityTimelineQuery
             description: $transaction->description,
             bankTransferSenderName: $transaction->bank_transfer_sender_name,
             bankTransferIbanLast4: $transaction->bank_transfer_iban_last4,
+            p2pCounterpartyName: $counterparty?->name,
+            p2pCounterpartyUsername: $counterparty?->username,
+            p2pCounterpartyRole: $transaction->p2pCounterpartyRole(),
             stripeTransaction: $transaction,
             sourceLabel: 'Stripe',
         );

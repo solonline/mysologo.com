@@ -9,6 +9,7 @@ return [
 
     'status' => [
         'completed' => 'Plată finalizată',
+        'completed_hint' => 'Mulțumim. Plata a fost înregistrată cu succes.',
         'failed'    => 'Plată eșuată. Vă rugăm să încercați din nou.',
         'expired'   => 'Acest link a expirat.',
         'cancelled' => 'Acest link a fost anulat.',

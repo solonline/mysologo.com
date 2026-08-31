@@ -78,13 +78,12 @@ class CustomerDashboardShowTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)
+        $response = $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.show', $customer));
 
         $response->assertOk();
-        $response->assertSee('Verificação Didit');
-        $response->assertSee('9e06e806-4b55-4b79-b7fa-792287ae7ed8');
-        $response->assertSee('c159a625-9dde-444c-990d-9accf2298448');
+        $response->assertDontSee('Verificação Didit');
+        $response->assertSee('Documentos KYC');
         $response->assertSee('Motivos da verificação');
         $response->assertSee('Screen capture of document detected');
         $response->assertSee('SCREEN_CAPTURE_DETECTED');
@@ -105,11 +104,12 @@ class CustomerDashboardShowTest extends TestCase
             'bank_transfer_type' => 'eu_bank_transfer',
         ]);
 
-        $response = $this->actingAs($user)
+        $response = $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.show', $customer));
 
         $response->assertOk();
-        $response->assertSee('IBAN de Funding (Stripe)');
+        $response->assertSee('Conta Stripe');
+        $response->assertSee('IBAN');
         $response->assertSee('DE89370400440532013000');
         $response->assertSee('COBADEFFXXX');
         $response->assertSee('Mario Rossi');
@@ -119,7 +119,10 @@ class CustomerDashboardShowTest extends TestCase
     public function test_customer_show_displays_stripe_funding_failure_and_retry_button(): void
     {
         $user = User::factory()->create();
-        $user->givePermissionTo(['customers.view', 'customers.edit']);
+        $user->givePermissionTo([
+            Permission::findByName('customers.view', 'web'),
+            Permission::findByName('customers.edit', 'web'),
+        ]);
 
         $customer = Customer::factory()->create(['doc_status' => 'approved']);
         $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE, 'cus_show_failed', [
@@ -127,11 +130,11 @@ class CustomerDashboardShowTest extends TestCase
             'funding_status_reason' => 'Stripe API unavailable',
         ]);
 
-        $response = $this->actingAs($user)
+        $response = $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.show', $customer));
 
         $response->assertOk();
-        $response->assertSee('IBAN de Funding (Stripe)');
+        $response->assertSee('Conta Stripe');
         $response->assertSee('A criação do IBAN falhou.');
         $response->assertSee('Stripe API unavailable');
         $response->assertSee('Repetir criação do IBAN');
@@ -183,7 +186,7 @@ class CustomerDashboardShowTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($user)
+        $response = $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.show', $customer));
 
         $response->assertOk();
@@ -257,13 +260,74 @@ class CustomerDashboardShowTest extends TestCase
             ]);
         }
 
-        $response = $this->actingAs($user)
+        $response = $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.show', $customer));
 
         $response->assertOk();
         $response->assertSee(route('dashboard.customers.transactions', $customer), false);
         $response->assertSee('Movimento resumo 12');
         $this->assertSame(10, substr_count($response->getContent(), 'data-customer-movement'));
+    }
+
+    public function test_customer_show_displays_merchant_info_and_payment_requests(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'email_verified_at' => now(),
+            'doc_status' => 'approved',
+            'currency' => 'EUR',
+        ]);
+
+        $merchant = \App\Models\Merchant::query()->create([
+            'customer_id' => $customer->id,
+            'name' => 'Loja Backoffice',
+            'slug' => 'loja-backoffice-'.uniqid(),
+            'api_key' => hash('sha256', 'yoop_test_bo_'.uniqid()),
+            'mode' => 'test',
+            'webhook_url' => 'https://loja.exemplo.com/webhook',
+            'is_active' => true,
+        ]);
+
+        $transaction = StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::MERCHANT_PAYMENT,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 2599,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 2599,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'Pedido BO',
+            'stripe_created_at' => now(),
+        ]);
+
+        \App\Models\MerchantPaymentRequest::query()->create([
+            'merchant_id' => $merchant->id,
+            'transaction_id' => $transaction->id,
+            'amount' => 2599,
+            'currency' => 'EUR',
+            'description' => 'Pedido BO',
+            'external_reference' => 'ORD-BO-42',
+            'status' => 'completed',
+            'paid_at' => now(),
+            'expires_at' => now()->addHour(),
+            'language' => 'pt',
+        ]);
+
+        $response = $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertSee('SecurePay');
+        $response->assertSee('Loja Backoffice');
+        $response->assertSee('https://loja.exemplo.com/webhook');
+        $response->assertSee('25,99');
+        $response->assertSee('ORD-BO-42');
+        $response->assertSee('Pago');
+        $response->assertSee('Transações');
     }
 
     private function userWithPermission(string $permission): User

@@ -17,7 +17,9 @@ enum StripePaymentIntentStatus: string
 
     public static function fromStripe(?string $status): self
     {
-        return self::tryFrom((string) $status) ?? self::RequiresPaymentMethod;
+        $status = $status === 'cancelled' ? 'canceled' : (string) $status;
+
+        return self::tryFrom($status) ?? self::RequiresPaymentMethod;
     }
 
     public function isOpen(): bool

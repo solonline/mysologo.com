@@ -7,7 +7,7 @@
 <div class="flex items-center justify-between gap-4">
     <div>
         <h1 class="text-2xl font-bold text-slate-900">Receita Platform</h1>
-        <p class="mt-1 text-sm text-slate-500">Taxas Yoop cobradas em top-ups Stripe. P2P não gera taxa platform.</p>
+        <p class="mt-1 text-sm text-slate-500">Taxas Yoop cobradas em top-ups e SecurePay. Separadas entre liquidadas e a aguardar settlement Stripe.</p>
     </div>
     <a href="{{ route('dashboard.transactions', ['tab' => 'stripe', 'with_platform_fee' => 1]) }}"
        class="btn-secondary btn-sm">
@@ -63,25 +63,40 @@
 <div class="mb-8">
     <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wide mb-4">{{ $summary->currency }}</h2>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
         <div class="card p-5">
-            <p class="text-xs font-semibold text-slate-500 uppercase">Acumulado</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Total acumulado</p>
             <p class="text-2xl font-bold text-slate-900 mt-1">{{ number_format($summary->accruedCents / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
+            <p class="text-xs text-slate-400 mt-2">{{ number_format($summary->transactionCount) }} transações · este mês {{ number_format($summary->monthAccruedCents / 100, 2, ',', '.') }}</p>
         </div>
-        <div class="card p-5">
-            <p class="text-xs font-semibold text-slate-500 uppercase">Este mês</p>
-            <p class="text-2xl font-bold text-slate-900 mt-1">{{ number_format($summary->monthAccruedCents / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
+        <div class="card p-5 border-emerald-200/80">
+            <p class="text-xs font-semibold text-emerald-700 uppercase">Liquidado</p>
+            <p class="text-2xl font-bold text-emerald-800 mt-1">{{ number_format($summary->settledCents / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
+            <p class="text-xs text-emerald-700/70 mt-2">{{ number_format($summary->settledTransactionCount) }} txs · este mês {{ number_format($summary->monthSettledCents / 100, 2, ',', '.') }}</p>
         </div>
+        <div class="card p-5 border-amber-200/80">
+            <p class="text-xs font-semibold text-amber-700 uppercase">Aguarda liquidação</p>
+            <p class="text-2xl font-bold text-amber-800 mt-1">{{ number_format($summary->pendingCents / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
+            <p class="text-xs text-amber-700/70 mt-2">{{ number_format($summary->pendingTransactionCount) }} txs · este mês {{ number_format($summary->monthPendingCents / 100, 2, ',', '.') }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div class="card p-5">
-            <p class="text-xs font-semibold text-slate-500 uppercase">No ledger</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase">No ledger platform</p>
             <p class="text-2xl font-bold text-slate-900 mt-1">{{ number_format($summary->ledgerCents / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
-        </div>
-        <div class="card p-5">
-            <p class="text-xs font-semibold text-slate-500 uppercase">Transações</p>
-            <p class="text-2xl font-bold text-slate-900 mt-1">{{ number_format($summary->transactionCount) }}</p>
+            <p class="text-xs text-slate-400 mt-2">Créditos já registados na conta platform</p>
             @if (! $summary->ledgerMatchesStripe)
-            <p class="text-xs text-amber-600 mt-2 font-medium">Delta: {{ number_format(($summary->accruedCents - $summary->ledgerCents) / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
+            <p class="text-xs text-amber-600 mt-2 font-medium">Delta vs acumulado: {{ number_format(($summary->accruedCents - $summary->ledgerCents) / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
             @endif
+        </div>
+        <div class="card p-5 bg-slate-50/60">
+            <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Como ler</p>
+            <ul class="text-xs text-slate-600 space-y-1.5 leading-relaxed">
+                <li><span class="font-semibold text-emerald-700">Liquidado</span> — taxa de transações com settlement concluído (<code class="text-[10px]">balance_settled_at</code>).</li>
+                <li><span class="font-semibold text-amber-700">Aguarda liquidação</span> — taxa já calculada, à espera do payout Stripe / settlement.</li>
+                <li><span class="font-semibold text-slate-700">Ledger</span> — valor já creditado na wallet platform (pode incluir pendentes).</li>
+            </ul>
         </div>
     </div>
 
@@ -90,9 +105,11 @@
         <p class="text-xs font-semibold text-slate-500 uppercase mb-3">Últimos meses</p>
         <div class="flex flex-wrap gap-3">
             @foreach ($summary->monthlyBreakdown as $monthRow)
-            <div class="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2 text-center min-w-[88px]">
+            <div class="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2 text-center min-w-[108px]">
                 <p class="text-[10px] font-semibold text-slate-500">{{ $monthRow['month'] }}</p>
                 <p class="text-sm font-bold text-slate-800">{{ number_format($monthRow['amount_cents'] / 100, 2, ',', '.') }}</p>
+                <p class="text-[10px] text-emerald-700 mt-1">Liq. {{ number_format($monthRow['settled_cents'] / 100, 2, ',', '.') }}</p>
+                <p class="text-[10px] text-amber-700">Pend. {{ number_format($monthRow['pending_cents'] / 100, 2, ',', '.') }}</p>
             </div>
             @endforeach
         </div>
@@ -119,22 +136,33 @@
                     <th>Taxa Stripe</th>
                     <th>Taxa Platform</th>
                     <th>Líquido</th>
+                    <th>Liquidação</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($transactions as $tx)
-                @php $txDate = $tx->stripe_created_at ?? $tx->created_at; @endphp
+                @php
+                    $txDate = $tx->stripe_created_at ?? $tx->created_at;
+                    $isSettled = $tx->balance_settled_at !== null;
+                @endphp
                 <tr>
                     <td class="text-sm text-slate-600 whitespace-nowrap">{{ $txDate?->format('d/m/Y H:i') ?? '—' }}</td>
                     <td>
                         <p class="text-sm font-medium text-slate-800">{{ $tx->customer?->name ?? '—' }}</p>
-                        <p class="text-xs text-slate-400">#{{ $tx->id }}</p>
+                        <p class="text-xs text-slate-400">#{{ $tx->id }} · {{ $tx->type?->label() ?? '—' }}</p>
                     </td>
                     <td class="text-sm font-mono text-slate-700">{{ number_format($tx->amount / 100, 2, ',', '.') }} {{ strtoupper($tx->currency) }}</td>
                     <td class="text-sm font-mono text-slate-500">{{ number_format($tx->stripe_fee / 100, 2, ',', '.') }}</td>
                     <td class="text-sm font-mono font-semibold text-emerald-700">{{ number_format($tx->platform_fee / 100, 2, ',', '.') }}</td>
                     <td class="text-sm font-mono text-slate-700">{{ number_format($tx->net_amount / 100, 2, ',', '.') }}</td>
+                    <td>
+                        @if ($isSettled)
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">Liquidado</span>
+                        @else
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">Aguarda</span>
+                        @endif
+                    </td>
                     <td>
                         <a href="{{ route('dashboard.transactions', ['tab' => 'stripe', 'search' => $tx->id]) }}"
                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Ver →</a>
@@ -142,7 +170,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="text-center text-sm text-slate-400 py-8">Nenhuma transação com taxa platform no período.</td>
+                    <td colspan="8" class="text-center text-sm text-slate-400 py-8">Nenhuma transação com taxa platform no período.</td>
                 </tr>
                 @endforelse
             </tbody>

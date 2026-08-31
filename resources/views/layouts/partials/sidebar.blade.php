@@ -114,6 +114,9 @@
             </svg>
             <span x-show="!sidebarCollapsed" x-cloak>Transações</span>
         </a>
+        @endcan
+
+        @can('transactions.view')
         <a href="{{ route('dashboard.platform-revenue') }}"
            class="sidebar-item {{ request()->routeIs('dashboard.platform-revenue*') ? 'active' : '' }}">
             <svg class="sidebar-icon w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

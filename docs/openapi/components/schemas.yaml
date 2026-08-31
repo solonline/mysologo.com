@@ -425,13 +425,35 @@ MerchantPaymentRequest:
     external_reference:
       type: string
       nullable: true
+    payment_method_types:
+      type: array
+      nullable: true
+      items:
+        type: string
     status:
       type: string
+      description: Estado do pedido (`pending`, `processing`, `completed`, `failed`, `expired`, `cancelled`)
+    settlement_status:
+      type: string
+      nullable: true
+      enum: [pending, available]
+      description: |
+        Presente quando `status=completed`.
+        `pending` = pago pelo cliente, fundos ainda a aguardar liquidação (ainda não disponíveis).
+        `available` = liquidado e disponível na wallet (fase futura de payout).
     url:
       type: string
       format: uri
       description: URL pública de pagamento (`/pay/{uuid}`)
+    paid_at:
+      type: string
+      format: date-time
+      nullable: true
     expires_at:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
       type: string
       format: date-time
       nullable: true
@@ -441,7 +463,7 @@ TerminalConnectionToken:
   properties:
     secret:
       type: string
-      description: Secret para o Stripe Terminal SDK
+      description: Secret para inicializar o SDK do terminal no POS
 
 TerminalPaymentIntent:
   type: object

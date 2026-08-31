@@ -5,12 +5,13 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolesSeeder extends Seeder
 {
     public function run(): void
     {
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Permissões por módulo
         $permissions = [
@@ -57,9 +58,9 @@ class RolesSeeder extends Seeder
 
         // Roles
         $superAdmin = Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
-        $admin      = Role::firstOrCreate(['name' => 'admin',       'guard_name' => 'web']);
-        $manager    = Role::firstOrCreate(['name' => 'manager',     'guard_name' => 'web']);
-        $support    = Role::firstOrCreate(['name' => 'support',     'guard_name' => 'web']);
+        $admin = Role::firstOrCreate(['name' => 'admin',       'guard_name' => 'web']);
+        $manager = Role::firstOrCreate(['name' => 'manager',     'guard_name' => 'web']);
+        $support = Role::firstOrCreate(['name' => 'support',     'guard_name' => 'web']);
 
         // super-admin tem tudo
         $superAdmin->syncPermissions(Permission::where('guard_name', 'web')->get());

@@ -13,6 +13,7 @@ class MerchantResource extends JsonResource
             'id'                 => $this->id,
             'name'               => $this->name,
             'slug'               => $this->slug,
+            'mode'               => $this->mode,
             'webhook_url'        => $this->webhook_url,
             'allowed_currencies' => $this->allowed_currencies,
             'is_active'          => $this->is_active,

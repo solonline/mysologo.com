@@ -130,6 +130,15 @@ class WalletAuditService
                 $expectedPlatformFee = $feeConfig->calculatePlatformFee((int) $transaction->amount);
 
                 if ((int) $transaction->platform_fee !== $expectedPlatformFee) {
+                    // Config may have changed after the payment — do not flag historical fees.
+                    if (
+                        $feeConfig->updated_at !== null
+                        && $transaction->created_at !== null
+                        && $feeConfig->updated_at->gt($transaction->created_at)
+                    ) {
+                        return;
+                    }
+
                     $findings[] = new AuditFinding(
                         severity: 'warning',
                         code: 'PLATFORM_FEE_DRIFT',
@@ -227,6 +236,11 @@ class WalletAuditService
             ->where('net_amount', '>', 0)
             ->whereNull('balance_settled_at')
             ->each(function (StripeTransaction $transaction) use (&$findings): void {
+                // Already in available or intentionally held in pending — not a missing credit.
+                if ($this->hasAvailableWalletCredit($transaction) || $this->hasPendingWalletCredit($transaction)) {
+                    return;
+                }
+
                 $findings[] = new AuditFinding(
                     severity: 'warning',
                     code: 'UNSETTLED_WALLET_CREDIT',
@@ -251,7 +265,6 @@ class WalletAuditService
             $customerIdValue = (int) $pair['customer_id'];
             $currencyValue = strtoupper((string) $pair['currency']);
 
-            $expectedFromLedger = $this->ledgerService->recalculateBalance($customerIdValue, $currencyValue);
             $expectedFromSettledTx = (int) StripeTransaction::query()
                 ->where('customer_id', $customerIdValue)
                 ->where('currency', $currencyValue)
@@ -274,19 +287,7 @@ class WalletAuditService
                 ->where('currency', $currencyValue)
                 ->count();
 
-            if ($ledgerEntryCount > 0 && $available !== $expectedFromLedger) {
-                $findings[] = new AuditFinding(
-                    severity: 'critical',
-                    code: 'LEDGER_BALANCE_MISMATCH',
-                    message: 'customer_balances.available does not match ledger sum.',
-                    context: [
-                        'customer_id' => $customerIdValue,
-                        'currency' => $currencyValue,
-                        'available' => $available,
-                        'ledger_available' => $expectedFromLedger,
-                    ],
-                );
-            }
+            // LEDGER_BALANCE_MISMATCH is emitted solely by checkBalanceConsistency to avoid duplicates.
 
             if ($expectedFromSettledTx > 0 && $available !== $expectedFromSettledTx && $ledgerEntryCount === 0) {
                 $findings[] = new AuditFinding(
@@ -348,6 +349,15 @@ class WalletAuditService
         }
 
         $query->each(function (CustomerBalance $balance) use (&$findings): void {
+            $explainedPending = $this->explainedPendingCents(
+                (int) $balance->customer_id,
+                strtoupper($balance->currency),
+            );
+
+            if ((int) $balance->pending <= $explainedPending) {
+                return;
+            }
+
             $findings[] = new AuditFinding(
                 severity: 'warning',
                 code: 'STALE_PENDING_BALANCE',
@@ -357,11 +367,47 @@ class WalletAuditService
                     'currency' => strtoupper($balance->currency),
                     'pending' => (int) $balance->pending,
                     'available' => (int) $balance->available,
+                    'explained_pending' => $explainedPending,
                 ],
             );
         });
 
         return $findings;
+    }
+
+    /**
+     * Pending that is expected: last snapshot's pending_after when present,
+     * otherwise open PAYMENT_RECEIVED in pending bucket
+     * (merchant awaiting Stripe payout, or top-up awaiting Wallester release).
+     */
+    private function explainedPendingCents(int $customerId, string $currency): int
+    {
+        $latestPendingAfter = LedgerEntry::query()
+            ->where('customer_id', $customerId)
+            ->where('currency', $currency)
+            ->whereNotNull('pending_after')
+            ->orderByDesc('id')
+            ->value('pending_after');
+
+        if ($latestPendingAfter !== null) {
+            return max(0, (int) $latestPendingAfter);
+        }
+
+        $pendingCredits = (int) LedgerEntry::query()
+            ->where('customer_id', $customerId)
+            ->where('currency', $currency)
+            ->where('direction', TransactionDirection::Credit)
+            ->where('metadata->bucket', 'pending')
+            ->sum('amount');
+
+        $pendingDebits = (int) LedgerEntry::query()
+            ->where('customer_id', $customerId)
+            ->where('currency', $currency)
+            ->where('direction', TransactionDirection::Debit)
+            ->where('metadata->bucket', 'pending')
+            ->sum('amount');
+
+        return max(0, $pendingCredits - $pendingDebits);
     }
 
     /** @return list<AuditFinding> */
@@ -643,6 +689,43 @@ class WalletAuditService
             ->where('reference_type', $transaction->getMorphClass())
             ->where('reference_id', $transaction->id)
             ->where('entry_type', LedgerEntryType::PAYMENT_RECEIVED)
+            ->exists();
+    }
+
+    private function hasAvailableWalletCredit(StripeTransaction $transaction): bool
+    {
+        $hasAvailablePayment = LedgerEntry::query()
+            ->where('reference_type', $transaction->getMorphClass())
+            ->where('reference_id', $transaction->id)
+            ->where('entry_type', LedgerEntryType::PAYMENT_RECEIVED)
+            ->where(function ($query): void {
+                $query->whereNull('metadata->bucket')
+                    ->orWhere('metadata->bucket', '!=', 'pending');
+            })
+            ->exists();
+
+        if ($hasAvailablePayment) {
+            return true;
+        }
+
+        return LedgerEntry::query()
+            ->where('reference_type', $transaction->getMorphClass())
+            ->where('reference_id', $transaction->id)
+            ->where('entry_type', LedgerEntryType::PARTNER_FUNDING_RELEASED)
+            ->exists();
+    }
+
+    private function hasPendingWalletCredit(StripeTransaction $transaction): bool
+    {
+        if ($this->ledgerService->hasPendingCreditReversal($transaction)) {
+            return false;
+        }
+
+        return LedgerEntry::query()
+            ->where('reference_type', $transaction->getMorphClass())
+            ->where('reference_id', $transaction->id)
+            ->where('entry_type', LedgerEntryType::PAYMENT_RECEIVED)
+            ->where('metadata->bucket', 'pending')
             ->exists();
     }
 

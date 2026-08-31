@@ -64,11 +64,12 @@ class PlatformRevenueDashboardTest extends TestCase
             'description' => PlatformRevenueService::LEDGER_PLATFORM_FEE_DESCRIPTION_PREFIX.$transaction->id,
         ]);
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.platform-revenue'))
             ->assertOk()
             ->assertSee('Receita Platform')
-            ->assertSee('P2P não gera taxa platform')
+            ->assertSee('Liquidado')
+            ->assertSee('Aguarda liquidação')
             ->assertSee('0,10')
             ->assertSee('Cliente Taxa Platform')
             ->assertSee('Transações com taxa platform');
@@ -111,7 +112,7 @@ class PlatformRevenueDashboardTest extends TestCase
             'status' => 'succeeded',
         ]);
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->get(route('dashboard.transactions', ['tab' => 'stripe', 'with_platform_fee' => 1]))
             ->assertOk()
             ->assertSee('Com taxa platform')
@@ -192,10 +193,10 @@ class PlatformRevenueDashboardTest extends TestCase
 
     private function userWithPermission(string $permission): User
     {
-        Permission::findOrCreate($permission);
+        $permissionModel = Permission::findOrCreate($permission, 'web');
 
         $user = User::factory()->create();
-        $user->givePermissionTo($permission);
+        $user->givePermissionTo($permissionModel);
 
         return $user;
     }

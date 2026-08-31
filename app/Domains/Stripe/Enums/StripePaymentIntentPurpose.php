@@ -9,4 +9,5 @@ enum StripePaymentIntentPurpose: string
     case Topup = 'topup';
     case Terminal = 'terminal';
     case BankTransferTopup = 'bank_transfer_topup';
+    case MerchantPayment = 'merchant_payment';
 }

@@ -3,17 +3,15 @@
 namespace App\Domains\Merchant\Controllers;
 
 use App\Domains\Merchant\Services\MerchantService;
-use App\Models\MerchantPaymentRequest;
-use App\Models\StripePaymentMethodFee;
 use App\Domains\Settings\Services\SettingsService;
+use App\Domains\Stripe\Enums\StripePaymentIntentStatus;
+use App\Models\MerchantPaymentRequest;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\App;
 
 class PayController extends Controller
 {
-    private const LINK_VISIBLE_DAYS = 7;
-
     public function __construct(
         protected MerchantService $merchantService,
         protected SettingsService $settingsService,
@@ -22,12 +20,8 @@ class PayController extends Controller
     public function show(Request $request, string $uuid)
     {
         $paymentRequest = MerchantPaymentRequest::where('uuid', $uuid)
-            ->with(['merchant.customer', 'payer'])
+            ->with(['merchant.customer', 'payer', 'stripePaymentIntent'])
             ->firstOrFail();
-
-        if ($paymentRequest->created_at->addDays(self::LINK_VISIBLE_DAYS)->isPast()) {
-            abort(404);
-        }
 
         App::setLocale($paymentRequest->language ?? 'pt');
 
@@ -38,24 +32,38 @@ class PayController extends Controller
 
         $customerCurrency = strtoupper($paymentRequest->merchant->customer->currency ?? 'EUR');
 
-        $paymentMethodTypes = StripePaymentMethodFee::where('currency', $customerCurrency)
-            ->where('is_active', true)
-            ->get()
-            ->map(fn (StripePaymentMethodFee $fee) => $fee->stripePaymentMethodType())
-            ->unique()
-            ->values()
-            ->all();
-
         $clientSecret = null;
         $awaitingConfirmation = false;
         $publishableKey = $this->settingsService->getByKey("stripe.{$customerCurrency}.public_key");
 
         $redirectStatus = $request->query('redirect_status');
+        $piStatus = $paymentRequest->stripePaymentIntent?->status;
 
         if ($redirectStatus === 'succeeded' && $paymentRequest->isProcessing()) {
             $awaitingConfirmation = true;
+        } elseif ($piStatus === StripePaymentIntentStatus::Succeeded) {
+            if ($paymentRequest->status !== 'completed') {
+                $paymentRequest->update([
+                    'status' => 'completed',
+                    'paid_at' => $paymentRequest->paid_at ?? now(),
+                ]);
+                $paymentRequest->refresh();
+            }
+        } elseif ($piStatus === StripePaymentIntentStatus::Canceled) {
+            if ($paymentRequest->status !== 'cancelled') {
+                $paymentRequest->update(['status' => 'cancelled']);
+                $paymentRequest->refresh();
+            }
+        } elseif ($piStatus === StripePaymentIntentStatus::Failed) {
+            if ($paymentRequest->status !== 'failed') {
+                $paymentRequest->update(['status' => 'failed']);
+                $paymentRequest->refresh();
+            }
+        } elseif ($piStatus === StripePaymentIntentStatus::Processing
+            || $piStatus === StripePaymentIntentStatus::RequiresCapture) {
+            $awaitingConfirmation = true;
         } elseif ($paymentRequest->isPayable()) {
-            $result = $this->merchantService->initializePayment($paymentRequest, $paymentMethodTypes);
+            $result = $this->merchantService->initializePayment($paymentRequest);
             if ($result !== null) {
                 $clientSecret = $result['client_secret'];
             }
@@ -69,12 +77,30 @@ class PayController extends Controller
             default => 'PT',
         };
 
+        $isEmbed = $request->boolean('embed')
+            || $request->headers->get('Sec-Fetch-Dest') === 'iframe';
+
+        $returnUrl = null;
+        $candidateReturnUrl = $request->query('return_url');
+        if (is_string($candidateReturnUrl) && $candidateReturnUrl !== '') {
+            $parts = parse_url($candidateReturnUrl);
+            if (
+                is_array($parts)
+                && in_array($parts['scheme'] ?? '', ['http', 'https'], true)
+                && ! empty($parts['host'])
+            ) {
+                $returnUrl = $candidateReturnUrl;
+            }
+        }
+
         return view('pay.show', compact(
             'paymentRequest',
             'clientSecret',
             'publishableKey',
             'billingCountry',
             'awaitingConfirmation',
+            'isEmbed',
+            'returnUrl',
         ));
     }
 }

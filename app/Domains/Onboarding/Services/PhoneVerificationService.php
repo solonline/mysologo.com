@@ -4,7 +4,6 @@ namespace App\Domains\Onboarding\Services;
 
 use App\Domains\Onboarding\Contracts\PhoneVerificationRepositoryInterface;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
-use App\Domains\Onboarding\Services\CustomerLifecycleService;
 use App\Domains\Sms\Contracts\SmsGatewayInterface;
 use App\Domains\Sms\Support\SmsLogger;
 use App\Models\Customer;
@@ -58,8 +57,10 @@ class PhoneVerificationService
         $code = random_int(100000, 999999);
         $verification = $this->createOrUpdate($customer, $phone, (string) $code);
 
-        $message = "Olá! Para concluir sua verificação na Yoop, utilize o código: {$code}. \n";
-        $message .= 'Obrigado por escolher a Yoop!';
+        $message = "Ola utilize o código: {$code}. \n";
+        $message .= 'Obrigado por escolher a Yoop.';
+
+        // $message = $code;
 
         SmsLogger::info('phone_verification_sms_dispatch', [
             'customer_id' => $customer->id,

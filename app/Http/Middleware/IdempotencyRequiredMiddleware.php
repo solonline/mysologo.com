@@ -16,9 +16,9 @@ class IdempotencyRequiredMiddleware
      */
     public function handle($request, Closure $next)
     {
-        if (!$request->header('Idempotency-Key')) {
+        if (! $request->header('Idempotency-Key')) {
             return response()->json([
-                'error' => 'Idempotency-Key required'
+                'error' => 'Idempotency-Key required',
             ], 400);
         }
 
@@ -36,7 +36,7 @@ class IdempotencyRequiredMiddleware
             // Payload diferente = erro
             if ($existing->request_hash !== $hash) {
                 return response()->json([
-                    'error' => 'Idempotency key reuse with different payload'
+                    'error' => 'Idempotency key reuse with different payload',
                 ], 409);
             }
 
@@ -47,17 +47,17 @@ class IdempotencyRequiredMiddleware
             );
         }
 
-        // Executa request
         $response = $next($request);
 
-        // Salva resultado
-        IdempotencyKey::create([
-            'key' => $key,
-            'endpoint' => $endpoint,
-            'request_hash' => $hash,
-            'response' => $response->getContent(),
-            'status_code' => $response->getStatusCode(),
-        ]);
+        if ($response instanceof Response && $response->isSuccessful()) {
+            IdempotencyKey::create([
+                'key' => $key,
+                'endpoint' => $endpoint,
+                'request_hash' => $hash,
+                'response' => $response->getContent(),
+                'status_code' => $response->getStatusCode(),
+            ]);
+        }
 
         return $response;
     }

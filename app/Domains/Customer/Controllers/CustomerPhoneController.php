@@ -19,8 +19,7 @@ class CustomerPhoneController extends Controller
     /**
      * Request Phone Change
      *
-     * Updates the phone immediately when the current number is not verified.
-     * Sends an SMS code to the new number when the current phone is already verified.
+     * Sends an SMS code to the new number. The phone is only updated after confirmation.
      *
      * @tags Profile
      */

@@ -233,10 +233,21 @@ paths:
   # Merchant
   /merchant/health:
     $ref: './paths/merchant.yaml#/merchant-health'
+  /merchant:
+    $ref: './paths/merchant.yaml#/merchant-index'
   /merchant/register:
     $ref: './paths/merchant.yaml#/merchant-register'
+  /merchant/{merchant}:
+    $ref: './paths/merchant.yaml#/merchant-customer-update'
+  /merchant/{merchant}/credentials:
+    $ref: './paths/merchant.yaml#/merchant-customer-credentials/get'
+  /merchant/{merchant}/credentials/rotate:
+    $ref: './paths/merchant.yaml#/merchant-customer-credentials/post'
   /merchant/payment-requests:
-    $ref: './paths/merchant.yaml#/merchant-payment-requests'
+    get:
+      $ref: './paths/merchant.yaml#/merchant-customer-payment-requests/get'
+    post:
+      $ref: './paths/merchant.yaml#/merchant-payment-requests/post'
   /merchant/terminal/connection-token:
     $ref: './paths/merchant.yaml#/merchant-terminal-connection-token'
   /merchant/terminal/create-intent:

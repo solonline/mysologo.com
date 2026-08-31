@@ -42,7 +42,53 @@
         .icon-fade  { animation: fade-scale-in .4s ease-out both; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4{{ $isEmbed ? ' pay-embed' : '' }}">
+<script>
+window.YoopPay = {
+    uuid: @json($paymentRequest->uuid),
+    status: @json($paymentRequest->status),
+    isEmbedHint: @json((bool) $isEmbed),
+    returnUrl: @json($returnUrl),
+    isEmbed() {
+        try {
+            return this.isEmbedHint || window.self !== window.top;
+        } catch (e) {
+            // cross-origin iframe: access to top throws → estamos embutidos
+            return true;
+        }
+    },
+    selfPayUrl(extra = {}) {
+        const params = new URLSearchParams(window.location.search);
+        if (this.isEmbed()) params.set('embed', '1');
+        else params.delete('embed');
+        Object.entries(extra).forEach(([k, v]) => {
+            if (v === null || v === undefined || v === '') params.delete(k);
+            else params.set(k, v);
+        });
+        const q = params.toString();
+        return window.location.pathname + (q ? '?' + q : '');
+    },
+    notifyParent(type, extra = {}) {
+        if (!this.isEmbed()) return;
+        const message = {
+            source: 'yoop-pay',
+            type,
+            uuid: this.uuid,
+            status: this.status,
+            ...extra,
+        };
+        try {
+            window.parent.postMessage(message, '*');
+        } catch (e) {}
+    },
+    /** Só full-page: nunca usar window.top em iframe. */
+    maybeRedirectReturnUrl() {
+        if (this.isEmbed()) return;
+        if (!this.returnUrl) return;
+        window.location.assign(this.returnUrl);
+    },
+};
+</script>
 
 <div class="w-full max-w-sm bg-white rounded-2xl shadow-md overflow-hidden">
 
@@ -125,7 +171,7 @@
 
         {{-- Estados terminais --}}
         @if($paymentRequest->status === 'completed')
-            <div class="flex flex-col items-center gap-4 py-4">
+            <div class="flex flex-col items-center gap-4 py-4" id="pay-success">
                 <div class="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
                     <svg class="w-10 h-10 text-green-500 icon-draw" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"/>
@@ -133,11 +179,20 @@
                 </div>
                 <div class="text-center">
                     <p class="text-sm font-medium text-gray-800">{{ __('pay.status.completed') }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ __('pay.status.completed_hint') }}</p>
                     @if($paymentRequest->paid_at)
                         <p class="text-xs text-gray-400 mt-0.5">{{ $paymentRequest->paid_at->format('d/m/Y H:i') }}</p>
                     @endif
                 </div>
             </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    window.YoopPay.status = 'completed';
+                    window.YoopPay.notifyParent('payment_request.completed', { status: 'completed' });
+                    // return_url só em full-page (não em iframe)
+                    setTimeout(() => window.YoopPay.maybeRedirectReturnUrl(), 1200);
+                });
+            </script>
 
         @elseif($paymentRequest->status === 'failed')
             <div class="flex flex-col items-center gap-4 py-4">
@@ -179,7 +234,19 @@
                 </div>
                 <p class="text-sm font-medium text-gray-700 text-center">{{ __('pay.confirming') }}</p>
             </div>
-            <script>setTimeout(() => location.replace(location.pathname), 30000);</script>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    window.YoopPay.notifyParent('payment_request.confirming', { status: 'processing' });
+                    // Recarregar no próprio iframe (nunca window.top), preservando embed=1
+                    setTimeout(() => {
+                        window.location.replace(window.YoopPay.selfPayUrl({
+                            redirect_status: null,
+                            payment_intent: null,
+                            payment_intent_client_secret: null,
+                        }));
+                    }, 2500);
+                });
+            </script>
 
         @elseif($clientSecret)
             {{-- Stripe Payment Element --}}
@@ -217,8 +284,9 @@
 
             <script>
                 document.addEventListener('DOMContentLoaded', async () => {
-                    const stripe   = Stripe('{{ $publishableKey }}');
-                    const elements = stripe.elements({ clientSecret: '{{ $clientSecret }}' });
+                    const stripe   = Stripe(@json($publishableKey));
+                    const elements = stripe.elements({ clientSecret: @json($clientSecret) });
+                    const isEmbed  = window.YoopPay.isEmbed();
 
                     const paymentElement = elements.create('payment', {
                         fields: {
@@ -245,16 +313,23 @@
                         btnSpinner.classList.remove('hidden');
                         msgBox.classList.add('hidden');
 
-                        const { error } = await stripe.confirmPayment({
+                        // Em iframe: preferir ficar no frame; return_url Stripe = esta página com embed=1.
+                        // return_url da loja (?return_url=) só em full-page após completed.
+                        const returnUrl = window.location.origin + window.YoopPay.selfPayUrl(
+                            isEmbed ? { embed: '1' } : {},
+                        );
+
+                        const { error, paymentIntent } = await stripe.confirmPayment({
                             elements,
                             confirmParams: {
-                                return_url: window.location.href,
+                                return_url: returnUrl,
                                 payment_method_data: {
                                     billing_details: {
-                                        address: { country: '{{ $billingCountry }}' },
+                                        address: { country: @json($billingCountry) },
                                     },
                                 },
                             },
+                            redirect: isEmbed ? 'if_required' : 'always',
                         });
 
                         if (error) {
@@ -264,6 +339,21 @@
                             submitBtn.disabled = false;
                             btnText.classList.remove('hidden');
                             btnSpinner.classList.add('hidden');
+                            return;
+                        }
+
+                        // Concluído sem redirect (típico em iframe com redirect: if_required)
+                        if (paymentIntent && ['succeeded', 'processing'].includes(paymentIntent.status)) {
+                            window.YoopPay.status = paymentIntent.status === 'succeeded' ? 'completed' : 'processing';
+                            window.YoopPay.notifyParent(
+                                paymentIntent.status === 'succeeded'
+                                    ? 'payment_request.completed'
+                                    : 'payment_request.confirming',
+                                { status: window.YoopPay.status, payment_intent: paymentIntent.id },
+                            );
+                            window.location.replace(window.YoopPay.selfPayUrl({
+                                redirect_status: paymentIntent.status === 'succeeded' ? 'succeeded' : 'pending',
+                            }));
                         }
                     });
                 });
@@ -276,7 +366,7 @@
     <div class="border-t border-gray-100 px-6 py-3 flex items-center justify-center">
         <span class="text-xs text-gray-400 mr-1">{{ __('pay.secure') }}</span>
         <a href="https://www.securepay.com" target="_blank" rel="noopener noreferrer">
-            <img src="{{ asset('securepay1.png') }}" alt="SecurePay" class="h-8">
+            <img src="{{ asset('securepay.png') }}" alt="SecurePay" class="h-8">
         </a>
     </div>
 

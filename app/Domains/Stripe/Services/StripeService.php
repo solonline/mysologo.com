@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Domains\Stripe\Services;
 
 use App\Domains\Merchant\Contracts\MerchantPaymentRequestRepositoryInterface;
-use App\Domains\Merchant\Jobs\DispatchMerchantCallback;
+use App\Domains\Merchant\Jobs\DispatchMerchantWebhook;
 use App\Domains\Onboarding\Services\IntegrationAccountService;
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
 use App\Domains\Stripe\Enums\StripePaymentIntentPurpose;
 use App\Domains\Stripe\Enums\StripePaymentIntentStatus;
-use App\Domains\Stripe\Services\StripePaymentIntentService;
+use App\Domains\Stripe\Jobs\ProcessStripePayoutPaidJob;
 use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
@@ -20,6 +20,7 @@ use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
+use App\Models\CustomerPaymentMethodFee;
 use App\Models\CustomerStripeAccount;
 use App\Models\StripePaymentIntent;
 use App\Models\StripePaymentMethodFee;
@@ -31,8 +32,10 @@ use Illuminate\Support\Facades\Log;
 
 class StripeService
 {
+    private bool $dispatchPartnerFunding = true;
+
     private const PAYMENT_METHOD_CURRENCIES = [
-        'mbway' => ['eur'],
+        'mb_way' => ['eur'],
         'twint' => ['chf'],
         'blik' => ['pln'],
         'bancontact' => ['eur'],
@@ -563,8 +566,10 @@ class StripeService
         return $result['data'];
     }
 
-    public function handleWebhook(array $payload): void
+    public function handleWebhook(array $payload, bool $dispatchPartnerFunding = true): void
     {
+        $this->dispatchPartnerFunding = $dispatchPartnerFunding;
+
         $eventType = $payload['type'] ?? null;
         $object = $payload['data']['object'] ?? [];
 
@@ -575,8 +580,44 @@ class StripeService
             'charge.updated' => $this->handleChargeUpdated($object),
             'customer_cash_balance_settings.updated', 'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
             'customer_cash_balance_transaction.created', 'customer.cash_balance_transaction.created' => $this->handleCashBalanceTransactionCreated($object),
+            'payout.paid' => $this->handlePayoutPaid($object),
             default => Log::info('Stripe webhook ignorado', ['type' => $eventType]),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $payout
+     */
+    private function handlePayoutPaid(array $payout): void
+    {
+        $payoutId = $payout['id'] ?? null;
+
+        if (! is_string($payoutId) || ! str_starts_with($payoutId, 'po_')) {
+            Log::channel('stripe')->warning('Stripe webhook: payout.paid sem id válido', $payout);
+
+            return;
+        }
+
+        if (($payout['status'] ?? null) !== 'paid') {
+            Log::channel('stripe')->info('Stripe webhook: payout.paid ignorado (status != paid)', [
+                'payout_id' => $payoutId,
+                'status' => $payout['status'] ?? null,
+            ]);
+
+            return;
+        }
+
+        $currency = strtolower((string) ($payout['currency'] ?? 'eur'));
+        $livemode = (bool) ($payout['livemode'] ?? true);
+
+        ProcessStripePayoutPaidJob::dispatch($payoutId, $currency, $livemode);
+
+        Log::channel('stripe')->info('Stripe webhook: payout.paid enfileirado', [
+            'payout_id' => $payoutId,
+            'currency' => $currency,
+            'livemode' => $livemode,
+            'amount' => $payout['amount'] ?? null,
+        ]);
     }
 
     public function getCashBalance(string $customerId): array
@@ -766,7 +807,7 @@ class StripeService
 
         if ($merchantRequest) {
             $this->merchantPaymentRequestRepository->complete($merchantRequest, $transaction->id);
-            DispatchMerchantCallback::dispatch($merchantRequest->fresh())->onQueue('default');
+            DispatchMerchantWebhook::dispatch($merchantRequest->fresh())->onQueue('default');
         }
     }
 
@@ -893,7 +934,7 @@ class StripeService
 
         if ($merchantRequest) {
             $this->merchantPaymentRequestRepository->fail($merchantRequest);
-            DispatchMerchantCallback::dispatch($merchantRequest->fresh())->onQueue('default');
+            DispatchMerchantWebhook::dispatch($merchantRequest->fresh())->onQueue('default');
         }
     }
 
@@ -977,7 +1018,12 @@ class StripeService
         $feeMethod = $this->resolveFeePaymentMethod($transaction, $pmType, $pmDetails);
 
         $feeConfig = $this->resolveActiveFeeConfig($transaction, $feeMethod);
-        $platformFee = $feeConfig ? $feeConfig->calculatePlatformFee((int) $transaction->amount) : 0;
+        $platformFee = $this->resolvePlatformFeeAmount(
+            $transaction,
+            $feeConfig,
+            $paymentIntentId,
+            (int) $realStripeFee,
+        );
         $realNetAmount = max(0, (int) $transaction->amount - (int) $realStripeFee - $platformFee);
 
         $transaction->update([
@@ -999,6 +1045,12 @@ class StripeService
                 'wallester_funding_net_amount' => $allocation->wallesterFundingNetCents,
                 'stripe_deferred_net_amount' => $allocation->stripeDeferredNetCents,
             ]);
+        } elseif ($transaction->type === TransactionType::MERCHANT_PAYMENT) {
+            $transaction->update([
+                'immediate_gross_amount' => 0,
+                'wallester_funding_net_amount' => 0,
+                'stripe_deferred_net_amount' => max(0, (int) $transaction->net_amount),
+            ]);
         }
 
         // Credit wallet immediately for the quota Wallester; deferred quota waits for Stripe settlement.
@@ -1016,8 +1068,31 @@ class StripeService
             'available_on' => $availableOn,
         ]);
 
-        if ($this->topupFundingPolicy->shouldDispatchPartnerFundingJob($transaction->fresh(), $charge)) {
-            FundWallesterTopupFromStripeJob::dispatch($transaction->id);
+        $freshTransaction = $transaction->fresh();
+
+        if ($freshTransaction?->type === TransactionType::MERCHANT_PAYMENT) {
+            $merchantRequest = $this->merchantPaymentRequestRepository
+                ->findByStripePaymentIntentId($paymentIntentId);
+
+            if ($merchantRequest) {
+                if ($merchantRequest->transaction_id !== $freshTransaction->id) {
+                    $this->merchantPaymentRequestRepository->complete(
+                        $merchantRequest,
+                        $freshTransaction->id,
+                    );
+                }
+
+                DispatchMerchantWebhook::dispatch($merchantRequest->fresh())->onQueue('default');
+            }
+        }
+
+        if (
+            $this->dispatchPartnerFunding
+            && $freshTransaction
+            && $freshTransaction->type !== TransactionType::MERCHANT_PAYMENT
+            && $this->topupFundingPolicy->shouldDispatchPartnerFundingJob($freshTransaction, $charge)
+        ) {
+            FundWallesterTopupFromStripeJob::dispatch($freshTransaction->id);
         }
     }
 
@@ -1044,6 +1119,57 @@ class StripeService
         }
 
         return $this->resolvePaymentMethodCategory((string) ($pmType ?? ''), $pmDetails);
+    }
+
+    private function resolvePlatformFeeAmount(
+        StripeTransaction $transaction,
+        ?StripePaymentMethodFee $feeConfig,
+        string $paymentIntentId,
+        int $stripeFee,
+    ): int {
+        $merchantFee = $this->resolveCustomerMerchantPlatformFee($transaction, $paymentIntentId);
+
+        if ($merchantFee !== null) {
+            $grossFee = (int) $merchantFee->calculateFee((int) $transaction->amount)['fee'];
+
+            if ($grossFee >= $stripeFee) {
+                return $grossFee - $stripeFee;
+            }
+
+            Log::channel('stripe')->warning('stripe_service: taxa personalizada inferior à taxa Stripe — a usar config global', [
+                'transaction_id' => $transaction->id,
+                'payment_intent_id' => $paymentIntentId,
+                'customer_payment_method_fee_id' => $merchantFee->id,
+                'custom_fee_gross' => $grossFee,
+                'stripe_fee' => $stripeFee,
+            ]);
+        }
+
+        return $feeConfig ? $feeConfig->calculatePlatformFee((int) $transaction->amount) : 0;
+    }
+
+    private function resolveCustomerMerchantPlatformFee(
+        StripeTransaction $transaction,
+        string $paymentIntentId,
+    ): ?CustomerPaymentMethodFee {
+        if ($transaction->type !== TransactionType::MERCHANT_PAYMENT) {
+            return null;
+        }
+
+        $merchantRequest = $this->merchantPaymentRequestRepository
+            ->findByStripePaymentIntentId($paymentIntentId);
+
+        if ($merchantRequest === null || $merchantRequest->merchant_id === null) {
+            return null;
+        }
+
+        return CustomerPaymentMethodFee::query()
+            ->active()
+            ->forMerchant((int) $merchantRequest->merchant_id)
+            ->where('customer_id', $transaction->customer_id)
+            ->whereNotNull('merchant_id')
+            ->where('currency', strtoupper((string) $transaction->currency))
+            ->first();
     }
 
     private function resolveActiveFeeConfig(

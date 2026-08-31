@@ -9,15 +9,16 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
- * @property int         $id
- * @property int         $customer_id
- * @property string      $name
- * @property string      $slug
- * @property string      $api_key
- * @property string      $mode
+ * @property int $id
+ * @property int $customer_id
+ * @property string $name
+ * @property string $slug
+ * @property string $api_key
+ * @property string|null $webhook_secret
+ * @property string $mode
  * @property string|null $webhook_url
- * @property array|null  $allowed_currencies
- * @property bool        $is_active
+ * @property array|null $allowed_currencies
+ * @property bool $is_active
  */
 class Merchant extends Model
 {
@@ -27,7 +28,7 @@ class Merchant extends Model
     {
         return LogOptions::defaults()
             ->logFillable()
-            ->logExcept(['api_key'])
+            ->logExcept(['api_key', 'webhook_secret'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('merchants');
@@ -38,6 +39,7 @@ class Merchant extends Model
         'name',
         'slug',
         'api_key',
+        'webhook_secret',
         'webhook_url',
         'allowed_currencies',
         'mode',
@@ -46,10 +48,11 @@ class Merchant extends Model
 
     protected $casts = [
         'allowed_currencies' => 'array',
-        'is_active'          => 'boolean',
+        'is_active' => 'boolean',
+        'webhook_secret' => 'encrypted',
     ];
 
-    protected $hidden = ['api_key'];
+    protected $hidden = ['api_key', 'webhook_secret'];
 
     public static function findByRawKey(string $rawKey): ?self
     {
@@ -75,5 +78,10 @@ class Merchant extends Model
     public function paymentRequests()
     {
         return $this->hasMany(MerchantPaymentRequest::class);
+    }
+
+    public function paymentMethodFees()
+    {
+        return $this->hasMany(CustomerPaymentMethodFee::class);
     }
 }

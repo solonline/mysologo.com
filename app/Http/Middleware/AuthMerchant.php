@@ -11,7 +11,7 @@ class AuthMerchant
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $rawKey = $request->header('X-Api-Key');
+        $rawKey = $request->header('X-Merchant-Key') ?: $request->header('X-Api-Key');
 
         if (! $rawKey) {
             return response()->json(['message' => 'API key em falta.'], 401);

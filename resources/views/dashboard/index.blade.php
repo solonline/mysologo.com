@@ -136,6 +136,7 @@
                     ['label' => 'Em análise', 'value' => $stats['analysis_customers'] ?? 0, 'color' => '#0ea5e9'],
                     ['label' => 'Bloqueados', 'value' => $stats['blocked_customers'] ?? 0, 'color' => '#ef4444'],
                     ['label' => 'Docs pendentes', 'value' => $stats['pending_documents'] ?? 0, 'color' => '#64748b'],
+                    ['label' => 'Com SecurePay', 'value' => $stats['merchant_customers'] ?? 0, 'color' => '#0891b2'],
                 ];
             @endphp
             @foreach ($customerBreakdown as $row)
@@ -441,6 +442,7 @@
 </div>
 
 {{-- Modal: Funding Wallester --}}
+<template x-teleport="body">
 <div x-show="showWallesterFundingModal" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4"
      x-transition:enter="transition ease-out duration-200"
@@ -449,7 +451,7 @@
      x-transition:leave="transition ease-in duration-150"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0">
-    <div class="fixed inset-0 bg-black/50 backdrop-blur-md" @click="showWallesterFundingModal = false"></div>
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-md" @click="showWallesterFundingModal = false"></div>
     <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-95"
@@ -521,6 +523,7 @@
         @endcan
     </div>
 </div>
+</template>
 
 </div>
 

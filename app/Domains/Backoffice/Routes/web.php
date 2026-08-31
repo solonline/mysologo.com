@@ -4,6 +4,7 @@ use App\Domains\Backoffice\Controllers\AccountPayableController;
 use App\Domains\Backoffice\Controllers\AuditLogController;
 use App\Domains\Backoffice\Controllers\Auth\LoginController;
 use App\Domains\Backoffice\Controllers\CustomerController;
+use App\Domains\Backoffice\Controllers\CustomerMerchantFeeController;
 use App\Domains\Backoffice\Controllers\CustomerTpaController;
 use App\Domains\Backoffice\Controllers\DashboardController;
 use App\Domains\Backoffice\Controllers\NotificationController;
@@ -51,6 +52,8 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
         Route::delete('/customers/{customer}/tpas/{tpa}', [CustomerTpaController::class, 'destroy'])->name('.customers.tpas.destroy');
         Route::post('/customers/{customer}/tpas/{tpa}/fees', [CustomerTpaController::class, 'storeFee'])->name('.customers.tpas.fees.store');
         Route::delete('/customers/{customer}/tpas/{tpa}/fees/{fee}', [CustomerTpaController::class, 'destroyFee'])->name('.customers.tpas.fees.destroy');
+        Route::post('/customers/{customer}/merchants/{merchant}/fees', [CustomerMerchantFeeController::class, 'storeFee'])->name('.customers.merchants.fees.store');
+        Route::delete('/customers/{customer}/merchants/{merchant}/fees/{fee}', [CustomerMerchantFeeController::class, 'destroyFee'])->name('.customers.merchants.fees.destroy');
     });
 
     Route::middleware('can:transactions.view')->group(function () {
@@ -60,34 +63,59 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
 
     Route::middleware('can:users.view')->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('.users');
-        Route::get('/users/{user}', [UserController::class, 'show'])->name('.users.show');
     });
     Route::middleware('can:users.create')->group(function () {
         Route::get('/users/create', [UserController::class, 'create'])->name('.users.create');
         Route::post('/users', [UserController::class, 'store'])->name('.users.store');
     });
-    Route::middleware('can:users.edit')->group(function () {
-        Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('.users.edit');
-        Route::put('/users/{user}', [UserController::class, 'update'])->name('.users.update');
+    Route::middleware('can:users.view')->group(function () {
+        Route::get('/users/{user}', [UserController::class, 'show'])
+            ->whereNumber('user')
+            ->name('.users.show');
     });
-    Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('.users.destroy')->middleware('can:users.delete');
+    Route::middleware('can:users.edit')->group(function () {
+        Route::get('/users/{user}/edit', [UserController::class, 'edit'])
+            ->whereNumber('user')
+            ->name('.users.edit');
+        Route::put('/users/{user}', [UserController::class, 'update'])
+            ->whereNumber('user')
+            ->name('.users.update');
+    });
+    Route::delete('/users/{user}', [UserController::class, 'destroy'])
+        ->whereNumber('user')
+        ->name('.users.destroy')
+        ->middleware('can:users.delete');
 
     Route::middleware('can:roles.view')->group(function () {
         Route::get('/roles', [RoleController::class, 'index'])->name('.roles');
-        Route::get('/roles/{role}', [RoleController::class, 'show'])->name('.roles.show');
     });
     Route::middleware('can:roles.create')->group(function () {
         Route::get('/roles/create', [RoleController::class, 'create'])->name('.roles.create');
         Route::post('/roles', [RoleController::class, 'store'])->name('.roles.store');
     });
-    Route::middleware('can:roles.edit')->group(function () {
-        Route::get('/roles/{role}/edit', [RoleController::class, 'edit'])->name('.roles.edit');
-        Route::put('/roles/{role}', [RoleController::class, 'update'])->name('.roles.update');
+    Route::middleware('can:roles.view')->group(function () {
+        Route::get('/roles/{role}', [RoleController::class, 'show'])
+            ->whereNumber('role')
+            ->name('.roles.show');
     });
-    Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('.roles.destroy')->middleware('can:roles.delete');
+    Route::middleware('can:roles.edit')->group(function () {
+        Route::get('/roles/{role}/edit', [RoleController::class, 'edit'])
+            ->whereNumber('role')
+            ->name('.roles.edit');
+        Route::put('/roles/{role}', [RoleController::class, 'update'])
+            ->whereNumber('role')
+            ->name('.roles.update');
+    });
+    Route::delete('/roles/{role}', [RoleController::class, 'destroy'])
+        ->whereNumber('role')
+        ->name('.roles.destroy')
+        ->middleware('can:roles.delete');
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('.settings')->middleware('can:settings.view');
     Route::post('/settings', [SettingsController::class, 'update'])->name('.settings.update')->middleware('can:settings.edit');
+    Route::post('/settings/test-mail', [SettingsController::class, 'testMail'])
+        ->name('.settings.test-mail')
+        ->middleware('can:settings.edit');
     Route::post('/operations/retry-wallester-topups', [OperationsController::class, 'retryWallesterTopups'])
         ->name('.operations.retry-wallester-topups')
         ->middleware('can:settings.edit');

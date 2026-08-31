@@ -23,6 +23,7 @@ class MerchantServiceProvider extends ServiceProvider
                 $app->make(MerchantRepositoryInterface::class),
                 $app->make(MerchantPaymentRequestRepositoryInterface::class),
                 $app->make(StripeGatewayInterface::class),
+                $app->make(\App\Domains\Stripe\Services\StripePaymentIntentService::class),
             );
         });
     }

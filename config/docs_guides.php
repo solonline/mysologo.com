@@ -68,8 +68,14 @@ return [
         [
             'slug' => 'terminal-topup',
             'title' => 'Terminal (POS)',
-            'description' => 'Connection token, intent e captura no TPA.',
+            'description' => 'Connection token e intent no TPA.',
             'file' => 'partners/terminal-topup.md',
+        ],
+        [
+            'slug' => 'ai-prompt',
+            'title' => 'Prompt para IA',
+            'description' => 'Texto pronto a colar num assistente para integrar a API.',
+            'file' => 'partners/ai-prompt.md',
         ],
     ],
 

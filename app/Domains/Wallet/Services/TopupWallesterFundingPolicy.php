@@ -8,10 +8,13 @@ use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
+use Illuminate\Support\Carbon;
 
 class TopupWallesterFundingPolicy
 {
     public const DAILY_IMMEDIATE_TOPUP_GROSS_LIMIT_CENTS = 10_000;
+
+    public const ACCOUNTING_CUTOFF_AT = '2026-08-17 00:00:00';
 
     public function allocate(StripeTransaction $transaction): TopupSettlementAllocation
     {
@@ -67,6 +70,10 @@ class TopupWallesterFundingPolicy
 
     public function shouldDispatchPartnerFundingJob(StripeTransaction $transaction, array $charge): bool
     {
+        if ($this->isBeforeAccountingCutoff($transaction)) {
+            return false;
+        }
+
         if (! $this->requiresPartnerFunding($transaction)) {
             return false;
         }
@@ -100,17 +107,32 @@ class TopupWallesterFundingPolicy
 
     public function isRetriable(StripeTransaction $transaction): bool
     {
+        if ($this->isBeforeAccountingCutoff($transaction)) {
+            return false;
+        }
+
         if (! $this->requiresPartnerFunding($transaction)) {
             return false;
         }
 
         $status = $transaction->partner_funding_status;
 
-        if ($status instanceof PartnerFundingStatus && $status === PartnerFundingStatus::Completed) {
+        if ($status instanceof PartnerFundingStatus && $status->isTerminal()) {
             return false;
         }
 
         return ! $this->hasCompletedMovement($transaction);
+    }
+
+    public function isBeforeAccountingCutoff(StripeTransaction $transaction): bool
+    {
+        $occurredAt = $transaction->stripe_created_at ?? $transaction->created_at;
+
+        if ($occurredAt === null) {
+            return false;
+        }
+
+        return Carbon::parse($occurredAt)->lt(Carbon::parse(self::ACCOUNTING_CUTOFF_AT));
     }
 
     public function hasOperationalWallesterAccount(StripeTransaction $transaction): bool

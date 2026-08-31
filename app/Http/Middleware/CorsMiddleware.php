@@ -31,6 +31,7 @@ class CorsMiddleware
             'X-Requested-With',
             'Idempotency-Key',
             'X-Merchant-Key',
+            'X-Api-Key',
         ]));
         $response->headers->set('Access-Control-Max-Age', '86400');
 

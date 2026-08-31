@@ -1,4 +1,5 @@
 {{-- Modal de detalhes (Stripe / Wallester) — Alpine.js --}}
+<template x-teleport="body">
 <div x-show="showDetailsModal" x-cloak
      class="fixed inset-0 z-50 flex items-center justify-center p-4"
      x-transition:enter="transition ease-out duration-200"
@@ -7,7 +8,7 @@
      x-transition:leave="transition ease-in duration-150"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0">
-    <div class="fixed inset-0 bg-black/50 backdrop-blur-md" @click="showDetailsModal = false"></div>
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-md" @click="showDetailsModal = false"></div>
 
     <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden"
          x-transition:enter="transition ease-out duration-200"
@@ -85,3 +86,4 @@
         </div>
     </div>
 </div>
+</template>

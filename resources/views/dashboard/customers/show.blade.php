@@ -51,8 +51,6 @@
         return Storage::url($path);
     };
 
-    $latestDiditSession = $customer->diditSessions->first();
-
     $formatDateTime = function ($value, string $fallback = '—'): string {
         if ($value === null || $value === '') {
             return $fallback;
@@ -123,6 +121,27 @@
         'ANALYSING' => ['badge' => 'bg-sky-50 text-sky-700 border-sky-200',             'dot' => 'bg-sky-500',     'label' => 'Em Análise'],
         'DECLINED'  => ['badge' => 'bg-red-50 text-red-700 border-red-200',             'dot' => 'bg-red-500',     'label' => 'Recusado'],
         default     => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200',      'dot' => 'bg-slate-400',   'label' => $docVal ?: '—'],
+    };
+    $acceptedCurrencies = collect(app(\App\Domains\Backoffice\Queries\GetAcceptedCurrenciesQuery::class)->execute())
+        ->push($customer->currency)
+        ->filter()
+        ->map(fn ($currency) => strtoupper((string) $currency))
+        ->unique()
+        ->values();
+    $remainingFeeCurrencies = function ($entity, $allowed = null) use ($acceptedCurrencies): \Illuminate\Support\Collection {
+        $pool = collect($allowed ?? [])->filter()->map(fn ($currency) => strtoupper((string) $currency));
+        if ($pool->isEmpty()) {
+            $pool = $acceptedCurrencies;
+        }
+        if ($pool->isEmpty()) {
+            $pool = collect(['EUR']);
+        }
+
+        $used = $entity->paymentMethodFees
+            ->pluck('currency')
+            ->map(fn ($currency) => strtoupper((string) $currency));
+
+        return $pool->diff($used)->values();
     };
 @endphp
 
@@ -303,19 +322,28 @@
         </div>{{-- fim Informações Gerais --}}
 
         {{-- Telefone --}}
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100">
-                <h2 class="text-sm font-semibold text-slate-900">Telefone</h2>
-                <p class="text-xs text-slate-500 mt-1">
-                    @if ($currentPhoneVerified)
-                        O número actual está confirmado. Alterações exigem confirmação por SMS no novo número.
-                    @else
-                        O número actual ainda não está confirmado e pode ser alterado directamente.
-                    @endif
-                </p>
-            </div>
+        <div x-data="{ sectionOpen: false }"
+             class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <button type="button"
+                    @click="sectionOpen = !sectionOpen"
+                    class="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors"
+                    :class="sectionOpen ? 'border-b border-slate-100' : ''">
+                <div class="min-w-0">
+                    <h2 class="text-sm font-semibold text-slate-900">Telefone</h2>
+                    <p class="text-xs text-slate-500 mt-0.5 truncate">
+                        {{ $customer->phone ?: '—' }}
+                        · {{ $currentPhoneVerified ? 'Confirmado' : 'Não confirmado' }}
+                    </p>
+                </div>
+                <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
 
-            <div class="p-5 space-y-5">
+            <div x-show="sectionOpen" x-cloak class="p-5 space-y-5">
+                <p class="text-xs text-slate-500">
+                    O telefone só é alterado após confirmação do código SMS enviado para o novo número.
+                </p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <p class="text-xs text-slate-400 font-medium mb-0.5">Número actual</p>
@@ -386,79 +414,29 @@
                     </div>
                     <button type="submit"
                             class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-500/25">
-                        @if ($currentPhoneVerified)
-                            {{ $pendingPhoneChange ? 'Enviar para novo número' : 'Enviar código SMS' }}
-                        @else
-                            Actualizar telefone
-                        @endif
+                        {{ $pendingPhoneChange ? 'Enviar para novo número' : 'Enviar código SMS' }}
                     </button>
                 </form>
                 @endcan
-            </div>
+            </div>{{-- fim sectionOpen --}}
         </div>
-
-        {{-- Sessão Didit --}}
-        @if ($latestDiditSession)
-        @php
-            $diditStatus = $latestDiditSession->status ?? '—';
-            $diditBadge = match (strtolower(str_replace(' ', '', $diditStatus))) {
-                'approved' => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Aprovado'],
-                'declined' => ['badge' => 'bg-red-50 text-red-700 border-red-200', 'dot' => 'bg-red-500', 'label' => 'Recusado'],
-                'inreview' => ['badge' => 'bg-sky-50 text-sky-700 border-sky-200', 'dot' => 'bg-sky-500', 'label' => 'Em análise'],
-                'inprogress', 'notfinished' => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Em progresso'],
-                'notstarted' => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'dot' => 'bg-slate-400', 'label' => 'Não iniciado'],
-                default => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'dot' => 'bg-slate-400', 'label' => $diditStatus],
-            };
-            $diditMetadata = is_array($latestDiditSession->metadata) ? $latestDiditSession->metadata : [];
-        @endphp
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-900">Verificação Didit</h2>
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border {{ $diditBadge['badge'] }}">
-                    <span class="w-1.5 h-1.5 rounded-full mr-1.5 {{ $diditBadge['dot'] }}"></span>
-                    {{ $diditBadge['label'] }}
-                </span>
-            </div>
-            <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                <div>
-                    <p class="text-xs text-slate-400 font-medium mb-0.5">Session ID</p>
-                    <p class="font-mono text-xs text-slate-700 break-all">{{ $latestDiditSession->session_id }}</p>
-                </div>
-                @if (!empty($diditMetadata['application_id']))
-                <div>
-                    <p class="text-xs text-slate-400 font-medium mb-0.5">Application ID</p>
-                    <p class="font-mono text-xs text-slate-700 break-all">{{ $diditMetadata['application_id'] }}</p>
-                </div>
-                @endif
-                <div>
-                    <p class="text-xs text-slate-400 font-medium mb-0.5">Workflow</p>
-                    <p class="text-slate-800 font-medium">{{ $latestDiditSession->workflow_id ?? '—' }}</p>
-                </div>
-                <div>
-                    <p class="text-xs text-slate-400 font-medium mb-0.5">Última actualização</p>
-                    <p class="text-slate-800 font-medium">{{ $formatDateTime($latestDiditSession->updated_at) }}</p>
-                </div>
-                @if (filled($latestDiditSession->session_url))
-                <div class="sm:col-span-2">
-                    <a href="{{ $latestDiditSession->session_url }}" target="_blank" rel="noopener"
-                       class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                        Abrir sessão Didit
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                        </svg>
-                    </a>
-                </div>
-                @endif
-            </div>
-        </div>
-        @endif
 
         {{-- Documentos --}}
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-slate-900">Documentos KYC</h2>
-                <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->documents->count() }}</span>
-            </div>
+        <div x-data="{ sectionOpen: false }"
+             class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <button type="button"
+                    @click="sectionOpen = !sectionOpen"
+                    class="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors"
+                    :class="sectionOpen ? 'border-b border-slate-100' : ''">
+                <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    Documentos KYC
+                    <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->documents->count() }}</span>
+                </h2>
+                <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div x-show="sectionOpen" x-cloak>
             @forelse ($customer->documents as $doc)
             @php
                 $extraFields = is_array($doc->extra_fields) ? $doc->extra_fields : [];
@@ -710,26 +688,35 @@
                 <p class="text-sm text-slate-400">Nenhum documento cadastrado.</p>
             </div>
             @endforelse
+            </div>{{-- fim sectionOpen --}}
         </div>
 
         {{-- TPAs --}}
         <div x-data="{
+                 sectionOpen: false,
                  showFeeModal: false,
                  activeTpaId: null,
                  expandedTpa: null,
              }">
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
 
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <button type="button"
+                    @click="sectionOpen = !sectionOpen"
+                    class="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors"
+                    :class="sectionOpen ? 'border-b border-slate-100' : ''">
                 <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                     </svg>
                     TPAs
+                    <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->tpas->count() }}</span>
                 </h2>
-                <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->tpas->count() }}</span>
-            </div>
+                <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
 
+            <div x-show="sectionOpen" x-cloak>
             @forelse ($customer->tpas as $tpa)
             @php
                 $tpaBadge = match($tpa->status) {
@@ -774,9 +761,11 @@
                     </div>
                 </div>
 
+                @php $tpaRemainingCurrencies = $remainingFeeCurrencies($tpa); @endphp
                 <div x-show="expandedTpa === {{ $tpa->id }}" x-cloak class="px-5 pb-4 bg-slate-50/60 border-t border-slate-100">
                     <div class="flex items-center justify-between pt-3 mb-3">
                         <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Taxas do TPA</p>
+                        @if ($tpaRemainingCurrencies->isNotEmpty())
                         <button @click="activeTpaId = {{ $tpa->id }}; showFeeModal = true"
                                 class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -784,6 +773,7 @@
                             </svg>
                             Adicionar Taxa
                         </button>
+                        @endif
                     </div>
 
                     @if ($tpa->paymentMethodFees->isEmpty())
@@ -793,7 +783,6 @@
                         <table class="w-full text-xs">
                             <thead>
                                 <tr class="bg-slate-100 border-b border-slate-200">
-                                    <th class="text-left font-semibold text-slate-500 px-3 py-2">Método</th>
                                     <th class="text-left font-semibold text-slate-500 px-3 py-2">Label</th>
                                     <th class="text-right font-semibold text-slate-500 px-3 py-2">%</th>
                                     <th class="text-right font-semibold text-slate-500 px-3 py-2">Fixo</th>
@@ -805,7 +794,6 @@
                             <tbody class="divide-y divide-slate-100 bg-white">
                                 @foreach ($tpa->paymentMethodFees as $fee)
                                 <tr class="hover:bg-slate-50">
-                                    <td class="px-3 py-2 font-mono font-medium text-slate-700">{{ $fee->payment_method }}</td>
                                     <td class="px-3 py-2 text-slate-600">{{ $fee->label }}</td>
                                     <td class="px-3 py-2 text-right text-slate-700">{{ number_format($fee->fee_percentage * 100, 2) }}%</td>
                                     <td class="px-3 py-2 text-right text-slate-700">{{ number_format($fee->fee_fixed, 2) }}</td>
@@ -845,10 +833,13 @@
                 <p class="text-sm text-slate-400">Nenhum TPA vinculado.</p>
             </div>
             @endforelse
+            </div>{{-- fim sectionOpen --}}
 
         </div>{{-- fim card --}}
 
             {{-- Modal: Adicionar Taxa --}}
+            @if ($customer->tpas->contains(fn ($tpa) => $remainingFeeCurrencies($tpa)->isNotEmpty()))
+            <template x-teleport="body">
             <div x-show="showFeeModal" x-cloak
                  class="fixed inset-0 z-50 flex items-center justify-center p-4"
                  x-transition:enter="transition ease-out duration-200"
@@ -857,7 +848,7 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100"
                  x-transition:leave-end="opacity-0">
-                <div class="fixed inset-0 bg-black/50 backdrop-blur-md" @click="showFeeModal = false"></div>
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-md" @click="showFeeModal = false"></div>
                 <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
                      x-transition:enter="transition ease-out duration-200"
                      x-transition:enter-start="opacity-0 scale-95"
@@ -871,22 +862,19 @@
                         </button>
                     </div>
                     @foreach ($customer->tpas as $tpa)
+                    @php $tpaRemainingCurrencies = $remainingFeeCurrencies($tpa); @endphp
+                    @continue($tpaRemainingCurrencies->isEmpty())
                     <form x-show="activeTpaId === {{ $tpa->id }}"
                           method="POST"
                           action="{{ route('dashboard.customers.tpas.fees.store', [$customer, $tpa]) }}">
                         @csrf
+                        <input type="hidden" name="payment_method" value="all">
                         <div class="grid grid-cols-2 gap-4">
-                            <div class="col-span-2">
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Método de Pagamento</label>
-                                <input type="text" name="payment_method" required
-                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-                                       placeholder="Ex: visa, mastercard, mbway">
-                            </div>
                             <div class="col-span-2">
                                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Label</label>
                                 <input type="text" name="label" required
                                        class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-                                       placeholder="Ex: Visa Crédito">
+                                       placeholder="Ex: Taxa TPA">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Taxa % <span class="normal-case text-slate-400">(ex: 0.015 = 1.5%)</span></label>
@@ -902,8 +890,12 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moeda</label>
-                                <input type="text" name="currency" maxlength="3" required value="EUR"
-                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 uppercase">
+                                <select name="currency" required
+                                        class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 uppercase">
+                                    @foreach ($tpaRemainingCurrencies as $currency)
+                                    <option value="{{ $currency }}">{{ $currency }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                             <div class="flex items-end">
                                 <label class="flex items-center gap-2 cursor-pointer">
@@ -927,8 +919,349 @@
                     @endforeach
                 </div>
             </div>
+            </template>
+            @endif
 
         </div>{{-- fim wrapper x-data TPAs --}}
+
+        {{-- SecurePay --}}
+        <div x-data="{
+                 sectionOpen: false,
+                 showFeeModal: false,
+                 activeMerchantId: null,
+             }">
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <button type="button"
+                    @click="sectionOpen = !sectionOpen"
+                    class="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors"
+                    :class="sectionOpen ? 'border-b border-slate-100' : ''">
+                <div class="flex items-center gap-2 min-w-0">
+                    <h2 class="text-sm font-semibold text-slate-900">SecurePay</h2>
+                    <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full font-medium">{{ $customer->merchants->count() }}</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <img src="{{ asset('securepay.png') }}" alt="SecurePay" class="h-7">
+                    <svg class="w-4 h-4 text-slate-400 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+            </button>
+
+            <div x-show="sectionOpen" x-cloak>
+            @forelse ($customer->merchants as $merchant)
+            @php
+                $modeBadge = $merchant->mode === 'live'
+                    ? ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Live']
+                    : ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'dot' => 'bg-amber-500', 'label' => 'Test'];
+                $activeBadge = $merchant->is_active
+                    ? ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'dot' => 'bg-emerald-500', 'label' => 'Activo']
+                    : ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'dot' => 'bg-slate-400', 'label' => 'Inactivo'];
+                $currencies = collect($merchant->allowed_currencies ?? [])->filter()->map(fn ($c) => strtoupper($c))->implode(', ');
+                $merchantRemainingCurrencies = $remainingFeeCurrencies($merchant, $merchant->allowed_currencies);
+            @endphp
+            <div class="border-b border-slate-50 last:border-0">
+                <div class="px-5 py-4 space-y-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-slate-900 truncate">{{ $merchant->name }}</p>
+                            <p class="text-xs text-slate-400 font-mono mt-0.5 truncate">{{ $merchant->slug }}</p>
+                        </div>
+                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border {{ $modeBadge['badge'] }}">
+                                <span class="w-1.5 h-1.5 rounded-full mr-1 {{ $modeBadge['dot'] }}"></span>
+                                {{ $modeBadge['label'] }}
+                            </span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border {{ $activeBadge['badge'] }}">
+                                <span class="w-1.5 h-1.5 rounded-full mr-1 {{ $activeBadge['dot'] }}"></span>
+                                {{ $activeBadge['label'] }}
+                            </span>
+                            @if($merchant->paymentMethodFees->count() > 0)
+                                <span class="text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full font-medium">
+                                    Taxa Personalizada
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                        <div>
+                            <p class="text-xs text-slate-400 font-medium mb-0.5">ID</p>
+                            <p class="text-sm text-slate-800 font-mono">{{ $merchant->id }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 font-medium mb-0.5">Criado</p>
+                            <p class="text-sm text-slate-800">{{ $formatDateTime($merchant->created_at) }}</p>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <p class="text-xs text-slate-400 font-medium mb-0.5">Webhook URL</p>
+                            <p class="text-sm text-slate-800 break-all">{{ $merchant->webhook_url ?: '—' }}</p>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <p class="text-xs text-slate-400 font-medium mb-0.5">Moedas permitidas</p>
+                            <p class="text-sm text-slate-800">{{ $currencies !== '' ? $currencies : 'Todas' }}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Taxa</p>
+                            @if ($merchantRemainingCurrencies->isNotEmpty())
+                            <button @click="activeMerchantId = {{ $merchant->id }}; showFeeModal = true"
+                                    class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                Adicionar Taxa
+                            </button>
+                            @endif
+                        </div>
+
+                        @if ($merchant->paymentMethodFees->isEmpty())
+                        <p class="text-xs text-slate-400 py-2">Nenhuma taxa personalizada. Veja as o valor das taxas <a href="{{  route('dashboard.stripe-fees') }}" style="color:#000" > clicando aqui </a>
+                        @else
+                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                            <table class="w-full text-xs">
+                                <thead>
+                                    <tr class="bg-slate-100 border-b border-slate-200">
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Label</th>
+                                        <th class="text-right font-semibold text-slate-500 px-3 py-2">%</th>
+                                        <th class="text-right font-semibold text-slate-500 px-3 py-2">Fixo</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Moeda</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Estado</th>
+                                        <th class="px-3 py-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    @foreach ($merchant->paymentMethodFees as $fee)
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="px-3 py-2 text-slate-600">{{ $fee->label }}</td>
+                                        <td class="px-3 py-2 text-right text-slate-700">{{ number_format($fee->fee_percentage * 100, 2) }}%</td>
+                                        <td class="px-3 py-2 text-right text-slate-700">{{ number_format($fee->fee_fixed, 2) }}</td>
+                                        <td class="px-3 py-2 text-slate-600">{{ $fee->currency }}</td>
+                                        <td class="px-3 py-2">
+                                            @if ($fee->is_active)
+                                            <span class="inline-flex items-center gap-1 text-emerald-700">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Ativo
+                                            </span>
+                                            @else
+                                            <span class="inline-flex items-center gap-1 text-slate-400">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>Inativo
+                                            </span>
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <form method="POST" action="{{ route('dashboard.customers.merchants.fees.destroy', [$customer, $merchant, $fee]) }}"
+                                                  onsubmit="return confirm('Remover esta taxa?')">
+                                                @csrf @method('DELETE')
+                                                <button type="submit" class="text-slate-400 hover:text-red-500 transition-colors">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @endif
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Transações</p>
+                            <span class="text-xs text-slate-400">{{ $merchant->paymentRequests->count() }} recentes</span>
+                        </div>
+
+                        @if ($merchant->paymentRequests->isEmpty())
+                        <p class="text-xs text-slate-400 py-2">Nenhuma transação SecurePay.</p>
+                        @else
+                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                            <table class="w-full text-xs">
+                                <thead>
+                                    <tr class="bg-slate-100 border-b border-slate-200">
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Data</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">UUID</th>
+                                        <th class="text-right font-semibold text-slate-500 px-3 py-2">Valor</th>
+                                        <th class="text-right font-semibold text-slate-500 px-3 py-2">Taxas</th>
+                                        <th class="text-right font-semibold text-slate-500 px-3 py-2">Líquido</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Estado</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Liquidação</th>
+                                        <th class="text-left font-semibold text-slate-500 px-3 py-2">Ref.</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    @foreach ($merchant->paymentRequests as $pr)
+                                    @php
+                                        $prStatus = match ($pr->status) {
+                                            'completed'  => ['badge' => 'bg-emerald-50 text-emerald-700 border-emerald-200', 'label' => 'Pago'],
+                                            'processing' => ['badge' => 'bg-sky-50 text-sky-700 border-sky-200', 'label' => 'A processar'],
+                                            'pending'    => ['badge' => 'bg-amber-50 text-amber-700 border-amber-200', 'label' => 'Pendente'],
+                                            'failed'     => ['badge' => 'bg-red-50 text-red-700 border-red-200', 'label' => 'Falhou'],
+                                            'expired'    => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'label' => 'Expirado'],
+                                            'cancelled'  => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'label' => 'Cancelado'],
+                                            default      => ['badge' => 'bg-slate-100 text-slate-500 border-slate-200', 'label' => $pr->status],
+                                        };
+                                        $funding = $pr->stripeTransaction?->partner_funding_status;
+                                        $settlement = match (true) {
+                                            $pr->status !== 'completed' => ['label' => '—', 'class' => 'text-slate-400'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::Completed => ['label' => 'Disponível', 'class' => 'text-emerald-700'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::Failed => ['label' => 'Falhou', 'class' => 'text-red-700'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::AwaitingStripePayout => ['label' => 'A aguardar payout', 'class' => 'text-amber-700'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::AwaitingLiquidity => ['label' => 'A aguardar liquidez', 'class' => 'text-amber-700'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::Pending => ['label' => 'Pendente', 'class' => 'text-amber-700'],
+                                            default => ['label' => 'Pendente', 'class' => 'text-amber-700'],
+                                        };
+                                        $feeTotal = $pr->stripeTransaction?->resolvedFeeTotal();
+                                        $netAmount = $pr->stripeTransaction?->resolvedNetAmount();
+                                    @endphp
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                            {{ $formatDateTime($pr->paid_at ?? $pr->created_at) }}
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <a href="{{ url('/pay/'.$pr->uuid) }}" target="_blank" rel="noopener"
+                                               class="font-mono text-indigo-600 hover:underline">
+                                                {{ \Illuminate\Support\Str::limit($pr->uuid, 8, '') }}…
+                                            </a>
+                                        </td>
+                                        <td class="px-3 py-2 text-right font-medium text-slate-800 whitespace-nowrap">
+                                            {{ number_format($pr->amount / 100, 2, ',', '.') }}
+                                            <span class="text-slate-400 font-normal">{{ strtoupper($pr->currency) }}</span>
+                                        </td>
+                                        <td class="px-3 py-2 text-right text-slate-600 whitespace-nowrap">
+                                            @if ($feeTotal === null && $pr->status === 'completed')
+                                                —
+                                            @elseif ($feeTotal === null)
+                                                —
+                                            @else
+                                                {{ number_format($feeTotal / 100, 2, ',', '.') }}
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2 text-right text-slate-700 whitespace-nowrap">
+                                            @if ($netAmount === null)
+                                                —
+                                            @else
+                                                {{ number_format($netAmount / 100, 2, ',', '.') }}
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border {{ $prStatus['badge'] }}">
+                                                {{ $prStatus['label'] }}
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2 {{ $settlement['class'] }} font-medium whitespace-nowrap">
+                                            {{ $settlement['label'] }}
+                                        </td>
+                                        <td class="px-3 py-2 text-slate-500 max-w-[8rem] truncate" title="{{ $pr->external_reference }}">
+                                            {{ $pr->external_reference ?: '—' }}
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @empty
+            <div class="px-5 py-10 text-center">
+                <p class="text-sm text-slate-400">Nenhum SecurePay registado.</p>
+            </div>
+            @endforelse
+            </div>{{-- fim sectionOpen --}}
+
+        </div>{{-- fim card --}}
+
+            {{-- Modal: Adicionar Taxa SecurePay --}}
+            @if ($customer->merchants->contains(fn ($merchant) => $remainingFeeCurrencies($merchant, $merchant->allowed_currencies)->isNotEmpty()))
+            <template x-teleport="body">
+            <div x-show="showFeeModal" x-cloak
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0">
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-md" @click="showFeeModal = false"></div>
+                <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100">
+                    <div class="flex items-center justify-between mb-5">
+                        <h3 class="text-base font-semibold text-slate-900">Adicionar Taxa</h3>
+                        <button @click="showFeeModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    @foreach ($customer->merchants as $merchant)
+                    @php $merchantRemainingCurrencies = $remainingFeeCurrencies($merchant, $merchant->allowed_currencies); @endphp
+                    @continue($merchantRemainingCurrencies->isEmpty())
+                    <form x-show="activeMerchantId === {{ $merchant->id }}"
+                          method="POST"
+                          action="{{ route('dashboard.customers.merchants.fees.store', [$customer, $merchant]) }}">
+                        @csrf
+                        <input type="hidden" name="payment_method" value="all">
+                        <div class="grid grid-cols-2 gap-4">
+
+                            <div class="col-span-2">
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Label</label>
+                                <input type="text" name="label" required
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                       placeholder="Ex: Taxa padrão">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Taxa % <span class="normal-case text-slate-400">(ex: 0.015 = 1.5%)</span></label>
+                                <input type="number" name="fee_percentage" step="0.0001" min="0" max="100" required
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                       placeholder="0.0150">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Taxa Fixa</label>
+                                <input type="number" name="fee_fixed" step="0.0001" min="0" required
+                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                       placeholder="0.25">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moeda</label>
+                                <select name="currency" required
+                                        class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 uppercase">
+                                    @foreach ($merchantRemainingCurrencies as $currency)
+                                    <option value="{{ $currency }}">{{ $currency }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="is_active" value="1" checked
+                                           class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500/30">
+                                    <span class="text-sm text-slate-600 font-medium">Ativo</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 mt-6">
+                            <button type="button" @click="showFeeModal = false"
+                                    class="flex-1 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
+                                Cancelar
+                            </button>
+                            <button type="submit"
+                                    class="flex-1 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors">
+                                Guardar
+                            </button>
+                        </div>
+                    </form>
+                    @endforeach
+                </div>
+            </div>
+            </template>
+            @endif
+
+        </div>{{-- fim wrapper x-data SecurePay --}}
 
     </div>{{-- fim LEFT COLUMN --}}
 
@@ -1201,6 +1534,7 @@
             </div>
 
             @if ($canAdjustBalance && ! $pendingBalanceAdjustment)
+            <template x-teleport="body">
             <div x-show="showBalanceModal" x-cloak
                  class="fixed inset-0 z-50 flex items-center justify-center p-4"
                  x-transition:enter="transition ease-out duration-200"
@@ -1209,7 +1543,7 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100"
                  x-transition:leave-end="opacity-0">
-                <div class="fixed inset-0 bg-black/50 backdrop-blur-md" @click="showBalanceModal = false"></div>
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-md" @click="showBalanceModal = false"></div>
                 <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
                      x-transition:enter="transition ease-out duration-200"
                      x-transition:enter-start="opacity-0 scale-95"
@@ -1257,9 +1591,11 @@
                     </form>
                 </div>
             </div>
+            </template>
             @endif
 
             @if ($canAdjustBalance)
+            <template x-teleport="body">
             <div x-show="showSmsModal" x-cloak
                  class="fixed inset-0 z-50 flex items-center justify-center p-4"
                  x-transition:enter="transition ease-out duration-200"
@@ -1268,7 +1604,7 @@
                  x-transition:leave="transition ease-in duration-150"
                  x-transition:leave-start="opacity-100"
                  x-transition:leave-end="opacity-0">
-                <div class="fixed inset-0 bg-black/50 backdrop-blur-md" @click="showSmsModal = false"></div>
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-md" @click="showSmsModal = false"></div>
                 <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
                     <div class="flex items-center justify-between mb-5">
                         <div>
@@ -1318,6 +1654,7 @@
                     </template>
                 </div>
             </div>
+            </template>
             @endif
         </div>
         @endif
@@ -1336,6 +1673,12 @@
                     <span class="text-slate-500">Customer ID</span>
                     <span class="font-mono text-xs text-slate-700 bg-slate-50 px-2 py-0.5 rounded">{{ $customer->stripeAccount->stripe_customer_id ?? '—' }}</span>
                 </div>
+                @if ($stripeFundingBadge)
+                <div class="flex justify-between items-center gap-4">
+                    <span class="text-slate-500">Funding</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border {{ $stripeFundingBadge['badge'] }}">{{ $stripeFundingBadge['label'] }}</span>
+                </div>
+                @endif
                 @if ($stripeFundingActive && filled($customer->stripeAccount->funding_iban))
                 <div class="flex justify-between items-center gap-4">
                     <span class="text-slate-500 flex-shrink-0">IBAN</span>

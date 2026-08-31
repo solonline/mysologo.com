@@ -2,8 +2,9 @@
 
 namespace App\Domains\Settings\Controllers;
 
-use App\Domains\Settings\Services\SettingsService;
 use App\Domains\Settings\DTOs\SettingDTO;
+use App\Domains\Settings\Services\MailSettingsService;
+use App\Domains\Settings\Services\SettingsService;
 use App\Http\Resources\SettingResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,7 +12,10 @@ use Illuminate\Routing\Controller;
 
 class SettingController extends Controller
 {
-    public function __construct(private readonly SettingsService $settingsService) {}
+    public function __construct(
+        private readonly SettingsService $settingsService,
+        private readonly MailSettingsService $mailSettings,
+    ) {}
 
     /**
      * List Settings
@@ -57,6 +61,10 @@ class SettingController extends Controller
             key: $key,
             value: (string) $request->input('value', ''),
         ));
+
+        if (str_starts_with($key, 'mail.')) {
+            $this->mailSettings->apply();
+        }
 
         return response()->json(['ok' => true]);
     }

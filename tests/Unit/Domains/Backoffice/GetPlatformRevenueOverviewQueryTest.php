@@ -63,9 +63,66 @@ class GetPlatformRevenueOverviewQueryTest extends TestCase
         $this->assertNotNull($summary);
         $this->assertSame('EUR', $summary->currency);
         $this->assertSame(10, $summary->accruedCents);
+        $this->assertSame(0, $summary->settledCents);
+        $this->assertSame(10, $summary->pendingCents);
         $this->assertSame(10, $summary->ledgerCents);
         $this->assertSame(1, $summary->transactionCount);
+        $this->assertSame(0, $summary->settledTransactionCount);
+        $this->assertSame(1, $summary->pendingTransactionCount);
         $this->assertTrue($overview->ledgerMatchesStripe);
+    }
+
+    public function test_overview_splits_settled_and_pending_platform_fees(): void
+    {
+        $platform = $this->createPlatformCustomer();
+        $retail = $this->createRetailCustomer();
+
+        StripeTransaction::query()->create([
+            'customer_id' => $retail->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 1_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 10,
+            'net_amount' => 990,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'balance_settled_at' => now(),
+        ]);
+
+        StripeTransaction::query()->create([
+            'customer_id' => $retail->id,
+            'type' => TransactionType::MERCHANT_PAYMENT,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 2_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 25,
+            'net_amount' => 1_975,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'balance_settled_at' => null,
+        ]);
+
+        LedgerEntry::query()->create([
+            'customer_id' => $platform->id,
+            'currency' => 'EUR',
+            'direction' => 'credit',
+            'amount' => 35,
+            'balance_after' => 35,
+            'entry_type' => LedgerEntryType::MANUAL_CREDIT,
+            'description' => PlatformRevenueService::LEDGER_PLATFORM_FEE_DESCRIPTION_PREFIX.'split',
+        ]);
+
+        $overview = app(GetPlatformRevenueOverviewQuery::class)->execute();
+        $summary = $overview->primary();
+
+        $this->assertSame(35, $summary?->accruedCents);
+        $this->assertSame(10, $summary?->settledCents);
+        $this->assertSame(25, $summary?->pendingCents);
+        $this->assertSame(1, $summary?->settledTransactionCount);
+        $this->assertSame(1, $summary?->pendingTransactionCount);
     }
 
     public function test_overview_detects_ledger_mismatch(): void
@@ -90,6 +147,8 @@ class GetPlatformRevenueOverviewQueryTest extends TestCase
 
         $this->assertFalse($overview->ledgerMatchesStripe);
         $this->assertSame(20, $overview->primary()?->accruedCents);
+        $this->assertSame(20, $overview->primary()?->pendingCents);
+        $this->assertSame(0, $overview->primary()?->settledCents);
         $this->assertSame(0, $overview->primary()?->ledgerCents);
     }
 

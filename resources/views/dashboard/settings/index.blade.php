@@ -20,6 +20,7 @@ $tabs = [
     'stripe'   => ['label' => 'Stripe',         'title' => 'Stripe'],
     'didit'    => ['label' => 'Didit',          'title' => 'Didit (KYC / KYB)'],
     'wallester'=> ['label' => 'Wallester',      'title' => 'Wallester'],
+    'mail'     => ['label' => 'Email',          'title' => 'SMTP (email de clientes)'],
     'sms'      => ['label' => 'SMS',            'title' => 'SMS'],
     'social'   => ['label' => 'Redes Sociais',  'title' => 'Redes Sociais'],
     'currency' => ['label' => 'Moedas',         'title' => 'Configurações de Moedas'],
@@ -62,13 +63,21 @@ $currencyColors = [
     'GBP' => 'bg-purple-50 text-purple-700 border-purple-200',
     'CHF' => 'bg-red-50 text-red-700 border-red-200',
 ];
+
+$selectOptions = [
+    'mail.encryption' => [
+        '' => 'Nenhuma',
+        'tls' => 'TLS (STARTTLS)',
+        'ssl' => 'SSL (SMTPS)',
+    ],
+];
 @endphp
 
-<form method="POST" action="{{ route('dashboard.settings.update') }}" x-data="{ tab: 'company' }">
+<form method="POST" action="{{ route('dashboard.settings.update') }}" x-data="{ tab: '{{ session('settings_tab', 'company') }}' }">
     @csrf
 
     {{-- Tabs --}}
-    <div class="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit">
+    <div class="flex flex-wrap gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit">
         @foreach ($tabs as $group => $meta)
         <button type="button" @click="tab = '{{ $group }}'"
                 :class="tab === '{{ $group }}' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
@@ -80,7 +89,7 @@ $currencyColors = [
 
     {{-- Panels --}}
     @foreach ($tabs as $group => $meta)
-    <div x-show="tab === '{{ $group }}'" @if($group !== 'company') x-cloak @endif class="space-y-4">
+    <div x-show="tab === '{{ $group }}'" @if($group !== session('settings_tab', 'company')) x-cloak @endif class="space-y-4">
 
         @foreach ($panels[$group] ?? [] as $panel)
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -99,9 +108,14 @@ $currencyColors = [
                     @endif
                 </h2>
                 @else
-                <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">
-                    {{ $panel['title'] }}
-                </h2>
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">
+                        {{ $panel['title'] }}
+                    </h2>
+                    @if ($group === 'mail')
+                    <p class="text-xs text-slate-500 mt-1">Servidor SMTP usado para emails enviados aos clientes.</p>
+                    @endif
+                </div>
                 @endif
             </div>
 
@@ -112,16 +126,29 @@ $currencyColors = [
                 <div class="{{ $isWide ? 'sm:col-span-2' : '' }}">
 
                     @if ($setting->type === 'toggle')
-                    <div class="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl"
-                         x-data="{ on: {{ $setting->value === 'true' ? 'true' : 'false' }} }">
+                    @php
+                        $toggleHint = match ($setting->key) {
+                            'mail.verify_peer' => 'Desactive se o servidor SMTP usar certificado autoassinado (ex.: Plesk/Contabo).',
+                            'system.maintenance_mode' => 'Quando activo, a API fica indisponível para os clientes.',
+                            default => null,
+                        };
+                        $toggleOn = $setting->value === 'true';
+                        $toggleTone = $setting->key === 'mail.verify_peer'
+                            ? ['wrap' => 'bg-slate-50 border-slate-200', 'title' => 'text-slate-800', 'hint' => 'text-slate-500', 'on' => 'bg-indigo-600', 'ring' => 'focus:ring-indigo-400/40']
+                            : ['wrap' => 'bg-amber-50 border-amber-200', 'title' => 'text-amber-800', 'hint' => 'text-amber-600', 'on' => 'bg-amber-500', 'ring' => 'focus:ring-amber-400/40'];
+                    @endphp
+                    <div class="flex items-center justify-between p-4 border rounded-xl {{ $toggleTone['wrap'] }}"
+                         x-data="{ on: {{ $toggleOn ? 'true' : 'false' }} }">
                         <div>
-                            <p class="text-sm font-semibold text-amber-800">{{ $setting->label }}</p>
-                            <p class="text-xs text-amber-600 mt-0.5">Quando activo, a API fica indisponível para os clientes.</p>
+                            <p class="text-sm font-semibold {{ $toggleTone['title'] }}">{{ $setting->label }}</p>
+                            @if ($toggleHint)
+                            <p class="text-xs {{ $toggleTone['hint'] }} mt-0.5">{{ $toggleHint }}</p>
+                            @endif
                         </div>
                         <input type="hidden" name="settings[{{ $setting->key }}]" :value="on ? 'true' : 'false'">
                         <button type="button" @click="on = !on"
-                                :class="on ? 'bg-amber-500' : 'bg-slate-300'"
-                                class="relative ml-4 w-11 h-6 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/40 flex-shrink-0">
+                                :class="on ? '{{ $toggleTone['on'] }}' : 'bg-slate-300'"
+                                class="relative ml-4 w-11 h-6 rounded-full transition-colors focus:outline-none {{ $toggleTone['ring'] }} flex-shrink-0">
                             <span :class="on ? 'translate-x-5' : 'translate-x-0.5'"
                                   class="absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"></span>
                         </button>
@@ -167,6 +194,14 @@ $currencyColors = [
                         <input type="hidden" name="settings[{{ $setting->key }}]" :value="JSON.stringify(items)">
                     </div>
 
+                    @elseif ($setting->type === 'select')
+                    <label class="{{ $lc }}">{{ $setting->label }}</label>
+                    <select name="settings[{{ $setting->key }}]" class="{{ $ic }}">
+                        @foreach ($selectOptions[$setting->key] ?? [] as $optionValue => $optionLabel)
+                            <option value="{{ $optionValue }}" @selected((string) $setting->value === (string) $optionValue)>{{ $optionLabel }}</option>
+                        @endforeach
+                    </select>
+
                     @elseif ($setting->type === 'timezone')
                     <label class="{{ $lc }}">{{ $setting->label }}</label>
                     <select name="settings[{{ $setting->key }}]" class="{{ $ic }}">
@@ -211,6 +246,36 @@ $currencyColors = [
 
         </div>
         @endforeach
+
+        @if ($group === 'mail')
+        @can('settings.edit')
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100">
+                <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wider">Testar SMTP</h2>
+                <p class="text-xs text-slate-500 mt-1">Envia um email de teste com a configuração actualmente guardada.</p>
+            </div>
+            <div class="px-6 py-5">
+                <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+                    <div class="flex-1">
+                        <label class="{{ $lc }}" for="mail-test-to">Destinatário</label>
+                        <input type="email" form="test-mail-form" id="mail-test-to" name="to"
+                               value="{{ old('to', auth()->user()?->email) }}"
+                               placeholder="ex: voce@empresa.com"
+                               required
+                               class="{{ $ic }}">
+                    </div>
+                    <button type="submit" form="test-mail-form"
+                            class="px-5 py-2.5 bg-slate-800 text-white text-sm font-semibold rounded-xl hover:bg-slate-900 transition whitespace-nowrap">
+                        Enviar email de teste
+                    </button>
+                </div>
+                @error('to')
+                <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+        </div>
+        @endcan
+        @endif
 
         @if ($group === 'wallester')
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -283,6 +348,9 @@ $currencyColors = [
 
 @can('settings.edit')
 <form id="retry-wallester-topups-form" method="POST" action="{{ route('dashboard.operations.retry-wallester-topups') }}" class="hidden">
+    @csrf
+</form>
+<form id="test-mail-form" method="POST" action="{{ route('dashboard.settings.test-mail') }}" class="hidden">
     @csrf
 </form>
 @endcan

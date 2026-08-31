@@ -11,6 +11,7 @@ use App\Domains\Wallet\Enums\TransactionType;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
+use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -52,6 +53,7 @@ class WalletTransactionService
         string $deviceToken,
         string $pin,
         ?string $description = null,
+        ?string $idempotencyKey = null,
     ): array {
         $this->deviceAuthService->verifyPin($sender, $deviceToken, $pin);
 
@@ -71,8 +73,13 @@ class WalletTransactionService
             throw new ApiException(ErrorCode::P2P_SELF_TRANSFER, 422, 'Não é possível transferir para si mesmo.');
         }
 
-        $idempotencyKey = 'p2p:'.Str::uuid()->toString();
+        $movementKey = $this->p2pMovementKey($idempotencyKey);
         $description ??= 'P2P transfer';
+
+        $existing = $this->findExistingP2pPair($movementKey);
+        if ($existing !== null) {
+            return $existing;
+        }
 
         $this->fundingPartnerMovements->transferBetweenCustomers(
             from: $sender,
@@ -80,10 +87,15 @@ class WalletTransactionService
             amountCents: $amount,
             currency: $currency,
             description: $description,
-            idempotencyKey: $idempotencyKey,
+            idempotencyKey: $movementKey,
         );
 
-        return DB::transaction(function () use ($sender, $recipient, $amount, $currency, $description) {
+        $existing = $this->findExistingP2pPair($movementKey);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        return DB::transaction(function () use ($sender, $recipient, $amount, $currency, $description, $movementKey) {
             $base = [
                 'type' => TransactionType::P2P,
                 'payment_method_type' => 'p2p',
@@ -112,6 +124,8 @@ class WalletTransactionService
 
             $debit->update(['related_transaction_id' => $credit->id]);
 
+            $this->attachP2pMovementReferences($movementKey, $debit, $credit);
+
             $this->ledgerService->record(
                 customerId: $sender->id,
                 currency: $currency,
@@ -135,5 +149,68 @@ class WalletTransactionService
                 'credit' => $credit,
             ];
         });
+    }
+
+    private function p2pMovementKey(?string $idempotencyKey): string
+    {
+        $key = trim((string) $idempotencyKey);
+
+        if ($key === '') {
+            $key = (string) Str::uuid();
+        }
+
+        return str_starts_with($key, 'p2p:') ? $key : 'p2p:'.$key;
+    }
+
+    /**
+     * @return array{debit: StripeTransaction, credit: StripeTransaction}|null
+     */
+    private function findExistingP2pPair(string $movementKey): ?array
+    {
+        $outMovement = FundingPartnerMovement::query()
+            ->where('idempotency_key', $movementKey.':out')
+            ->first();
+
+        if (! $outMovement instanceof FundingPartnerMovement) {
+            return null;
+        }
+
+        $debit = $outMovement->reference;
+        if (! $debit instanceof StripeTransaction) {
+            return null;
+        }
+
+        $credit = $debit->related_transaction_id
+            ? StripeTransaction::query()->find($debit->related_transaction_id)
+            : null;
+
+        if (! $credit instanceof StripeTransaction) {
+            return null;
+        }
+
+        return [
+            'debit' => $debit,
+            'credit' => $credit,
+        ];
+    }
+
+    private function attachP2pMovementReferences(
+        string $movementKey,
+        StripeTransaction $debit,
+        StripeTransaction $credit,
+    ): void {
+        FundingPartnerMovement::query()
+            ->where('idempotency_key', $movementKey.':out')
+            ->update([
+                'reference_type' => $debit->getMorphClass(),
+                'reference_id' => $debit->id,
+            ]);
+
+        FundingPartnerMovement::query()
+            ->where('idempotency_key', $movementKey.':in')
+            ->update([
+                'reference_type' => $credit->getMorphClass(),
+                'reference_id' => $credit->id,
+            ]);
     }
 }

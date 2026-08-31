@@ -94,6 +94,7 @@ class WallesterBalanceSyncTest extends TestCase
         $token = $sender->createToken('test')->plainTextToken;
 
         $this->withToken($token)
+            ->withHeaders(['Idempotency-Key' => 'p2p-sync-1'])
             ->postJson('/api/wallet/transactions/p2p', [
                 'recipient_username' => 'recipient_sync',
                 'amount' => 2500,

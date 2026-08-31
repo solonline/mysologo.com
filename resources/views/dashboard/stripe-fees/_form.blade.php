@@ -160,6 +160,8 @@
 
 {{-- Modal: Identificadores Stripe --}}
 <div id="modal_payment_method_info"
+     x-data
+     x-init="$nextTick(() => document.body.appendChild($el))"
      class="hidden fixed inset-0 z-50 flex items-center justify-center p-4"
      onclick="if(event.target===this) this.classList.add('hidden')">
     <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>

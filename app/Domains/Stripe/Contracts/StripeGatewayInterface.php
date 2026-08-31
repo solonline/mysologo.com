@@ -26,6 +26,8 @@ interface StripeGatewayInterface
 
     public function getBalanceTransaction(string $balanceTransactionId): array;
 
+    public function getTransactionsByIdPayout(string $payoutId, string $currency = 'eur', string $mode = 'live'): array;
+
     public function createPaymentIntentWithMode(array $data, string $mode): array;
 
     public function getPaymentIntentWithMode(string $paymentIntentId, string $mode, string $currency = 'eur'): array;
@@ -35,4 +37,15 @@ interface StripeGatewayInterface
     public function createTerminalConnectionToken(string $currency = 'eur'): array;
 
     public function applyCustomerBalance(string $paymentIntentId, array $params = []): array;
+
+    /**
+     * @param  list<string>  $types
+     */
+    public function listEvents(int $createdGte, int $createdLte, array $types, string $currency = 'eur'): array;
+
+    public function listPaymentIntents(int $createdGte, int $createdLte, string $currency = 'eur'): array;
+
+    public function listCharges(int $createdGte, int $createdLte, string $currency = 'eur'): array;
+
+    public function listCashBalanceTransactions(string $stripeCustomerId, int $createdGte, int $createdLte, string $currency = 'eur'): array;
 }

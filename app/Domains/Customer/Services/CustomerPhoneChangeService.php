@@ -62,23 +62,6 @@ class CustomerPhoneChangeService
             return $this->resendPendingChange($customer);
         }
 
-        if (! $this->isCurrentPhoneVerified($customer)) {
-            $customer->update(['phone' => $newPhone]);
-
-            SmsLogger::info('phone_change_direct_update', [
-                'customer_id' => $customer->id,
-                'previous_phone' => $currentPhone,
-                'new_phone' => $newPhone,
-            ]);
-
-            return [
-                'status' => 'updated',
-                'phone' => $newPhone,
-                'phone_verified' => false,
-                'message' => 'Phone number updated.',
-            ];
-        }
-
         if ($pendingPhone !== null && $pendingPhone !== $newPhone) {
             $this->clearPendingVerifications($customer);
         }

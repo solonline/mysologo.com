@@ -9,6 +9,7 @@ return [
 
     'status' => [
         'completed' => 'Zahlung abgeschlossen',
+        'completed_hint' => 'Danke. Ihre Zahlung wurde erfolgreich erfasst.',
         'failed'    => 'Zahlung fehlgeschlagen. Bitte erneut versuchen.',
         'expired'   => 'Dieser Link ist abgelaufen.',
         'cancelled' => 'Dieser Link wurde storniert.',

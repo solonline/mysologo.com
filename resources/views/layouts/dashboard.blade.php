@@ -188,9 +188,12 @@
         .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 2px; }
 
         /* ── Content entrance (sidebar é estática, só o conteúdo anima) ── */
+        /* Não deixar transform no estado final: fill-mode `both` + translateY(0)
+           cria containing block e os overlays `fixed`/`backdrop-blur` ficam
+           presos à coluna do main (sidebar, navbar e footer ficam de fora). */
         @keyframes contentFadeIn {
             from { opacity: 0; transform: translateY(8px); }
-            to   { opacity: 1; transform: translateY(0); }
+            to   { opacity: 1; }
         }
         main {
             animation: contentFadeIn .35s cubic-bezier(.4,0,.2,1) both;

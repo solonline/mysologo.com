@@ -169,4 +169,119 @@ class StripeHttpClient
 
         return Webhook::constructEvent($payload, $sigHeader, $this->webhookSecret);
     }
+
+    public function getTransactionsByIdPayout(string $payoutId): array
+    {
+        $all = [];
+        $startingAfter = null;
+
+        do {
+            $params = ['payout' => $payoutId, 'limit' => 100];
+            if ($startingAfter !== null) {
+                $params['starting_after'] = $startingAfter;
+            }
+
+            $page = $this->client()->balanceTransactions->all($params)->toArray();
+            $data = $page['data'] ?? [];
+            $all = array_merge($all, $data);
+            $hasMore = (bool) ($page['has_more'] ?? false);
+            $startingAfter = $hasMore && $data !== []
+                ? (string) $data[array_key_last($data)]['id']
+                : null;
+        } while ($hasMore && $startingAfter !== null);
+
+        return [
+            'object' => 'list',
+            'data' => $all,
+            'has_more' => false,
+            'url' => '/v1/balance_transactions',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array{object: string, data: list<array<string, mixed>>, has_more: bool, url: string}
+     */
+    public function listEvents(array $params): array
+    {
+        return $this->paginateList(
+            fn (array $pageParams) => $this->client()->events->all($pageParams)->toArray(),
+            $params,
+            '/v1/events',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array{object: string, data: list<array<string, mixed>>, has_more: bool, url: string}
+     */
+    public function listPaymentIntents(array $params): array
+    {
+        return $this->paginateList(
+            fn (array $pageParams) => $this->client()->paymentIntents->all($pageParams)->toArray(),
+            $params,
+            '/v1/payment_intents',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array{object: string, data: list<array<string, mixed>>, has_more: bool, url: string}
+     */
+    public function listCharges(array $params): array
+    {
+        return $this->paginateList(
+            fn (array $pageParams) => $this->client()->charges->all($pageParams)->toArray(),
+            $params,
+            '/v1/charges',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array{object: string, data: list<array<string, mixed>>, has_more: bool, url: string}
+     */
+    public function listCashBalanceTransactions(string $stripeCustomerId, array $params = []): array
+    {
+        return $this->paginateList(
+            fn (array $pageParams) => $this->client()->customers->allCashBalanceTransactions($stripeCustomerId, $pageParams)->toArray(),
+            $params,
+            '/v1/customers/'.$stripeCustomerId.'/cash_balance_transactions',
+        );
+    }
+
+    /**
+     * @param  callable(array<string, mixed>): array<string, mixed>  $fetcher
+     * @param  array<string, mixed>  $params
+     * @return array{object: string, data: list<array<string, mixed>>, has_more: bool, url: string}
+     */
+    private function paginateList(callable $fetcher, array $params, string $url): array
+    {
+        $all = [];
+        $startingAfter = null;
+        $pages = 0;
+
+        do {
+            $pageParams = array_merge($params, ['limit' => 100]);
+            if ($startingAfter !== null) {
+                $pageParams['starting_after'] = $startingAfter;
+            }
+
+            $page = $fetcher($pageParams);
+            $data = $page['data'] ?? [];
+            $all = array_merge($all, $data);
+            $hasMore = (bool) ($page['has_more'] ?? false);
+            $startingAfter = $hasMore && $data !== []
+                ? (string) $data[array_key_last($data)]['id']
+                : null;
+            $pages++;
+        } while ($hasMore && $startingAfter !== null && $pages < 50);
+
+        return [
+            'object' => 'list',
+            'data' => $all,
+            'has_more' => false,
+            'url' => $url,
+        ];
+    }
 }

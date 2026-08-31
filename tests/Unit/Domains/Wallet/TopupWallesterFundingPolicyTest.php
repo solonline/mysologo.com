@@ -4,6 +4,7 @@ namespace Tests\Unit\Domains\Wallet;
 
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
@@ -183,5 +184,53 @@ class TopupWallesterFundingPolicyTest extends TestCase
         $this->assertSame(0, $allocation->immediateGrossCents);
         $this->assertSame(0, $allocation->wallesterFundingNetCents);
         $this->assertSame(5_000, $allocation->stripeDeferredNetCents);
+    }
+
+    public function test_is_retriable_skips_transactions_before_accounting_cutoff(): void
+    {
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'email_verified_at' => now(),
+            'doc_status' => 'approved',
+        ]);
+
+        $historical = StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::MERCHANT_PAYMENT,
+            'payment_method_type' => 'card',
+            'direction' => TransactionDirection::Credit,
+            'amount' => 330,
+            'stripe_fee' => 35,
+            'platform_fee' => 0,
+            'net_amount' => 295,
+            'wallester_funding_net_amount' => 295,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'partner_funding_status' => PartnerFundingStatus::AwaitingLiquidity,
+            'stripe_created_at' => '2026-07-21 15:55:09',
+        ]);
+
+        $inPeriod = StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => TransactionDirection::Credit,
+            'amount' => 2_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 2_000,
+            'wallester_funding_net_amount' => 2_000,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'partner_funding_status' => PartnerFundingStatus::AwaitingLiquidity,
+            'stripe_created_at' => '2026-08-17 10:00:00',
+        ]);
+
+        $policy = app(TopupWallesterFundingPolicy::class);
+
+        $this->assertTrue($policy->isBeforeAccountingCutoff($historical));
+        $this->assertFalse($policy->isRetriable($historical));
+        $this->assertFalse($policy->isBeforeAccountingCutoff($inPeriod));
+        $this->assertTrue($policy->isRetriable($inPeriod));
     }
 }
