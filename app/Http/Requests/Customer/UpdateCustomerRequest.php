@@ -15,6 +15,13 @@ class UpdateCustomerRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->exists('show_profile_pic')) {
+            $this->merge(['show_profile_pic' => $this->boolean('show_profile_pic')]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -26,6 +33,7 @@ class UpdateCustomerRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:200'],
             'username' => ['sometimes', 'string', 'max:40', 'unique:customers', 'regex:/^[a-zA-Z0-9_]+$/'],
             'avatar' => ['nullable', 'string', 'max:255'],
+            'show_profile_pic' => ['sometimes', 'boolean'],
             'email' => ['sometimes', 'string', 'email', 'max:100', 'unique:customers'],
             'referal_email_code' => ['nullable', 'string', 'max:255'],
             'email_verified_at' => ['nullable', 'date'],

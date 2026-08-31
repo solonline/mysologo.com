@@ -21,6 +21,7 @@ class CustomerFactory extends Factory
             'type' => 'retail',
             'corporate_id' => null,
             'avatar' => null,
+            'show_profile_pic' => false,
             'language' => 'en',
             'email' => $this->faker->unique()->safeEmail(),
             'email_verified_at' => null,

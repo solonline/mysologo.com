@@ -21,6 +21,7 @@ class CustomerProfileResource extends JsonResource
             'language' => $customer->language,
             'currency' => $customer->currency,
             'avatar'   => $customer->avatar,
+            'show_profile_pic' => (bool) $customer->show_profile_pic,
             'phone'    => $customer->phone,
 
             'status'            => $customer->status,

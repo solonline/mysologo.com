@@ -8,6 +8,7 @@ class UpdateCustomerDTO
         public readonly ?string $name = null,
         public readonly ?string $username = null,
         public readonly ?string $avatar = null,
+        public readonly ?bool $showProfilePic = null,
         public readonly ?string $email = null,
         public readonly ?string $password = null,
         public readonly ?string $referalEmailCode = null,
@@ -19,6 +20,9 @@ class UpdateCustomerDTO
             name: $data['name'] ?? null,
             username: $data['username'] ?? null,
             avatar: $data['avatar'] ?? null,
+            showProfilePic: array_key_exists('show_profile_pic', $data)
+                ? (bool) $data['show_profile_pic']
+                : null,
             email: $data['email'] ?? null,
             password: $data['password'] ?? null,
             referalEmailCode: $data['referal_email_code'] ?? null,

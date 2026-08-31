@@ -13,7 +13,7 @@ class PublicCustomerResource extends JsonResource
             'id'         => $this->id,
             'name'       => $this->name,
             'username'   => $this->username,
-            'avatar_url' => $this->avatar ? asset('storage/' . $this->avatar) : null,
+            'avatar_url' => $this->publicAvatarUrl(),
         ];
     }
 }

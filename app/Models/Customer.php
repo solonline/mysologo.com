@@ -23,6 +23,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string|null $phone
  * @property string|null $currency
  * @property string|null $avatar
+ * @property bool $show_profile_pic
  * @property string $type
  * @property string $status
  * @property string|null $doc_status
@@ -50,6 +51,7 @@ class Customer extends Model
         'type',
         'corporate_id',
         'avatar',
+        'show_profile_pic',
         'language',
         'currency',
         'email',
@@ -68,8 +70,13 @@ class Customer extends Model
         'remember_token',
     ];
 
+    protected $attributes = [
+        'show_profile_pic' => false,
+    ];
+
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'show_profile_pic' => 'boolean',
         'status' => CustomerLifecycleStatus::class,
     ];
 
@@ -196,5 +203,14 @@ class Customer extends Model
             'customer_id',
             'favorite_customer_id',
         )->withTimestamps();
+    }
+
+    public function publicAvatarUrl(): ?string
+    {
+        if (! $this->show_profile_pic || ! $this->avatar) {
+            return null;
+        }
+
+        return asset('storage/'.$this->avatar);
     }
 }

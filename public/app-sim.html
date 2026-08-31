@@ -539,6 +539,53 @@ body {
 
 .account-avatar-btn:disabled { opacity: .5; cursor: not-allowed; }
 
+.account-pic-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--slate-200);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+  font-family: inherit;
+  text-align: left;
+  box-sizing: border-box;
+}
+.account-pic-toggle:has(input:checked) {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+.account-pic-toggle:has(input:disabled) {
+  opacity: .6;
+  cursor: default;
+}
+.account-pic-toggle input {
+  accent-color: var(--indigo);
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.account-pic-toggle-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-700);
+}
+.account-pic-toggle-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--slate-400);
+  line-height: 1.35;
+}
+
 /* ── Transaction screens ──────────────────────────── */
 .tx-screen { background: #fff; }
 
@@ -5624,6 +5671,7 @@ function customerInitials(name) {
 function renderAccountAvatar(customer) {
   const url = resolveAvatarUrl(customer.avatar);
   const initials = customerInitials(customer.name);
+  const showPic = customer.show_profile_pic === true;
   const inner = url
     ? `<img src="${url.replace(/"/g, '&quot;')}" alt="" />`
     : initials;
@@ -5640,6 +5688,13 @@ function renderAccountAvatar(customer) {
       </div>
       <button type="button" class="account-avatar-btn" id="account-avatar-btn" onclick="triggerAccountAvatarPick()">Alterar foto de perfil</button>
       <input type="file" id="account-avatar-input" accept="image/jpeg,image/png,image/webp" hidden onchange="uploadAccountAvatar(this)" />
+      <label class="account-pic-toggle">
+        <input type="checkbox" id="account-show-profile-pic" ${showPic ? 'checked' : ''} onchange="toggleShowProfilePic(this)" />
+        <span>
+          <span class="account-pic-toggle-title">Mostrar a minha foto a outros</span>
+          <span class="account-pic-toggle-hint">Autoriza a exibição em envios P2P e favoritos</span>
+        </span>
+      </label>
     </div>`;
 }
 
@@ -5716,6 +5771,32 @@ async function uploadAccountAvatar(input) {
   }
 }
 
+async function toggleShowProfilePic(input) {
+  if (!input) return;
+  const enabled = !!input.checked;
+  input.disabled = true;
+
+  try {
+    const { ok, data } = await api('POST', '/customer/update', { show_profile_pic: enabled });
+    if (!ok) {
+      input.checked = !enabled;
+      showToast(data?.message || 'Não foi possível actualizar a preferência', 'error');
+      return;
+    }
+
+    const updated = unwrap(data);
+    if (authSession?.user) {
+      authSession.user.show_profile_pic = updated?.show_profile_pic ?? enabled;
+    }
+    showToast(enabled ? 'Foto visível para outros' : 'Foto oculta para outros', 'success');
+  } catch (e) {
+    input.checked = !enabled;
+    showToast(e.message || 'Não foi possível actualizar a preferência', 'error');
+  } finally {
+    input.disabled = false;
+  }
+}
+
 async function loadAccountInfo() {
   const body = document.getElementById('account-body');
   if (!body) return;
@@ -5732,6 +5813,9 @@ async function loadAccountInfo() {
 
     if (meRes.ok) {
       customer = { ...customer, ...unwrap(meRes.data) };
+      if (authSession?.user) {
+        authSession.user = { ...authSession.user, ...customer };
+      }
     }
     if (accountRes.ok) {
       stripeAccount = unwrap(accountRes.data)?.stripe ?? null;

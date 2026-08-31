@@ -23,6 +23,7 @@ class CustomerResource extends JsonResource
             'language' => $this->language,
             'currency' => $this->currency,
             'avatar' => $this->avatar ?? null,
+            'show_profile_pic' => (bool) $this->show_profile_pic,
             'email_verified_at' => $this->email_verified_at ?? null,
             'phone' => $this->phone ?? null,
             'created_at' => $this->created_at,

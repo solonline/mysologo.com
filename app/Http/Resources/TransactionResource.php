@@ -35,7 +35,7 @@ class TransactionResource extends JsonResource
                         'id' => $customer->id,
                         'name' => $customer->name,
                         'username' => $customer->username,
-                        'avatar_url' => $customer->avatar ? asset('storage/'.$customer->avatar) : null,
+                        'avatar_url' => $customer->publicAvatarUrl(),
                         'role' => $this->p2pCounterpartyRole(),
                     ];
                 }
