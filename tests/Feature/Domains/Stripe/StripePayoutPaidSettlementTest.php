@@ -71,6 +71,70 @@ class StripePayoutPaidSettlementTest extends TestCase
         });
     }
 
+    public function test_process_stripe_webhook_job_enqueues_payout_even_if_type_key_is_missing(): void
+    {
+        Bus::fake([ProcessStripePayoutPaidJob::class]);
+
+        $job = new \App\Domains\Stripe\Jobs\ProcessStripeWebhook([
+            'livemode' => false,
+            'data' => [
+                'object' => [
+                    'object' => 'payout',
+                    'id' => 'po_test_shape',
+                    'status' => 'paid',
+                    'amount' => 100,
+                    'currency' => 'eur',
+                    'livemode' => false,
+                ],
+            ],
+        ]);
+
+        $job->handle(app(\App\Domains\Stripe\Services\StripeService::class));
+
+        Bus::assertDispatched(ProcessStripePayoutPaidJob::class, function (ProcessStripePayoutPaidJob $job): bool {
+            return $job->payoutId === 'po_test_shape' && $job->livemode === false;
+        });
+    }
+
+    public function test_recover_recent_paid_payouts_dispatches_settlement_jobs(): void
+    {
+        Bus::fake([ProcessStripePayoutPaidJob::class]);
+
+        $gateway = Mockery::mock(StripeGatewayInterface::class);
+        $gateway->shouldReceive('listPayouts')
+            ->once()
+            ->withArgs(fn (int $createdGte, string $currency, string $mode): bool => $mode === 'live' && $currency === 'eur')
+            ->andReturn(['status' => 'success', 'message' => null, 'data' => ['data' => []]]);
+        $gateway->shouldReceive('listPayouts')
+            ->once()
+            ->withArgs(fn (int $createdGte, string $currency, string $mode): bool => $mode === 'test' && $currency === 'eur')
+            ->andReturn([
+                'status' => 'success',
+                'message' => null,
+                'data' => [
+                    'data' => [
+                        [
+                            'id' => 'po_recovered_test',
+                            'status' => 'paid',
+                            'currency' => 'eur',
+                        ],
+                    ],
+                ],
+            ]);
+
+        $this->app->instance(StripeGatewayInterface::class, $gateway);
+
+        $stats = app(StripePayoutSettlementService::class)->recoverRecentPaidPayouts(now()->subDay()->timestamp);
+
+        $this->assertSame(1, $stats['dispatched']);
+        $this->assertSame(1, $stats['test']);
+        $this->assertSame(0, $stats['live']);
+
+        Bus::assertDispatched(ProcessStripePayoutPaidJob::class, function (ProcessStripePayoutPaidJob $job): bool {
+            return $job->payoutId === 'po_recovered_test' && $job->livemode === false;
+        });
+    }
+
     public function test_payout_settlement_arms_merchant_for_wallester_funding(): void
     {
         Bus::fake([FundWallesterTopupFromStripeJob::class]);

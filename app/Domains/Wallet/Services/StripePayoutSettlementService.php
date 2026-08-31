@@ -3,6 +3,7 @@
 namespace App\Domains\Wallet\Services;
 
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
+use App\Domains\Stripe\Jobs\ProcessStripePayoutPaidJob;
 use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
@@ -89,6 +90,59 @@ class StripePayoutSettlementService
             'livemode' => $livemode,
             ...$stats,
         ]);
+
+        return $stats;
+    }
+
+    /**
+     * Re-dispatch settlement for recently paid Stripe payouts (missed webhooks / old workers).
+     *
+     * @return array{dispatched: int, live: int, test: int}
+     */
+    public function recoverRecentPaidPayouts(int $createdGte): array
+    {
+        $stats = ['dispatched' => 0, 'live' => 0, 'test' => 0];
+
+        foreach ([true, false] as $livemode) {
+            $modeKey = $livemode ? 'live' : 'test';
+            $result = $this->stripeGateway->listPayouts($createdGte, 'eur', $modeKey);
+
+            if (($result['status'] ?? null) !== 'success') {
+                Log::channel('stripe')->warning('stripe_payout_settlement: failed to list payouts for recovery', [
+                    'mode' => $modeKey,
+                    'message' => $result['message'] ?? null,
+                ]);
+
+                continue;
+            }
+
+            foreach ($result['data']['data'] ?? [] as $payout) {
+                if (! is_array($payout)) {
+                    continue;
+                }
+
+                $payoutId = $payout['id'] ?? null;
+
+                if (! is_string($payoutId) || ! str_starts_with($payoutId, 'po_')) {
+                    continue;
+                }
+
+                if (($payout['status'] ?? null) !== 'paid') {
+                    continue;
+                }
+
+                ProcessStripePayoutPaidJob::dispatch(
+                    $payoutId,
+                    strtolower((string) ($payout['currency'] ?? 'eur')),
+                    $livemode,
+                );
+
+                $stats['dispatched']++;
+                $stats[$modeKey]++;
+            }
+        }
+
+        Log::channel('stripe')->info('stripe_payout_settlement: recovery dispatch completed', $stats);
 
         return $stats;
     }

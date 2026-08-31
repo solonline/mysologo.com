@@ -7,6 +7,7 @@ use App\Domains\Stripe\Clients\StripeHttpClient;
 use App\Domains\Stripe\Commands\MigratePendingToPaymentIntents;
 use App\Domains\Stripe\Commands\PurgeMerchantPaymentsCommand;
 use App\Domains\Stripe\Commands\SettleStripeBalances;
+use App\Domains\Stripe\Commands\SettleStripePayoutCommand;
 use App\Domains\Stripe\Jobs\ExpireStaleStripePaymentIntentsJob;
 use App\Domains\Stripe\Services\PurgeMerchantPaymentsService;
 use App\Domains\Stripe\Services\StripePaymentIntentService;
@@ -37,6 +38,7 @@ class StripeServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SettleStripeBalances::class,
+                SettleStripePayoutCommand::class,
                 MigratePendingToPaymentIntents::class,
                 PurgeMerchantPaymentsCommand::class,
             ]);

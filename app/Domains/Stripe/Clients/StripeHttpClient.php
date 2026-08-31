@@ -202,6 +202,19 @@ class StripeHttpClient
      * @param  array<string, mixed>  $params
      * @return array{object: string, data: list<array<string, mixed>>, has_more: bool, url: string}
      */
+    public function listPayouts(array $params): array
+    {
+        return $this->paginateList(
+            fn (array $pageParams) => $this->client()->payouts->all($pageParams)->toArray(),
+            $params,
+            '/v1/payouts',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array{object: string, data: list<array<string, mixed>>, has_more: bool, url: string}
+     */
     public function listEvents(array $params): array
     {
         return $this->paginateList(

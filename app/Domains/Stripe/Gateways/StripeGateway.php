@@ -95,6 +95,21 @@ class StripeGateway implements StripeGatewayInterface
         );
     }
 
+    public function listPayouts(int $createdGte, string $currency = 'eur', string $mode = 'live'): array
+    {
+        $resolvedMode = $mode === 'test' ? 'test' : 'live';
+
+        return $this->run(
+            'listPayouts',
+            fn () => $this->client
+                ->forMode($resolvedMode, $currency)
+                ->listPayouts([
+                    'status' => 'paid',
+                    'created' => ['gte' => $createdGte],
+                ])
+        );
+    }
+
     public function createPaymentIntentWithMode(array $data, string $mode): array
     {
         $currency = strtolower($data['currency'] ?? 'eur');

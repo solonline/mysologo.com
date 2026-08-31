@@ -28,6 +28,11 @@ interface StripeGatewayInterface
 
     public function getTransactionsByIdPayout(string $payoutId, string $currency = 'eur', string $mode = 'live'): array;
 
+    /**
+     * @return array{status: string, message: ?string, data: mixed}
+     */
+    public function listPayouts(int $createdGte, string $currency = 'eur', string $mode = 'live'): array;
+
     public function createPaymentIntentWithMode(array $data, string $mode): array;
 
     public function getPaymentIntentWithMode(string $paymentIntentId, string $mode, string $currency = 'eur'): array;
