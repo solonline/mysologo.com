@@ -14,6 +14,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->ensureLogDirectories();
+
         RateLimiter::for('api', function (Request $request) {
             return $request->user()
                 ? Limit::perMinute(60)->by($request->user()->id.'|'.$request->ip())
@@ -27,5 +29,20 @@ class AppServiceProvider extends ServiceProvider
                     'message' => 'Muitas tentativas. Tente novamente em breve.',
                 ], 429));
         });
+    }
+
+    private function ensureLogDirectories(): void
+    {
+        if ($this->app->environment('testing')) {
+            return;
+        }
+
+        foreach (config('logging.directories', []) as $directory) {
+            $path = storage_path('logs/'.$directory);
+
+            if (! is_dir($path)) {
+                mkdir($path, 02775, true);
+            }
+        }
     }
 }

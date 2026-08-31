@@ -391,7 +391,7 @@ class StripeService
 
         $tpa = $customer->tpas()->where('serial', $tpaSerialNumber)->first();
 
-        \Log::info('Creating terminal payment intent', [
+        \Log::channel('stripe')->info('Creating terminal payment intent', [
             'customer_id' => $customer->id,
             'amount' => $amount,
             'currency' => $currency,
@@ -581,7 +581,7 @@ class StripeService
             'customer_cash_balance_settings.updated', 'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
             'customer_cash_balance_transaction.created', 'customer.cash_balance_transaction.created' => $this->handleCashBalanceTransactionCreated($object),
             'payout.paid' => $this->handlePayoutPaid($object),
-            default => Log::info('Stripe webhook ignorado', ['type' => $eventType]),
+            default => Log::channel('stripe')->info('Stripe webhook ignorado', ['type' => $eventType]),
         };
     }
 
@@ -800,7 +800,7 @@ class StripeService
             'stripe_metadata' => $intent,
         ]);
 
-        Log::info('Stripe webhook: payment_intent.succeeded', ['pi' => $intent['id'], 'transaction_id' => $transaction->id]);
+        Log::channel('stripe')->info('Stripe webhook: payment_intent.succeeded', ['pi' => $intent['id'], 'transaction_id' => $transaction->id]);
 
         $merchantRequest = $this->merchantPaymentRequestRepository
             ->findByStripePaymentIntentId($intent['id']);
@@ -927,7 +927,7 @@ class StripeService
             $this->stripePaymentWallet->reverseStripePayment($transaction->fresh());
         }
 
-        Log::info('Stripe webhook: payment_intent.payment_failed', ['pi' => $intent['id'], 'transaction_id' => $transaction->id]);
+        Log::channel('stripe')->info('Stripe webhook: payment_intent.payment_failed', ['pi' => $intent['id'], 'transaction_id' => $transaction->id]);
 
         $merchantRequest = $this->merchantPaymentRequestRepository
             ->findByStripePaymentIntentId($intent['id']);
@@ -950,7 +950,7 @@ class StripeService
 
         $this->paymentIntents->markCanceled($paymentIntent, $intent);
 
-        Log::info('Stripe webhook: payment_intent.canceled', ['pi' => $intent['id'], 'payment_intent_id' => $paymentIntent->id]);
+        Log::channel('stripe')->info('Stripe webhook: payment_intent.canceled', ['pi' => $intent['id'], 'payment_intent_id' => $paymentIntent->id]);
     }
 
     private function handleChargeUpdated(array $charge): void

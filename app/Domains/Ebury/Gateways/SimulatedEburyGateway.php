@@ -13,7 +13,7 @@ class SimulatedEburyGateway implements EburyGatewayInterface
     {
         $externalId = 'sim:' . $customer->id;
 
-        Log::info('Ebury simulation: customer submitted', [
+        Log::channel('ebury')->info('Ebury simulation: customer submitted', [
             'customer_id' => $customer->id,
             'ebury_account_id' => $externalId,
         ]);

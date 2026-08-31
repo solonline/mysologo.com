@@ -26,7 +26,7 @@ class SimulateEburyDecisionJob implements ShouldQueue
         $customer = Customer::with('eburyAccount')->find($this->customerId);
 
         if (! $customer?->eburyAccount) {
-            Log::warning('Ebury simulation: account not found', ['customer_id' => $this->customerId]);
+            Log::channel('ebury')->warning('Ebury simulation: account not found', ['customer_id' => $this->customerId]);
 
             return;
         }
@@ -44,7 +44,7 @@ class SimulateEburyDecisionJob implements ShouldQueue
             'ebury.simulator',
         );
 
-        Log::info('Ebury simulation: decision applied', [
+        Log::channel('ebury')->info('Ebury simulation: decision applied', [
             'customer_id' => $this->customerId,
             'decision' => $this->decision,
             'status' => $status,

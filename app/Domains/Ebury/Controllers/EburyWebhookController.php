@@ -21,7 +21,7 @@ class EburyWebhookController extends Controller
     {
         $payload = $request->all();
 
-        Log::info('Received Ebury webhook', ['payload' => $payload]);
+        Log::channel('ebury')->info('Received Ebury webhook', ['payload' => $payload]);
 
         $accountId = $payload['account_id'] ?? $payload['id'] ?? $payload['ebury_account_id'] ?? null;
         $status = $payload['status'] ?? $payload['account_status'] ?? null;
@@ -34,7 +34,7 @@ class EburyWebhookController extends Controller
         $account = $this->integrationAccounts->findEburyByExternalId((string) $accountId);
 
         if (! $account) {
-            Log::warning('Ebury webhook: account not found', ['account_id' => $accountId]);
+            Log::channel('ebury')->warning('Ebury webhook: account not found', ['account_id' => $accountId]);
 
             return response()->json(['success' => true]);
         }

@@ -21,7 +21,7 @@ class StripeWebhookController extends Controller
         $payload   = $request->getContent();
         $sigHeader = $request->header('Stripe-Signature');
 
-        Log::info('Recebido webhook Stripe', [
+        Log::channel('stripe')->info('Recebido webhook Stripe', [
             'event' => $request->input('type'),
             'payload' => $payload,
         ]);
@@ -32,7 +32,7 @@ class StripeWebhookController extends Controller
         try {
             $event = $this->stripeClient->constructWebhookEvent($payload, $sigHeader);
         } catch (SignatureVerificationException $e) {
-            Log::warning('Stripe webhook: assinatura inválida', ['error' => $e->getMessage()]);
+            Log::channel('stripe')->warning('Stripe webhook: assinatura inválida', ['error' => $e->getMessage()]);
             return response()->json(['error' => 'Invalid signature'], 401);
         }
 

@@ -9,37 +9,50 @@ class FixLogPermissionsCommand extends Command
 {
     protected $signature = 'logs:fix-permissions';
 
-    protected $description = 'Garante que storage/logs é gravável por www-data (evita Permission denied em logs diários criados por root)';
+    protected $description = 'Cria as pastas de log e garante que storage/logs é gravável por www-data';
 
     public function handle(): int
     {
-        $dir = storage_path('logs');
+        $root = storage_path('logs');
 
-        if (! File::isDirectory($dir)) {
-            File::makeDirectory($dir, 02775, true);
+        if (! File::isDirectory($root)) {
+            File::makeDirectory($root, 02775, true);
         }
 
-        @chmod($dir, 02775);
+        foreach (config('logging.directories', []) as $directory) {
+            $path = $root.DIRECTORY_SEPARATOR.$directory;
+
+            if (! File::isDirectory($path)) {
+                File::makeDirectory($path, 02775, true);
+            }
+        }
 
         $webUser = 'www-data';
         $webGroup = 'www-data';
+        $canChown = function_exists('posix_getpwnam') && posix_getpwnam($webUser);
 
-        if (function_exists('posix_getpwnam') && posix_getpwnam($webUser)) {
-            @chown($dir, $webUser);
-            @chgrp($dir, $webGroup);
+        $directories = [$root, ...File::directories($root)];
+
+        foreach ($directories as $directory) {
+            @chmod($directory, 02775);
+
+            if ($canChown) {
+                @chown($directory, $webUser);
+                @chgrp($directory, $webGroup);
+            }
         }
 
-        foreach (File::files($dir) as $file) {
+        foreach (File::allFiles($root) as $file) {
             $path = $file->getPathname();
             @chmod($path, 0664);
 
-            if (function_exists('posix_getpwnam') && posix_getpwnam($webUser)) {
+            if ($canChown) {
                 @chown($path, $webUser);
                 @chgrp($path, $webGroup);
             }
         }
 
-        $this->info('Permissões de logs corrigidas.');
+        $this->info('Permissões e pastas de logs corrigidas.');
 
         return self::SUCCESS;
     }

@@ -25,7 +25,7 @@ class DiditWebhookController extends Controller
             return response()->json(['error' => 'Invalid signature'], 401);
         }
 
-        Log::info('Received Didit webhook', ['payload' => $request->all()]);
+        Log::channel('diditDocumentJob')->info('Received Didit webhook', ['payload' => $request->all()]);
 
         ProcessIdentityVerificationWebhook::dispatch($request->all())->onQueue('didit-webhooks');
 

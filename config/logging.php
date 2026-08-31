@@ -5,31 +5,27 @@ use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
 
+$daily = static function (string $directory, string $filename, int $days = 30): array {
+    if (env('APP_ENV') === 'testing') {
+        return [
+            'driver' => 'monolog',
+            'handler' => NullHandler::class,
+        ];
+    }
+
+    return [
+        'driver' => 'daily',
+        'path' => storage_path("logs/{$directory}/{$filename}"),
+        'level' => env('LOG_LEVEL', 'debug'),
+        'days' => $days,
+        'permission' => 0664,
+        'replace_placeholders' => true,
+    ];
+};
+
 return [
 
-    /*
-    |--------------------------------------------------------------------------
-    | Default Log Channel
-    |--------------------------------------------------------------------------
-    |
-    | This option defines the default log channel that is utilized to write
-    | messages to your logs. The value provided here should match one of
-    | the channels present in the list of "channels" configured below.
-    |
-    */
-
     'default' => env('LOG_CHANNEL', 'stack'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Deprecations Log Channel
-    |--------------------------------------------------------------------------
-    |
-    | This option controls the log channel that should be used to log warnings
-    | regarding deprecated PHP and library features. This allows you to get
-    | your application ready for upcoming major versions of dependencies.
-    |
-    */
 
     'deprecations' => [
         'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
@@ -37,43 +33,38 @@ return [
     ],
 
     /*
-    |--------------------------------------------------------------------------
-    | Log Channels
-    |--------------------------------------------------------------------------
-    |
-    | Here you may configure the log channels for your application. Laravel
-    | utilizes the Monolog PHP logging library, which includes a variety
-    | of powerful log handlers and formatters that you're free to use.
-    |
-    | Available drivers: "single", "daily", "slack", "syslog",
-    |                    "errorlog", "monolog", "custom", "stack"
-    |
+    | Pastas criadas em AppServiceProvider / logs:fix-permissions.
     */
+    'directories' => [
+        'app',
+        'auth',
+        'customer',
+        'ebury',
+        'kyc',
+        'merchant',
+        'queue',
+        'sms',
+        'stripe',
+        'wallester',
+    ],
 
     'channels' => [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
+            'channels' => explode(',', (string) env('LOG_STACK', 'daily')),
             'ignore_exceptions' => false,
         ],
 
         'single' => [
             'driver' => 'single',
-            'path' => storage_path('logs/laravel.log'),
+            'path' => storage_path('logs/app/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'permission' => 0664,
             'replace_placeholders' => true,
         ],
 
-        'daily' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'days' => env('LOG_DAILY_DAYS', 14),
-            'permission' => 0664,
-            'replace_placeholders' => true,
-        ],
+        'daily' => $daily('app', 'laravel.log', (int) env('LOG_DAILY_DAYS', 14)),
 
         'slack' => [
             'driver' => 'slack',
@@ -126,77 +117,23 @@ return [
         ],
 
         'emergency' => [
-            'path' => storage_path('logs/laravel.log'),
+            'path' => storage_path('logs/app/laravel.log'),
         ],
 
-        'diditDocumentJob' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/didit_document_job.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
+        'stripe' => $daily('stripe', 'stripe.log'),
+        'wallester' => $daily('wallester', 'wallester.log'),
+        'sms' => $daily('sms', 'sms.log'),
+        'ebury' => $daily('ebury', 'ebury.log'),
+        'merchant' => $daily('merchant', 'merchant.log'),
 
-        'diditUploadDocumentMediaJob' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/didit_upload_document_media_job.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
+        'diditDocumentJob' => $daily('kyc', 'didit-document.log'),
+        'diditUploadDocumentMediaJob' => $daily('kyc', 'didit-upload.log'),
+        'createDiditSession' => $daily('kyc', 'didit-session.log'),
 
-        'authRegister' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/auth_register.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
+        'authRegister' => $daily('auth', 'register.log'),
 
-        'createDiditSession' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/create_didit_session.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
-
-        'customerUploadDocument' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/customer_upload_document.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
-
-        'corporateDocumentUpload' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/corporate_document_upload.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'replace_placeholders' => true,
-        ],
-
-        'stripe' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/stripe.log'),
-            'level' => 'debug',
-            'days' => 30,
-            'permission' => 0664,
-            'replace_placeholders' => true,
-        ],
-
-        'wallester' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/wallester.log'),
-            'level' => 'debug',
-            'days' => 30,
-            'permission' => 0664,
-            'replace_placeholders' => true,
-        ],
-
-        'sms' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/sms.log'),
-            'level' => 'debug',
-            'days' => 30,
-            'permission' => 0664,
-            'replace_placeholders' => true,
-        ],
+        'customerUploadDocument' => $daily('customer', 'upload-document.log'),
+        'corporateDocumentUpload' => $daily('customer', 'corporate-document.log'),
 
     ],
 

@@ -61,7 +61,7 @@ class DispatchMerchantWebhook implements ShouldQueue
             $headers[MerchantWebhookSigner::HEADER_TIMESTAMP] = (string) $signed['timestamp'];
             $headers[MerchantWebhookSigner::HEADER_SIGNATURE] = $signed['signature'];
         } else {
-            Log::warning('DispatchMerchantWebhook: merchant sem webhook_secret — a enviar sem assinatura', [
+            Log::channel('merchant')->warning('DispatchMerchantWebhook: merchant sem webhook_secret — a enviar sem assinatura', [
                 'payment_request_uuid' => $this->paymentRequest->uuid,
                 'merchant_id' => $this->paymentRequest->merchant_id,
             ]);
@@ -85,7 +85,7 @@ class DispatchMerchantWebhook implements ShouldQueue
 
         $status = $response->status();
 
-        Log::warning('DispatchMerchantWebhook: entrega falhou', [
+        Log::channel('merchant')->warning('DispatchMerchantWebhook: entrega falhou', [
             'payment_request_uuid' => $this->paymentRequest->uuid,
             'webhook_url' => $webhookUrl,
             'status' => $status,
@@ -162,7 +162,7 @@ class DispatchMerchantWebhook implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        Log::error('DispatchMerchantWebhook: esgotaram-se as tentativas', [
+        Log::channel('merchant')->error('DispatchMerchantWebhook: esgotaram-se as tentativas', [
             'payment_request_uuid' => $this->paymentRequest->uuid,
             'merchant_id' => $this->paymentRequest->merchant_id,
             'message' => $exception?->getMessage(),
