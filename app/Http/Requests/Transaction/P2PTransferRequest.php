@@ -20,6 +20,7 @@ class P2PTransferRequest extends FormRequest
             'description'        => ['nullable', 'string', 'max:255'],
             'device_token'       => ['required', 'string'],
             'pin'                => ['required', 'digits:4'],
+            'favorite'           => ['sometimes', 'boolean'],
         ];
     }
 }

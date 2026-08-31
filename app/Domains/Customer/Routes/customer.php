@@ -18,6 +18,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/create-corporate-responsible', [CustomerController::class, 'createResponsible'])->name('customer.create-responsible');
     Route::post('/send-validation-email', [CustomerController::class, 'sendValidationEmail'])->name('customer.send-validation-email');
     Route::post('/upload-avatar', [CustomerController::class, 'uploadAvatar'])->name('customer.upload-avatar');
+    Route::get('/favorites', [CustomerController::class, 'favorites'])->name('customer.favorites');
     Route::get('/find/{username}', [CustomerController::class, 'findByUsername'])
         ->where('username', '[a-zA-Z0-9_]+')
         ->name('customer.find-by-username');

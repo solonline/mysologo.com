@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Notifications\Notifiable;
@@ -180,5 +181,20 @@ class Customer extends Model
     public function merchants()
     {
         return $this->hasMany(Merchant::class);
+    }
+
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(CustomerFavorite::class);
+    }
+
+    public function favoriteCustomers(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Customer::class,
+            'customer_favorites',
+            'customer_id',
+            'favorite_customer_id',
+        )->withTimestamps();
     }
 }

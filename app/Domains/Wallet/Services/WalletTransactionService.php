@@ -4,6 +4,7 @@ namespace App\Domains\Wallet\Services;
 
 use App\Domains\Auth\Services\DeviceAuthService;
 use App\Domains\Customer\Contracts\CustomerRepositoryInterface;
+use App\Domains\Customer\Services\CustomerFavoriteService;
 use App\Domains\Wallet\Contracts\TransactionRepositoryInterface;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\TransactionDirection;
@@ -26,6 +27,7 @@ class WalletTransactionService
         protected DeviceAuthService $deviceAuthService,
         protected LedgerService $ledgerService,
         protected FundingPartnerMovementService $fundingPartnerMovements,
+        protected CustomerFavoriteService $favorites,
     ) {}
 
     public function list(Customer $customer, int $perPage = 15): LengthAwarePaginator
@@ -54,6 +56,7 @@ class WalletTransactionService
         string $pin,
         ?string $description = null,
         ?string $idempotencyKey = null,
+        bool $favorite = false,
     ): array {
         $this->deviceAuthService->verifyPin($sender, $deviceToken, $pin);
 
@@ -77,25 +80,20 @@ class WalletTransactionService
         $description ??= 'P2P transfer';
 
         $existing = $this->findExistingP2pPair($movementKey);
-        if ($existing !== null) {
-            return $existing;
+        if ($existing === null) {
+            $this->fundingPartnerMovements->transferBetweenCustomers(
+                from: $sender,
+                to: $recipient,
+                amountCents: $amount,
+                currency: $currency,
+                description: $description,
+                idempotencyKey: $movementKey,
+            );
+
+            $existing = $this->findExistingP2pPair($movementKey);
         }
 
-        $this->fundingPartnerMovements->transferBetweenCustomers(
-            from: $sender,
-            to: $recipient,
-            amountCents: $amount,
-            currency: $currency,
-            description: $description,
-            idempotencyKey: $movementKey,
-        );
-
-        $existing = $this->findExistingP2pPair($movementKey);
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        return DB::transaction(function () use ($sender, $recipient, $amount, $currency, $description, $movementKey) {
+        $result = $existing ?? DB::transaction(function () use ($sender, $recipient, $amount, $currency, $description, $movementKey) {
             $base = [
                 'type' => TransactionType::P2P,
                 'payment_method_type' => 'p2p',
@@ -149,6 +147,12 @@ class WalletTransactionService
                 'credit' => $credit,
             ];
         });
+
+        if ($favorite) {
+            $this->favorites->add($sender, $recipient);
+        }
+
+        return $result;
     }
 
     private function p2pMovementKey(?string $idempotencyKey): string

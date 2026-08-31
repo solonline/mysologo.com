@@ -5,6 +5,7 @@ namespace App\Domains\Customer\Controllers;
 use App\Domains\Customer\DTOs\CreateResponsibleDTO;
 use App\Domains\Customer\DTOs\UpdateCustomerDTO;
 use App\Domains\Customer\Services\CustomerDocumentService;
+use App\Domains\Customer\Services\CustomerFavoriteService;
 use App\Domains\Customer\Services\CustomerPhoneChangeService;
 use App\Domains\Customer\Services\CustomerProfileService;
 use App\Domains\Kyc\Enums\DocumentStatus;
@@ -20,6 +21,7 @@ use App\Http\Resources\PublicCustomerResource;
 use App\Http\Resources\ResponsibleResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 
 class CustomerController extends Controller
@@ -29,6 +31,7 @@ class CustomerController extends Controller
         protected CustomerDocumentService $documents,
         protected IdentityVerificationService $identityVerification,
         protected CustomerPhoneChangeService $phoneChange,
+        protected CustomerFavoriteService $favoriteCustomers,
     ) {}
 
     /**
@@ -152,6 +155,21 @@ class CustomerController extends Controller
         );
 
         return response()->json(new PublicCustomerResource($customer));
+    }
+
+    /**
+     * List Favorite Customers
+     *
+     * Returns public profiles of customers saved as P2P favorites. Newest first.
+     * Inactive or unverified favorites are omitted.
+     *
+     * @tags Profile
+     */
+    public function favorites(Request $request): AnonymousResourceCollection
+    {
+        return PublicCustomerResource::collection(
+            $this->favoriteCustomers->list($request->user()),
+        );
     }
 
     /**

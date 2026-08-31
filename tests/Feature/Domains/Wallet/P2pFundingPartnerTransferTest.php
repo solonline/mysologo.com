@@ -134,6 +134,51 @@ class P2pFundingPartnerTransferTest extends TestCase
             'direction' => 'debit',
             'amount' => 2500,
         ]);
+
+        $this->assertDatabaseMissing('customer_favorites', [
+            'customer_id' => $sender->id,
+            'favorite_customer_id' => $recipient->id,
+        ]);
+    }
+
+    public function test_p2p_saves_recipient_as_favorite_when_requested(): void
+    {
+        $sender = $this->createActiveCustomer(['username' => 'sender_fav']);
+        $recipient = $this->createActiveCustomer(['username' => 'recipient_fav']);
+
+        $this->createWallesterAccount($sender, IntegrationAccountStatus::ACTIVE, 'wal_sender_fav');
+        $this->createWallesterAccount($recipient, IntegrationAccountStatus::ACTIVE, 'wal_recipient_fav');
+
+        CustomerDevice::query()->create([
+            'customer_id' => $sender->id,
+            'device_name' => 'Phone',
+            'device_token' => 'device-fav-1',
+            'pin' => bcrypt('1234'),
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')->andReturn(['available_amount' => 100.00]);
+        $gateway->shouldReceive('accountTransfer')->once()->andReturn(['id' => 'pay_p2p_fav']);
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $token = $sender->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->withHeaders(['Idempotency-Key' => 'p2p-fav-1'])
+            ->postJson('/api/wallet/transactions/p2p', [
+                'recipient_username' => 'recipient_fav',
+                'amount' => 2500,
+                'currency' => 'EUR',
+                'device_token' => 'device-fav-1',
+                'pin' => '1234',
+                'favorite' => true,
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('customer_favorites', [
+            'customer_id' => $sender->id,
+            'favorite_customer_id' => $recipient->id,
+        ]);
     }
 
     public function test_p2p_retry_with_same_key_does_not_transfer_again(): void

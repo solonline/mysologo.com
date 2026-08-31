@@ -62,6 +62,7 @@ class WalletTransactionController extends Controller
                 pin: $data['pin'],
                 description: $data['description'] ?? null,
                 idempotencyKey: (string) $request->header('Idempotency-Key'),
+                favorite: (bool) ($data['favorite'] ?? false),
             );
         } catch (ApiException $e) {
             return response()->json($e->toArray(), $e->status);
