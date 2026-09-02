@@ -7,6 +7,7 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -25,6 +26,7 @@ class FundingPartnerMovement extends Model
         'original_amount',
         'original_currency',
         'fees_amount',
+        'platform_fees_amount',
         'transfer_group_id',
         'counterparty_external_account_id',
         'customer_wallester_card_id',
@@ -50,6 +52,7 @@ class FundingPartnerMovement extends Model
             'amount' => 'integer',
             'original_amount' => 'integer',
             'fees_amount' => 'integer',
+            'platform_fees_amount' => 'integer',
             'metadata' => 'array',
         ];
     }
@@ -69,21 +72,31 @@ class FundingPartnerMovement extends Model
         return $this->belongsTo(CustomerWallesterCard::class, 'customer_wallester_card_id');
     }
 
+    public function counterpartyWallesterAccount(): BelongsTo
+    {
+        return $this->belongsTo(CustomerWallesterAccount::class, 'counterparty_external_account_id', 'wallester_account_id');
+    }
+
     public function fxDetailLabel(): ?string
     {
-        if ($this->fees_amount === null || (int) $this->fees_amount <= 0) {
+        if ($this->type === FundingPartnerMovementType::Fee) {
             return null;
         }
 
-        $parts = [];
-
-        if ($this->original_amount && $this->original_currency) {
-            $parts[] = number_format(((int) $this->original_amount) / 100, 2, ',', '.').' '.strtoupper((string) $this->original_currency);
+        if (! $this->original_amount || ! $this->original_currency) {
+            return null;
         }
 
-        $parts[] = 'câmbio '.number_format(((int) $this->fees_amount) / 100, 2, ',', '.').' '.strtoupper((string) $this->currency);
+        $originalCurrency = strtoupper((string) $this->original_currency);
+        $accountCurrency = strtoupper((string) $this->currency);
 
-        return implode(' · ', $parts);
+        if ($originalCurrency === '' || $originalCurrency === $accountCurrency) {
+            return null;
+        }
+
+        return number_format(((int) $this->original_amount) / 100, 2, ',', '.').' '.$originalCurrency
+            .' → '
+            .number_format(((int) $this->amount) / 100, 2, ',', '.').' '.$accountCurrency;
     }
 
     public function isWallesterFxFee(): bool
@@ -100,5 +113,70 @@ class FundingPartnerMovement extends Model
         return str_contains($transactionType, 'foreignexchange')
             || str_contains($transactionType, 'foreign_exchange')
             || str_contains($transactionType, 'fee');
+    }
+
+    public function isInternalPlatformFxTransfer(): bool
+    {
+        $key = (string) $this->idempotency_key;
+
+        return $key !== '' && str_starts_with($key, 'fx-platform:');
+    }
+
+    public function isStripePlatformFeeTransfer(): bool
+    {
+        $key = (string) $this->idempotency_key;
+
+        return $key !== '' && str_starts_with($key, 'stripe-platform-fee:');
+    }
+
+    /**
+     * Débito fx-platform no cliente retail duplica a linha Câmbio.
+     * O crédito na master (:in) deve aparecer na conta plataforma.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeCustomerVisible($query)
+    {
+        return $query->where(function ($visible): void {
+            $visible->whereNull('idempotency_key')
+                ->orWhere('idempotency_key', 'not like', 'fx-platform:%:out');
+        });
+    }
+
+    public function displayTypeLabel(): string
+    {
+        if ($this->isInternalPlatformFxTransfer()) {
+            return 'Câmbio Yoop';
+        }
+
+        if ($this->isStripePlatformFeeTransfer()) {
+            return 'Taxa Yoop';
+        }
+
+        return match ($this->type) {
+            FundingPartnerMovementType::AccountTransfer => 'Transferência',
+            FundingPartnerMovementType::CardPurchase => 'Compra cartão',
+            FundingPartnerMovementType::CardRefund => 'Reembolso cartão',
+            FundingPartnerMovementType::InboundPayment => 'Entrada',
+            FundingPartnerMovementType::Fee => 'Câmbio',
+            default => $this->type?->value ?? 'Wallester',
+        };
+    }
+
+    public function displayDescription(): ?string
+    {
+        if ($this->isStripePlatformFeeTransfer()) {
+            return $this->description ?: 'Taxa Yoop';
+        }
+
+        if (! $this->isInternalPlatformFxTransfer()) {
+            return $this->description;
+        }
+
+        $purchase = $this->reference;
+        $merchant = $purchase instanceof self ? trim((string) $purchase->description) : '';
+
+        return $merchant !== '' ? 'Câmbio Yoop · '.$merchant : 'Câmbio Yoop';
     }
 }

@@ -2,10 +2,14 @@
 
 namespace App\Domains\Wallet;
 
+use App\Domains\Wallet\Commands\AlignPlatformWalletToWallesterCommand;
+use App\Domains\Wallet\Commands\BackfillStripePlatformFeesToSubMasterCommand;
+use App\Domains\Wallet\Commands\ReassignPlatformFeesToSubMasterCommand;
 use App\Domains\Wallet\Commands\RunPlatformRevenueReportCommand;
 use App\Domains\Wallet\Commands\RunWalletAuditCommand;
 use App\Domains\Wallet\Contracts\TransactionRepositoryInterface;
 use App\Domains\Wallet\Repositories\TransactionRepository;
+use App\Domains\Wallet\Services\AlignPlatformWalletToWallesterService;
 use App\Domains\Wallet\Services\Audit\WalletAuditService;
 use App\Domains\Wallet\Services\BankTransferTopupNotifier;
 use App\Domains\Wallet\Services\FundingLiquidityNotifier;
@@ -44,6 +48,7 @@ class WalletServiceProvider extends ServiceProvider
         FundingPartnerMovementService::class,
         FundingPartnerTransferResolver::class,
         PlatformRevenueService::class,
+        AlignPlatformWalletToWallesterService::class,
         WalletAuditService::class,
     ];
 
@@ -62,6 +67,9 @@ class WalletServiceProvider extends ServiceProvider
             $this->commands([
                 RunWalletAuditCommand::class,
                 RunPlatformRevenueReportCommand::class,
+                AlignPlatformWalletToWallesterCommand::class,
+                ReassignPlatformFeesToSubMasterCommand::class,
+                BackfillStripePlatformFeesToSubMasterCommand::class,
             ]);
         }
 

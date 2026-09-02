@@ -2,11 +2,15 @@
 
 namespace Tests\Feature\Domains\Backoffice;
 
-use App\Domains\Wallet\Enums\LedgerEntryType;
+use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Onboarding\Enums\IntegrationProvider;
+use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
+use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
+use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
+use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\TransactionType;
-use App\Domains\Wallet\Services\PlatformRevenueService;
 use App\Models\Customer;
-use App\Models\LedgerEntry;
+use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,12 +36,12 @@ class PlatformRevenueDashboardTest extends TestCase
     public function test_platform_revenue_page_shows_fee_totals_and_transactions(): void
     {
         $user = $this->userWithPermission('transactions.view');
-        $platform = $this->createPlatformCustomer();
+        $this->createPlatformCustomer();
         $retail = $this->createRetailCustomer([
             'name' => 'Cliente Taxa Platform',
         ]);
 
-        $transaction = StripeTransaction::query()->create([
+        StripeTransaction::query()->create([
             'customer_id' => $retail->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',
@@ -52,16 +56,39 @@ class PlatformRevenueDashboardTest extends TestCase
             'stripe_created_at' => now(),
         ]);
 
-        LedgerEntry::query()->create([
-            'customer_id' => $platform->id,
-            'currency' => 'EUR',
+        $historical = $this->createRetailCustomer(['name' => 'Taxa Velha Ignorada']);
+        StripeTransaction::query()->create([
+            'customer_id' => $historical->id,
+            'type' => TransactionType::MERCHANT_PAYMENT,
+            'payment_method_type' => 'card',
             'direction' => 'credit',
-            'amount' => 10,
-            'balance_after' => 10,
-            'entry_type' => LedgerEntryType::MANUAL_CREDIT,
-            'reference_type' => $transaction->getMorphClass(),
-            'reference_id' => $transaction->id,
-            'description' => PlatformRevenueService::LEDGER_PLATFORM_FEE_DESCRIPTION_PREFIX.$transaction->id,
+            'amount' => 1_100,
+            'stripe_fee' => 61,
+            'platform_fee' => 6,
+            'net_amount' => 1_033,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'Order velha',
+            'stripe_created_at' => '2026-07-22 10:46:20',
+        ]);
+
+        $account = $this->createWallesterAccount($retail, IntegrationAccountStatus::ACTIVE, 'wal_fx_page');
+        FundingPartnerMovement::query()->create([
+            'provider' => IntegrationProvider::WALLESTER,
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => 'wal_fx_page',
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::CardPurchase,
+            'amount' => 454,
+            'currency' => 'EUR',
+            'fees_amount' => 9,
+            'platform_fees_amount' => 5,
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Webhook,
+            'idempotency_key' => 'card:fx-page:out',
+            'partner_external_id' => 'fx-page',
+            'description' => 'LidlGB',
         ]);
 
         $this->actingAs($user, 'web')
@@ -70,8 +97,14 @@ class PlatformRevenueDashboardTest extends TestCase
             ->assertSee('Receita Platform')
             ->assertSee('Liquidado')
             ->assertSee('Aguarda liquidação')
+            ->assertSee('Câmbio Yoop')
+            ->assertSee('faturação em todas as modalidades')
+            ->assertSee('0,15')
             ->assertSee('0,10')
+            ->assertSee('0,05')
+            ->assertDontSee('0,16')
             ->assertSee('Cliente Taxa Platform')
+            ->assertDontSee('Taxa Velha Ignorada')
             ->assertSee('Transações com taxa platform');
     }
 
@@ -121,42 +154,6 @@ class PlatformRevenueDashboardTest extends TestCase
 
     public function test_platform_revenue_command_reports_totals(): void
     {
-        $platform = $this->createPlatformCustomer();
-        $retail = $this->createRetailCustomer();
-
-        $transaction = StripeTransaction::query()->create([
-            'customer_id' => $retail->id,
-            'type' => TransactionType::TOPUP,
-            'payment_method_type' => 'card',
-            'direction' => 'credit',
-            'amount' => 1_000,
-            'stripe_fee' => 280,
-            'platform_fee' => 10,
-            'net_amount' => 710,
-            'currency' => 'EUR',
-            'status' => 'succeeded',
-        ]);
-
-        LedgerEntry::query()->create([
-            'customer_id' => $platform->id,
-            'currency' => 'EUR',
-            'direction' => 'credit',
-            'amount' => 10,
-            'balance_after' => 10,
-            'entry_type' => LedgerEntryType::MANUAL_CREDIT,
-            'reference_type' => $transaction->getMorphClass(),
-            'reference_id' => $transaction->id,
-            'description' => PlatformRevenueService::LEDGER_PLATFORM_FEE_DESCRIPTION_PREFIX.$transaction->id,
-        ]);
-
-        $this->artisan('wallet:platform-revenue')
-            ->assertSuccessful()
-            ->expectsOutputToContain('Platform revenue report')
-            ->expectsOutputToContain('Consistent');
-    }
-
-    public function test_wallet_audit_reports_platform_revenue_mismatch(): void
-    {
         $this->createPlatformCustomer();
         $retail = $this->createRetailCustomer();
 
@@ -173,9 +170,11 @@ class PlatformRevenueDashboardTest extends TestCase
             'status' => 'succeeded',
         ]);
 
-        $this->artisan('wallet:audit', ['--dry-run' => true])
-            ->assertFailed()
-            ->expectsOutputToContain('PLATFORM_REVENUE_LEDGER_MISMATCH');
+        $this->artisan('wallet:platform-revenue')
+            ->assertSuccessful()
+            ->expectsOutputToContain('Platform revenue report')
+            ->expectsOutputToContain('Total billed')
+            ->expectsOutputToContain('FX Yoop');
     }
 
     private function createPlatformCustomer(): Customer

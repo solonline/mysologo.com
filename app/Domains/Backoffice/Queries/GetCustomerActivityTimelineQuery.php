@@ -7,6 +7,7 @@ use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentDirection;
 use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
+use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Customer;
 use App\Models\CustomerBalanceAdjustment;
 use App\Models\CustomerWallesterAccount;
@@ -23,7 +24,7 @@ class GetCustomerActivityTimelineQuery
     {
         $stripeItems = StripeTransaction::query()
             ->where('customer_id', $customer->id)
-            ->where('type', '!=', \App\Domains\Wallet\Enums\TransactionType::MERCHANT_PAYMENT->value)
+            ->where('type', '!=', TransactionType::MERCHANT_PAYMENT->value)
             ->with('relatedStripeTransaction.customer')
             ->latest('stripe_created_at')
             ->limit($limit)
@@ -37,15 +38,22 @@ class GetCustomerActivityTimelineQuery
         $wallesterItems = collect();
 
         if ($wallesterAccountIds->isNotEmpty()) {
+            $types = [
+                FundingPartnerMovementType::CardPurchase,
+                FundingPartnerMovementType::CardRefund,
+                FundingPartnerMovementType::Fee,
+            ];
+
+            if ($customer->type === 'platform') {
+                $types[] = FundingPartnerMovementType::AccountTransfer;
+            }
+
             $wallesterItems = FundingPartnerMovement::query()
+                ->customerVisible()
                 ->where('funding_account_type', CustomerWallesterAccount::class)
                 ->whereIn('funding_account_id', $wallesterAccountIds)
-                ->whereIn('type', [
-                    FundingPartnerMovementType::CardPurchase,
-                    FundingPartnerMovementType::CardRefund,
-                    FundingPartnerMovementType::Fee,
-                ])
-                ->with('wallesterCard')
+                ->whereIn('type', $types)
+                ->with(['wallesterCard', 'reference'])
                 ->latest('created_at')
                 ->limit($limit)
                 ->get()
@@ -96,15 +104,9 @@ class GetCustomerActivityTimelineQuery
     private function fromWallesterMovement(FundingPartnerMovement $movement): CustomerActivityItem
     {
         $metadata = is_array($movement->metadata) ? $movement->metadata : [];
-        $type = $movement->type;
         $direction = $movement->direction;
 
-        $typeLabel = match ($type) {
-            FundingPartnerMovementType::CardPurchase => 'Compra cartão',
-            FundingPartnerMovementType::CardRefund => 'Reembolso cartão',
-            FundingPartnerMovementType::Fee => 'Taxa Wallester',
-            default => $type?->value ?? 'Wallester',
-        };
+        $typeLabel = $movement->displayTypeLabel();
 
         $card = $movement->wallesterCard;
         $cardLabel = $card?->name
@@ -120,7 +122,7 @@ class GetCustomerActivityTimelineQuery
             currency: strtoupper((string) $movement->currency),
             typeLabel: $typeLabel,
             status: $movement->status?->value ?? (string) $movement->status,
-            description: $movement->description,
+            description: $movement->displayDescription(),
             wallesterMovement: $movement,
             cardLabel: $cardLabel,
             merchantCity: is_string($metadata['merchant_city'] ?? null) ? $metadata['merchant_city'] : null,

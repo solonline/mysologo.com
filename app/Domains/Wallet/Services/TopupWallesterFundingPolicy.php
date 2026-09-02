@@ -8,6 +8,7 @@ use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
 class TopupWallesterFundingPolicy
@@ -133,6 +134,23 @@ class TopupWallesterFundingPolicy
         }
 
         return Carbon::parse($occurredAt)->lt(Carbon::parse(self::ACCOUNTING_CUTOFF_AT));
+    }
+
+    /**
+     * @param  Builder<StripeTransaction>  $query
+     * @return Builder<StripeTransaction>
+     */
+    public function constrainAfterAccountingCutoff(Builder $query): Builder
+    {
+        $cutoff = Carbon::parse(self::ACCOUNTING_CUTOFF_AT);
+
+        return $query->where(function (Builder $inner) use ($cutoff): void {
+            $inner->where('stripe_created_at', '>=', $cutoff)
+                ->orWhere(function (Builder $withoutStripeDate) use ($cutoff): void {
+                    $withoutStripeDate->whereNull('stripe_created_at')
+                        ->where('created_at', '>=', $cutoff);
+                });
+        });
     }
 
     public function hasOperationalWallesterAccount(StripeTransaction $transaction): bool

@@ -286,6 +286,106 @@ class StripeTopupWallesterFundingTest extends TestCase
         Bus::assertNotDispatched(SendBankTransferTopupReceivedEmail::class);
     }
 
+    public function test_topup_job_sends_platform_fee_to_sub_master_account(): void
+    {
+        Bus::fake([SendBankTransferTopupReceivedEmail::class]);
+
+        $this->seedWallesterSettings([
+            'wallester.eur.platform_fee_account_id' => '626c80a3-f8e7-4627-8bcf-ca73f9944abf',
+        ]);
+
+        $customer = $this->createActiveCustomer();
+        $platform = $this->createPlatformCustomer();
+        $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'master-eur-uuid', [
+            'is_main' => true,
+            'currency_code' => 'EUR',
+            'funding_currency' => 'EUR',
+        ]);
+        $feeAccount = $this->createWallesterAccount(
+            $platform,
+            IntegrationAccountStatus::ACTIVE,
+            '626c80a3-f8e7-4627-8bcf-ca73f9944abf',
+            [
+                'is_main' => false,
+                'receiver_name' => 'Sub Conta Master',
+                'currency_code' => 'EUR',
+                'funding_currency' => 'EUR',
+                'product_id' => 'prod_fee_'.$platform->id,
+                'company_id' => 'comp_fee_'.$platform->id,
+            ],
+        );
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_topup_customer');
+
+        $transaction = StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 3_000,
+            'stripe_fee' => 100,
+            'platform_fee' => 25,
+            'net_amount' => 2_875,
+            'immediate_gross_amount' => 3_000,
+            'wallester_funding_net_amount' => 2_875,
+            'stripe_deferred_net_amount' => 0,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'partner_funding_status' => PartnerFundingStatus::Pending,
+            'balance_settled_at' => now(),
+        ]);
+
+        app(LedgerService::class)->recordPendingCredit(
+            customerId: $customer->id,
+            currency: 'EUR',
+            entryType: LedgerEntryType::PAYMENT_RECEIVED,
+            amount: 2_875,
+            reference: $transaction,
+            description: 'Stripe payment #'.$transaction->id,
+        );
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(function (array $payload): bool {
+                return ($payload['from_account_id'] ?? null) === 'master-eur-uuid'
+                    && ($payload['to_account_id'] ?? null) === 'wal_topup_customer'
+                    && ($payload['amount'] ?? null) === 28.75;
+            }), Mockery::any())
+            ->andReturn(['id' => 'pay_topup_1']);
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(function (array $payload): bool {
+                return ($payload['from_account_id'] ?? null) === 'master-eur-uuid'
+                    && ($payload['to_account_id'] ?? null) === '626c80a3-f8e7-4627-8bcf-ca73f9944abf'
+                    && ($payload['amount'] ?? null) === 0.25
+                    && ($payload['description'] ?? null) === 'Taxa Yoop';
+            }), 'platform')
+            ->andReturn(['id' => 'pay_platform_fee_1']);
+        $gateway->shouldReceive('getAccount')->andReturn([
+            'available_amount' => 500.00,
+            'balance' => 500.00,
+        ]);
+
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $job = new FundWallesterTopupFromStripeJob($transaction->id);
+        $job->handle(app(FundingPartnerMovementService::class), app(TopupWallesterFundingPolicy::class));
+        $job->handle(app(FundingPartnerMovementService::class), app(TopupWallesterFundingPolicy::class));
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'amount' => 2_875,
+            'idempotency_key' => 'stripe_topup:'.$transaction->id.':out',
+            'status' => FundingPartnerMovementStatus::Completed->value,
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'amount' => 25,
+            'funding_account_id' => $feeAccount->id,
+            'idempotency_key' => 'stripe-platform-fee:'.$transaction->id.':in',
+            'status' => FundingPartnerMovementStatus::Completed->value,
+            'description' => 'Taxa Yoop',
+        ]);
+    }
+
     public function test_topup_job_marks_awaiting_liquidity_on_insufficient_main_funds(): void
     {
         $customer = $this->createActiveCustomer();

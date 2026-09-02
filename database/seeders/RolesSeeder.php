@@ -50,6 +50,11 @@ class RolesSeeder extends Seeder
             'accounts_payable.pay',
             // Auditoria
             'audit_logs.view',
+            // Notícias
+            'news.view',
+            'news.create',
+            'news.edit',
+            'news.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -78,12 +83,14 @@ class RolesSeeder extends Seeder
             'transactions.view',
             'reports.view',
             'accounts_payable.view', 'accounts_payable.create', 'accounts_payable.edit', 'accounts_payable.pay',
+            'news.view', 'news.create', 'news.edit', 'news.delete',
         ]);
 
         // support — só leitura
         $support->syncPermissions([
             'customers.view',
             'transactions.view',
+            'news.view',
         ]);
     }
 }

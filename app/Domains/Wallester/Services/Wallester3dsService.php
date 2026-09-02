@@ -125,14 +125,36 @@ class Wallester3dsService
     }
 
     /**
-     * @return array{out_of_band_enabled: true, out_of_band_id: string}
+     * @return array{email: string, mobile: string, out_of_band_enabled: true, out_of_band_id: string}
      */
-    public function outOfBandSettingsFor(CustomerWallesterAccount $account): array
+    public function outOfBandSettingsFor(CustomerWallesterAccount $account, Customer $customer): array
     {
         return [
+            'email' => (string) $customer->email,
+            'mobile' => $this->wallesterMobileFor($customer),
             'out_of_band_enabled' => true,
             'out_of_band_id' => (string) $account->wallester_oob_id,
         ];
+    }
+
+    /**
+     * Wallester 3DS exige E.164: '+' seguido apenas de dígitos.
+     */
+    private function wallesterMobileFor(Customer $customer): string
+    {
+        $digits = preg_replace('/\D+/', '', trim((string) $customer->phone)) ?? '';
+
+        if (str_starts_with($digits, '00')) {
+            $digits = substr($digits, 2);
+        }
+
+        if ($digits === '') {
+            throw new RuntimeException(
+                'Customer phone must be a valid number for Wallester 3DS (digits with a leading "+").',
+            );
+        }
+
+        return '+'.$digits;
     }
 
     private function resolveChallenge(

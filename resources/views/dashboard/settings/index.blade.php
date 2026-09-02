@@ -24,6 +24,7 @@ $tabs = [
     'sms'      => ['label' => 'SMS',            'title' => 'SMS'],
     'social'   => ['label' => 'Redes Sociais',  'title' => 'Redes Sociais'],
     'currency' => ['label' => 'Moedas',         'title' => 'Configurações de Moedas'],
+    'fx'       => ['label' => 'Câmbio',         'title' => 'Cotação de moedas (AwesomeAPI)'],
 ];
 
 $grouped = $settings->groupBy(fn($s) => explode('.', $s->key)[0]);
@@ -114,6 +115,8 @@ $selectOptions = [
                     </h2>
                     @if ($group === 'mail')
                     <p class="text-xs text-slate-500 mt-1">Servidor SMTP usado para emails enviados aos clientes.</p>
+                    @elseif ($group === 'fx')
+                    <p class="text-xs text-slate-500 mt-1">A API Key da AwesomeAPI é enviada no header <code class="text-[11px]">x-api-key</code>. Sem chave, as cotações vêm com cache de 1 minuto.</p>
                     @endif
                 </div>
                 @endif
@@ -238,6 +241,9 @@ $selectOptions = [
                     <label class="{{ $lc }}">{{ $setting->label }}</label>
                     <input type="{{ $setting->type }}" name="settings[{{ $setting->key }}]"
                            value="{{ $setting->value }}" class="{{ $ic }}">
+                    @if ($setting->key === 'fx.percentage')
+                    <p class="text-xs text-slate-500 mt-1.5">Estilo Stripe: <code class="text-[11px]">0.01</code> = 1%. Vazio ou 0 = não cobra taxa Yoop nas compras com câmbio Wallester.</p>
+                    @endif
                     @endif
 
                 </div>

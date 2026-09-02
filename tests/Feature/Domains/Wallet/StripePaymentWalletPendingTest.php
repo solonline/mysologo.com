@@ -4,9 +4,11 @@ namespace Tests\Feature\Domains\Wallet;
 
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Domains\Wallet\Services\StripePaymentWalletService;
+use App\Models\Customer;
 use App\Models\CustomerBalance;
 use App\Models\StripeTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -99,5 +101,57 @@ class StripePaymentWalletPendingTest extends TestCase
             ->first();
 
         $this->assertNull($balance);
+    }
+
+    public function test_platform_fee_does_not_credit_platform_wallet(): void
+    {
+        $platform = Customer::query()->create([
+            'name' => 'Yoop Platform',
+            'email' => 'platform-wallet-fee@yoop.test',
+            'username' => 'platform_wallet_fee',
+            'type' => 'platform',
+            'currency' => 'EUR',
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'email_verified_at' => now(),
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $platform->id,
+            'currency' => 'EUR',
+            'available' => 100,
+            'pending' => 0,
+        ]);
+
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'email_verified_at' => now(),
+            'doc_status' => 'approved',
+        ]);
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_no_platform_fee');
+
+        $transaction = StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 5_000,
+            'stripe_fee' => 100,
+            'platform_fee' => 25,
+            'net_amount' => 4_875,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+        ]);
+
+        app(StripePaymentWalletService::class)->creditFromStripePayment($transaction);
+
+        $this->assertSame(100, (int) CustomerBalance::query()
+            ->where('customer_id', $platform->id)
+            ->where('currency', 'EUR')
+            ->value('available'));
+
+        $this->assertDatabaseMissing('ledger_entries', [
+            'customer_id' => $platform->id,
+            'entry_type' => LedgerEntryType::MANUAL_CREDIT->value,
+        ]);
     }
 }

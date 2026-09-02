@@ -11,6 +11,7 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\TransactionType;
+use App\Models\Customer;
 use App\Models\CustomerBalanceAdjustment;
 use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
@@ -132,7 +133,7 @@ class GetCustomerActivityTimelineQueryTest extends TestCase
             'external_account_id' => $account->wallester_account_id,
             'direction' => FundingPartnerMovementDirection::Out,
             'type' => FundingPartnerMovementType::CardPurchase,
-            'amount' => 463,
+            'amount' => 454,
             'currency' => 'EUR',
             'original_amount' => 388,
             'original_currency' => 'GBP',
@@ -147,8 +148,61 @@ class GetCustomerActivityTimelineQueryTest extends TestCase
         $timeline = app(GetCustomerActivityTimelineQuery::class)->execute($customer);
 
         $this->assertCount(1, $timeline);
-        $this->assertSame(463, $timeline->first()->amountCents);
+        $this->assertSame(454, $timeline->first()->amountCents);
         $this->assertSame('EUR', $timeline->first()->currency);
-        $this->assertSame('3,88 GBP · câmbio 0,09 EUR', $timeline->first()->fxDetailLabel);
+        $this->assertSame('3,88 GBP → 4,54 EUR', $timeline->first()->fxDetailLabel);
+    }
+
+    public function test_platform_timeline_includes_incoming_yoop_fx_fee(): void
+    {
+        $retail = $this->createRetailCustomer();
+        $retailAccount = $this->createWallesterAccount($retail, IntegrationAccountStatus::ACTIVE, 'wal_retail_fx');
+        $platform = Customer::factory()->create(['type' => 'platform', 'name' => 'Yoop Platform']);
+        $master = $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'wal_master_fx', [
+            'is_main' => true,
+        ]);
+
+        $purchase = FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $retailAccount::class,
+            'funding_account_id' => $retailAccount->id,
+            'external_account_id' => $retailAccount->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::CardPurchase,
+            'amount' => 454,
+            'currency' => 'EUR',
+            'fees_amount' => 9,
+            'platform_fees_amount' => 5,
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Webhook,
+            'idempotency_key' => 'card:timeline-master-fx:out',
+            'partner_external_id' => 'timeline-master-fx',
+            'description' => 'LidlGB',
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $master::class,
+            'funding_account_id' => $master->id,
+            'external_account_id' => $master->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::In,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 5,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'fx-platform:timeline-master-fx:in',
+            'description' => 'Platform FX fee timeline-master-fx',
+            'reference_type' => $purchase->getMorphClass(),
+            'reference_id' => $purchase->id,
+        ]);
+
+        $timeline = app(GetCustomerActivityTimelineQuery::class)->execute($platform);
+
+        $this->assertCount(1, $timeline);
+        $this->assertTrue($timeline->first()->isIncoming);
+        $this->assertSame(5, $timeline->first()->amountCents);
+        $this->assertSame('Câmbio Yoop', $timeline->first()->typeLabel);
+        $this->assertSame('Câmbio Yoop · LidlGB', $timeline->first()->description);
     }
 }

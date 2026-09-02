@@ -10,7 +10,6 @@ use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Domains\Wallet\Services\LedgerService;
-use App\Domains\Wallet\Services\PlatformRevenueService;
 use App\Models\CustomerBalance;
 use App\Models\CustomerWallesterAccount;
 use App\Models\FundingPartnerMovement;
@@ -26,7 +25,6 @@ class WalletAuditService
 
     public function __construct(
         protected LedgerService $ledgerService,
-        protected PlatformRevenueService $platformRevenueService,
     ) {}
 
     public function run(
@@ -46,7 +44,6 @@ class WalletAuditService
             ...$this->checkTopupWallesterMovements($from, $to, $customerId, $currency),
             ...$this->checkMissingWallesterTopups($from, $to, $customerId, $currency),
             ...$this->checkPartnerFundingStatuses($from, $to, $customerId, $currency),
-            ...$this->checkPlatformRevenueLedgerMismatch($from, $to, $customerId, $currency),
         ];
 
         return new AuditReport($from, $to, $customerId, $currency, $findings);
@@ -738,44 +735,5 @@ class WalletAuditService
                 FundingPartnerMovementStatus::Pending,
             ])
             ->first();
-    }
-
-    /** @return list<AuditFinding> */
-    private function checkPlatformRevenueLedgerMismatch(
-        ?string $from,
-        ?string $to,
-        ?int $customerId,
-        ?string $currency,
-    ): array {
-        if ($customerId !== null) {
-            return [];
-        }
-
-        $findings = [];
-
-        foreach ($this->platformRevenueService->summarize($from, $to) as $row) {
-            if ($currency !== null && strtoupper($currency) !== $row['currency']) {
-                continue;
-            }
-
-            if ($row['ledger_matches_stripe']) {
-                continue;
-            }
-
-            $findings[] = new AuditFinding(
-                severity: 'critical',
-                code: 'PLATFORM_REVENUE_LEDGER_MISMATCH',
-                message: 'Platform fee totals from stripe_transactions do not match ledger credits.',
-                context: [
-                    'currency' => $row['currency'],
-                    'stripe_platform_fee_total' => $row['accrued_cents'],
-                    'ledger_platform_fee_total' => $row['ledger_cents'],
-                    'delta' => $row['accrued_cents'] - $row['ledger_cents'],
-                    'transaction_count' => $row['transaction_count'],
-                ],
-            );
-        }
-
-        return $findings;
     }
 }

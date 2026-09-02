@@ -106,7 +106,7 @@ class NormalizeSwallowedWallesterFxPurchasesTest extends TestCase
 
         $this->assertDatabaseHas('funding_partner_movements', [
             'id' => $movement->id,
-            'amount' => 463,
+            'amount' => 454,
             'currency' => 'EUR',
             'original_amount' => 388,
             'original_currency' => 'GBP',
@@ -118,13 +118,13 @@ class NormalizeSwallowedWallesterFxPurchasesTest extends TestCase
         $this->assertDatabaseHas('ledger_entries', [
             'customer_id' => $customer->id,
             'entry_type' => LedgerEntryType::CARD_PURCHASE->value,
-            'amount' => 454,
+            'amount' => 445,
             'reference_id' => $movement->id,
         ]);
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 43952,
+            'available' => 43961,
         ]);
         $this->assertTrue(app(NormalizeSwallowedWallesterFxPurchasesService::class)->execute($customer->id)->isEmpty());
     }

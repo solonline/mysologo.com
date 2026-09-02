@@ -3,6 +3,7 @@
 namespace App\Domains\Wallester;
 
 use App\Domains\Wallester\Clients\WallesterHttpClient;
+use App\Domains\Wallester\Commands\ApplyPlatformFxFeesToExistingPurchasesCommand;
 use App\Domains\Wallester\Commands\NormalizeSwallowedWallesterFxPurchasesCommand;
 use App\Domains\Wallester\Commands\SyncWallesterCardMovementsCommand;
 use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
@@ -14,6 +15,7 @@ use App\Domains\Wallester\Services\SyncWallesterCardMovementsService;
 use App\Domains\Wallester\Services\Wallester3dsService;
 use App\Domains\Wallester\Services\WallesterCardMovementIngestService;
 use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
+use App\Domains\Wallester\Services\WallesterPlatformFxFeeService;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Domains\Wallester\Services\WallesterSettingsService;
 use App\Domains\Wallester\Services\WallesterTransactionService;
@@ -34,6 +36,7 @@ class WallesterServiceProvider extends ServiceProvider
         $this->app->singleton(WallesterFundingTransferDriver::class);
         $this->app->singleton(PlatformMasterCurrencyResolver::class);
         $this->app->singleton(WallesterCardMovementIngestService::class);
+        $this->app->singleton(WallesterPlatformFxFeeService::class);
         $this->app->bind(SyncWallesterCardMovementsService::class);
     }
 
@@ -43,6 +46,7 @@ class WallesterServiceProvider extends ServiceProvider
             $this->commands([
                 SyncWallesterCardMovementsCommand::class,
                 NormalizeSwallowedWallesterFxPurchasesCommand::class,
+                ApplyPlatformFxFeesToExistingPurchasesCommand::class,
             ]);
         }
 

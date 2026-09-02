@@ -253,13 +253,140 @@ class FundingPartnerMovementService
         string $idempotencyKey,
         ?object $reference = null,
     ): void {
+        $this->transferFromCustomerToPlatformAccount(
+            from: $from,
+            amountCents: $amountCents,
+            currency: $currency,
+            description: $description,
+            idempotencyKey: $idempotencyKey,
+            reference: $reference,
+            toFeeAccount: false,
+        );
+    }
+
+    public function transferFromCustomerToPlatformFees(
+        Customer $from,
+        int $amountCents,
+        string $currency,
+        string $description,
+        string $idempotencyKey,
+        ?object $reference = null,
+    ): void {
+        $this->transferFromCustomerToPlatformAccount(
+            from: $from,
+            amountCents: $amountCents,
+            currency: $currency,
+            description: $description,
+            idempotencyKey: $idempotencyKey,
+            reference: $reference,
+            toFeeAccount: true,
+        );
+    }
+
+    public function transferFromMasterToPlatformFees(
+        int $amountCents,
+        string $currency,
+        string $description,
+        string $idempotencyKey,
+        ?object $reference = null,
+    ): void {
+        if ($amountCents <= 0 || $this->hasCompletedMovement($idempotencyKey)) {
+            return;
+        }
+
+        $routingCurrency = $this->currencyResolver->resolve($currency);
+        $masterAccount = $this->wallesterDriver->getPlatformMasterAccount($routingCurrency);
+        $feeAccount = $this->wallesterDriver->getPlatformFeeAccount($routingCurrency);
+
+        if ($masterAccount->is($feeAccount)) {
+            return;
+        }
+
+        $masterCustomer = $masterAccount->customer;
+
+        if (! $masterCustomer instanceof Customer) {
+            return;
+        }
+
+        $available = $this->wallesterDriver->getAvailableBalance($masterCustomer, $routingCurrency);
+        if ($available < $amountCents) {
+            throw new ApiException(
+                ErrorCode::INSUFFICIENT_BALANCE,
+                422,
+                "Saldo insuficiente na Wallester master para o lucro da plataforma. Disponível: {$available} {$routingCurrency}.",
+            );
+        }
+
+        $provider = IntegrationProvider::WALLESTER;
+
+        $pair = DB::transaction(function () use (
+            $masterAccount,
+            $feeAccount,
+            $amountCents,
+            $routingCurrency,
+            $description,
+            $idempotencyKey,
+            $provider,
+            $reference,
+        ) {
+            return $this->resolveTransferMovementPair(
+                idempotencyKey: $idempotencyKey,
+                provider: $provider,
+                fromAccount: $masterAccount,
+                toAccount: $feeAccount,
+                amountCents: $amountCents,
+                routingCurrency: $routingCurrency,
+                description: $description,
+                reference: $reference,
+            );
+        });
+
+        if ($pair === null) {
+            return;
+        }
+
+        [$outMovement, $inMovement] = $pair;
+
+        try {
+            $response = $this->wallesterDriver->executeTransfer(
+                fromAccount: $masterAccount,
+                toAccount: $feeAccount,
+                amountCents: $amountCents,
+                description: $description,
+                auditUserId: 'platform',
+            );
+
+            $this->completeTransferPair($outMovement, $inMovement, $response);
+
+            $this->mainAccountSync->syncAccount($masterAccount);
+            $this->mainAccountSync->syncAccount($feeAccount);
+        } catch (Throwable $exception) {
+            $reason = $exception->getMessage();
+            $this->markMovementFailed($outMovement, $reason);
+            $this->markMovementFailed($inMovement, $reason);
+
+            throw $exception;
+        }
+    }
+
+    private function transferFromCustomerToPlatformAccount(
+        Customer $from,
+        int $amountCents,
+        string $currency,
+        string $description,
+        string $idempotencyKey,
+        ?object $reference,
+        bool $toFeeAccount,
+    ): void {
         if ($this->hasCompletedMovement($idempotencyKey)) {
             return;
         }
 
         $routingCurrency = $this->currencyResolver->resolve($currency);
         $fromAccount = $this->wallesterDriver->requireActiveAccount($from, $routingCurrency);
-        $masterAccount = $this->wallesterDriver->getPlatformMasterAccount($routingCurrency);
+        $masterAccount = $toFeeAccount
+            ? $this->wallesterDriver->getPlatformFeeAccount($routingCurrency)
+            : $this->wallesterDriver->getPlatformMasterAccount($routingCurrency);
         $provider = IntegrationProvider::WALLESTER;
 
         $available = $this->wallesterDriver->getAvailableBalance($from, $routingCurrency);
@@ -399,6 +526,64 @@ class FundingPartnerMovementService
             ]);
 
             $this->applyCardMovementLedger($movement, $account);
+
+            return $movement;
+        });
+    }
+
+    public function recordCustomerFxFeeMovement(
+        FundingPartnerMovement $purchase,
+        CustomerWallesterAccount $account,
+        int $amountCents,
+    ): FundingPartnerMovement {
+        $partnerExternalId = (string) $purchase->partner_external_id;
+        $idempotencyKey = 'fx-fees:'.$partnerExternalId;
+
+        return DB::transaction(function () use (
+            $purchase,
+            $account,
+            $amountCents,
+            $idempotencyKey,
+        ): FundingPartnerMovement {
+            $existing = FundingPartnerMovement::query()
+                ->where('idempotency_key', $idempotencyKey)
+                ->first();
+
+            if ($existing instanceof FundingPartnerMovement) {
+                $existing->update([
+                    'amount' => $amountCents,
+                    'fees_amount' => $purchase->fees_amount,
+                    'platform_fees_amount' => $purchase->platform_fees_amount,
+                    'status' => FundingPartnerMovementStatus::Completed,
+                ]);
+
+                $this->applyFxFeeLedger($existing->fresh(), $account);
+
+                return $existing->fresh();
+            }
+
+            $movement = FundingPartnerMovement::query()->create([
+                'provider' => IntegrationProvider::WALLESTER,
+                'funding_account_type' => $account::class,
+                'funding_account_id' => $account->id,
+                'external_account_id' => $account->wallester_account_id,
+                'direction' => FundingPartnerMovementDirection::Out,
+                'type' => FundingPartnerMovementType::Fee,
+                'amount' => $amountCents,
+                'currency' => strtoupper((string) $purchase->currency),
+                'fees_amount' => $purchase->fees_amount,
+                'platform_fees_amount' => $purchase->platform_fees_amount,
+                'customer_wallester_card_id' => $purchase->customer_wallester_card_id,
+                'partner_external_id' => $idempotencyKey,
+                'status' => FundingPartnerMovementStatus::Completed,
+                'source' => $purchase->source ?? FundingPartnerMovementSource::Webhook,
+                'idempotency_key' => $idempotencyKey,
+                'description' => 'Câmbio',
+                'reference_type' => $purchase->getMorphClass(),
+                'reference_id' => $purchase->id,
+            ]);
+
+            $this->applyFxFeeLedger($movement, $account);
 
             return $movement;
         });
@@ -581,9 +766,71 @@ class FundingPartnerMovementService
         );
     }
 
+    private function applyFxFeeLedger(
+        FundingPartnerMovement $movement,
+        CustomerWallesterAccount $account,
+    ): void {
+        if ($movement->status !== FundingPartnerMovementStatus::Completed) {
+            return;
+        }
+
+        $target = $this->fxFeeLedgerTarget($movement);
+        $recorded = (int) LedgerEntry::query()
+            ->where('reference_type', $movement->getMorphClass())
+            ->where('reference_id', $movement->id)
+            ->where('entry_type', LedgerEntryType::PLATFORM_FEE)
+            ->sum('amount');
+
+        $delta = $target - $recorded;
+
+        if ($delta <= 0) {
+            return;
+        }
+
+        $this->ledger->record(
+            customerId: (int) $account->customer_id,
+            currency: (string) $movement->currency,
+            entryType: LedgerEntryType::PLATFORM_FEE,
+            amount: $delta,
+            reference: $movement,
+            description: $movement->description ?? 'Câmbio',
+            metadata: [
+                'partner_external_id' => $movement->partner_external_id,
+                'purchase_reference_id' => $movement->reference_id,
+            ],
+        );
+    }
+
+    /**
+     * Em compras antigas o CARD_PURCHASE já inclui a taxa Wallester.
+     * O ledger da row `fee` só acresce a % Yoop para não debitar o câmbio duas vezes.
+     */
+    private function fxFeeLedgerTarget(FundingPartnerMovement $movement): int
+    {
+        $fullAmount = (int) $movement->amount;
+        $purchase = $movement->reference;
+
+        if (! $purchase instanceof FundingPartnerMovement) {
+            return $fullAmount;
+        }
+
+        $cardPurchaseTotal = (int) LedgerEntry::query()
+            ->where('reference_type', $purchase->getMorphClass())
+            ->where('reference_id', $purchase->id)
+            ->where('entry_type', LedgerEntryType::CARD_PURCHASE)
+            ->sum('amount');
+
+        if ($cardPurchaseTotal >= (int) $purchase->amount + (int) $purchase->fees_amount) {
+            return (int) $purchase->platform_fees_amount;
+        }
+
+        return $fullAmount;
+    }
+
     public function listForFundingAccount(Model $fundingAccount, int $perPage = 15): LengthAwarePaginator
     {
         return FundingPartnerMovement::query()
+            ->customerVisible()
             ->where('funding_account_type', $fundingAccount::class)
             ->where('funding_account_id', $fundingAccount->id)
             ->latest('id')
@@ -789,6 +1036,12 @@ class FundingPartnerMovementService
             return null;
         }
 
+        if ($inMovement instanceof FundingPartnerMovement
+            && $inMovement->status === FundingPartnerMovementStatus::Completed
+            && ! $outMovement instanceof FundingPartnerMovement) {
+            return null;
+        }
+
         if ($outMovement instanceof FundingPartnerMovement
             && $inMovement instanceof FundingPartnerMovement) {
             if ($outMovement->status === FundingPartnerMovementStatus::Failed) {
@@ -799,41 +1052,45 @@ class FundingPartnerMovementService
             return [$outMovement->fresh(), $inMovement->fresh()];
         }
 
-        $transferGroupId = (string) Str::uuid();
+        $transferGroupId = (string) ($inMovement?->transfer_group_id ?: Str::uuid());
 
-        $outMovement = $this->createMovement(
-            provider: $provider,
-            fundingAccount: $fromAccount,
-            externalAccountId: $fromAccount->wallester_account_id,
-            direction: FundingPartnerMovementDirection::Out,
-            type: FundingPartnerMovementType::AccountTransfer,
-            amountCents: $amountCents,
-            currency: $routingCurrency,
-            transferGroupId: $transferGroupId,
-            counterpartyExternalAccountId: $toAccount->wallester_account_id,
-            status: FundingPartnerMovementStatus::Pending,
-            source: FundingPartnerMovementSource::Api,
-            idempotencyKey: $outKey,
-            description: $description,
-            reference: $reference,
-        );
+        if (! $outMovement instanceof FundingPartnerMovement) {
+            $outMovement = $this->createMovement(
+                provider: $provider,
+                fundingAccount: $fromAccount,
+                externalAccountId: $fromAccount->wallester_account_id,
+                direction: FundingPartnerMovementDirection::Out,
+                type: FundingPartnerMovementType::AccountTransfer,
+                amountCents: $amountCents,
+                currency: $routingCurrency,
+                transferGroupId: $transferGroupId,
+                counterpartyExternalAccountId: $toAccount->wallester_account_id,
+                status: FundingPartnerMovementStatus::Pending,
+                source: FundingPartnerMovementSource::Api,
+                idempotencyKey: $outKey,
+                description: $description,
+                reference: $reference,
+            );
+        }
 
-        $inMovement = $this->createMovement(
-            provider: $provider,
-            fundingAccount: $toAccount,
-            externalAccountId: $toAccount->wallester_account_id,
-            direction: FundingPartnerMovementDirection::In,
-            type: FundingPartnerMovementType::AccountTransfer,
-            amountCents: $amountCents,
-            currency: $routingCurrency,
-            transferGroupId: $transferGroupId,
-            counterpartyExternalAccountId: $fromAccount->wallester_account_id,
-            status: FundingPartnerMovementStatus::Pending,
-            source: FundingPartnerMovementSource::Api,
-            idempotencyKey: $inKey,
-            description: $description,
-            reference: $reference,
-        );
+        if (! $inMovement instanceof FundingPartnerMovement) {
+            $inMovement = $this->createMovement(
+                provider: $provider,
+                fundingAccount: $toAccount,
+                externalAccountId: $toAccount->wallester_account_id,
+                direction: FundingPartnerMovementDirection::In,
+                type: FundingPartnerMovementType::AccountTransfer,
+                amountCents: $amountCents,
+                currency: $routingCurrency,
+                transferGroupId: $transferGroupId,
+                counterpartyExternalAccountId: $fromAccount->wallester_account_id,
+                status: FundingPartnerMovementStatus::Pending,
+                source: FundingPartnerMovementSource::Api,
+                idempotencyKey: $inKey,
+                description: $description,
+                reference: $reference,
+            );
+        }
 
         return [$outMovement, $inMovement];
     }

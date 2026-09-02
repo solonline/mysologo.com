@@ -139,6 +139,39 @@ class WallesterFundingTransferDriver implements FundingPartnerTransferInterface
         return $account;
     }
 
+    public function getPlatformFeeAccount(string $currency): CustomerWallesterAccount
+    {
+        $routingCurrency = $this->currencyResolver->resolve($currency);
+
+        $configuredId = $this->wallesterSettings->platformFeeAccountId($routingCurrency);
+
+        if ($configuredId !== '') {
+            $account = CustomerWallesterAccount::query()
+                ->where('wallester_account_id', $configuredId)
+                ->first();
+
+            if ($account instanceof CustomerWallesterAccount) {
+                return $account;
+            }
+        }
+
+        $platformCustomer = Customer::query()
+            ->where('type', 'platform')
+            ->get();
+
+        foreach ($platformCustomer as $platform) {
+            $account = $platform->platformWallesterFeeAccounts()
+                ->where('funding_currency', $routingCurrency)
+                ->first();
+
+            if ($account instanceof CustomerWallesterAccount) {
+                return $account;
+            }
+        }
+
+        return $this->getPlatformMasterAccount($routingCurrency);
+    }
+
     public function requireActiveAccount(Customer $customer, string $currency): CustomerWallesterAccount
     {
         $routingCurrency = $this->currencyResolver->resolve($currency);

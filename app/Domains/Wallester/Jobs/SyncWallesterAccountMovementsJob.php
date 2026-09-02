@@ -5,6 +5,7 @@ namespace App\Domains\Wallester\Jobs;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Services\WallesterCardMovementPayloadMapper;
+use App\Domains\Wallester\Services\WallesterPlatformFxFeeService;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
@@ -35,6 +36,7 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
         WallesterGatewayInterface $gateway,
         FundingPartnerMovementService $movements,
         WallesterCardMovementPayloadMapper $payloadMapper,
+        WallesterPlatformFxFeeService $platformFxFees,
     ): void {
         $query = CustomerWallesterAccount::query()
             ->where('status', IntegrationAccountStatus::ACTIVE);
@@ -43,8 +45,8 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
             $query->whereKey($this->customerWallesterAccountId);
         }
 
-        $query->each(function (CustomerWallesterAccount $account) use ($gateway, $movements, $payloadMapper): void {
-            $this->syncAccount($account, $gateway, $movements, $payloadMapper);
+        $query->each(function (CustomerWallesterAccount $account) use ($gateway, $movements, $payloadMapper, $platformFxFees): void {
+            $this->syncAccount($account, $gateway, $movements, $payloadMapper, $platformFxFees);
         });
     }
 
@@ -53,6 +55,7 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
         WallesterGatewayInterface $gateway,
         FundingPartnerMovementService $movements,
         WallesterCardMovementPayloadMapper $payloadMapper,
+        WallesterPlatformFxFeeService $platformFxFees,
     ): void {
         $response = $gateway->forCurrency((string) ($account->funding_currency ?? 'EUR'))->listAccountTransactions($account->wallester_account_id, [
             'from_record' => 0,
@@ -60,7 +63,7 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
         ], (string) $account->customer_id);
 
         foreach ($response['transactions'] as $transaction) {
-            $this->importTransaction($account, $transaction, $movements, $payloadMapper);
+            $this->importTransaction($account, $transaction, $movements, $payloadMapper, $platformFxFees);
         }
     }
 
@@ -72,6 +75,7 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
         array $transaction,
         FundingPartnerMovementService $movements,
         WallesterCardMovementPayloadMapper $payloadMapper,
+        WallesterPlatformFxFeeService $platformFxFees,
     ): void {
         $externalId = (string) ($transaction['id'] ?? '');
 
@@ -119,7 +123,7 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
         }
 
         try {
-            $movements->recordCardMovement(
+            $movement = $movements->recordCardMovement(
                 account: $account,
                 type: $movementType,
                 direction: $direction,
@@ -134,6 +138,8 @@ class SyncWallesterAccountMovementsJob implements ShouldQueue
                 originalCurrency: $amounts['original_currency'],
                 feesAmountCents: $amounts['fees_amount_cents'],
             );
+
+            $platformFxFees->collect($movement, $account);
         } catch (\Throwable $exception) {
             Log::channel('wallester')->warning('wallester_sync_movement_import_failed', [
                 'account_id' => $account->id,

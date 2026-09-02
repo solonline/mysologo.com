@@ -25,16 +25,50 @@ class FundingPartnerMovementsListTest extends TestCase
             'funding_account_type' => $account::class,
             'funding_account_id' => $account->id,
             'external_account_id' => 'wal_list',
-            'direction' => 'in',
-            'type' => FundingPartnerMovementType::AccountTransfer->value,
-            'amount' => 1500,
+            'direction' => 'out',
+            'type' => FundingPartnerMovementType::CardPurchase->value,
+            'amount' => 454,
             'currency' => 'EUR',
             'original_amount' => 1280,
             'original_currency' => 'GBP',
             'fees_amount' => 9,
+            'platform_fees_amount' => 5,
+            'status' => 'completed',
+            'source' => 'webhook',
+            'idempotency_key' => 'card:list-fx:out',
+            'partner_external_id' => 'list-fx',
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => 'wal_list',
+            'direction' => 'out',
+            'type' => FundingPartnerMovementType::Fee->value,
+            'amount' => 14,
+            'currency' => 'EUR',
+            'fees_amount' => 9,
+            'platform_fees_amount' => 5,
+            'status' => 'completed',
+            'source' => 'webhook',
+            'idempotency_key' => 'fx-fees:list-fx',
+            'description' => 'Câmbio',
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => 'wal_list',
+            'direction' => 'out',
+            'type' => FundingPartnerMovementType::AccountTransfer->value,
+            'amount' => 5,
+            'currency' => 'EUR',
             'status' => 'completed',
             'source' => 'api',
-            'idempotency_key' => 'list:test:1',
+            'idempotency_key' => 'fx-platform:list-fx:out',
+            'description' => 'Platform FX fee list-fx',
         ]);
 
         $token = $customer->createToken('test')->plainTextToken;
@@ -42,12 +76,15 @@ class FundingPartnerMovementsListTest extends TestCase
         $this->withToken($token)
             ->getJson('/api/wallet/funding-accounts/'.$account->id.'/movements')
             ->assertOk()
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.amount', 1500)
-            ->assertJsonPath('data.0.direction', 'in')
-            ->assertJsonPath('data.0.original_amount', 1280)
-            ->assertJsonPath('data.0.original_currency', 'GBP')
-            ->assertJsonPath('data.0.fees_amount', 9);
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.amount', 14)
+            ->assertJsonPath('data.0.type', 'fee')
+            ->assertJsonPath('data.1.amount', 454)
+            ->assertJsonPath('data.1.type', 'card_purchase')
+            ->assertJsonPath('data.1.original_amount', 1280)
+            ->assertJsonPath('data.1.original_currency', 'GBP')
+            ->assertJsonPath('data.1.fees_amount', 9)
+            ->assertJsonPath('data.1.platform_fees_amount', 5);
     }
 
     private function createActiveCustomer()

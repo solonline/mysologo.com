@@ -155,6 +155,19 @@
     @php
         $wallesterAccounts = $wallesterMainAccounts ?? collect();
         $wallesterPrimaryAccount = $wallesterAccounts->first();
+        $accountsAvailableByCurrency = collect($wallesterAccountsAvailableByCurrency ?? []);
+        $feeSub = $platformFeeSubAccount ?? null;
+        $primaryCurrency = strtoupper((string) (
+            $wallesterPrimaryAccount?->funding_currency
+            ?: $wallesterPrimaryAccount?->currency_code
+            ?: $accountsAvailableByCurrency->keys()->first()
+            ?: 'EUR'
+        ));
+        $accountsTotalCents = (int) ($accountsAvailableByCurrency->get($primaryCurrency) ?? $accountsAvailableByCurrency->first() ?? 0);
+        $showWallesterBreakdown = $wallesterAccounts->count() > 1
+            || $accountsAvailableByCurrency->contains(fn ($cents) => (int) $cents !== 0)
+            || $blockedTopups > 0
+            || ($feeSub && $feeSub->hasBreakdown());
     @endphp
     <a href="#"
        @click.prevent="showWallesterFundingModal = true"
@@ -178,27 +191,62 @@
         @if ($wallesterPrimaryAccount === null)
         <p class="text-3xl font-bold text-slate-400 tracking-tight">—</p>
         @else
-        @php $primaryCurrency = strtoupper($wallesterPrimaryAccount->funding_currency ?: $wallesterPrimaryAccount->currency_code); @endphp
         <p class="text-3xl font-bold text-slate-900 tracking-tight">
             {{ number_format(((int) $wallesterPrimaryAccount->available_amount) / 100, 2, ',', '.') }}
             <span class="text-sm font-semibold text-slate-500">{{ $primaryCurrency }}</span>
         </p>
         @endif
         <p class="text-sm text-slate-500 mt-1 font-medium">Wallester · Main</p>
-        @if ($wallesterAccounts->count() > 1 || $blockedTopups > 0)
+        @if ($showWallesterBreakdown)
         <div class="mt-4 space-y-2">
             @foreach ($wallesterAccounts->skip(1) as $mainAccount)
             @php $currency = strtoupper($mainAccount->funding_currency ?: $mainAccount->currency_code); @endphp
             <div class="flex items-center justify-between text-xs">
-                <span class="text-slate-600">{{ $currency }}</span>
+                <span class="text-slate-600">Main {{ $currency }}</span>
                 <span class="font-bold text-slate-800">
                     {{ number_format(((int) $mainAccount->available_amount) / 100, 2, ',', '.') }} {{ $currency }}
                 </span>
             </div>
             @endforeach
+            @if ($accountsTotalCents !== 0 || $accountsAvailableByCurrency->isNotEmpty())
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Contas</span>
+                <span class="font-bold text-slate-800">
+                    {{ number_format($accountsTotalCents / 100, 2, ',', '.') }} {{ $primaryCurrency }}
+                </span>
+            </div>
+            @endif
+            @foreach ($accountsAvailableByCurrency as $currency => $cents)
+            @if (strtoupper((string) $currency) !== $primaryCurrency)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Contas {{ strtoupper((string) $currency) }}</span>
+                <span class="font-bold text-slate-800">
+                    {{ number_format(((int) $cents) / 100, 2, ',', '.') }} {{ strtoupper((string) $currency) }}
+                </span>
+            </div>
+            @endif
+            @endforeach
+            @if ($feeSub && $feeSub->onSubCents > 0)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Sub-conta</span>
+                <span class="font-bold text-slate-800">{{ number_format($feeSub->onSubCents / 100, 2, ',', '.') }} {{ $feeSub->currency }}</span>
+            </div>
+            @endif
+            @if ($feeSub && $feeSub->awaitingLiquidityCents > 0)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Lucro à espera de liquidez</span>
+                <span class="font-bold text-amber-700">{{ number_format($feeSub->awaitingLiquidityCents / 100, 2, ',', '.') }} {{ $feeSub->currency }}</span>
+            </div>
+            @endif
+            @if ($feeSub && $feeSub->awaitingStripeCents > 0)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Lucro à espera Stripe</span>
+                <span class="font-bold text-amber-700">{{ number_format($feeSub->awaitingStripeCents / 100, 2, ',', '.') }} {{ $feeSub->currency }}</span>
+            </div>
+            @endif
             @if ($blockedTopups > 0)
             <div class="flex items-center justify-between text-xs">
-                <span class="text-slate-600">À espera de liquidez</span>
+                <span class="text-slate-600">Top-ups à espera</span>
                 <span class="font-bold text-amber-700">{{ $fundingCounts['awaiting_liquidity'] ?? 0 }}</span>
             </div>
             @endif
@@ -217,35 +265,60 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
             </div>
-            @if ($platformRevenuePrimary && ! $platformRevenue->ledgerMatchesStripe)
-            <span class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style="background:#fffbeb;color:#d97706;">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                Divergência
-            </span>
-            @else
             <span class="text-xs font-semibold text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">Ver detalhe →</span>
-            @endif
         </div>
 
         @if ($platformRevenuePrimary === null)
         <p class="text-3xl font-bold text-slate-400 tracking-tight">—</p>
         @else
         <p class="text-3xl font-bold text-slate-900 tracking-tight">
-            {{ number_format($platformRevenuePrimary->accruedCents / 100, 2, ',', '.') }}
+            {{ number_format($platformRevenuePrimary->billedCents() / 100, 2, ',', '.') }}
             <span class="text-sm font-semibold text-slate-500">{{ $platformRevenuePrimary->currency }}</span>
         </p>
         @endif
         <p class="text-sm text-slate-500 mt-1 font-medium">Receita Yoop · ganhos com taxas</p>
-        @if ($platformRevenuePrimary)
+        @if ($platformRevenuePrimary || ($feeSub && $feeSub->hasBreakdown()))
         <div class="mt-4 space-y-2">
+            @if ($platformRevenuePrimary)
             <div class="flex items-center justify-between text-xs">
                 <span class="text-slate-600">Este mês</span>
-                <span class="font-bold text-slate-800">{{ number_format($platformRevenuePrimary->monthAccruedCents / 100, 2, ',', '.') }} {{ $platformRevenuePrimary->currency }}</span>
+                <span class="font-bold text-slate-800">{{ number_format($platformRevenuePrimary->monthBilledCents() / 100, 2, ',', '.') }} {{ $platformRevenuePrimary->currency }}</span>
             </div>
+            @if ($platformRevenuePrimary->accruedCents > 0)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Stripe</span>
+                <span class="font-bold text-slate-800">{{ number_format($platformRevenuePrimary->accruedCents / 100, 2, ',', '.') }} {{ $platformRevenuePrimary->currency }}</span>
+            </div>
+            @endif
+            @if ($platformRevenuePrimary->fxCents > 0)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Câmbio Yoop</span>
+                <span class="font-bold text-slate-800">{{ number_format($platformRevenuePrimary->fxCents / 100, 2, ',', '.') }} {{ $platformRevenuePrimary->currency }}</span>
+            </div>
+            @endif
             <div class="flex items-center justify-between text-xs">
                 <span class="text-slate-600">Transações com taxa</span>
-                <span class="font-bold text-slate-800">{{ number_format($platformRevenuePrimary->transactionCount) }}</span>
+                <span class="font-bold text-slate-800">{{ number_format($platformRevenuePrimary->billedTransactionCount()) }}</span>
             </div>
+            @endif
+            @if ($feeSub && $feeSub->onSubCents > 0)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">Na sub-conta</span>
+                <span class="font-bold text-emerald-700">{{ number_format($feeSub->onSubCents / 100, 2, ',', '.') }} {{ $feeSub->currency }}</span>
+            </div>
+            @endif
+            @if ($feeSub && $feeSub->awaitingLiquidityCents > 0)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">À espera de liquidez</span>
+                <span class="font-bold text-amber-700">{{ number_format($feeSub->awaitingLiquidityCents / 100, 2, ',', '.') }} {{ $feeSub->currency }}</span>
+            </div>
+            @endif
+            @if ($feeSub && $feeSub->awaitingStripeCents > 0)
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600">À espera Stripe</span>
+                <span class="font-bold text-amber-700">{{ number_format($feeSub->awaitingStripeCents / 100, 2, ',', '.') }} {{ $feeSub->currency }}</span>
+            </div>
+            @endif
         </div>
         @endif
     </a>

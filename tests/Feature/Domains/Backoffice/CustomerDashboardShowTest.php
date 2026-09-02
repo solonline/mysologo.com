@@ -11,9 +11,13 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Customer;
+use App\Models\CustomerBalance;
 use App\Models\CustomerDiditSession;
 use App\Models\CustomerRetailDocument;
+use App\Models\CustomerWallesterAccount;
 use App\Models\FundingPartnerMovement;
+use App\Models\Merchant;
+use App\Models\MerchantPaymentRequest;
 use App\Models\StripeTransaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -141,6 +145,40 @@ class CustomerDashboardShowTest extends TestCase
         $response->assertSee(route('dashboard.customers.retry-stripe-funding', $customer), false);
     }
 
+    public function test_customer_show_displays_add_wallester_card_button_when_account_is_active(): void
+    {
+        $user = User::factory()->create();
+        $user->givePermissionTo([
+            Permission::findByName('customers.view', 'web'),
+            Permission::findByName('customers.edit', 'web'),
+        ]);
+
+        $customer = $this->createRetailCustomer(['name' => 'Cliente Cartao']);
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_show_card_btn');
+
+        $response = $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertSee('Adicionar cartão');
+        $response->assertSee(route('dashboard.customers.wallester-cards.store', $customer), false);
+        $response->assertSee('Nenhum cartão emitido.');
+    }
+
+    public function test_customer_show_hides_add_wallester_card_button_without_edit_permission(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+        $customer = $this->createRetailCustomer();
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_show_card_hidden');
+
+        $response = $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertDontSee('Adicionar cartão');
+        $response->assertDontSee(route('dashboard.customers.wallester-cards.store', $customer), false);
+    }
+
     public function test_customer_show_displays_unified_movements_with_card_purchase(): void
     {
         $user = $this->userWithPermission('customers.view');
@@ -216,7 +254,7 @@ class CustomerDashboardShowTest extends TestCase
             'external_account_id' => $account->wallester_account_id,
             'direction' => FundingPartnerMovementDirection::Out,
             'type' => FundingPartnerMovementType::CardPurchase,
-            'amount' => 463,
+            'amount' => 454,
             'currency' => 'EUR',
             'original_amount' => 388,
             'original_currency' => 'GBP',
@@ -233,9 +271,9 @@ class CustomerDashboardShowTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('LidlGB');
-        $response->assertSee('4,63');
+        $response->assertSee('4,54');
         $response->assertSee('3,88 GBP');
-        $response->assertSee('câmbio 0,09 EUR');
+        $response->assertSee('4,54 EUR');
     }
 
     public function test_customer_show_limits_recent_movements_to_ten_and_links_to_full_list(): void
@@ -279,7 +317,7 @@ class CustomerDashboardShowTest extends TestCase
             'currency' => 'EUR',
         ]);
 
-        $merchant = \App\Models\Merchant::query()->create([
+        $merchant = Merchant::query()->create([
             'customer_id' => $customer->id,
             'name' => 'Loja Backoffice',
             'slug' => 'loja-backoffice-'.uniqid(),
@@ -304,7 +342,7 @@ class CustomerDashboardShowTest extends TestCase
             'stripe_created_at' => now(),
         ]);
 
-        \App\Models\MerchantPaymentRequest::query()->create([
+        MerchantPaymentRequest::query()->create([
             'merchant_id' => $merchant->id,
             'transaction_id' => $transaction->id,
             'amount' => 2599,
@@ -328,6 +366,66 @@ class CustomerDashboardShowTest extends TestCase
         $response->assertSee('ORD-BO-42');
         $response->assertSee('Pago');
         $response->assertSee('Transações');
+    }
+
+    public function test_platform_customer_show_uses_wallester_master_cash(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+        $platform = Customer::factory()->create([
+            'type' => 'platform',
+            'name' => 'Yoop Platform',
+        ]);
+
+        $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'master-eur-show', [
+            'is_main' => true,
+            'available_amount' => 522,
+            'balance' => 522,
+            'funding_currency' => 'EUR',
+            'currency_code' => 'EUR',
+        ]);
+
+        $feeAccount = $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, '626c80a3-f8e7-4627-8bcf-ca73f9944abf', [
+            'is_main' => false,
+            'receiver_name' => 'Sub Conta Master',
+            'available_amount' => 15,
+            'balance' => 15,
+            'funding_currency' => 'EUR',
+            'currency_code' => 'EUR',
+            'product_id' => 'prod_fee_'.$platform->id,
+            'company_id' => 'comp_fee_'.$platform->id,
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $platform->id,
+            'currency' => 'EUR',
+            'available' => 1598,
+            'pending' => 0,
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => CustomerWallesterAccount::class,
+            'funding_account_id' => $feeAccount->id,
+            'external_account_id' => $feeAccount->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::In,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 5,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'fx-platform:master-show:in',
+            'description' => 'Câmbio Yoop',
+        ]);
+
+        $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $platform))
+            ->assertOk()
+            ->assertSee('5,22')
+            ->assertSee('Caixa Wallester')
+            ->assertSee('Sub Conta Master')
+            ->assertSee('Câmbio Yoop')
+            ->assertSee('0,05')
+            ->assertDontSee('15,98');
     }
 
     private function userWithPermission(string $permission): User

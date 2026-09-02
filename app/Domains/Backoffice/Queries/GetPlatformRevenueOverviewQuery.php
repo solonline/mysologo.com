@@ -25,11 +25,12 @@ class GetPlatformRevenueOverviewQuery
                 monthAccruedCents: $row['month_accrued_cents'],
                 monthSettledCents: $row['month_settled_cents'],
                 monthPendingCents: $row['month_pending_cents'],
-                ledgerCents: $row['ledger_cents'],
+                fxCents: $row['fx_cents'],
+                monthFxCents: $row['month_fx_cents'],
                 transactionCount: $row['transaction_count'],
+                fxTransactionCount: $row['fx_transaction_count'],
                 settledTransactionCount: $row['settled_transaction_count'],
                 pendingTransactionCount: $row['pending_transaction_count'],
-                ledgerMatchesStripe: $row['ledger_matches_stripe'],
                 monthlyBreakdown: $row['monthly_breakdown'],
             ),
             $rows,
@@ -37,7 +38,6 @@ class GetPlatformRevenueOverviewQuery
 
         return new PlatformRevenueOverview(
             currencies: $currencies,
-            ledgerMatchesStripe: $this->platformRevenueService->ledgerMatchesStripeGlobally($from, $to),
         );
     }
 }

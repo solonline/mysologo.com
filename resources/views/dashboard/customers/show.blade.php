@@ -1154,7 +1154,7 @@
                                             $pr->status !== 'completed' => ['label' => '—', 'class' => 'text-slate-400'],
                                             $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::Completed => ['label' => 'Disponível', 'class' => 'text-emerald-700'],
                                             $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::Failed => ['label' => 'Falhou', 'class' => 'text-red-700'],
-                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::AwaitingStripePayout => ['label' => 'A aguardar payout', 'class' => 'text-amber-700'],
+                                            $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::AwaitingStripePayout => ['label' => 'Aguardar Liquidez', 'class' => 'text-amber-700'],
                                             $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::AwaitingLiquidity => ['label' => 'A aguardar liquidez', 'class' => 'text-amber-700'],
                                             $funding === \App\Domains\Wallet\Enums\PartnerFundingStatus::Pending => ['label' => 'Pendente', 'class' => 'text-amber-700'],
                                             default => ['label' => 'Pendente', 'class' => 'text-amber-700'],
@@ -1198,7 +1198,7 @@
                                             </span>
                                         </td>
                                         <td class="px-3 py-2 {{ $settlement['class'] }} font-medium whitespace-nowrap">
-                                            {{ $settlement['label'] }}
+                                            {{ $settlement['label'] }} → {{ \Carbon\Carbon::parse($pr->stripeTransaction?->available_on)->format('d/m/Y') }}
                                         </td>
                                         <td class="px-3 py-2 text-slate-500 max-w-[8rem] truncate" title="{{ $pr->external_reference }}">
                                             {{ $pr->external_reference ?: '—' }}
@@ -1314,7 +1314,69 @@
     {{-- ==================== RIGHT COLUMN ==================== --}}
     <div class="flex flex-col gap-6">
         {{-- Saldo --}}
-        @if ($customer->balances->isNotEmpty())
+        @php
+            $isPlatformCustomer = $customer->type === 'platform';
+            $platformMasterAccounts = $isPlatformCustomer
+                ? $customer->platformWallesterMainAccounts
+                : collect();
+            $platformFeeAccounts = $isPlatformCustomer
+                ? $customer->platformWallesterFeeAccounts
+                : collect();
+        @endphp
+        @if ($isPlatformCustomer && ($platformMasterAccounts->isNotEmpty() || $platformFeeAccounts->isNotEmpty()))
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                <h2 class="text-sm font-semibold text-slate-900">Saldo</h2>
+            </div>
+            <div class="divide-y divide-slate-50">
+                @foreach ($platformMasterAccounts as $masterAccount)
+                @php $masterCurrency = strtoupper($masterAccount->funding_currency ?: $masterAccount->currency_code ?: 'EUR'); @endphp
+                <div class="px-5 py-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ $masterCurrency }} · Caixa</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                <span class="text-xs text-slate-500">Disponível</span>
+                            </div>
+                            <span class="text-sm font-bold text-emerald-600">
+                                {{ number_format(((int) $masterAccount->available_amount) / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ $masterCurrency }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-3">Caixa Wallester · master. Lucro (taxas Stripe e câmbio) vai para a Sub Conta Master.@can('transactions.view') Ver também <a href="{{ route('dashboard.platform-revenue') }}" class="text-emerald-700 hover:underline">Receita Platform</a>.@endcan</p>
+                </div>
+                @endforeach
+                @foreach ($platformFeeAccounts as $feeAccount)
+                @php $feeCurrency = strtoupper($feeAccount->funding_currency ?: $feeAccount->currency_code ?: 'EUR'); @endphp
+                <div class="px-5 py-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-violet-500 uppercase tracking-widest">{{ $feeAccount->receiver_name ?: 'Sub Conta Master' }}</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-violet-400"></span>
+                                <span class="text-xs text-slate-500">Ganhos da plataforma</span>
+                            </div>
+                            <span class="text-sm font-bold text-violet-600">
+                                {{ number_format(((int) $feeAccount->available_amount) / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ $feeCurrency }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-3 font-mono">{{ $feeAccount->wallester_account_id }}</p>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @elseif ($customer->balances->isNotEmpty())
         <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
             <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
                 <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1536,10 +1598,26 @@
                 </div>
                 @endif
 
-                @if ($customer->wallesterAccount->cards->isNotEmpty())
                 <div class="pt-3 mt-1 border-t border-slate-100 space-y-3">
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cartões</p>
-                    @foreach ($customer->wallesterAccount->cards as $card)
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cartões</p>
+                        @can('customers.edit')
+                        @if ($wallesterActive)
+                        <form method="POST" action="{{ route('dashboard.customers.wallester-cards.store', $customer) }}"
+                              onsubmit="return confirm('Emitir um novo cartão virtual para este cliente?')">
+                            @csrf
+                            <button type="submit"
+                                    class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                Adicionar cartão
+                            </button>
+                        </form>
+                        @endif
+                        @endcan
+                    </div>
+                    @forelse ($customer->wallesterAccount->cards as $card)
                     @php
                         $cardStatus = (string) ($card->status ?? '');
                         $cardStatusMap = match ($cardStatus) {
@@ -1574,9 +1652,10 @@
                             </div>
                         </div>
                     </div>
-                    @endforeach
+                    @empty
+                    <p class="text-xs text-slate-500">Nenhum cartão emitido.</p>
+                    @endforelse
                 </div>
-                @endif
             </div>
 
             @if ($canAdjustBalance && ! $pendingBalanceAdjustment)

@@ -16,6 +16,8 @@ class GetCustomerDetailQuery
             'stripeAccount',
             'wallesterAccount.cards' => fn ($q) => $q->orderByDesc('id'),
             'wallesterAccounts',
+            'platformWallesterMainAccounts',
+            'platformWallesterFeeAccounts',
             'eburyAccount',
             'phoneVerifications',
             'tpas.paymentMethodFees',

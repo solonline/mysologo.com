@@ -96,17 +96,19 @@ class WallesterServiceTest extends TestCase
 
     public function test_create_card_for_customer_injects_oob_settings_and_activates_virtual_card(): void
     {
-        $customer = $this->createRetailCustomer();
+        $customer = $this->createRetailCustomer(['phone' => '351 912 345 678']);
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_acc_oob');
 
         $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('createCard')
             ->once()
-            ->with(Mockery::on(function (array $payload) use ($account): bool {
+            ->with(Mockery::on(function (array $payload) use ($account, $customer): bool {
                 return $payload['account_id'] === $account->wallester_account_id
                     && $payload['type'] === 'Virtual'
                     && $payload['name'] === 'Main Card'
                     && $payload['3d_secure_settings'] === [
+                        'email' => (string) $customer->email,
+                        'mobile' => '+351912345678',
                         'out_of_band_enabled' => true,
                         'out_of_band_id' => (string) $account->wallester_oob_id,
                     ]
@@ -280,6 +282,42 @@ class WallesterServiceTest extends TestCase
         ]);
 
         $this->assertSame('card_new', $card->wallester_card_id);
+    }
+
+    public function test_create_card_for_customer_allows_additional_card_when_flag_is_set(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_additional');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_existing_active',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('createCard')->once()->andReturn([
+            'id' => 'card_extra',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Second Card',
+        ]);
+        $gateway->shouldNotReceive('activateCard');
+
+        $service = new WallesterService(
+            $gateway,
+            app(WallesterAccountRepositoryInterface::class),
+            app(Wallester3dsService::class),
+        );
+
+        $card = $service->createCardForCustomer($customer, [
+            'type' => 'Virtual',
+            'name' => 'Second Card',
+        ], allowAdditionalCards: true);
+
+        $this->assertSame('card_extra', $card->wallester_card_id);
     }
 
     public function test_create_card_for_customer_requires_active_wallester_account(): void

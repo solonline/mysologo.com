@@ -2,6 +2,20 @@
 
 namespace App\Providers;
 
+use App\Domains\Auth\AuthServiceProvider;
+use App\Domains\Backoffice\BackofficeServiceProvider;
+use App\Domains\Customer\CustomerServiceProvider;
+use App\Domains\Ebury\EburyServiceProvider;
+use App\Domains\Fx\FxServiceProvider;
+use App\Domains\Kyc\KycServiceProvider;
+use App\Domains\Merchant\MerchantServiceProvider;
+use App\Domains\Onboarding\OnboardingServiceProvider;
+use App\Domains\Settings\SettingsServiceProvider;
+use App\Domains\Sms\SmsServiceProvider;
+use App\Domains\Stripe\StripeServiceProvider;
+use App\Domains\Tpa\TpaServiceProvider;
+use App\Domains\Wallester\WallesterServiceProvider;
+use App\Domains\Wallet\WalletServiceProvider;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -14,22 +28,23 @@ use Illuminate\Support\ServiceProvider;
 class DomainServiceProvider extends ServiceProvider
 {
     /**
-     * @var array<int, class-string<\Illuminate\Support\ServiceProvider>>
+     * @var array<int, class-string<ServiceProvider>>
      */
     private array $domainProviders = [
-        \App\Domains\Auth\AuthServiceProvider::class,
-        \App\Domains\Onboarding\OnboardingServiceProvider::class,
-        \App\Domains\Sms\SmsServiceProvider::class,
-        \App\Domains\Kyc\KycServiceProvider::class,
-        \App\Domains\Ebury\EburyServiceProvider::class,
-        \App\Domains\Stripe\StripeServiceProvider::class,
-        \App\Domains\Wallester\WallesterServiceProvider::class,
-        \App\Domains\Backoffice\BackofficeServiceProvider::class,
-        \App\Domains\Wallet\WalletServiceProvider::class,
-        \App\Domains\Merchant\MerchantServiceProvider::class,
-        \App\Domains\Customer\CustomerServiceProvider::class,
-        \App\Domains\Settings\SettingsServiceProvider::class,
-        \App\Domains\Tpa\TpaServiceProvider::class,
+        AuthServiceProvider::class,
+        OnboardingServiceProvider::class,
+        SmsServiceProvider::class,
+        KycServiceProvider::class,
+        EburyServiceProvider::class,
+        StripeServiceProvider::class,
+        WallesterServiceProvider::class,
+        FxServiceProvider::class,
+        BackofficeServiceProvider::class,
+        WalletServiceProvider::class,
+        MerchantServiceProvider::class,
+        CustomerServiceProvider::class,
+        SettingsServiceProvider::class,
+        TpaServiceProvider::class,
     ];
 
     public function register(): void

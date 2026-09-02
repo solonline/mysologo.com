@@ -3,6 +3,7 @@
 namespace App\Domains\Backoffice\Controllers;
 
 use App\Domains\Backoffice\Queries\GetDashboardOverviewQuery;
+use App\Domains\Backoffice\Queries\GetPlatformFeeSubAccountOverviewQuery;
 use App\Domains\Backoffice\Queries\GetPlatformRevenueOverviewQuery;
 use App\Domains\Backoffice\Queries\GetWallesterFundingOverviewQuery;
 use App\Http\Controllers\Controller;
@@ -13,6 +14,7 @@ class DashboardController extends Controller
         protected GetDashboardOverviewQuery $overviewQuery,
         protected GetWallesterFundingOverviewQuery $wallesterFundingOverviewQuery,
         protected GetPlatformRevenueOverviewQuery $platformRevenueOverviewQuery,
+        protected GetPlatformFeeSubAccountOverviewQuery $platformFeeSubAccountOverviewQuery,
     ) {}
 
     public function index()
@@ -26,8 +28,10 @@ class DashboardController extends Controller
             'recentCustomers' => $overview->recentCustomers,
             'platformCustomers' => $overview->platformCustomers,
             'wallesterMainAccounts' => $wallesterFunding['mainAccounts'],
+            'wallesterAccountsAvailableByCurrency' => $wallesterFunding['accountsAvailableByCurrency'],
             'wallesterTopupFundingCounts' => $wallesterFunding['topupFundingCounts'],
             'platformRevenue' => $platformRevenue,
+            'platformFeeSubAccount' => $this->platformFeeSubAccountOverviewQuery->execute(),
         ]);
     }
 }

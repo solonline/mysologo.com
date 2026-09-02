@@ -4,20 +4,43 @@ namespace Tests\Feature\Domains\Wallester;
 
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\TransactionDirection;
+use App\Models\Customer;
 use App\Models\CustomerBalance;
 use App\Models\CustomerWallesterCard;
+use App\Models\FundingPartnerMovement;
+use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Mockery;
 use Tests\Concerns\InteractsWithOnboarding;
+use Tests\Concerns\InteractsWithWallesterSettings;
 use Tests\TestCase;
 
 class WallesterCardMovementWebhookTest extends TestCase
 {
     use InteractsWithOnboarding;
+    use InteractsWithWallesterSettings;
     use RefreshDatabase;
+
+    private const MASTER_ACCOUNT_ID = '75d92dc4-6de9-4580-8b62-3cbd3513af56';
+
+    private const FEE_ACCOUNT_ID = '626c80a3-f8e7-4627-8bcf-ca73f9944abf';
+
+    private const LIDL_ACCOUNT_ID = '50b270f8-31f8-463b-981f-67cc69591854';
+
+    private const LIDL_AUTH_ID = '0aa86719-5a62-4ce7-abf5-577d2918db20';
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+
+        parent::tearDown();
+    }
 
     public function test_webhook_ingests_card_purchase_movement(): void
     {
@@ -335,27 +358,45 @@ class WallesterCardMovementWebhookTest extends TestCase
 
         $this->postJson('/api/webhooks/wallester', $this->lidlAuthorizationPayload())->assertOk();
 
-        $this->assertDatabaseCount('funding_partner_movements', 1);
+        $this->assertDatabaseCount('funding_partner_movements', 2);
         $this->assertDatabaseHas('funding_partner_movements', [
             'funding_account_id' => $account->id,
             'customer_wallester_card_id' => $card->id,
             'type' => FundingPartnerMovementType::CardPurchase->value,
             'direction' => 'out',
-            'amount' => 463,
+            'amount' => 454,
             'currency' => 'EUR',
             'original_amount' => 388,
             'original_currency' => 'GBP',
             'fees_amount' => 9,
+            'platform_fees_amount' => null,
             'partner_external_id' => '0aa86719-5a62-4ce7-abf5-577d2918db20',
             'description' => 'LidlGB',
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'funding_account_id' => $account->id,
+            'type' => FundingPartnerMovementType::Fee->value,
+            'amount' => 9,
+            'fees_amount' => 9,
+            'platform_fees_amount' => null,
+            'description' => 'Câmbio',
+            'idempotency_key' => 'fx-fees:0aa86719-5a62-4ce7-abf5-577d2918db20',
         ]);
 
         $this->assertDatabaseHas('ledger_entries', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
             'direction' => TransactionDirection::Debit->value,
-            'amount' => 463,
+            'amount' => 454,
             'entry_type' => LedgerEntryType::CARD_PURCHASE->value,
+        ]);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'direction' => TransactionDirection::Debit->value,
+            'amount' => 9,
+            'entry_type' => LedgerEntryType::PLATFORM_FEE->value,
+            'description' => 'Câmbio',
         ]);
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
@@ -379,13 +420,14 @@ class WallesterCardMovementWebhookTest extends TestCase
 
         $this->postJson('/api/webhooks/wallester', $this->lidlAuthorizationPayload())->assertOk();
 
-        $this->assertDatabaseCount('funding_partner_movements', 1);
+        $this->assertDatabaseCount('funding_partner_movements', 2);
         $this->assertDatabaseHas('funding_partner_movements', [
             'funding_account_id' => $account->id,
-            'amount' => 463,
+            'amount' => 454,
             'original_amount' => 388,
             'original_currency' => 'GBP',
             'fees_amount' => 9,
+            'platform_fees_amount' => null,
         ]);
     }
 
@@ -426,8 +468,277 @@ class WallesterCardMovementWebhookTest extends TestCase
             'original_amount' => 1234,
             'original_currency' => 'EUR',
             'fees_amount' => null,
+            'platform_fees_amount' => null,
             'partner_external_id' => 'txn_same_ccy',
         ]);
+    }
+
+    public function test_fx_purchase_collects_platform_fee_when_percentage_configured(): void
+    {
+        $this->seedWallesterSettings();
+        $this->setFxPercentage('0.01');
+
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, self::LIDL_ACCOUNT_ID);
+        $platform = $this->createPlatformMaster();
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 10000,
+            'pending' => 0,
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')
+            ->with(self::LIDL_ACCOUNT_ID, (string) $customer->id)
+            ->andReturn(['available_amount' => 100.00, 'balance' => 100.00]);
+        $gateway->shouldReceive('getAccount')
+            ->with(self::MASTER_ACCOUNT_ID, 'platform')
+            ->andReturn(['available_amount' => 1000.00, 'balance' => 1000.00]);
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(function (array $payload): bool {
+                return $payload['from_account_id'] === self::LIDL_ACCOUNT_ID
+                    && $payload['to_account_id'] === self::MASTER_ACCOUNT_ID
+                    && $payload['amount'] === 0.05
+                    && $payload['description'] === 'Câmbio Yoop';
+            }), (string) $customer->id)
+            ->andReturn(['id' => 'pay_fx_platform_1']);
+
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $this->postJson('/api/webhooks/wallester', $this->lidlAuthorizationPayload())->assertOk();
+
+        $purchase = FundingPartnerMovement::query()
+            ->where('partner_external_id', self::LIDL_AUTH_ID)
+            ->where('type', FundingPartnerMovementType::CardPurchase)
+            ->firstOrFail();
+
+        $this->assertSame(5, (int) $purchase->platform_fees_amount);
+        $this->assertSame(454, (int) $purchase->amount);
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'type' => FundingPartnerMovementType::Fee->value,
+            'amount' => 14,
+            'fees_amount' => 9,
+            'platform_fees_amount' => 5,
+            'idempotency_key' => 'fx-fees:'.self::LIDL_AUTH_ID,
+            'description' => 'Câmbio',
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'idempotency_key' => 'fx-platform:'.self::LIDL_AUTH_ID.':out',
+            'status' => FundingPartnerMovementStatus::Completed->value,
+            'amount' => 5,
+            'currency' => 'EUR',
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'idempotency_key' => 'fx-platform:'.self::LIDL_AUTH_ID.':in',
+            'status' => FundingPartnerMovementStatus::Completed->value,
+            'amount' => 5,
+        ]);
+
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'direction' => TransactionDirection::Debit->value,
+            'amount' => 454,
+            'entry_type' => LedgerEntryType::CARD_PURCHASE->value,
+        ]);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'direction' => TransactionDirection::Debit->value,
+            'amount' => 14,
+            'entry_type' => LedgerEntryType::PLATFORM_FEE->value,
+            'description' => 'Câmbio',
+        ]);
+        $this->assertDatabaseMissing('ledger_entries', [
+            'customer_id' => $platform->id,
+            'entry_type' => LedgerEntryType::MANUAL_CREDIT->value,
+        ]);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 9532,
+        ]);
+    }
+
+    public function test_fx_purchase_sends_platform_fee_to_sub_master_account(): void
+    {
+        $this->seedWallesterSettings([
+            'wallester.eur.platform_fee_account_id' => self::FEE_ACCOUNT_ID,
+        ]);
+        $this->setFxPercentage('0.01');
+
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, self::LIDL_ACCOUNT_ID);
+        $platform = $this->createPlatformMaster();
+        $feeAccount = $this->createWallesterAccount(
+            $platform,
+            IntegrationAccountStatus::ACTIVE,
+            self::FEE_ACCOUNT_ID,
+            [
+                'is_main' => false,
+                'receiver_name' => 'Sub Conta Master',
+                'product_id' => 'prod_fee_'.$platform->id,
+                'company_id' => 'comp_fee_'.$platform->id,
+            ],
+        );
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 10000,
+            'pending' => 0,
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')
+            ->with(self::LIDL_ACCOUNT_ID, (string) $customer->id)
+            ->andReturn(['available_amount' => 100.00, 'balance' => 100.00]);
+        $gateway->shouldReceive('getAccount')
+            ->with(self::FEE_ACCOUNT_ID, 'platform')
+            ->andReturn(['available_amount' => 1.00, 'balance' => 1.00]);
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(function (array $payload): bool {
+                return $payload['from_account_id'] === self::LIDL_ACCOUNT_ID
+                    && $payload['to_account_id'] === self::FEE_ACCOUNT_ID
+                    && $payload['amount'] === 0.05
+                    && $payload['description'] === 'Câmbio Yoop';
+            }), (string) $customer->id)
+            ->andReturn(['id' => 'pay_fx_platform_fee_sub']);
+
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $this->postJson('/api/webhooks/wallester', $this->lidlAuthorizationPayload())->assertOk();
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'idempotency_key' => 'fx-platform:'.self::LIDL_AUTH_ID.':in',
+            'funding_account_id' => $feeAccount->id,
+            'amount' => 5,
+            'status' => FundingPartnerMovementStatus::Completed->value,
+        ]);
+    }
+
+    public function test_same_currency_purchase_does_not_collect_platform_fx_fee_when_percentage_set(): void
+    {
+        $this->setFxPercentage('0.01');
+        Http::preventStrayRequests();
+
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_same_ccy_pct');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_same_ccy_pct',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => 'txn_same_ccy_pct',
+                'card_id' => 'card_same_ccy_pct',
+                'account_id' => 'wal_same_ccy_pct',
+                'type' => 'payWaveLowValuePurchase',
+                'account_amount' => -12.34,
+                'account_currency_code' => 'EUR',
+                'transaction_amount' => -12.34,
+                'transaction_currency_code' => 'EUR',
+                'merchant_name' => 'Cafe',
+                'response_code' => 'Approved',
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseCount('funding_partner_movements', 1);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'partner_external_id' => 'txn_same_ccy_pct',
+            'platform_fees_amount' => null,
+        ]);
+    }
+
+    public function test_platform_fx_fee_failure_does_not_fail_webhook(): void
+    {
+        $this->setFxPercentage('0.01');
+        Http::preventStrayRequests();
+
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, self::LIDL_ACCOUNT_ID);
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', $this->lidlAuthorizationPayload())->assertOk();
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'funding_account_id' => $account->id,
+            'partner_external_id' => self::LIDL_AUTH_ID,
+            'type' => FundingPartnerMovementType::CardPurchase->value,
+            'amount' => 454,
+            'platform_fees_amount' => null,
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'type' => FundingPartnerMovementType::Fee->value,
+            'amount' => 9,
+            'platform_fees_amount' => null,
+        ]);
+        $this->assertDatabaseCount('funding_partner_movements', 2);
+    }
+
+    private function setFxPercentage(string $value): void
+    {
+        Setting::query()->updateOrCreate(
+            ['key' => 'fx.percentage'],
+            [
+                'label' => 'Percentagem da plataforma',
+                'type' => 'text',
+                'value' => $value,
+            ],
+        );
+    }
+
+    private function createPlatformMaster(): Customer
+    {
+        $platform = Customer::factory()->create([
+            'type' => 'platform',
+            'email' => 'master@yoop.test',
+            'name' => 'Platform',
+        ]);
+
+        $this->createWallesterAccount(
+            $platform,
+            IntegrationAccountStatus::ACTIVE,
+            self::MASTER_ACCOUNT_ID,
+            ['is_main' => true, 'funding_currency' => 'EUR'],
+        );
+
+        return $platform;
     }
 
     /**

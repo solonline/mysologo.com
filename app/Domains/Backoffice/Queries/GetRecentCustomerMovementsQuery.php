@@ -26,6 +26,7 @@ class GetRecentCustomerMovementsQuery
             ]);
 
         $wallesterMovements = FundingPartnerMovement::query()
+            ->customerVisible()
             ->with('wallesterCard')
             ->whereHasMorph(
                 'fundingAccount',

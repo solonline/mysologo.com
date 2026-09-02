@@ -126,11 +126,11 @@ class LedgerAvailableBalanceCalculationTest extends TestCase
         $this->assertSame(120, (int) $balance->pending);
     }
 
-    public function test_platform_revenue_subtracts_fee_reversals(): void
+    public function test_platform_revenue_ignores_purged_stripe_fees(): void
     {
         Cache::flush();
 
-        $platform = Customer::query()->create([
+        Customer::query()->create([
             'name' => 'Platform',
             'email' => 'platform-ledger-calc@yoop.test',
             'username' => 'platform_ledger_calc',
@@ -142,9 +142,8 @@ class LedgerAvailableBalanceCalculationTest extends TestCase
         ]);
         Cache::flush();
         $retail = $this->createRetailCustomer();
-        $ledger = app(LedgerService::class);
 
-        $live = StripeTransaction::query()->create([
+        StripeTransaction::query()->create([
             'customer_id' => $retail->id,
             'type' => TransactionType::TOPUP,
             'payment_method_type' => 'card',
@@ -170,31 +169,6 @@ class LedgerAvailableBalanceCalculationTest extends TestCase
             'status' => 'succeeded',
         ]);
 
-        $ledger->record(
-            customerId: $platform->id,
-            currency: 'EUR',
-            entryType: LedgerEntryType::MANUAL_CREDIT,
-            amount: 11,
-            reference: $live,
-            description: PlatformRevenueService::LEDGER_PLATFORM_FEE_DESCRIPTION_PREFIX.$live->id,
-        );
-        $ledger->record(
-            customerId: $platform->id,
-            currency: 'EUR',
-            entryType: LedgerEntryType::MANUAL_CREDIT,
-            amount: 85,
-            reference: $purged,
-            description: PlatformRevenueService::LEDGER_PLATFORM_FEE_DESCRIPTION_PREFIX.$purged->id,
-        );
-        $ledger->record(
-            customerId: $platform->id,
-            currency: 'EUR',
-            entryType: LedgerEntryType::MANUAL_DEBIT,
-            amount: 85,
-            reference: $purged,
-            description: PlatformRevenueService::LEDGER_PLATFORM_FEE_REVERSAL_PREFIX.$purged->id,
-        );
-
         $purged->delete();
 
         $summary = collect(app(PlatformRevenueService::class)->summarize())
@@ -202,7 +176,6 @@ class LedgerAvailableBalanceCalculationTest extends TestCase
 
         $this->assertNotNull($summary);
         $this->assertSame(11, $summary['accrued_cents']);
-        $this->assertSame(11, $summary['ledger_cents']);
-        $this->assertTrue($summary['ledger_matches_stripe']);
+        $this->assertSame(0, $summary['fx_cents']);
     }
 }

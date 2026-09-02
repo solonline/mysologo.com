@@ -12,4 +12,7 @@ Artisan::command('inspire', function () {
 Schedule::command('stripe:settle-balances')->dailyAt('01:00');
 Schedule::job(new ExpireStaleStripePaymentIntentsJob)->dailyAt('02:00');
 Schedule::command('wallester:sync-card-movements')->twiceDaily(0, 12);
+Schedule::command('wallet:backfill-stripe-fees-to-sub-master')
+    ->everySixHours()
+    ->withoutOverlapping();
 Schedule::command('logs:fix-permissions')->dailyAt('00:01');

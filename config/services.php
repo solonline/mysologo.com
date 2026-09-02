@@ -58,4 +58,11 @@ return [
         'simulate_use_queue' => env('EBURY_SIMULATE_USE_QUEUE', false),
     ],
 
+    'fx' => [
+        'base_url' => env('FX_BASE_URL', 'https://economia.awesomeapi.com.br'),
+        'api_key' => env('FX_API_KEY'),
+        'cache_ttl_seconds' => env('FX_CACHE_TTL', 60),
+        'percentage' => env('FX_PERCENTAGE', ''),
+    ],
+
 ];

@@ -141,12 +141,19 @@ class Customer extends Model
             ->where('is_main', true);
     }
 
+    public function platformWallesterFeeAccounts(): HasMany
+    {
+        return $this->hasMany(CustomerWallesterAccount::class)
+            ->where('is_main', false);
+    }
+
     public function wallesterAccountFor(string $currency): ?CustomerWallesterAccount
     {
         $routingCurrency = app(PlatformMasterCurrencyResolver::class)->resolve($currency);
 
         return $this->wallesterAccounts()
             ->where('funding_currency', $routingCurrency)
+            ->orderByDesc('is_main')
             ->first();
     }
 

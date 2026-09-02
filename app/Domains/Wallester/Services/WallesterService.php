@@ -38,8 +38,11 @@ class WallesterService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function createCardForCustomer(Customer $customer, array $data): CustomerWallesterCard
-    {
+    public function createCardForCustomer(
+        Customer $customer,
+        array $data,
+        bool $allowAdditionalCards = false,
+    ): CustomerWallesterCard {
         $account = $this->wallesterAccountRepository->findByCustomerId($customer->id);
 
         if ($account === null) {
@@ -58,7 +61,9 @@ class WallesterService
             );
         }
 
-        $this->ensureCustomerHasNoCard($account);
+        if (! $allowAdditionalCards) {
+            $this->ensureCustomerHasNoCard($account);
+        }
 
         $card = $this->createCard(
             $this->buildCreateCardPayload($customer, $account, $data),
@@ -144,7 +149,7 @@ class WallesterService
 
         return array_merge($data, [
             'account_id' => $account->wallester_account_id,
-            '3d_secure_settings' => $this->threeDsService->outOfBandSettingsFor($account),
+            '3d_secure_settings' => $this->threeDsService->outOfBandSettingsFor($account, $customer),
             'security' => array_merge([
                 'contactless_enabled' => true,
                 'withdrawal_enabled' => false,

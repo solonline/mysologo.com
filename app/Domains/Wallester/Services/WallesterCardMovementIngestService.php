@@ -10,6 +10,8 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class WallesterCardMovementIngestService
 {
@@ -17,6 +19,7 @@ class WallesterCardMovementIngestService
         protected IntegrationAccountService $integrationAccounts,
         protected FundingPartnerMovementService $movements,
         protected WallesterCardMovementPayloadMapper $payloadMapper,
+        protected WallesterPlatformFxFeeService $platformFxFees,
     ) {}
 
     /**
@@ -65,7 +68,7 @@ class WallesterCardMovementIngestService
 
         $card = $this->resolveCard($payload, $account);
 
-        $this->movements->recordCardMovement(
+        $movement = $this->movements->recordCardMovement(
             account: $account,
             type: $movementType,
             direction: $direction,
@@ -82,6 +85,15 @@ class WallesterCardMovementIngestService
             status: $declined ? FundingPartnerMovementStatus::Failed : FundingPartnerMovementStatus::Completed,
             failureReason: $declined ? $this->declineReason($payload) : null,
         );
+
+        try {
+            $this->platformFxFees->collect($movement, $account);
+        } catch (Throwable $exception) {
+            Log::channel('wallester')->warning('wallester_platform_fx_fee_unhandled', [
+                'movement_id' => $movement->id,
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**

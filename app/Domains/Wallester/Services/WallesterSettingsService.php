@@ -34,6 +34,14 @@ class WallesterSettingsService
         return $this->requiredCurrencySetting($currency, 'platform_master_account_id');
     }
 
+    public function platformFeeAccountId(string $currency): string
+    {
+        $key = 'wallester.'.strtolower($currency).'.platform_fee_account_id';
+        $value = $this->settings->getByKey($key);
+
+        return $value === null ? '' : trim((string) $value);
+    }
+
     public function baseUrl(): string
     {
         return rtrim($this->requiredGlobalSetting('base_url'), '/').'/';

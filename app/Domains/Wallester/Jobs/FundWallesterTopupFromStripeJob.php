@@ -47,14 +47,17 @@ class FundWallesterTopupFromStripeJob implements ShouldQueue
         }
 
         $amountCents = max(0, (int) ($transaction->wallester_funding_net_amount ?? 0));
+        $idempotencyKey = 'stripe_topup:'.$transaction->id;
 
         if ($amountCents <= 0) {
+            $this->collectStripePlatformProfit($movements, $transaction);
+
             return;
         }
 
-        $idempotencyKey = 'stripe_topup:'.$transaction->id;
-
         if ($movements->hasCompletedMovement($idempotencyKey)) {
+            $this->collectStripePlatformProfit($movements, $transaction);
+
             return;
         }
 
@@ -74,6 +77,8 @@ class FundWallesterTopupFromStripeJob implements ShouldQueue
                 idempotencyKey: $idempotencyKey,
                 reference: $transaction,
             );
+
+            $this->collectStripePlatformProfit($movements, $transaction);
         } catch (Throwable $exception) {
             Log::channel('wallester')->error('wallester_topup_from_stripe_failed', [
                 'transaction_id' => $transaction->id,
@@ -82,6 +87,25 @@ class FundWallesterTopupFromStripeJob implements ShouldQueue
 
             throw $exception;
         }
+    }
+
+    private function collectStripePlatformProfit(
+        FundingPartnerMovementService $movements,
+        StripeTransaction $transaction,
+    ): void {
+        $feeCents = (int) $transaction->platform_fee;
+
+        if ($feeCents <= 0) {
+            return;
+        }
+
+        $movements->transferFromMasterToPlatformFees(
+            amountCents: $feeCents,
+            currency: $transaction->currency,
+            description: 'Taxa Yoop',
+            idempotencyKey: 'stripe-platform-fee:'.$transaction->id,
+            reference: $transaction,
+        );
     }
 
     public function failed(?Throwable $exception): void

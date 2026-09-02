@@ -14,6 +14,7 @@ class ListFundingPartnerMovementsQuery
     public function execute(array $filters, int $perPage = 25): LengthAwarePaginator
     {
         $query = FundingPartnerMovement::query()
+            ->customerVisible()
             ->with([
                 'fundingAccount' => function ($morphTo) {
                     $morphTo->morphWith([
@@ -22,6 +23,7 @@ class ListFundingPartnerMovementsQuery
                 },
                 'reference',
                 'wallesterCard',
+                'counterpartyWallesterAccount.customer',
             ])
             ->latest('id');
 

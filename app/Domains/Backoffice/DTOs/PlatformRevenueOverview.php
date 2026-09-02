@@ -9,7 +9,6 @@ readonly class PlatformRevenueOverview
      */
     public function __construct(
         public array $currencies,
-        public bool $ledgerMatchesStripe,
     ) {}
 
     public function primary(): ?PlatformRevenueCurrencySummary

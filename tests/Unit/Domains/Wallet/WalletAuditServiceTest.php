@@ -23,7 +23,7 @@ class WalletAuditServiceTest extends TestCase
         Cache::flush();
     }
 
-    public function test_audit_reports_platform_revenue_ledger_mismatch(): void
+    public function test_audit_does_not_flag_missing_platform_fee_wallet_credits(): void
     {
         $this->createPlatformCustomer();
         $retail = $this->createRetailCustomer();
@@ -42,31 +42,6 @@ class WalletAuditServiceTest extends TestCase
         ]);
 
         $report = app(WalletAuditService::class)->run();
-
-        $codes = array_map(fn ($finding) => $finding->code, $report->findings);
-
-        $this->assertContains('PLATFORM_REVENUE_LEDGER_MISMATCH', $codes);
-    }
-
-    public function test_audit_skips_platform_revenue_check_when_customer_filter_is_set(): void
-    {
-        $this->createPlatformCustomer();
-        $retail = $this->createRetailCustomer();
-
-        StripeTransaction::query()->create([
-            'customer_id' => $retail->id,
-            'type' => TransactionType::TOPUP,
-            'payment_method_type' => 'card',
-            'direction' => 'credit',
-            'amount' => 1_000,
-            'stripe_fee' => 280,
-            'platform_fee' => 10,
-            'net_amount' => 710,
-            'currency' => 'EUR',
-            'status' => 'succeeded',
-        ]);
-
-        $report = app(WalletAuditService::class)->run(customerId: $retail->id);
 
         $codes = array_map(fn ($finding) => $finding->code, $report->findings);
 

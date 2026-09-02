@@ -58,7 +58,7 @@ class WallesterCardMovementPayloadMapper
         $originalCurrency = $payload['transaction_currency_code'] ?? null;
 
         return [
-            'amount_cents' => $this->wallesterDriver->absoluteAmountToCents($accountAmount) + ($feesCents ?? 0),
+            'amount_cents' => $this->wallesterDriver->absoluteAmountToCents($accountAmount),
             'currency' => strtoupper((string) ($payload['account_currency_code'] ?? $payload['currency_code'] ?? 'EUR')),
             'fees_amount_cents' => $feesCents,
             'original_amount_cents' => $this->optionalCents($payload['transaction_amount'] ?? null),

@@ -25,6 +25,7 @@ class FundingPartnerMovementResource extends JsonResource
             'original_amount' => $this->original_amount,
             'original_currency' => $this->original_currency,
             'fees_amount' => $this->fees_amount,
+            'platform_fees_amount' => $this->platform_fees_amount,
             'transfer_group_id' => $this->transfer_group_id,
             'counterparty_external_account_id' => $this->counterparty_external_account_id,
             'partner_external_id' => $this->partner_external_id,

@@ -2,6 +2,7 @@
 
 use App\Domains\Customer\Controllers\CustomerController;
 use App\Domains\Customer\Controllers\CustomerPhoneController;
+use App\Domains\Customer\Controllers\NewsController;
 use App\Domains\Customer\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,6 +19,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/create-corporate-responsible', [CustomerController::class, 'createResponsible'])->name('customer.create-responsible');
     Route::post('/send-validation-email', [CustomerController::class, 'sendValidationEmail'])->name('customer.send-validation-email');
     Route::post('/upload-avatar', [CustomerController::class, 'uploadAvatar'])->name('customer.upload-avatar');
+    Route::get('/news', [NewsController::class, 'index'])->name('customer.news.index');
+    Route::get('/news/{news}', [NewsController::class, 'show'])->name('customer.news.show');
     Route::get('/favorites', [CustomerController::class, 'favorites'])->name('customer.favorites');
     Route::get('/find/{username}', [CustomerController::class, 'findByUsername'])
         ->where('username', '[a-zA-Z0-9_]+')

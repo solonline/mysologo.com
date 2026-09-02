@@ -13,6 +13,7 @@ class GetWallesterFundingOverviewQuery
     /**
      * @return array{
      *     mainAccounts: Collection<int, CustomerWallesterAccount>,
+     *     accountsAvailableByCurrency: Collection<string, int>,
      *     topupFundingCounts: array{awaiting_liquidity: int, failed: int, pending: int}
      * }
      */
@@ -23,6 +24,7 @@ class GetWallesterFundingOverviewQuery
                 ->where('is_main', true)
                 ->orderBy('funding_currency')
                 ->get(['id', 'funding_currency', 'currency_code', 'wallester_account_id', 'available_amount', 'balance']),
+            'accountsAvailableByCurrency' => $this->accountsAvailableByCurrency(),
             'topupFundingCounts' => [
                 'awaiting_liquidity' => StripeTransaction::query()
                     ->where('type', TransactionType::TOPUP->value)
@@ -41,5 +43,27 @@ class GetWallesterFundingOverviewQuery
                     ->count(),
             ],
         ];
+    }
+
+    /**
+     * Soma o disponível das contas Wallester, excluindo as contas main.
+     *
+     * @return Collection<string, int>
+     */
+    private function accountsAvailableByCurrency(): Collection
+    {
+        return CustomerWallesterAccount::query()
+            ->where('is_main', false)
+            ->get(['funding_currency', 'currency_code', 'available_amount'])
+            ->groupBy(fn (CustomerWallesterAccount $account): string => $this->accountCurrency($account))
+            ->map(fn (Collection $accounts): int => (int) $accounts->sum(
+                fn (CustomerWallesterAccount $account): int => (int) ($account->available_amount ?? 0)
+            ))
+            ->sortKeys();
+    }
+
+    private function accountCurrency(CustomerWallesterAccount $account): string
+    {
+        return strtoupper((string) ($account->funding_currency ?: $account->currency_code ?: 'EUR'));
     }
 }

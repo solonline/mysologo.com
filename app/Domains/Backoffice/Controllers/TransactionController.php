@@ -69,7 +69,6 @@ class TransactionController extends Controller
             'transactionTypes' => [
                 TransactionType::TOPUP,
                 TransactionType::MERCHANT_PAYMENT,
-                TransactionType::P2P,
                 TransactionType::CARD,
                 TransactionType::BANK_TRANSFER,
             ],

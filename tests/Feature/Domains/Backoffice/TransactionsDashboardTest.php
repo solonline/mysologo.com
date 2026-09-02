@@ -8,6 +8,7 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\TransactionType;
+use App\Models\Customer;
 use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
 use App\Models\User;
@@ -101,11 +102,12 @@ class TransactionsDashboardTest extends TestCase
             'external_account_id' => $account->wallester_account_id,
             'direction' => FundingPartnerMovementDirection::Out,
             'type' => FundingPartnerMovementType::CardPurchase,
-            'amount' => 463,
+            'amount' => 454,
             'currency' => 'EUR',
             'original_amount' => 388,
             'original_currency' => 'GBP',
             'fees_amount' => 9,
+            'platform_fees_amount' => 5,
             'status' => FundingPartnerMovementStatus::Completed,
             'source' => FundingPartnerMovementSource::Webhook,
             'idempotency_key' => 'card:dashboard-fx:out',
@@ -113,14 +115,81 @@ class TransactionsDashboardTest extends TestCase
             'description' => 'LidlGB',
         ]);
 
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::Fee,
+            'amount' => 14,
+            'currency' => 'EUR',
+            'fees_amount' => 9,
+            'platform_fees_amount' => 5,
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Webhook,
+            'idempotency_key' => 'fx-fees:dashboard-fx',
+            'partner_external_id' => 'fx-fees:dashboard-fx',
+            'description' => 'Câmbio',
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 5,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'fx-platform:dashboard-fx:out',
+            'description' => 'Platform FX fee dashboard-fx',
+        ]);
+
+        $platform = Customer::factory()->create([
+            'type' => 'platform',
+            'name' => 'Yoop Platform',
+        ]);
+        $master = $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'master-fx-dashboard', [
+            'is_main' => true,
+        ]);
+
+        $purchase = FundingPartnerMovement::query()
+            ->where('idempotency_key', 'card:dashboard-fx:out')
+            ->firstOrFail();
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $master::class,
+            'funding_account_id' => $master->id,
+            'external_account_id' => $master->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::In,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 5,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'fx-platform:dashboard-fx:in',
+            'description' => 'Platform FX fee dashboard-fx',
+            'reference_type' => $purchase->getMorphClass(),
+            'reference_id' => $purchase->id,
+        ]);
+
         $this->actingAs($user, 'web')
             ->get(route('dashboard.transactions', ['tab' => 'wallester']))
             ->assertOk()
             ->assertSee('LidlGB')
-            ->assertSee('4,63')
+            ->assertSee('4,54')
             ->assertSee('3,88 GBP')
-            ->assertSee('câmbio 0,09 EUR')
-            ->assertSee('Compra');
+            ->assertSee('0,09 EUR')
+            ->assertSee('0,05 EUR')
+            ->assertSee('0,14')
+            ->assertSee('Câmbio')
+            ->assertSee('Câmbio Yoop')
+            ->assertSee('Compra')
+            ->assertSee('Yoop Platform');
     }
 
     public function test_guest_cannot_access_transactions_page(): void
@@ -235,6 +304,108 @@ class TransactionsDashboardTest extends TestCase
             ->assertSee('Venda merchant filtro')
             ->assertSee('Aguarda payout Stripe')
             ->assertDontSee('Topup nao deve aparecer');
+    }
+
+    public function test_stripe_tab_excludes_p2p_which_appears_on_wallester_tab(): void
+    {
+        $user = $this->userWithPermission('transactions.view');
+        $customer = $this->createRetailCustomer(['name' => 'Cliente P2P Dashboard']);
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal-p2p-dashboard');
+
+        StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::P2P,
+            'payment_method_type' => 'p2p',
+            'direction' => 'debit',
+            'amount' => 2_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 2_000,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'P2P transfer dashboard nao deve aparecer na stripe',
+        ]);
+
+        StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'card',
+            'direction' => 'credit',
+            'amount' => 5_000,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 5_000,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'Top-up deve aparecer na stripe',
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 2_000,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'p2p:dashboard-test:out',
+            'description' => 'P2P transfer movimento wallester',
+        ]);
+
+        $this->actingAs($user, 'web')
+            ->get(route('dashboard.transactions', ['tab' => 'stripe']))
+            ->assertOk()
+            ->assertSee('Top-up deve aparecer na stripe')
+            ->assertDontSee('P2P transfer dashboard nao deve aparecer na stripe')
+            ->assertDontSee('>P2P</option>', false);
+
+        $this->actingAs($user, 'web')
+            ->get(route('dashboard.transactions', ['tab' => 'wallester']))
+            ->assertOk()
+            ->assertSee('P2P transfer movimento wallester')
+            ->assertSee('Transferência');
+    }
+
+    public function test_wallester_details_modal_shows_counterparty_username(): void
+    {
+        $user = $this->userWithPermission('transactions.view');
+        $sender = $this->createRetailCustomer([
+            'name' => 'Remetente P2P',
+            'username' => 'remetente_p2p',
+        ]);
+        $recipient = $this->createRetailCustomer([
+            'name' => 'Destinatario P2P',
+            'username' => 'destinatario_p2p',
+        ]);
+        $senderAccount = $this->createWallesterAccount($sender, IntegrationAccountStatus::ACTIVE, 'wal-p2p-sender');
+        $recipientAccount = $this->createWallesterAccount($recipient, IntegrationAccountStatus::ACTIVE, 'wal-p2p-recipient');
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $senderAccount::class,
+            'funding_account_id' => $senderAccount->id,
+            'external_account_id' => $senderAccount->wallester_account_id,
+            'counterparty_external_account_id' => $recipientAccount->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::Out,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 2_000,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'p2p:counterparty-username:out',
+            'description' => 'P2P com contraparte',
+        ]);
+
+        $this->actingAs($user, 'web')
+            ->get(route('dashboard.transactions', ['tab' => 'wallester']))
+            ->assertOk()
+            ->assertSee('P2P com contraparte')
+            ->assertSee('@destinatario_p2p')
+            ->assertSee('Destinatario P2P')
+            ->assertSee('wal-p2p-recipient');
     }
 
     private function userWithPermission(string $permission): User

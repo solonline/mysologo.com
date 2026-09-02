@@ -45,17 +45,54 @@ class Wallester3dsChallengeTest extends TestCase
 
     public function test_out_of_band_settings_use_wallester_account_uuid(): void
     {
-        $customer = $this->createRetailCustomer();
+        $customer = $this->createRetailCustomer([
+            'email' => 'mario@example.com',
+            'phone' => '+351 912 345 678',
+        ]);
         $account = $this->createWallesterAccount($customer);
 
-        $settings = app(Wallester3dsService::class)->outOfBandSettingsFor($account);
+        $settings = app(Wallester3dsService::class)->outOfBandSettingsFor($account, $customer);
 
         $this->assertTrue($settings['out_of_band_enabled']);
         $this->assertSame($account->wallester_oob_id, $settings['out_of_band_id']);
+        $this->assertSame('mario@example.com', $settings['email']);
+        $this->assertSame('+351912345678', $settings['mobile']);
         $this->assertMatchesRegularExpression(
             '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
             (string) $account->wallester_oob_id,
         );
+    }
+
+    public function test_out_of_band_mobile_normalizes_digits_only_and_international_prefix(): void
+    {
+        $digitsOnly = $this->createRetailCustomer(['phone' => '351912345678']);
+        $with00 = $this->createRetailCustomer(['phone' => '00351 912 345 678']);
+
+        $this->assertSame(
+            '+351912345678',
+            app(Wallester3dsService::class)->outOfBandSettingsFor(
+                $this->createWallesterAccount($digitsOnly),
+                $digitsOnly,
+            )['mobile'],
+        );
+        $this->assertSame(
+            '+351912345678',
+            app(Wallester3dsService::class)->outOfBandSettingsFor(
+                $this->createWallesterAccount($with00),
+                $with00,
+            )['mobile'],
+        );
+    }
+
+    public function test_out_of_band_settings_require_a_valid_phone(): void
+    {
+        $customer = $this->createRetailCustomer(['phone' => '']);
+        $account = $this->createWallesterAccount($customer);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Customer phone must be a valid number for Wallester 3DS');
+
+        app(Wallester3dsService::class)->outOfBandSettingsFor($account, $customer);
     }
 
     private function createActiveCustomer()

@@ -9,6 +9,8 @@ class SettingsSeeder extends Seeder
 {
     private const DEFAULT_WALLESTER_MASTER_EUR = '75d92dc4-6de9-4580-8b62-3cbd3513af56';
 
+    private const DEFAULT_WALLESTER_FEE_EUR = '626c80a3-f8e7-4627-8bcf-ca73f9944abf';
+
     public function run(): void
     {
         $settings = [
@@ -90,11 +92,18 @@ class SettingsSeeder extends Seeder
             ['key' => 'wallester.eur.private_key',                 'label' => 'Private Key (PEM)',           'type' => 'textarea', 'value' => env('WALLESTER_PRIVATE_KEY', '')],
             ['key' => 'wallester.eur.product_code',                'label' => 'Product Code',                'type' => 'text',     'value' => env('WALLESTER_PRODUCT_CODE', '')],
             ['key' => 'wallester.eur.platform_master_account_id',  'label' => 'Platform Master Account ID',  'type' => 'text',     'value' => env('WALLESTER_PLATFORM_MASTER_EUR', env('WALLESTER_PLATFORM_MASTER_ACCOUNT_ID', self::DEFAULT_WALLESTER_MASTER_EUR))],
+            ['key' => 'wallester.eur.platform_fee_account_id',     'label' => 'Sub Conta Master (lucro)',    'type' => 'text',     'value' => env('WALLESTER_PLATFORM_FEE_EUR', self::DEFAULT_WALLESTER_FEE_EUR)],
             // Wallester — USD
             ['key' => 'wallester.usd.api_key',                     'label' => 'API Key',                     'type' => 'secret',   'value' => env('WALLESTER_USD_API_KEY', '')],
             ['key' => 'wallester.usd.private_key',                 'label' => 'Private Key (PEM)',           'type' => 'textarea', 'value' => env('WALLESTER_USD_PRIVATE_KEY', '')],
             ['key' => 'wallester.usd.product_code',                'label' => 'Product Code',                'type' => 'text',     'value' => env('WALLESTER_USD_PRODUCT_CODE', '')],
             ['key' => 'wallester.usd.platform_master_account_id',  'label' => 'Platform Master Account ID',  'type' => 'text',     'value' => env('WALLESTER_PLATFORM_MASTER_USD', '')],
+            ['key' => 'wallester.usd.platform_fee_account_id',     'label' => 'Sub Conta Master USD (taxas)', 'type' => 'text',    'value' => env('WALLESTER_PLATFORM_FEE_USD', '')],
+            // Câmbio (AwesomeAPI hoje)
+            ['key' => 'fx.base_url',           'label' => 'URL Base',                      'type' => 'url',    'value' => env('FX_BASE_URL', 'https://economia.awesomeapi.com.br')],
+            ['key' => 'fx.api_key',            'label' => 'API Key (x-api-key)',           'type' => 'secret', 'value' => env('FX_API_KEY', '')],
+            ['key' => 'fx.cache_ttl_seconds',  'label' => 'Cache TTL (segundos)',          'type' => 'number', 'value' => (string) env('FX_CACHE_TTL', '60')],
+            ['key' => 'fx.percentage',         'label' => 'Percentagem da plataforma',    'type' => 'text',    'value' => env('FX_PERCENTAGE', '')],
         ];
 
         foreach ($settings as $setting) {

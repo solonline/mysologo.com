@@ -5,6 +5,7 @@ namespace App\Domains\Backoffice\Controllers;
 use App\Domains\Backoffice\Actions\CancelCustomerBalanceAdjustmentAction;
 use App\Domains\Backoffice\Actions\ConfirmCustomerBalanceAdjustmentAction;
 use App\Domains\Backoffice\Actions\CreateCustomerFromBackofficeAction;
+use App\Domains\Backoffice\Actions\CreateCustomerWallesterCardAction;
 use App\Domains\Backoffice\Actions\RequestCustomerBalanceAdjustmentAction;
 use App\Domains\Backoffice\Actions\ResendCustomerBalanceAdjustmentOtpAction;
 use App\Domains\Backoffice\Actions\RetryCustomerProvisioningAction;
@@ -46,6 +47,7 @@ class CustomerController extends Controller
         protected UpdateCustomerFromBackofficeAction $updateCustomer,
         protected RetryCustomerProvisioningAction $retryProvisioning,
         protected RetryStripeFundingAction $retryStripeFunding,
+        protected CreateCustomerWallesterCardAction $createWallesterCard,
         protected CustomerPhoneChangeService $phoneChange,
         protected RequestCustomerBalanceAdjustmentAction $requestBalanceAdjustment,
         protected ConfirmCustomerBalanceAdjustmentAction $confirmBalanceAdjustment,
@@ -195,6 +197,21 @@ class CustomerController extends Controller
         $this->retryProvisioning->execute($customer);
 
         return back()->with('success', 'Provisioning reenviado para a fila.');
+    }
+
+    public function storeWallesterCard(Customer $customer)
+    {
+        try {
+            $this->createWallesterCard->execute($customer);
+        } catch (ValidationException $exception) {
+            return back()->with('error', collect($exception->errors())->flatten()->first());
+        } catch (ApiException $exception) {
+            return back()->with('error', $exception->getMessage());
+        } catch (\Throwable $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'Cartão virtual criado com sucesso.');
     }
 
     public function retryStripeFunding(Customer $customer)

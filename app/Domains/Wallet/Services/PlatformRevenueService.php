@@ -2,19 +2,22 @@
 
 namespace App\Domains\Wallet\Services;
 
-use App\Domains\Wallet\Enums\LedgerEntryType;
-use App\Models\Customer;
-use App\Models\LedgerEntry;
+use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
+use App\Domains\Wallet\Enums\FundingPartnerMovementType;
+use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 
 class PlatformRevenueService
 {
     public const LEDGER_PLATFORM_FEE_DESCRIPTION_PREFIX = 'Platform fee from transaction #';
 
     public const LEDGER_PLATFORM_FEE_REVERSAL_PREFIX = 'Platform fee reversal #';
+
+    public function __construct(
+        protected TopupWallesterFundingPolicy $fundingPolicy,
+    ) {}
 
     /**
      * @return list<array{
@@ -25,51 +28,35 @@ class PlatformRevenueService
      *     month_accrued_cents: int,
      *     month_settled_cents: int,
      *     month_pending_cents: int,
-     *     ledger_cents: int,
+     *     fx_cents: int,
+     *     month_fx_cents: int,
      *     transaction_count: int,
+     *     fx_transaction_count: int,
      *     settled_transaction_count: int,
      *     pending_transaction_count: int,
-     *     ledger_matches_stripe: bool,
-     *     monthly_breakdown: list<array{month: string, amount_cents: int, settled_cents: int, pending_cents: int}>
+     *     monthly_breakdown: list<array{month: string, amount_cents: int, settled_cents: int, pending_cents: int, fx_cents: int}>
      * }>
      */
     public function summarize(?string $from = null, ?string $to = null): array
     {
-        $platformCustomer = $this->resolvePlatformCustomer();
-
-        if ($platformCustomer === null) {
-            return [];
-        }
-
         $monthStart = now()->startOfMonth();
-        $currencies = $this->resolveCurrencies($platformCustomer->id, $from, $to);
         $summaries = [];
 
-        foreach ($currencies as $currency) {
-            $accruedCents = $this->sumStripePlatformFees($currency, $from, $to);
-            $settledCents = $this->sumStripePlatformFees($currency, $from, $to, settled: true);
-            $pendingCents = $this->sumStripePlatformFees($currency, $from, $to, settled: false);
-            $monthAccruedCents = $this->sumStripePlatformFees($currency, $monthStart->toDateString(), $to);
-            $monthSettledCents = $this->sumStripePlatformFees($currency, $monthStart->toDateString(), $to, settled: true);
-            $monthPendingCents = $this->sumStripePlatformFees($currency, $monthStart->toDateString(), $to, settled: false);
-            $ledgerCents = $this->sumLedgerPlatformFees($platformCustomer->id, $currency, $from, $to);
-            $transactionCount = $this->countStripePlatformFeeTransactions($currency, $from, $to);
-            $settledTransactionCount = $this->countStripePlatformFeeTransactions($currency, $from, $to, settled: true);
-            $pendingTransactionCount = $this->countStripePlatformFeeTransactions($currency, $from, $to, settled: false);
-
+        foreach ($this->resolveCurrencies($from, $to) as $currency) {
             $summaries[] = [
                 'currency' => $currency,
-                'accrued_cents' => $accruedCents,
-                'settled_cents' => $settledCents,
-                'pending_cents' => $pendingCents,
-                'month_accrued_cents' => $monthAccruedCents,
-                'month_settled_cents' => $monthSettledCents,
-                'month_pending_cents' => $monthPendingCents,
-                'ledger_cents' => $ledgerCents,
-                'transaction_count' => $transactionCount,
-                'settled_transaction_count' => $settledTransactionCount,
-                'pending_transaction_count' => $pendingTransactionCount,
-                'ledger_matches_stripe' => $accruedCents === $ledgerCents,
+                'accrued_cents' => $this->sumStripePlatformFees($currency, $from, $to),
+                'settled_cents' => $this->sumStripePlatformFees($currency, $from, $to, settled: true),
+                'pending_cents' => $this->sumStripePlatformFees($currency, $from, $to, settled: false),
+                'month_accrued_cents' => $this->sumStripePlatformFees($currency, $monthStart->toDateString(), $to),
+                'month_settled_cents' => $this->sumStripePlatformFees($currency, $monthStart->toDateString(), $to, settled: true),
+                'month_pending_cents' => $this->sumStripePlatformFees($currency, $monthStart->toDateString(), $to, settled: false),
+                'fx_cents' => $this->sumFxPlatformFees($currency, $from, $to),
+                'month_fx_cents' => $this->sumFxPlatformFees($currency, $monthStart->toDateString(), $to),
+                'transaction_count' => $this->countStripePlatformFeeTransactions($currency, $from, $to),
+                'fx_transaction_count' => (int) $this->fxPlatformFeesQuery($currency, $from, $to)->count(),
+                'settled_transaction_count' => $this->countStripePlatformFeeTransactions($currency, $from, $to, settled: true),
+                'pending_transaction_count' => $this->countStripePlatformFeeTransactions($currency, $from, $to, settled: false),
                 'monthly_breakdown' => $this->monthlyBreakdown($currency, $from, $to),
             ];
         }
@@ -77,48 +64,27 @@ class PlatformRevenueService
         return $summaries;
     }
 
-    public function ledgerMatchesStripeGlobally(?string $from = null, ?string $to = null): bool
-    {
-        foreach ($this->summarize($from, $to) as $row) {
-            if (! $row['ledger_matches_stripe']) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function resolvePlatformCustomer(): ?Customer
-    {
-        return Cache::rememberForever('platform_customer', fn () => Customer::query()
-            ->where('type', 'platform')
-            ->first());
-    }
-
     /**
      * @return list<string>
      */
-    private function resolveCurrencies(int $platformCustomerId, ?string $from, ?string $to): array
+    private function resolveCurrencies(?string $from, ?string $to): array
     {
-        $fromStripe = StripeTransaction::query()
-            ->where('status', 'succeeded')
-            ->where('platform_fee', '>', 0)
-            ->when($from !== null, fn ($q) => $q->whereDate('created_at', '>=', $from))
-            ->when($to !== null, fn ($q) => $q->whereDate('created_at', '<=', $to))
+        $fromStripe = $this->fundingPolicy->constrainAfterAccountingCutoff(
+            StripeTransaction::query()
+                ->where('status', 'succeeded')
+                ->where('platform_fee', '>', 0)
+                ->when($from !== null, fn ($q) => $q->whereDate('created_at', '>=', $from))
+                ->when($to !== null, fn ($q) => $q->whereDate('created_at', '<=', $to))
+        )
             ->distinct()
             ->pluck('currency');
 
-        $fromLedger = LedgerEntry::query()
-            ->where('customer_id', $platformCustomerId)
-            ->where('entry_type', LedgerEntryType::MANUAL_CREDIT->value)
-            ->where('description', 'like', self::LEDGER_PLATFORM_FEE_DESCRIPTION_PREFIX.'%')
-            ->when($from !== null, fn ($q) => $q->whereDate('created_at', '>=', $from))
-            ->when($to !== null, fn ($q) => $q->whereDate('created_at', '<=', $to))
+        $fromFx = $this->fxPlatformFeesQuery(null, $from, $to)
             ->distinct()
             ->pluck('currency');
 
         return $fromStripe
-            ->merge($fromLedger)
+            ->merge($fromFx)
             ->map(fn (string $currency) => strtoupper($currency))
             ->unique()
             ->sort()
@@ -136,27 +102,20 @@ class PlatformRevenueService
             ->sum('platform_fee');
     }
 
-    private function sumLedgerPlatformFees(int $platformCustomerId, string $currency, ?string $from, ?string $to): int
+    private function sumFxPlatformFees(string $currency, ?string $from, ?string $to): int
     {
-        $credits = (int) LedgerEntry::query()
-            ->where('customer_id', $platformCustomerId)
-            ->where('currency', strtoupper($currency))
-            ->where('entry_type', LedgerEntryType::MANUAL_CREDIT->value)
-            ->where('description', 'like', self::LEDGER_PLATFORM_FEE_DESCRIPTION_PREFIX.'%')
-            ->when($from !== null, fn ($q) => $q->whereDate('created_at', '>=', $from))
-            ->when($to !== null, fn ($q) => $q->whereDate('created_at', '<=', $to))
-            ->sum('amount');
+        return (int) $this->fxPlatformFeesQuery($currency, $from, $to)->sum('platform_fees_amount');
+    }
 
-        $reversals = (int) LedgerEntry::query()
-            ->where('customer_id', $platformCustomerId)
-            ->where('currency', strtoupper($currency))
-            ->where('entry_type', LedgerEntryType::MANUAL_DEBIT->value)
-            ->where('description', 'like', self::LEDGER_PLATFORM_FEE_REVERSAL_PREFIX.'%')
+    private function fxPlatformFeesQuery(?string $currency, ?string $from, ?string $to): Builder
+    {
+        return FundingPartnerMovement::query()
+            ->where('type', FundingPartnerMovementType::CardPurchase)
+            ->where('status', FundingPartnerMovementStatus::Completed)
+            ->where('platform_fees_amount', '>', 0)
+            ->when($currency !== null, fn ($q) => $q->where('currency', strtoupper($currency)))
             ->when($from !== null, fn ($q) => $q->whereDate('created_at', '>=', $from))
-            ->when($to !== null, fn ($q) => $q->whereDate('created_at', '<=', $to))
-            ->sum('amount');
-
-        return $credits - $reversals;
+            ->when($to !== null, fn ($q) => $q->whereDate('created_at', '<=', $to));
     }
 
     private function countStripePlatformFeeTransactions(
@@ -174,18 +133,20 @@ class PlatformRevenueService
         ?string $to,
         ?bool $settled = null,
     ): Builder {
-        return StripeTransaction::query()
-            ->where('status', 'succeeded')
-            ->where('platform_fee', '>', 0)
-            ->where('currency', strtoupper($currency))
-            ->when($from !== null, fn ($q) => $q->whereDate('created_at', '>=', $from))
-            ->when($to !== null, fn ($q) => $q->whereDate('created_at', '<=', $to))
-            ->when($settled === true, fn ($q) => $q->whereNotNull('balance_settled_at'))
-            ->when($settled === false, fn ($q) => $q->whereNull('balance_settled_at'));
+        return $this->fundingPolicy->constrainAfterAccountingCutoff(
+            StripeTransaction::query()
+                ->where('status', 'succeeded')
+                ->where('platform_fee', '>', 0)
+                ->where('currency', strtoupper($currency))
+                ->when($from !== null, fn ($q) => $q->whereDate('created_at', '>=', $from))
+                ->when($to !== null, fn ($q) => $q->whereDate('created_at', '<=', $to))
+                ->when($settled === true, fn ($q) => $q->whereNotNull('balance_settled_at'))
+                ->when($settled === false, fn ($q) => $q->whereNull('balance_settled_at'))
+        );
     }
 
     /**
-     * @return list<array{month: string, amount_cents: int, settled_cents: int, pending_cents: int}>
+     * @return list<array{month: string, amount_cents: int, settled_cents: int, pending_cents: int, fx_cents: int}>
      */
     private function monthlyBreakdown(string $currency, ?string $from, ?string $to): array
     {
@@ -195,21 +156,25 @@ class PlatformRevenueService
             : $rangeEnd->copy()->subMonths(5)->startOfMonth();
 
         $totalsByMonth = [];
+        $emptyBucket = static fn (): array => [
+            'amount_cents' => 0,
+            'settled_cents' => 0,
+            'pending_cents' => 0,
+            'fx_cents' => 0,
+        ];
 
-        StripeTransaction::query()
-            ->where('status', 'succeeded')
-            ->where('platform_fee', '>', 0)
-            ->where('currency', strtoupper($currency))
-            ->whereDate('created_at', '>=', $rangeStart->toDateString())
-            ->whereDate('created_at', '<=', $rangeEnd->toDateString())
+        $this->fundingPolicy->constrainAfterAccountingCutoff(
+            StripeTransaction::query()
+                ->where('status', 'succeeded')
+                ->where('platform_fee', '>', 0)
+                ->where('currency', strtoupper($currency))
+                ->whereDate('created_at', '>=', $rangeStart->toDateString())
+                ->whereDate('created_at', '<=', $rangeEnd->toDateString())
+        )
             ->get(['platform_fee', 'created_at', 'balance_settled_at'])
-            ->each(function (StripeTransaction $transaction) use (&$totalsByMonth): void {
+            ->each(function (StripeTransaction $transaction) use (&$totalsByMonth, $emptyBucket): void {
                 $key = $transaction->created_at->format('Y-m');
-                $bucket = $totalsByMonth[$key] ??= [
-                    'amount_cents' => 0,
-                    'settled_cents' => 0,
-                    'pending_cents' => 0,
-                ];
+                $bucket = $totalsByMonth[$key] ??= $emptyBucket();
                 $fee = (int) $transaction->platform_fee;
                 $bucket['amount_cents'] += $fee;
                 if ($transaction->balance_settled_at !== null) {
@@ -220,21 +185,29 @@ class PlatformRevenueService
                 $totalsByMonth[$key] = $bucket;
             });
 
+        $this->fxPlatformFeesQuery($currency, $rangeStart->toDateString(), $rangeEnd->toDateString())
+            ->get(['platform_fees_amount', 'created_at'])
+            ->each(function (FundingPartnerMovement $movement) use (&$totalsByMonth, $emptyBucket): void {
+                $key = $movement->created_at->format('Y-m');
+                $bucket = $totalsByMonth[$key] ??= $emptyBucket();
+                $fee = (int) $movement->platform_fees_amount;
+                $bucket['amount_cents'] += $fee;
+                $bucket['fx_cents'] += $fee;
+                $totalsByMonth[$key] = $bucket;
+            });
+
         $breakdown = [];
         $cursor = $rangeStart->copy();
 
         while ($cursor <= $rangeEnd) {
             $key = $cursor->format('Y-m');
-            $bucket = $totalsByMonth[$key] ?? [
-                'amount_cents' => 0,
-                'settled_cents' => 0,
-                'pending_cents' => 0,
-            ];
+            $bucket = $totalsByMonth[$key] ?? $emptyBucket();
             $breakdown[] = [
                 'month' => $key,
                 'amount_cents' => (int) $bucket['amount_cents'],
                 'settled_cents' => (int) $bucket['settled_cents'],
                 'pending_cents' => (int) $bucket['pending_cents'],
+                'fx_cents' => (int) $bucket['fx_cents'],
             ];
             $cursor->addMonth();
         }

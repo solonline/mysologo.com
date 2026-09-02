@@ -51,7 +51,7 @@
         'card_purchase' => 'Compra cartão',
         'card_refund' => 'Reembolso cartão',
         'inbound_payment' => 'Entrada',
-        'fee' => 'Taxa',
+        'fee' => 'Câmbio',
     ];
 
     $movementStatusLabels = [
@@ -428,16 +428,32 @@
                     $account = $movement->fundingAccount;
                     $customer = $account instanceof \App\Models\CustomerWallesterAccount ? $account->customer : null;
                     $direction = $movement->direction?->value;
+                    $movementTypeLabel = $movement->displayTypeLabel();
+                    $movementDescription = $movement->displayDescription();
                     $isIn = $direction === 'in';
                     $card = $movement->wallesterCard;
                     $fxDetailLabel = $movement->fxDetailLabel();
+                    $counterpartyCustomer = $movement->counterpartyWallesterAccount?->customer;
+                    $counterpartyHandle = $counterpartyCustomer?->username ? '@'.$counterpartyCustomer->username : null;
+                    $counterpartyLabel = $counterpartyCustomer
+                        ? trim(($counterpartyHandle ?: '').($counterpartyHandle && $counterpartyCustomer->name ? ' · ' : '').($counterpartyCustomer->name ?? ''))
+                        : $movement->counterparty_external_account_id;
+                    $counterpartyField = $counterpartyLabel
+                        ? array_filter([
+                            'label' => 'Contraparte',
+                            'value' => $counterpartyLabel,
+                            'link' => $counterpartyCustomer ? route('dashboard.customers.show', $counterpartyCustomer) : null,
+                            'mono' => $counterpartyCustomer ? null : true,
+                            'full' => true,
+                        ])
+                        : null;
 
                     $wallesterFields = array_values(array_filter([
                         ['label' => 'Data', 'value' => $movement->created_at?->format('d/m/Y H:i')],
                         $customer ? ['label' => 'Cliente', 'value' => $customer->name, 'link' => route('dashboard.customers.show', $customer)] : null,
                         $customer?->email ? ['label' => 'Email', 'value' => $customer->email] : null,
                         ['label' => 'Conta Wallester', 'value' => $movement->external_account_id, 'mono' => true, 'full' => true],
-                        ['label' => 'Tipo', 'value' => $movementTypeLabels[$movement->type?->value ?? ''] ?? ($movement->type?->value ?? '—')],
+                        ['label' => 'Tipo', 'value' => $movementTypeLabel],
                         ['label' => 'Direção', 'value' => strtoupper($direction ?? '—')],
                         ['label' => 'Status', 'value' => $movementStatusLabels[$movement->status?->value ?? ''] ?? ($movement->status?->value ?? '—')],
                         ['label' => 'Origem', 'value' => $movementSourceLabels[$movement->source?->value ?? ''] ?? ($movement->source?->value ?? '—')],
@@ -445,14 +461,20 @@
                         $movement->partner_external_id ? ['label' => 'ID parceiro', 'value' => $movement->partner_external_id, 'mono' => true, 'full' => true] : null,
                         $movement->idempotency_key ? ['label' => 'Idempotency', 'value' => $movement->idempotency_key, 'mono' => true, 'full' => true] : null,
                         $movement->transfer_group_id ? ['label' => 'Transfer group', 'value' => $movement->transfer_group_id, 'mono' => true, 'full' => true] : null,
-                        $movement->counterparty_external_account_id ? ['label' => 'Contraparte', 'value' => $movement->counterparty_external_account_id, 'mono' => true, 'full' => true] : null,
+                        $counterpartyField,
+                        $counterpartyCustomer && $movement->counterparty_external_account_id
+                            ? ['label' => 'Conta contraparte', 'value' => $movement->counterparty_external_account_id, 'mono' => true, 'full' => true]
+                            : null,
                         $movement->failure_reason ? ['label' => 'Motivo falha', 'value' => $movement->failure_reason, 'full' => true] : null,
-                        $movement->description ? ['label' => 'Descrição', 'value' => $movement->description, 'full' => true] : null,
+                        $movementDescription ? ['label' => 'Descrição', 'value' => $movementDescription, 'full' => true] : null,
                         $movement->original_amount && $movement->original_currency
                             ? ['label' => 'Compra', 'value' => number_format($movement->original_amount / 100, 2, ',', '.').' '.strtoupper($movement->original_currency)]
                             : null,
                         $movement->fees_amount
                             ? ['label' => 'Câmbio', 'value' => number_format($movement->fees_amount / 100, 2, ',', '.').' '.strtoupper($movement->currency)]
+                            : null,
+                        $movement->platform_fees_amount
+                            ? ['label' => 'Câmbio Yoop', 'value' => number_format($movement->platform_fees_amount / 100, 2, ',', '.').' '.strtoupper($movement->currency)]
                             : null,
                         $movement->reference instanceof \App\Models\StripeTransaction
                             ? ['label' => 'Referência Stripe', 'value' => 'Transação #'.$movement->reference->id, 'link' => route('dashboard.transactions', ['tab' => 'stripe', 'search' => $movement->reference->id])]
@@ -461,7 +483,7 @@
 
                     $wallesterDetails = [
                         'kind' => 'wallester',
-                        'subtitle' => ($movementTypeLabels[$movement->type?->value ?? ''] ?? 'Movimento').' #'.$movement->id,
+                        'subtitle' => $movementTypeLabel.' #'.$movement->id,
                         'isIncoming' => $isIn,
                         'amountLabel' => ($isIn ? '+' : '−').number_format($movement->amount / 100, 2, ',', '.').' '.strtoupper($movement->currency),
                         'netAmountLabel' => null,
@@ -487,7 +509,7 @@
                         <span class="text-xs text-slate-400 font-mono truncate block max-w-[200px]">{{ $movement->external_account_id }}</span>
                     </td>
                     <td>
-                        <span class="text-sm text-slate-700">{{ $movementTypeLabels[$movement->type?->value ?? ''] ?? ($movement->type?->value ?? '—') }}</span>
+                        <span class="text-sm text-slate-700">{{ $movementTypeLabel }}</span>
                         <span class="text-xs text-slate-400 block">#{{ $movement->id }}</span>
                     </td>
                     <td>

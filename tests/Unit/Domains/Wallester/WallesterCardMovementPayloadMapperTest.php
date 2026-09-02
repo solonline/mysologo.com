@@ -39,7 +39,7 @@ class WallesterCardMovementPayloadMapperTest extends TestCase
         ]));
     }
 
-    public function test_maps_unified_amount_from_account_plus_fee(): void
+    public function test_maps_quoted_amount_without_wallester_fee(): void
     {
         $amounts = $this->mapper()->mapAmounts([
             'account_amount' => -4.54,
@@ -49,7 +49,7 @@ class WallesterCardMovementPayloadMapperTest extends TestCase
             'fees_amount' => 0.09,
         ]);
 
-        $this->assertSame(463, $amounts['amount_cents']);
+        $this->assertSame(454, $amounts['amount_cents']);
         $this->assertSame('EUR', $amounts['currency']);
         $this->assertSame(9, $amounts['fees_amount_cents']);
         $this->assertSame(388, $amounts['original_amount_cents']);

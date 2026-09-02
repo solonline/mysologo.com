@@ -2,11 +2,16 @@
 
 namespace App\Domains\Backoffice\Queries;
 
+use App\Domains\Wallet\Enums\TransactionType;
+use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
 use App\Models\StripeTransaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ListStripeTransactionsQuery
 {
+    public function __construct(
+        protected TopupWallesterFundingPolicy $fundingPolicy,
+    ) {}
     /**
      * @param  array<string, string|null>  $filters
      */
@@ -14,6 +19,7 @@ class ListStripeTransactionsQuery
     {
         $query = StripeTransaction::query()
             ->with(['customer', 'relatedStripeTransaction.customer'])
+            ->where('type', '!=', TransactionType::P2P)
             ->latest('stripe_created_at')
             ->latest('id');
 
@@ -59,6 +65,10 @@ class ListStripeTransactionsQuery
 
         if (! empty($filters['with_platform_fee'])) {
             $query->where('platform_fee', '>', 0);
+        }
+
+        if (! empty($filters['after_accounting_cutoff'])) {
+            $this->fundingPolicy->constrainAfterAccountingCutoff($query);
         }
 
         return $query->paginate($perPage);

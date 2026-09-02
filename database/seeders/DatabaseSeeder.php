@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             SettingsSeeder::class,
             StripePaymentMethodFeeSeeder::class,
             PlatformAccountSeeder::class,
+            PlatformSubMasterAccountSeeder::class,
         ]);
     }
 }

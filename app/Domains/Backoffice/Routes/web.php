@@ -7,6 +7,7 @@ use App\Domains\Backoffice\Controllers\CustomerController;
 use App\Domains\Backoffice\Controllers\CustomerMerchantFeeController;
 use App\Domains\Backoffice\Controllers\CustomerTpaController;
 use App\Domains\Backoffice\Controllers\DashboardController;
+use App\Domains\Backoffice\Controllers\NewsController;
 use App\Domains\Backoffice\Controllers\NotificationController;
 use App\Domains\Backoffice\Controllers\OperationsController;
 use App\Domains\Backoffice\Controllers\PlatformRevenueController;
@@ -48,6 +49,7 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
     Route::post('/customers/{customer}/phone/confirm', [CustomerController::class, 'confirmPhoneChange'])->name('.customers.phone.confirm')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/retry-provisioning', [CustomerController::class, 'retryProvisioning'])->name('.customers.retry-provisioning')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/retry-stripe-funding', [CustomerController::class, 'retryStripeFunding'])->name('.customers.retry-stripe-funding')->middleware('can:customers.edit');
+    Route::post('/customers/{customer}/wallester-cards', [CustomerController::class, 'storeWallesterCard'])->name('.customers.wallester-cards.store')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/balance-adjustments', [CustomerController::class, 'requestBalanceAdjustment'])->name('.customers.balance-adjustments.request');
     Route::post('/customers/{customer}/balance-adjustments/{adjustment}/confirm', [CustomerController::class, 'confirmBalanceAdjustment'])->name('.customers.balance-adjustments.confirm');
     Route::post('/customers/{customer}/balance-adjustments/{adjustment}/resend', [CustomerController::class, 'resendBalanceAdjustment'])->name('.customers.balance-adjustments.resend');
@@ -123,6 +125,19 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
     Route::post('/operations/retry-wallester-topups', [OperationsController::class, 'retryWallesterTopups'])
         ->name('.operations.retry-wallester-topups')
         ->middleware('can:settings.edit');
+
+    Route::middleware('can:news.view')->group(function () {
+        Route::get('/news', [NewsController::class, 'index'])->name('.news');
+    });
+    Route::middleware('can:news.create')->group(function () {
+        Route::get('/news/create', [NewsController::class, 'create'])->name('.news.create');
+        Route::post('/news', [NewsController::class, 'store'])->name('.news.store');
+    });
+    Route::middleware('can:news.edit')->group(function () {
+        Route::get('/news/{news}/edit', [NewsController::class, 'edit'])->name('.news.edit');
+        Route::put('/news/{news}', [NewsController::class, 'update'])->name('.news.update');
+    });
+    Route::delete('/news/{news}', [NewsController::class, 'destroy'])->name('.news.destroy')->middleware('can:news.delete');
 
     Route::middleware('can:stripe_fees.view')->group(function () {
         Route::get('/stripe-fees', [StripeFeeController::class, 'index'])->name('.stripe-fees');

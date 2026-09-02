@@ -19,7 +19,10 @@ class WallesterMainAccountSyncService
         $synced = 0;
 
         CustomerWallesterAccount::query()
-            ->where('is_main', true)
+            ->where(function ($query): void {
+                $query->where('is_main', true)
+                    ->orWhereHas('customer', fn ($customer) => $customer->where('type', 'platform'));
+            })
             ->each(function (CustomerWallesterAccount $account) use (&$synced): void {
                 $this->syncAccount($account);
                 $synced++;

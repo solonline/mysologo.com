@@ -35,12 +35,14 @@ class WallesterCardTest extends TestCase
         $gateway = $this->mockWallesterGateway();
         $gateway->shouldReceive('createCard')
             ->once()
-            ->with(Mockery::on(function (array $payload) use ($account): bool {
+            ->with(Mockery::on(function (array $payload) use ($account, $customer): bool {
                 return $payload['account_id'] === $account->wallester_account_id
                     && $payload['type'] === 'Virtual'
                     && $payload['name'] === 'Travel Card'
                     && $payload['3d_secure_settings']['out_of_band_enabled'] === true
                     && $payload['3d_secure_settings']['out_of_band_id'] === (string) $account->wallester_oob_id
+                    && $payload['3d_secure_settings']['email'] === (string) $customer->email
+                    && $payload['3d_secure_settings']['mobile'] === '+'.preg_replace('/\D+/', '', (string) $customer->phone)
                     && $payload['security']['internet_purchase_enabled'] === true;
             }), (string) $customer->id)
             ->andReturn([

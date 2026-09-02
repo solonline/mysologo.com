@@ -25,6 +25,7 @@ class PlatformRevenueController extends Controller
         $transactions = $this->listStripeTransactions->execute(
             array_filter([
                 'with_platform_fee' => '1',
+                'after_accounting_cutoff' => '1',
                 'from' => $from,
                 'to' => $to,
             ]),

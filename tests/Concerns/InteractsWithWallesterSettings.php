@@ -22,6 +22,7 @@ trait InteractsWithWallesterSettings
             ['key' => 'wallester.eur.private_key', 'label' => 'EUR Private Key', 'type' => 'textarea', 'value' => "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAK5...\n-----END RSA PRIVATE KEY-----"],
             ['key' => 'wallester.eur.product_code', 'label' => 'EUR Product Code', 'type' => 'text', 'value' => 'EUR-PRODUCT'],
             ['key' => 'wallester.eur.platform_master_account_id', 'label' => 'Platform Master Account ID', 'type' => 'text', 'value' => '75d92dc4-6de9-4580-8b62-3cbd3513af56'],
+            ['key' => 'wallester.eur.platform_fee_account_id', 'label' => 'Sub Conta Master (taxas)', 'type' => 'text', 'value' => ''],
             ['key' => 'wallester.usd.api_key', 'label' => 'USD API Key', 'type' => 'secret', 'value' => 'usd-api-key'],
             ['key' => 'wallester.usd.private_key', 'label' => 'USD Private Key', 'type' => 'textarea', 'value' => "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAK5...\n-----END RSA PRIVATE KEY-----"],
             ['key' => 'wallester.usd.product_code', 'label' => 'USD Product Code', 'type' => 'text', 'value' => 'USD-PRODUCT'],

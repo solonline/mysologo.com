@@ -7,7 +7,7 @@
 <div class="flex items-center justify-between gap-4">
     <div>
         <h1 class="text-2xl font-bold text-slate-900">Receita Platform</h1>
-        <p class="mt-1 text-sm text-slate-500">Taxas Yoop cobradas em top-ups e SecurePay. Separadas entre liquidadas e a aguardar settlement Stripe.</p>
+        <p class="mt-1 text-sm text-slate-500">Faturação de taxas Yoop em top-ups, SecurePay e câmbio de cartão. Não é o saldo da sub-conta.</p>
     </div>
     <a href="{{ route('dashboard.transactions', ['tab' => 'stripe', 'with_platform_fee' => 1]) }}"
        class="btn-secondary btn-sm">
@@ -17,15 +17,6 @@
 @endsection
 
 @section('content')
-
-@if (! $overview->ledgerMatchesStripe)
-<div class="mb-6 flex items-start gap-4 px-5 py-4 rounded-2xl" style="background:#fffbeb;border:1px solid #fcd34d;">
-    <div class="flex-1 min-w-0">
-        <p class="text-sm font-semibold text-amber-800">Divergência entre Stripe e ledger</p>
-        <p class="text-xs text-amber-700 mt-0.5">O acumulado de <code class="text-[11px]">platform_fee</code> não coincide com os créditos no ledger da conta platform. Execute <code class="text-[11px]">php artisan wallet:audit</code> ou <code class="text-[11px]">wallet:platform-revenue</code>.</p>
-    </div>
-</div>
-@endif
 
 <div class="mb-6">
     <form method="GET" action="{{ route('dashboard.platform-revenue') }}" class="flex flex-wrap items-center gap-3">
@@ -66,8 +57,8 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
         <div class="card p-5">
             <p class="text-xs font-semibold text-slate-500 uppercase">Total acumulado</p>
-            <p class="text-2xl font-bold text-slate-900 mt-1">{{ number_format($summary->accruedCents / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
-            <p class="text-xs text-slate-400 mt-2">{{ number_format($summary->transactionCount) }} transações · este mês {{ number_format($summary->monthAccruedCents / 100, 2, ',', '.') }}</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1">{{ number_format($summary->billedCents() / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
+            <p class="text-xs text-slate-400 mt-2">{{ number_format($summary->billedTransactionCount()) }} transações · este mês {{ number_format($summary->monthBilledCents() / 100, 2, ',', '.') }}</p>
         </div>
         <div class="card p-5 border-emerald-200/80">
             <p class="text-xs font-semibold text-emerald-700 uppercase">Liquidado</p>
@@ -83,19 +74,17 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div class="card p-5">
-            <p class="text-xs font-semibold text-slate-500 uppercase">No ledger platform</p>
-            <p class="text-2xl font-bold text-slate-900 mt-1">{{ number_format($summary->ledgerCents / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
-            <p class="text-xs text-slate-400 mt-2">Créditos já registados na conta platform</p>
-            @if (! $summary->ledgerMatchesStripe)
-            <p class="text-xs text-amber-600 mt-2 font-medium">Delta vs acumulado: {{ number_format(($summary->accruedCents - $summary->ledgerCents) / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
-            @endif
+            <p class="text-xs font-semibold text-slate-500 uppercase">Câmbio Yoop</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1">{{ number_format($summary->fxCents / 100, 2, ',', '.') }} {{ $summary->currency }}</p>
+            <p class="text-xs text-slate-400 mt-2">Incluído no total · compras de cartão · este mês {{ number_format($summary->monthFxCents / 100, 2, ',', '.') }}</p>
         </div>
         <div class="card p-5 bg-slate-50/60">
             <p class="text-xs font-semibold text-slate-500 uppercase mb-2">Como ler</p>
             <ul class="text-xs text-slate-600 space-y-1.5 leading-relaxed">
-                <li><span class="font-semibold text-emerald-700">Liquidado</span> — taxa de transações com settlement concluído (<code class="text-[10px]">balance_settled_at</code>).</li>
-                <li><span class="font-semibold text-amber-700">Aguarda liquidação</span> — taxa já calculada, à espera do payout Stripe / settlement.</li>
-                <li><span class="font-semibold text-slate-700">Ledger</span> — valor já creditado na wallet platform (pode incluir pendentes).</li>
+                <li><span class="font-semibold text-slate-700">Total acumulado</span> — faturação em todas as modalidades (Stripe + câmbio).</li>
+                <li><span class="font-semibold text-emerald-700">Liquidado</span> — taxa Stripe com payout concluído. Não inclui câmbio.</li>
+                <li><span class="font-semibold text-amber-700">Aguarda liquidação</span> — taxa Stripe já faturada, à espera do payout.</li>
+                <li><span class="font-semibold text-slate-700">Câmbio Yoop</span> — % cobrada em compras de cartão; já entra no total.</li>
             </ul>
         </div>
     </div>
@@ -110,6 +99,9 @@
                 <p class="text-sm font-bold text-slate-800">{{ number_format($monthRow['amount_cents'] / 100, 2, ',', '.') }}</p>
                 <p class="text-[10px] text-emerald-700 mt-1">Liq. {{ number_format($monthRow['settled_cents'] / 100, 2, ',', '.') }}</p>
                 <p class="text-[10px] text-amber-700">Pend. {{ number_format($monthRow['pending_cents'] / 100, 2, ',', '.') }}</p>
+                @if (($monthRow['fx_cents'] ?? 0) > 0)
+                <p class="text-[10px] text-slate-600 mt-1">Câmbio {{ number_format($monthRow['fx_cents'] / 100, 2, ',', '.') }}</p>
+                @endif
             </div>
             @endforeach
         </div>
