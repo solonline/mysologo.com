@@ -10,6 +10,7 @@ use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
+use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
@@ -306,6 +307,7 @@ class WallesterService
             currency: $currency,
             description: 'Taxa de emissão de cartão virtual',
             idempotencyKey: $idempotencyKey,
+            movementType: FundingPartnerMovementType::VirtualCardIssuanceFee,
         );
 
         // Regista a saída no ledger interno (customer_balances) — idempotente.
@@ -313,7 +315,7 @@ class WallesterService
             $this->ledger->record(
                 customerId: (int) $customer->id,
                 currency: $currency,
-                entryType: LedgerEntryType::PLATFORM_FEE,
+                entryType: LedgerEntryType::VIRTUAL_CARD_ISSUANCE_FEE,
                 amount: $feeCents,
                 reference: $outMovement,
                 description: 'Taxa de emissão de cartão virtual',

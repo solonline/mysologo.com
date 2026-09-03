@@ -271,6 +271,7 @@ class FundingPartnerMovementService
         string $description,
         string $idempotencyKey,
         ?object $reference = null,
+        FundingPartnerMovementType $movementType = FundingPartnerMovementType::AccountTransfer,
     ): ?FundingPartnerMovement {
         return $this->transferFromCustomerToPlatformAccount(
             from: $from,
@@ -280,6 +281,7 @@ class FundingPartnerMovementService
             idempotencyKey: $idempotencyKey,
             reference: $reference,
             toFeeAccount: true,
+            movementType: $movementType,
         );
     }
 
@@ -377,6 +379,7 @@ class FundingPartnerMovementService
         string $idempotencyKey,
         ?object $reference,
         bool $toFeeAccount,
+        FundingPartnerMovementType $movementType = FundingPartnerMovementType::AccountTransfer,
     ): ?FundingPartnerMovement {
         if ($this->hasCompletedMovement($idempotencyKey)) {
             return null;
@@ -407,6 +410,7 @@ class FundingPartnerMovementService
             $idempotencyKey,
             $provider,
             $reference,
+            $movementType,
         ) {
             return $this->resolveTransferMovementPair(
                 idempotencyKey: $idempotencyKey,
@@ -417,6 +421,7 @@ class FundingPartnerMovementService
                 routingCurrency: $routingCurrency,
                 description: $description,
                 reference: $reference,
+                type: $movementType,
             );
         });
 
@@ -1026,6 +1031,7 @@ class FundingPartnerMovementService
         string $routingCurrency,
         string $description,
         ?object $reference,
+        FundingPartnerMovementType $type = FundingPartnerMovementType::AccountTransfer,
     ): ?array {
         $outKey = $idempotencyKey.':out';
         $inKey = $idempotencyKey.':in';
@@ -1062,7 +1068,7 @@ class FundingPartnerMovementService
                 fundingAccount: $fromAccount,
                 externalAccountId: $fromAccount->wallester_account_id,
                 direction: FundingPartnerMovementDirection::Out,
-                type: FundingPartnerMovementType::AccountTransfer,
+                type: $type,
                 amountCents: $amountCents,
                 currency: $routingCurrency,
                 transferGroupId: $transferGroupId,
@@ -1081,7 +1087,7 @@ class FundingPartnerMovementService
                 fundingAccount: $toAccount,
                 externalAccountId: $toAccount->wallester_account_id,
                 direction: FundingPartnerMovementDirection::In,
-                type: FundingPartnerMovementType::AccountTransfer,
+                type: $type,
                 amountCents: $amountCents,
                 currency: $routingCurrency,
                 transferGroupId: $transferGroupId,

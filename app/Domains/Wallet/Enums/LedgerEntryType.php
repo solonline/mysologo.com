@@ -17,6 +17,7 @@ enum LedgerEntryType: string
     case PARTNER_FUNDING_RELEASED = 'partner_funding_released';
     case MANUAL_CREDIT = 'manual_credit';
     case MANUAL_DEBIT = 'manual_debit';
+    case VIRTUAL_CARD_ISSUANCE_FEE = 'virtual_card_issuance_fee';
 
     public function label(): string
     {
@@ -34,6 +35,7 @@ enum LedgerEntryType: string
             self::PARTNER_FUNDING_RELEASED => 'Libertação de Funding Parceiro',
             self::MANUAL_CREDIT => 'Crédito Manual',
             self::MANUAL_DEBIT => 'Débito Manual',
+            self::VIRTUAL_CARD_ISSUANCE_FEE => 'Taxa de Emissão de Cartão Virtual',
         };
     }
 
@@ -52,7 +54,8 @@ enum LedgerEntryType: string
             self::CARD_LOAD,
             self::CARD_PURCHASE,
             self::SETTLEMENT,
-            self::MANUAL_DEBIT => TransactionDirection::Debit,
+            self::MANUAL_DEBIT,
+            self::VIRTUAL_CARD_ISSUANCE_FEE => TransactionDirection::Debit,
         };
     }
 }

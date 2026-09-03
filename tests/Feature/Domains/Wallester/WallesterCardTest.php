@@ -479,7 +479,7 @@ class WallesterCardTest extends TestCase
         // Verifica que o customer_balances foi debitado pela taxa
         $this->assertDatabaseHas('ledger_entries', [
             'customer_id' => $customer->id,
-            'entry_type' => 'platform_fee',
+            'entry_type' => 'virtual_card_issuance_fee',
             'amount' => 500,
         ]);
         $this->assertDatabaseHas('customer_balances', [
