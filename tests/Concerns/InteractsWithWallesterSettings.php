@@ -18,6 +18,7 @@ trait InteractsWithWallesterSettings
             ['key' => 'wallester.3ds_challenge_ttl_seconds', 'label' => '3DS TTL', 'type' => 'number', 'value' => '300'],
             ['key' => 'wallester.3ds_webhook_username', 'label' => '3DS Username', 'type' => 'secret', 'value' => 'test-user'],
             ['key' => 'wallester.3ds_webhook_password', 'label' => '3DS Password', 'type' => 'secret', 'value' => 'test-pass'],
+            ['key' => 'wallester.virtual_card_value', 'label' => 'Taxa do cartão virtual adicional (cêntimos)', 'type' => 'number', 'value' => '0'],
             ['key' => 'wallester.eur.api_key', 'label' => 'EUR API Key', 'type' => 'secret', 'value' => 'eur-api-key'],
             ['key' => 'wallester.eur.private_key', 'label' => 'EUR Private Key', 'type' => 'textarea', 'value' => "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAK5...\n-----END RSA PRIVATE KEY-----"],
             ['key' => 'wallester.eur.product_code', 'label' => 'EUR Product Code', 'type' => 'text', 'value' => 'EUR-PRODUCT'],

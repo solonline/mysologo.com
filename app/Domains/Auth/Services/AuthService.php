@@ -38,7 +38,7 @@ class AuthService implements AuthServiceInterface
                 phone: str_replace(' ', '', $dto->phone),
                 type: $dto->type,
                 username: $dto->username ? strtolower(str_replace(' ', '_', $dto->username)) : null,
-                name: strtolower(trim(ucwords($dto->name))),
+                name: ucwords(strtolower(trim($dto->name))),
                 language: $dto->language,
                 currency: $dto->currency
             );

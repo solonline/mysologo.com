@@ -1826,7 +1826,7 @@ body {
   display: none;
   align-items: flex-end;
   justify-content: center;
-  z-index: 50;
+  z-index: 80;
 }
 
 .pin-overlay.show { display: flex; }
@@ -2151,6 +2151,116 @@ body {
   opacity: .4;
   cursor: not-allowed;
 }
+
+.card-preview.blocked {
+  background: linear-gradient(135deg, #334155 0%, #475569 55%, #64748b 100%);
+  box-shadow: 0 12px 32px rgba(51,65,85,.28);
+}
+
+.card-blocked-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  background: rgba(239,68,68,.92);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+.card-list {
+  padding: 8px 0 16px;
+  flex: 1;
+}
+
+.card-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 20px;
+  border: none;
+  border-bottom: 1px solid var(--slate-50);
+  background: #fff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card-list-item:active { background: var(--slate-50); }
+
+.card-list-mini {
+  width: 46px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1e1b4b, #4f46e5);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.card-list-mini.blocked {
+  background: linear-gradient(135deg, #475569, #64748b);
+}
+
+.card-list-mini::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 6px;
+  width: 10px;
+  height: 7px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+}
+
+.card-list-body { flex: 1; min-width: 0; }
+.card-list-name { font-size: 14px; font-weight: 600; color: var(--slate-900); }
+.card-list-num { font-size: 12px; color: var(--slate-500); margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+.card-status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+.card-status-badge.active { background: #d1fae5; color: #047857; }
+.card-status-badge.blocked { background: #fee2e2; color: #b91c1c; }
+.card-status-badge.created { background: #fef3c7; color: #b45309; }
+
+.btn-action.danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 4px 20px rgba(239,68,68,.3);
+  margin-top: 0;
+}
+
+.card-fee-popup {
+  background: #fff;
+  border-radius: 20px;
+  width: 100%;
+  padding: 28px 24px 20px;
+  box-shadow: 0 18px 40px rgba(15,23,42,.28);
+  animation: newsPop .2s ease;
+  text-align: center;
+}
+.card-fee-title { font-size: 18px; font-weight: 700; color: var(--slate-900); }
+.card-fee-text { font-size: 14px; color: var(--slate-500); margin: 12px 0 8px; line-height: 1.45; }
+.card-fee-amount { font-size: 28px; font-weight: 700; color: var(--slate-900); margin: 8px 0 24px; }
+
+.header-add-btn {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--indigo);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+}
 </style>
 </head>
 <body>
@@ -2393,7 +2503,7 @@ body {
               <line x1="2" y1="10" x2="22" y2="10"/>
             </svg>
           </div>
-          <span>Cartão</span>
+          <span>Cartões</span>
         </button>
         <button class="action-btn" onclick="navigate('news')">
           <div class="action-icon amber">
@@ -2569,6 +2679,20 @@ body {
       </div>
     </div>
 
+    <!-- ── Card list ── -->
+    <div id="screen-card-list" class="screen tx-screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="goBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+        </button>
+        <h2>Cartões</h2>
+        <button class="header-add-btn" onclick="openCardCreate()">Novo</button>
+      </div>
+      <div id="card-list" class="card-list"></div>
+    </div>
+
     <!-- ── Card create ── -->
     <div id="screen-card-create" class="screen tx-screen">
       <div class="screen-header">
@@ -2591,7 +2715,7 @@ body {
 
         <div class="form-field">
           <label class="form-label">Tipo</label>
-          <select class="form-input form-select" id="card-type">
+          <select class="form-input form-select" id="card-type" onchange="refreshCardIssuanceHint()">
             <option value="Virtual" selected>Virtual</option>
             <option value="Physical">Physical</option>
           </select>
@@ -2599,7 +2723,7 @@ body {
 
         <div id="card-create-result" class="result-card"></div>
 
-        <button class="btn-action" id="card-create-btn" onclick="doCreateCard()">
+        <button class="btn-action" id="card-create-btn" onclick="startCreateCard()">
           Criar cartão
         </button>
       </div>
@@ -2617,7 +2741,7 @@ body {
       </div>
       <div class="tx-body">
         <div class="card-preview" id="card-preview">
-
+          <div class="card-blocked-badge" id="card-blocked-badge" hidden>Bloqueado</div>
           <div class="card-preview-chip"></div>
           <div style="display:flex; gap:10px;">
 
@@ -2648,19 +2772,43 @@ body {
             <span class="info-row-label">ID Wallester</span>
             <span class="info-row-value" id="card-detail-wid" style="font-size:11px;word-break:break-all">—</span>
           </div>
+          <div class="info-row" id="card-detail-block-row" hidden>
+            <span class="info-row-label">Bloqueio</span>
+            <span class="info-row-value" id="card-detail-block-type">—</span>
+          </div>
         </div>
 
-        <div class="divider"></div>
-
-        <div class="form-field">
-          <label class="form-label">Senha da conta (para revelar dados)</label>
-          <input class="form-input" id="card-reveal-password" type="password" placeholder="Sua senha de login" />
+        <div class="hint-box" id="card-blocked-hint" hidden>
+          Este cartão está congelado. Desbloqueie para voltar a usá-lo e revelar os dados.
         </div>
 
-        <div id="card-sensitive-result" class="result-card"></div>
+        <div id="card-reveal-section">
+          <div class="divider"></div>
 
-        <button class="btn-action" id="card-reveal-btn" onclick="doRevealCard()">
-          Revelar número e CVV
+          <div class="form-field">
+            <label class="form-label">Senha da conta (para revelar dados)</label>
+            <input class="form-input" id="card-reveal-password" type="password" placeholder="Sua senha de login" />
+          </div>
+
+          <div id="card-sensitive-result" class="result-card"></div>
+
+          <button class="btn-action" id="card-reveal-btn" onclick="doRevealCard()" style="margin-top:0">
+            Revelar número e CVV
+          </button>
+        </div>
+
+        <div id="card-block-result" class="result-card"></div>
+
+        <button class="btn-action danger" id="card-block-btn" onclick="startBlockCard()">
+          Bloquear cartão
+        </button>
+
+        <button class="btn-action" id="card-unblock-btn" onclick="startUnblockCard()" hidden>
+          Desbloquear cartão
+        </button>
+
+        <button class="btn-action danger" id="card-close-btn" onclick="startCloseCard()" hidden>
+          Fechar cartão
         </button>
       </div>
     </div>
@@ -3110,6 +3258,26 @@ body {
       </div>
     </div>
   </div>
+
+  <div class="news-overlay" id="card-fee-overlay" onclick="if(event.target===this) cancelCardFeeModal()">
+    <div class="card-fee-popup" role="dialog" aria-modal="true" aria-labelledby="card-fee-title">
+      <div class="card-fee-title" id="card-fee-title">Taxa de emissão</div>
+      <p class="card-fee-text" id="card-fee-text">A emissão deste cartão tem uma taxa.</p>
+      <div class="card-fee-amount" id="card-fee-amount">—</div>
+      <button class="btn-action" onclick="confirmCardFeeModal()">Continuar</button>
+      <button class="btn-link" style="color:var(--slate-500);width:100%;margin-top:12px" onclick="cancelCardFeeModal()">Cancelar</button>
+    </div>
+  </div>
+
+  <div class="pin-overlay" id="card-pin-overlay">
+    <div class="pin-sheet">
+      <div class="pin-title" id="card-pin-title" style="font-size:17px">Confirmar</div>
+      <div class="pin-subtitle" id="card-pin-summary" style="margin-bottom:24px">Introduza o PIN de 4 dígitos</div>
+      <div class="pin-dots" id="card-pin-dots"></div>
+      <div class="pin-keypad" id="card-pin-keypad"></div>
+      <button class="btn-link" style="color:var(--slate-500);width:100%;margin-top:16px" onclick="closeCardPin()">Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -3125,6 +3293,7 @@ let depositStripeElements = null;
 let authSession   = null;
 let wallesterReady = false;
 let currentCard   = null;
+let customerCards = [];
 let p2pRecipient  = null;
 let p2pFavorites  = [];
 let movementsAll = [];
@@ -3149,7 +3318,7 @@ let savedEmail = localStorage.getItem('yoop_sim_email') || '';
 const AUTH_SCREENS = ['welcome', 'login', 'register', 'pin-login'];
 const NO_NAV_SCREENS = [
   'welcome', 'login', 'register', 'pin-login', 'pin-setup', 'pin-reset', 'onboarding', 'kyc',
-  'deposit', 'payment', 'notifications', 'card-create', 'card-detail',
+  'deposit', 'payment', 'notifications', 'card-list', 'card-create', 'card-detail',
   'movements', 'transaction-detail', 'p2p', 'account', 'merchant',
   'news',
 ];
@@ -3185,6 +3354,7 @@ function showToast(msg, type = '') {
 
 // ── Navigation ────────────────────────────────────────
 function navigate(screen) {
+  closeCardPin();
   prevScreen = currentScreen;
 
   const cur = document.getElementById('screen-' + currentScreen);
@@ -3242,6 +3412,7 @@ function navigate(screen) {
   } else if (prevScreen === 'deposit') {
     resetDepositScreen();
   }
+  if (screen === 'card-list') loadCardList();
   if (screen === 'card-detail' && currentCard) renderCardDetail(currentCard);
   if (screen === 'transaction-detail') {
     if (currentMovementKey) loadMovementDetail(currentMovementKey);
@@ -3263,6 +3434,14 @@ function goBack() {
       ? txDetailReturnScreen
       : 'home';
     navigate(target);
+    return;
+  }
+  if (currentScreen === 'card-list') {
+    navigate('home');
+    return;
+  }
+  if (currentScreen === 'card-detail' || currentScreen === 'card-create') {
+    navigate('card-list');
     return;
   }
   if (currentScreen === 'movements') {
@@ -4905,6 +5084,8 @@ let pinSetupController = null;
 let pinLoginController = null;
 let pinResetController = null;
 let p2pPinController = null;
+let cardPinController = null;
+let cardPinAction = null;
 let pinSetupFirst = null;
 let pinResetStep = 'current';
 let pinResetCurrent = null;
@@ -6235,7 +6416,6 @@ async function loadHomeData() {
       }
     }
 
-    await loadCustomerCard();
     await loadHomeNews();
   } catch (e) {
     document.getElementById('home-account').textContent = 'Erro ao carregar';
@@ -6475,26 +6655,64 @@ async function doConfirmPayment() {
 }
 
 // ── Wallester cards ───────────────────────────────────
-async function loadCustomerCard() {
+function cardStatusLabel(status) {
+  if (status === 'Active') return 'Ativo';
+  if (status === 'Blocked') return 'Bloqueado';
+  if (status === 'Created') return 'Pendente';
+  if (status === 'Closed' || status === 'Closing') return 'Fechado';
+  return status || '—';
+}
+
+function cardStatusClass(status) {
+  if (status === 'Active') return 'active';
+  if (status === 'Blocked') return 'blocked';
+  return 'created';
+}
+
+async function loadCustomerCards() {
   const { ok, data } = await api('GET', '/wallester/cards');
   if (!ok) {
+    customerCards = [];
     currentCard = null;
+    return [];
+  }
+
+  customerCards = Array.isArray(data?.data) ? data.data : (Array.isArray(unwrap(data)) ? unwrap(data) : []);
+  return customerCards;
+}
+
+async function loadCardList() {
+  const list = document.getElementById('card-list');
+  list.innerHTML = `<div class="empty-state"><div class="spin" style="border-color:var(--slate-200);border-top-color:var(--indigo);width:32px;height:32px"></div></div>`;
+
+  await loadCustomerCards();
+
+  if (!customerCards.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="5" width="20" height="14" rx="2"/>
+          <line x1="2" y1="10" x2="22" y2="10"/>
+        </svg>
+        <p>Ainda não tem cartões</p>
+        <button class="btn-action" style="margin-top:16px;max-width:220px" onclick="openCardCreate()">Criar cartão</button>
+      </div>`;
     return;
   }
 
-  const cards = Array.isArray(data?.data) ? data.data : (Array.isArray(unwrap(data)) ? unwrap(data) : []);
-  if (!cards.length) {
-    currentCard = null;
-    return;
-  }
-
-  const card = cards[0];
-  currentCard = { local: card, api: card };
-
-  const detail = await api('GET', `/wallester/cards/${card.id}`);
-  if (detail.ok) {
-    currentCard = { local: card, api: unwrap(detail.data) };
-  }
+  list.innerHTML = customerCards.map(card => {
+    const blocked = card.status === 'Blocked';
+    const masked = formatCardNumber(card.masked_card_number);
+    return `
+      <button type="button" class="card-list-item" onclick="openCardDetail(${Number(card.id)})">
+        <div class="card-list-mini ${blocked ? 'blocked' : ''}"></div>
+        <div class="card-list-body">
+          <div class="card-list-name">${card.name || 'Cartão'}</div>
+          <div class="card-list-num">${masked}</div>
+        </div>
+        <span class="card-status-badge ${cardStatusClass(card.status)}">${cardStatusLabel(card.status)}</span>
+      </button>`;
+  }).join('');
 }
 
 async function openCardFlow() {
@@ -6503,18 +6721,79 @@ async function openCardFlow() {
     return;
   }
 
-  await loadCustomerCard();
+  navigate('card-list');
+}
 
-  if (currentCard?.local?.id) {
-    renderCardDetail(currentCard);
-    navigate('card-detail');
+function openCardCreate() {
+  if (!wallesterReady) {
+    showToast('Customer sem conta Wallester activa', 'error');
     return;
   }
 
   document.getElementById('card-create-hint').textContent =
-    'A conta Wallester está activa. Crie um cartão virtual para testar.';
+    'A conta Wallester está activa. Pode criar mais do que um cartão.';
   document.getElementById('card-create-result').className = 'result-card';
+  document.getElementById('card-name').value = '';
+  document.getElementById('card-type').value = 'Virtual';
   navigate('card-create');
+  refreshCardIssuanceHint();
+}
+
+function cardIssuanceQuoteForType(quote, type) {
+  const data = unwrap(quote) || quote;
+  const key = type === 'Physical' ? 'physical' : 'virtual';
+  return {
+    currency: data?.currency || 'EUR',
+    fee_cents: Number(data?.[key]?.fee_cents || 0),
+    will_charge: Boolean(data?.[key]?.will_charge),
+  };
+}
+
+function applyCardIssuanceHint(quote) {
+  const type = document.getElementById('card-type')?.value || 'Virtual';
+  const fee = cardIssuanceQuoteForType(quote, type);
+  const hint = document.getElementById('card-create-hint');
+  if (!hint) return;
+
+  if (fee.will_charge) {
+    hint.textContent = `A emissão deste cartão tem uma taxa de ${formatMoney(fee.fee_cents, fee.currency)}.`;
+    return;
+  }
+
+  hint.textContent = 'A conta Wallester está activa. Pode criar mais do que um cartão.';
+}
+
+async function fetchCardIssuanceQuote() {
+  const { ok, data } = await api('GET', '/wallester/cards/issuance-quote');
+  if (!ok) return null;
+  return unwrap(data) || data;
+}
+
+async function refreshCardIssuanceHint() {
+  try {
+    const quote = await fetchCardIssuanceQuote();
+    if (quote) applyCardIssuanceHint(quote);
+  } catch (e) {
+    // hint stays on the default text
+  }
+}
+
+async function openCardDetail(cardId) {
+  const local = customerCards.find(card => Number(card.id) === Number(cardId));
+  if (!local) {
+    showToast('Cartão não encontrado', 'error');
+    return;
+  }
+
+  currentCard = { local, api: local };
+
+  const detail = await api('GET', `/wallester/cards/${local.id}`);
+  if (detail.ok) {
+    currentCard = { local, api: unwrap(detail.data) };
+  }
+
+  renderCardDetail(currentCard);
+  navigate('card-detail');
 }
 
 function formatCardNumber(masked, full) {
@@ -6538,46 +6817,66 @@ let revealedCardNumber = null;
 
 function renderCardDetail(card) {
   const data = card?.api ?? card;
+  const status = data.status || '';
+  const blocked = status === 'Blocked';
+  const canReveal = status === 'Active';
+  const canBlock = status === 'Active';
+  const canUnblock = status === 'Blocked';
+  const canClose = status === 'Active' || status === 'Blocked';
+
   revealedCardNumber = null;
   document.getElementById('copy-card-btn').disabled = true;
 
+  document.getElementById('card-preview').classList.toggle('blocked', blocked);
+  document.getElementById('card-blocked-badge').hidden = !blocked;
   document.getElementById('card-preview-number').textContent =
     formatCardNumber(data.masked_card_number);
   document.getElementById('card-preview-name').textContent = data.name || '—';
   document.getElementById('card-preview-expiry').textContent = formatExpiry(data.expiry_date);
-  document.getElementById('card-preview-status').textContent = data.status || '—';
+  document.getElementById('card-preview-status').textContent = cardStatusLabel(status);
   document.getElementById('card-detail-type').textContent = data.type || '—';
   document.getElementById('card-detail-wid').textContent = data.wallester_card_id || data.id || '—';
+
+  const blockRow = document.getElementById('card-detail-block-row');
+  const blockType = data.block_type || '';
+  blockRow.hidden = !blocked;
+  document.getElementById('card-detail-block-type').textContent = blockType || '—';
+
+  document.getElementById('card-blocked-hint').hidden = !blocked;
+  document.getElementById('card-reveal-section').hidden = !canReveal;
+  document.getElementById('card-block-btn').hidden = !canBlock;
+  document.getElementById('card-unblock-btn').hidden = !canUnblock;
+  document.getElementById('card-close-btn').hidden = !canClose;
   document.getElementById('card-sensitive-result').className = 'result-card';
+  document.getElementById('card-block-result').className = 'result-card';
   document.getElementById('card-reveal-password').value = '';
 }
 
-async function doCreateCard() {
+async function doCreateCard(pin) {
   const name = document.getElementById('card-name').value.trim();
   const type = document.getElementById('card-type').value;
   const btn = document.getElementById('card-create-btn');
   const result = document.getElementById('card-create-result');
 
   if (!name) { showToast('Informe o nome do cartão', 'error'); return; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
 
   btn.disabled = true;
   btn.innerHTML = '<div class="spin"></div> Criando...';
   result.className = 'result-card';
 
   try {
-    const { ok, data, status } = await api('POST', '/wallester/cards', { type, name });
+    const { ok, data, status } = await api('POST', '/wallester/cards', {
+      type,
+      name,
+      pin,
+      device_token: deviceToken,
+    });
     const card = unwrap(data);
 
     if (!ok) {
       result.classList.add('show', 'error');
       result.textContent = JSON.stringify(data, null, 2);
-      if (data?.reason === 'card_already_exists') {
-        await loadCustomerCard();
-        if (currentCard?.local?.id) {
-          renderCardDetail(currentCard);
-          navigate('card-detail');
-        }
-      }
       showToast(data?.message || `Erro ${status}`, 'error');
       return;
     }
@@ -6600,6 +6899,235 @@ async function doCreateCard() {
 
   btn.disabled = false;
   btn.textContent = 'Criar cartão';
+}
+
+let pendingCardCreate = null;
+
+async function startCreateCard() {
+  const name = document.getElementById('card-name').value.trim();
+  const type = document.getElementById('card-type')?.value || 'Virtual';
+  if (!name) { showToast('Informe o nome do cartão', 'error'); return; }
+
+  pendingCardCreate = { name, type };
+
+  let fee = null;
+  try {
+    const quote = await fetchCardIssuanceQuote();
+    if (quote) {
+      applyCardIssuanceHint(quote);
+      fee = cardIssuanceQuoteForType(quote, type);
+    }
+  } catch (e) {
+    // Sem quote, segue para o PIN; a API valida o saldo no POST
+  }
+
+  if (fee?.will_charge) {
+    openCardFeeModal(name, fee);
+    return;
+  }
+
+  openCreateCardPin();
+}
+
+function openCardFeeModal(name, fee) {
+  document.getElementById('card-fee-text').textContent =
+    `A emissão de um novo cartão virtual tem uma taxa que será debitada da sua conta.`;
+  document.getElementById('card-fee-amount').textContent = formatMoney(fee.fee_cents, fee.currency);
+  document.getElementById('card-fee-overlay').classList.add('show');
+}
+
+function closeCardFeeModal() {
+  document.getElementById('card-fee-overlay')?.classList.remove('show');
+}
+
+function cancelCardFeeModal() {
+  closeCardFeeModal();
+  pendingCardCreate = null;
+}
+
+function confirmCardFeeModal() {
+  closeCardFeeModal();
+  openCreateCardPin();
+}
+
+function openCreateCardPin() {
+  const name = pendingCardCreate?.name || document.getElementById('card-name')?.value.trim();
+  pendingCardCreate = null;
+  if (!name) { showToast('Informe o nome do cartão', 'error'); return; }
+  openCardPin('create', 'Confirmar cartão', `Criar “${name}”`);
+}
+
+function startBlockCard() {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  if (currentCard?.api?.status === 'Blocked' || currentCard?.local?.status === 'Blocked') {
+    renderCardDetail(currentCard);
+    return;
+  }
+  const name = currentCard?.api?.name || currentCard?.local?.name || 'este cartão';
+  openCardPin('block', 'Bloquear cartão', `Congelar “${name}”`);
+}
+
+function startUnblockCard() {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  if (currentCard?.api?.status === 'Active' || currentCard?.local?.status === 'Active') {
+    renderCardDetail(currentCard);
+    return;
+  }
+  const name = currentCard?.api?.name || currentCard?.local?.name || 'este cartão';
+  openCardPin('unblock', 'Desbloquear cartão', `Reactivar “${name}”`);
+}
+
+function startCloseCard() {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  const status = currentCard?.api?.status || currentCard?.local?.status;
+  if (status !== 'Active' && status !== 'Blocked') {
+    renderCardDetail(currentCard);
+    return;
+  }
+  const name = currentCard?.api?.name || currentCard?.local?.name || 'este cartão';
+  openCardPin('close', 'Fechar cartão', `Encerrar “${name}” de forma permanente`);
+}
+
+function openCardPin(action, title, summary) {
+  cardPinAction = action;
+  document.getElementById('card-pin-title').textContent = title;
+  document.getElementById('card-pin-summary').textContent = summary;
+  document.getElementById('card-pin-overlay').classList.add('show');
+  if (cardPinController) cardPinController.reset();
+  cardPinController = createPinKeypad('card-pin-dots', 'card-pin-keypad', {
+    onComplete: (pin) => submitCardPin(pin),
+  });
+}
+
+function closeCardPin() {
+  document.getElementById('card-pin-overlay')?.classList.remove('show');
+  if (cardPinController) cardPinController.reset();
+  cardPinAction = null;
+}
+
+async function submitCardPin(pin) {
+  const action = cardPinAction;
+  closeCardPin();
+  if (action === 'create') await doCreateCard(pin);
+  if (action === 'block') await doBlockCard(pin);
+  if (action === 'unblock') await doUnblockCard(pin);
+  if (action === 'close') await doCloseCard(pin);
+}
+
+async function doBlockCard(pin) {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
+  if (currentCard?.api?.status === 'Blocked' || currentCard?.local?.status === 'Blocked') {
+    renderCardDetail(currentCard);
+    return;
+  }
+
+  const btn = document.getElementById('card-block-btn');
+  const result = document.getElementById('card-block-result');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Bloqueando...';
+  result.className = 'result-card';
+
+  try {
+    const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/block`, {
+      pin,
+      device_token: deviceToken,
+    });
+    const card = unwrap(data);
+
+    if (!ok) {
+      result.classList.add('show', 'error');
+      result.textContent = JSON.stringify(data, null, 2);
+      showToast(data?.message || `Erro ${status}`, 'error');
+      return;
+    }
+
+    currentCard = { local: { ...currentCard.local, ...card }, api: { ...currentCard.api, ...card } };
+    renderCardDetail(currentCard);
+    showToast('Cartão bloqueado', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro de conexão', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Bloquear cartão';
+}
+
+async function doUnblockCard(pin) {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
+  if (currentCard?.api?.status === 'Active' || currentCard?.local?.status === 'Active') {
+    renderCardDetail(currentCard);
+    return;
+  }
+
+  const btn = document.getElementById('card-unblock-btn');
+  const result = document.getElementById('card-block-result');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Desbloqueando...';
+  result.className = 'result-card';
+
+  try {
+    const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/unblock`, {
+      pin,
+      device_token: deviceToken,
+    });
+    const card = unwrap(data);
+
+    if (!ok) {
+      result.classList.add('show', 'error');
+      result.textContent = JSON.stringify(data, null, 2);
+      showToast(data?.message || `Erro ${status}`, 'error');
+      return;
+    }
+
+    currentCard = { local: { ...currentCard.local, ...card }, api: { ...currentCard.api, ...card } };
+    renderCardDetail(currentCard);
+    showToast('Cartão desbloqueado', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro de conexão', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Desbloquear cartão';
+}
+
+async function doCloseCard(pin) {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
+
+  const btn = document.getElementById('card-close-btn');
+  const result = document.getElementById('card-block-result');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Fechando...';
+  result.className = 'result-card';
+
+  try {
+    const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/close`, {
+      pin,
+      device_token: deviceToken,
+    });
+    const card = unwrap(data);
+
+    if (!ok) {
+      result.classList.add('show', 'error');
+      result.textContent = JSON.stringify(data, null, 2);
+      showToast(data?.message || `Erro ${status}`, 'error');
+      return;
+    }
+
+    currentCard = { local: { ...currentCard.local, ...card }, api: { ...currentCard.api, ...card } };
+    showToast('Cartão fechado', 'success');
+    navigate('card-list');
+  } catch (e) {
+    showToast(e.message || 'Erro de conexão', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Fechar cartão';
 }
 
 async function doRevealCard() {
@@ -6887,7 +7415,6 @@ async function tryAutoLogin() {
     if (!accOk) return;
     const w = unwrap(accData)?.wallester;
     wallesterReady = !!(w?.wallester_account_id && integrationStatusValue(w?.status) === 'ACTIVE');
-    if (wallesterReady) await loadCustomerCard();
   });
 }
 

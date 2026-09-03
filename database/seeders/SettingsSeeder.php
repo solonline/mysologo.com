@@ -87,6 +87,7 @@ class SettingsSeeder extends Seeder
             ['key' => 'wallester.3ds_challenge_ttl_seconds', 'label' => '3DS Challenge TTL (seconds)', 'type' => 'number', 'value' => (string) env('WALLESTER_3DS_CHALLENGE_TTL', 300)],
             ['key' => 'wallester.3ds_webhook_username',    'label' => '3DS Webhook Username',        'type' => 'secret',   'value' => ''],
             ['key' => 'wallester.3ds_webhook_password',    'label' => '3DS Webhook Password',        'type' => 'secret',   'value' => ''],
+            ['key' => 'wallester.virtual_card_value',      'label' => 'Taxa do cartão virtual adicional (cêntimos)', 'type' => 'number', 'value' => (string) env('WALLESTER_VIRTUAL_CARD_VALUE', '0')],
             // Wallester — EUR
             ['key' => 'wallester.eur.api_key',                     'label' => 'API Key',                     'type' => 'secret',   'value' => env('WALLESTER_API_KEY', '')],
             ['key' => 'wallester.eur.private_key',                 'label' => 'Private Key (PEM)',           'type' => 'textarea', 'value' => env('WALLESTER_PRIVATE_KEY', '')],

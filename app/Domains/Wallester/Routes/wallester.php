@@ -24,6 +24,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->name('wallester.accounts.show');
         Route::get('/cards', [WallesterCardController::class, 'index'])
             ->name('wallester.cards.index');
+        Route::get('/cards/issuance-quote', [WallesterCardController::class, 'issuanceQuote'])
+            ->name('wallester.cards.issuance-quote');
         Route::post('/cards', [WallesterCardController::class, 'store'])
             ->name('wallester.cards.store');
         Route::get('/cards/{card}', [WallesterCardController::class, 'show'])
@@ -32,6 +34,12 @@ Route::middleware('auth:sanctum')->group(function () {
             ->name('wallester.cards.sensitive');
         Route::post('/cards/{card}/activate', [WallesterCardController::class, 'activate'])
             ->name('wallester.cards.activate');
+        Route::post('/cards/{card}/block', [WallesterCardController::class, 'block'])
+            ->name('wallester.cards.block');
+        Route::post('/cards/{card}/unblock', [WallesterCardController::class, 'unblock'])
+            ->name('wallester.cards.unblock');
+        Route::post('/cards/{card}/close', [WallesterCardController::class, 'close'])
+            ->name('wallester.cards.close');
     });
 
     Route::middleware([

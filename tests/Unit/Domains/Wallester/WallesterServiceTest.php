@@ -4,9 +4,13 @@ namespace Tests\Unit\Domains\Wallester;
 
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
+use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Services\Wallester3dsService;
+use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
 use App\Domains\Wallester\Services\WallesterService;
+use App\Domains\Wallester\Services\WallesterSettingsService;
 use App\Exceptions\ApiException;
+use App\Exceptions\ErrorCode;
 use App\Models\CustomerWallesterCard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
@@ -65,11 +69,7 @@ class WallesterServiceTest extends TestCase
                 'updated_at' => '2026-07-01T10:00:00Z',
             ]);
 
-        $service = new WallesterService(
-            $gateway,
-            app(WallesterAccountRepositoryInterface::class),
-            app(Wallester3dsService::class),
-        );
+        $service = $this->makeService($gateway);
 
         $card = $service->createCard([
             'account_id' => 'wal_acc_123',
@@ -134,11 +134,7 @@ class WallesterServiceTest extends TestCase
                 'activated_at' => '2026-07-01T12:00:00Z',
             ]);
 
-        $service = new WallesterService(
-            $gateway,
-            app(WallesterAccountRepositoryInterface::class),
-            app(Wallester3dsService::class),
-        );
+        $service = $this->makeService($gateway);
 
         $card = $service->createCardForCustomer($customer, [
             'type' => 'Virtual',
@@ -176,11 +172,7 @@ class WallesterServiceTest extends TestCase
                 'activated_at' => '2026-07-01T12:30:00Z',
             ]);
 
-        $service = new WallesterService(
-            $gateway,
-            app(WallesterAccountRepositoryInterface::class),
-            app(Wallester3dsService::class),
-        );
+        $service = $this->makeService($gateway);
 
         $card = $service->activateVirtualCardForCustomer($customer, $localCard);
 
@@ -206,18 +198,14 @@ class WallesterServiceTest extends TestCase
         $gateway = $this->mockWallesterGateway();
         $gateway->shouldNotReceive('activateCard');
 
-        $service = new WallesterService(
-            $gateway,
-            app(WallesterAccountRepositoryInterface::class),
-            app(Wallester3dsService::class),
-        );
+        $service = $this->makeService($gateway);
 
         $card = $service->activateVirtualCardForCustomer($customer, $localCard);
 
         $this->assertSame('Active', $card->status);
     }
 
-    public function test_create_card_for_customer_rejects_existing_card(): void
+    public function test_create_card_for_customer_allows_additional_card(): void
     {
         $customer = $this->createRetailCustomer();
         $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_existing');
@@ -231,21 +219,23 @@ class WallesterServiceTest extends TestCase
         ]);
 
         $gateway = $this->mockWallesterGateway();
-        $gateway->shouldNotReceive('createCard');
+        $gateway->shouldReceive('createCard')->once()->andReturn([
+            'id' => 'card_second',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Second Card',
+        ]);
+        $gateway->shouldNotReceive('activateCard');
+        $gateway->shouldNotReceive('accountTransfer');
 
-        $service = new WallesterService(
-            $gateway,
-            app(WallesterAccountRepositoryInterface::class),
-            app(Wallester3dsService::class),
-        );
+        $service = $this->makeService($gateway);
 
-        $this->expectException(ApiException::class);
-        $this->expectExceptionMessage('Customer already has an active Wallester card.');
-
-        $service->createCardForCustomer($customer, [
+        $card = $service->createCardForCustomer($customer, [
             'type' => 'Virtual',
             'name' => 'Second Card',
         ]);
+
+        $this->assertSame('card_second', $card->wallester_card_id);
     }
 
     public function test_create_card_for_customer_allows_new_card_when_existing_is_closed(): void
@@ -270,11 +260,7 @@ class WallesterServiceTest extends TestCase
         ]);
         $gateway->shouldNotReceive('activateCard');
 
-        $service = new WallesterService(
-            $gateway,
-            app(WallesterAccountRepositoryInterface::class),
-            app(Wallester3dsService::class),
-        );
+        $service = $this->makeService($gateway);
 
         $card = $service->createCardForCustomer($customer, [
             'type' => 'Virtual',
@@ -284,40 +270,102 @@ class WallesterServiceTest extends TestCase
         $this->assertSame('card_new', $card->wallester_card_id);
     }
 
-    public function test_create_card_for_customer_allows_additional_card_when_flag_is_set(): void
+    public function test_create_additional_virtual_card_charges_fee_when_balance_covers_it(): void
     {
+        $this->seedWallesterSettings([
+            'wallester.virtual_card_value' => '500',
+            'wallester.eur.platform_fee_account_id' => 'wal_fee_card',
+        ]);
+
         $customer = $this->createRetailCustomer();
-        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_additional');
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_fee_from');
+        $this->createWallesterAccount($this->createRetailCustomer(), IntegrationAccountStatus::ACTIVE, 'wal_fee_card');
 
         CustomerWallesterCard::query()->create([
             'customer_wallester_account_id' => $account->id,
-            'wallester_card_id' => 'card_existing_active',
+            'wallester_card_id' => 'card_existing_fee',
             'type' => 'Virtual',
             'status' => 'Active',
             'name' => 'Main Card',
         ]);
 
         $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')
+            ->with('wal_fee_from', (string) $customer->id)
+            ->andReturn(['available_amount' => 5.00, 'balance' => 5.00]);
         $gateway->shouldReceive('createCard')->once()->andReturn([
-            'id' => 'card_extra',
+            'id' => 'card_paid_second',
             'type' => 'Virtual',
-            'status' => 'Active',
+            'status' => 'Created',
             'name' => 'Second Card',
         ]);
-        $gateway->shouldNotReceive('activateCard');
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(function (array $payload) use ($account): bool {
+                return $payload['from_account_id'] === $account->wallester_account_id
+                    && $payload['to_account_id'] === 'wal_fee_card'
+                    && $payload['amount'] === 5.0
+                    && $payload['description'] === 'Virtual card issuance fee';
+            }), (string) $customer->id)
+            ->andReturn(['id' => 'pay_card_fee']);
+        $gateway->shouldReceive('activateCard')
+            ->once()
+            ->with('card_paid_second', (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_paid_second',
+                'type' => 'Virtual',
+                'status' => 'Active',
+                'name' => 'Second Card',
+            ]);
 
-        $service = new WallesterService(
-            $gateway,
-            app(WallesterAccountRepositoryInterface::class),
-            app(Wallester3dsService::class),
-        );
+        $service = $this->makeService($gateway);
 
         $card = $service->createCardForCustomer($customer, [
             'type' => 'Virtual',
             'name' => 'Second Card',
-        ], allowAdditionalCards: true);
+        ]);
 
-        $this->assertSame('card_extra', $card->wallester_card_id);
+        $this->assertSame('card_paid_second', $card->wallester_card_id);
+        $this->assertSame('Active', $card->status);
+    }
+
+    public function test_create_additional_virtual_card_rejects_insufficient_balance(): void
+    {
+        $this->seedWallesterSettings([
+            'wallester.virtual_card_value' => '500',
+        ]);
+
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_fee_low');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_existing_low',
+            'type' => 'Virtual',
+            'status' => 'Blocked',
+            'name' => 'Frozen Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')
+            ->once()
+            ->with('wal_fee_low', (string) $customer->id)
+            ->andReturn(['available_amount' => 4.99, 'balance' => 4.99]);
+        $gateway->shouldNotReceive('createCard');
+        $gateway->shouldNotReceive('accountTransfer');
+
+        $service = $this->makeService($gateway);
+
+        try {
+            $service->createCardForCustomer($customer, [
+                'type' => 'Virtual',
+                'name' => 'Second Card',
+            ]);
+            $this->fail('Expected ApiException was not thrown.');
+        } catch (ApiException $exception) {
+            $this->assertSame(ErrorCode::INSUFFICIENT_BALANCE, $exception->reason);
+            $this->assertSame(422, $exception->getCode());
+        }
     }
 
     public function test_create_card_for_customer_requires_active_wallester_account(): void
@@ -328,11 +376,7 @@ class WallesterServiceTest extends TestCase
         $gateway = $this->mockWallesterGateway();
         $gateway->shouldNotReceive('createCard');
 
-        $service = new WallesterService(
-            $gateway,
-            app(WallesterAccountRepositoryInterface::class),
-            app(Wallester3dsService::class),
-        );
+        $service = $this->makeService($gateway);
 
         $this->expectException(ApiException::class);
         $this->expectExceptionMessage('Wallester account is not active.');
@@ -348,11 +392,7 @@ class WallesterServiceTest extends TestCase
         $gateway = $this->mockWallesterGateway();
         $gateway->shouldNotReceive('createCard');
 
-        $service = new WallesterService(
-            $gateway,
-            app(WallesterAccountRepositoryInterface::class),
-            app(Wallester3dsService::class),
-        );
+        $service = $this->makeService($gateway);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Wallester account [missing_acc] was not found.');
@@ -361,5 +401,322 @@ class WallesterServiceTest extends TestCase
             'account_id' => 'missing_acc',
             'type' => 'Virtual',
         ]);
+    }
+
+    public function test_block_card_for_customer_updates_local_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_block');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_block_1',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('blockCard')
+            ->once()
+            ->with('card_block_1', (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_block_1',
+                'type' => 'Virtual',
+                'status' => 'Blocked',
+                'name' => 'Main Card',
+                'block_type' => 'BlockedByCardUser',
+                'blocked_at' => '2026-09-03T10:00:00Z',
+                'blocked_by' => (string) $customer->id,
+            ]);
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->blockCardForCustomer($customer, $localCard);
+
+        $this->assertSame('Blocked', $card->status);
+        $this->assertSame('BlockedByCardUser', $card->block_type);
+        $this->assertNotNull($card->blocked_at);
+    }
+
+    public function test_block_card_for_customer_is_idempotent_when_already_blocked(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_blocked');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_blocked_1',
+            'type' => 'Virtual',
+            'status' => 'Blocked',
+            'name' => 'Main Card',
+            'block_type' => 'BlockedByCardUser',
+            'blocked_at' => now(),
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('blockCard');
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->blockCardForCustomer($customer, $localCard);
+
+        $this->assertSame('Blocked', $card->status);
+        $this->assertSame('BlockedByCardUser', $card->block_type);
+    }
+
+    public function test_block_card_for_customer_rejects_non_active_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_created_block');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_created_block',
+            'type' => 'Virtual',
+            'status' => 'Created',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('blockCard');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('This card cannot be blocked in its current status.');
+
+        $service->blockCardForCustomer($customer, $localCard);
+    }
+
+    public function test_unblock_card_for_customer_updates_local_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_unblock');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_unblock_1',
+            'type' => 'Virtual',
+            'status' => 'Blocked',
+            'name' => 'Main Card',
+            'block_type' => 'BlockedByCardUser',
+            'blocked_at' => now(),
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('unblockCard')
+            ->once()
+            ->with('card_unblock_1', (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_unblock_1',
+                'type' => 'Virtual',
+                'status' => 'Active',
+                'name' => 'Main Card',
+                'block_type' => null,
+                'blocked_at' => null,
+            ]);
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->unblockCardForCustomer($customer, $localCard);
+
+        $this->assertSame('Active', $card->status);
+        $this->assertNull($card->block_type);
+        $this->assertNull($card->blocked_at);
+    }
+
+    public function test_unblock_card_for_customer_is_idempotent_when_already_active(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_unblock_active');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_unblock_active',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('unblockCard');
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->unblockCardForCustomer($customer, $localCard);
+
+        $this->assertSame('Active', $card->status);
+    }
+
+    public function test_unblock_card_for_customer_rejects_non_blocked_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_created_unblock');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_created_unblock',
+            'type' => 'Virtual',
+            'status' => 'Created',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('unblockCard');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('This card cannot be unblocked in its current status.');
+
+        $service->unblockCardForCustomer($customer, $localCard);
+    }
+
+    public function test_close_card_for_customer_updates_local_card_when_wallester_returns_closed(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_close');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_close_1',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('closeCard')
+            ->once()
+            ->with('card_close_1', (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_close_1',
+                'type' => 'Virtual',
+                'status' => 'Closed',
+                'name' => 'Main Card',
+                'close_reason' => 'ClosedByCardholder',
+                'closed_at' => '2026-09-03T10:00:00Z',
+                'closed_by' => (string) $customer->id,
+            ]);
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->closeCardForCustomer($customer, $localCard);
+
+        $this->assertSame('Closed', $card->status);
+        $this->assertSame('ClosedByCardholder', $card->close_reason);
+        $this->assertNotNull($card->closed_at);
+        $this->assertDatabaseHas('customer_wallester_cards', [
+            'id' => $localCard->id,
+            'status' => 'Closed',
+        ]);
+    }
+
+    public function test_close_card_for_customer_does_not_persist_when_status_is_not_closed(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_close_no_confirm');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_close_no_confirm',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('closeCard')
+            ->once()
+            ->with('card_close_no_confirm', (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_close_no_confirm',
+                'type' => 'Virtual',
+                'status' => 'Active',
+                'name' => 'Main Card',
+            ]);
+
+        $service = $this->makeService($gateway);
+
+        try {
+            $service->closeCardForCustomer($customer, $localCard);
+            $this->fail('Expected RuntimeException was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Wallester card closing did not confirm a closed card.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseHas('customer_wallester_cards', [
+            'id' => $localCard->id,
+            'status' => 'Active',
+            'close_reason' => null,
+        ]);
+    }
+
+    public function test_close_card_for_customer_is_idempotent_when_already_closed(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_closed');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_closed_1',
+            'type' => 'Virtual',
+            'status' => 'Closed',
+            'name' => 'Main Card',
+            'close_reason' => 'ClosedByCardholder',
+            'closed_at' => now(),
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('closeCard');
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->closeCardForCustomer($customer, $localCard);
+
+        $this->assertSame('Closed', $card->status);
+        $this->assertSame('ClosedByCardholder', $card->close_reason);
+        $this->assertDatabaseHas('customer_wallester_cards', [
+            'id' => $localCard->id,
+            'status' => 'Closed',
+        ]);
+    }
+
+    public function test_close_card_for_customer_rejects_created_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_created_close');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_created_close',
+            'type' => 'Virtual',
+            'status' => 'Created',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('closeCard');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('This card cannot be closed in its current status.');
+
+        $service->closeCardForCustomer($customer, $localCard);
+    }
+
+    private function makeService($gateway): WallesterService
+    {
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        return new WallesterService(
+            $gateway,
+            app(WallesterAccountRepositoryInterface::class),
+            app(Wallester3dsService::class),
+            app(WallesterSettingsService::class),
+            app(WallesterFundingTransferDriver::class),
+        );
     }
 }

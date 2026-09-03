@@ -22,6 +22,8 @@ class CreateWallesterCardRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'limits' => ['sometimes', 'array'],
             'security' => ['sometimes', 'array'],
+            'pin' => ['required', 'digits:4'],
+            'device_token' => ['required', 'string'],
         ];
     }
 }

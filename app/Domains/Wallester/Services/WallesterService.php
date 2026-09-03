@@ -19,6 +19,8 @@ class WallesterService
         protected WallesterGatewayInterface $gateway,
         protected WallesterAccountRepositoryInterface $wallesterAccountRepository,
         protected Wallester3dsService $threeDsService,
+        protected WallesterSettingsService $wallesterSettings,
+        protected WallesterFundingTransferDriver $fundingTransferDriver,
     ) {}
 
     public function createAccount(array $data, string $currency = 'EUR'): array
@@ -41,7 +43,6 @@ class WallesterService
     public function createCardForCustomer(
         Customer $customer,
         array $data,
-        bool $allowAdditionalCards = false,
     ): CustomerWallesterCard {
         $account = $this->wallesterAccountRepository->findByCustomerId($customer->id);
 
@@ -61,8 +62,11 @@ class WallesterService
             );
         }
 
-        if (! $allowAdditionalCards) {
-            $this->ensureCustomerHasNoCard($account);
+        $isAdditionalVirtual = $this->isAdditionalVirtualCard($account, $data);
+        $feeCents = $this->wallesterSettings->virtualCardValueCents();
+
+        if ($isAdditionalVirtual && $feeCents > 0) {
+            $this->ensureAdditionalVirtualCardAffordable($customer, $account, $feeCents);
         }
 
         $card = $this->createCard(
@@ -70,11 +74,40 @@ class WallesterService
             (string) $customer->id,
         );
 
+        if ($isAdditionalVirtual && $feeCents > 0) {
+            $this->chargeAdditionalVirtualCardFee($customer, $account, $feeCents);
+        }
+
         if ($card->type === 'Virtual' && $card->status === 'Created') {
             return $this->activateVirtualCardForCustomer($customer, $card);
         }
 
         return $card;
+    }
+
+    /**
+     * @return array{currency: string, virtual: array{fee_cents: int, will_charge: bool}, physical: array{fee_cents: int, will_charge: bool}}
+     */
+    public function issuanceQuoteForCustomer(Customer $customer): array
+    {
+        $account = $this->wallesterAccountRepository->findByCustomerId($customer->id);
+        $currency = (string) ($account?->funding_currency ?? 'EUR');
+        $hasOpenCard = $account !== null && $this->hasOpenCard($account);
+
+        $virtualFeeCents = $this->wallesterSettings->virtualCardValueCents();
+        $physicalFeeCents = 0;
+
+        return [
+            'currency' => $currency,
+            'virtual' => [
+                'fee_cents' => $virtualFeeCents,
+                'will_charge' => $hasOpenCard && $virtualFeeCents > 0,
+            ],
+            'physical' => [
+                'fee_cents' => $physicalFeeCents,
+                'will_charge' => $hasOpenCard && $physicalFeeCents > 0,
+            ],
+        ];
     }
 
     public function activateVirtualCardForCustomer(Customer $customer, CustomerWallesterCard $card): CustomerWallesterCard
@@ -137,13 +170,178 @@ class WallesterService
         });
     }
 
+    public function blockCardForCustomer(Customer $customer, CustomerWallesterCard $card): CustomerWallesterCard
+    {
+        $this->ensureCustomerOwnsCard($customer, $card);
+
+        if ($card->status === 'Blocked') {
+            return $card;
+        }
+
+        $this->ensureCardBlockable($card);
+
+        $card->loadMissing('wallesterAccount');
+
+        $wallesterCard = $this->gateway
+            ->forCurrency((string) ($card->wallesterAccount?->funding_currency ?? 'EUR'))
+            ->blockCard($card->wallester_card_id, (string) $customer->id);
+
+        if (! isset($wallesterCard['id'])) {
+            throw new RuntimeException('Wallester card blocking returned empty response.');
+        }
+
+        $card->update(CustomerWallesterCard::updatableAttributesFromWallesterResponse($wallesterCard));
+
+        return $card->fresh();
+    }
+
+    public function unblockCardForCustomer(Customer $customer, CustomerWallesterCard $card): CustomerWallesterCard
+    {
+        $this->ensureCustomerOwnsCard($customer, $card);
+
+        if ($card->status === 'Active') {
+            return $card;
+        }
+
+        $this->ensureCardUnblockable($card);
+
+        $card->loadMissing('wallesterAccount');
+
+        $wallesterCard = $this->gateway
+            ->forCurrency((string) ($card->wallesterAccount?->funding_currency ?? 'EUR'))
+            ->unblockCard($card->wallester_card_id, (string) $customer->id);
+
+        if (! isset($wallesterCard['id'])) {
+            throw new RuntimeException('Wallester card unblocking returned empty response.');
+        }
+
+        $card->update(CustomerWallesterCard::updatableAttributesFromWallesterResponse($wallesterCard));
+
+        return $card->fresh();
+    }
+
+    public function closeCardForCustomer(Customer $customer, CustomerWallesterCard $card): CustomerWallesterCard
+    {
+        $this->ensureCustomerOwnsCard($customer, $card);
+
+        if ($card->status === 'Closed') {
+            return $card;
+        }
+
+        $this->ensureCardClosable($card);
+
+        $card->loadMissing('wallesterAccount');
+
+        $wallesterCard = $this->gateway
+            ->forCurrency((string) ($card->wallesterAccount?->funding_currency ?? 'EUR'))
+            ->closeCard($card->wallester_card_id, (string) $customer->id);
+
+        $status = $wallesterCard['status'] ?? null;
+
+        if (! isset($wallesterCard['id']) || ! in_array($status, ['Closed', 'Closing'], true)) {
+            throw new RuntimeException('Wallester card closing did not confirm a closed card.');
+        }
+
+        $card->update(CustomerWallesterCard::updatableAttributesFromWallesterResponse($wallesterCard));
+
+        return $card->fresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function isAdditionalVirtualCard(CustomerWallesterAccount $account, array $data): bool
+    {
+        if (($data['type'] ?? null) !== 'Virtual') {
+            return false;
+        }
+
+        return $this->hasOpenCard($account);
+    }
+
+    private function hasOpenCard(CustomerWallesterAccount $account): bool
+    {
+        return $account->cards()
+            ->whereIn('status', CustomerWallesterCard::OPEN_STATUSES)
+            ->exists();
+    }
+
+    private function ensureAdditionalVirtualCardAffordable(
+        Customer $customer,
+        CustomerWallesterAccount $account,
+        int $feeCents,
+    ): void {
+        $currency = (string) ($account->funding_currency ?? 'EUR');
+        $availableCents = $this->fundingTransferDriver->getAvailableBalance($customer, $currency);
+
+        if ($availableCents < $feeCents) {
+            throw new ApiException(
+                ErrorCode::INSUFFICIENT_BALANCE,
+                422,
+                'Balance is not enough to create an additional virtual card.',
+            );
+        }
+    }
+
+    private function chargeAdditionalVirtualCardFee(
+        Customer $customer,
+        CustomerWallesterAccount $account,
+        int $feeCents,
+    ): void {
+        $currency = (string) ($account->funding_currency ?? 'EUR');
+        $feeAccount = $this->fundingTransferDriver->getPlatformFeeAccount($currency);
+
+        $this->fundingTransferDriver->executeTransfer(
+            fromAccount: $account,
+            toAccount: $feeAccount,
+            amountCents: $feeCents,
+            description: 'Virtual card issuance fee',
+            auditUserId: (string) $customer->id,
+        );
+
+        $this->fundingTransferDriver->getAvailableBalance($customer, $currency);
+    }
+
+    private function ensureCardBlockable(CustomerWallesterCard $card): void
+    {
+        if ($card->status !== 'Active') {
+            throw new ApiException(
+                ErrorCode::CARD_NOT_BLOCKABLE,
+                422,
+                'This card cannot be blocked in its current status.',
+            );
+        }
+    }
+
+    private function ensureCardUnblockable(CustomerWallesterCard $card): void
+    {
+        if ($card->status !== 'Blocked') {
+            throw new ApiException(
+                ErrorCode::CARD_NOT_UNBLOCKABLE,
+                422,
+                'This card cannot be unblocked in its current status.',
+            );
+        }
+    }
+
+    private function ensureCardClosable(CustomerWallesterCard $card): void
+    {
+        if (! in_array($card->status, ['Active', 'Blocked'], true)) {
+            throw new ApiException(
+                ErrorCode::CARD_NOT_CLOSABLE,
+                422,
+                'This card cannot be closed in its current status.',
+            );
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private function buildCreateCardPayload(Customer $customer, CustomerWallesterAccount $account, array $data): array
     {
-        unset($data['account_id'], $data['3d_secure_settings']);
+        unset($data['account_id'], $data['3d_secure_settings'], $data['pin'], $data['device_token']);
 
         $security = is_array($data['security'] ?? null) ? $data['security'] : [];
 
@@ -187,17 +385,6 @@ class WallesterService
                 ErrorCode::ACCOUNT_NOT_ACTIVE,
                 422,
                 'This card cannot be activated in its current status.',
-            );
-        }
-    }
-
-    private function ensureCustomerHasNoCard(CustomerWallesterAccount $account): void
-    {
-        if ($account->cards()->operational()->exists()) {
-            throw new ApiException(
-                ErrorCode::CARD_ALREADY_EXISTS,
-                422,
-                'Customer already has an active Wallester card.',
             );
         }
     }

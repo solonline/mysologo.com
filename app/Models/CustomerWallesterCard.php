@@ -25,6 +25,12 @@ class CustomerWallesterCard extends Model
     /** @var list<string> */
     public const OPERATIONAL_STATUSES = ['Active', 'Created'];
 
+    /** @var list<string> */
+    public const OPEN_STATUSES = ['Active', 'Created', 'Blocked'];
+
+    /** @var list<string> */
+    public const MANAGED_STATUSES = ['Active', 'Created', 'Blocked'];
+
     protected $fillable = [
         'customer_wallester_account_id',
         'wallester_card_id',
@@ -101,6 +107,15 @@ class CustomerWallesterCard extends Model
     public function scopeOperational($query)
     {
         return $query->whereIn('status', self::OPERATIONAL_STATUSES);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeManaged($query)
+    {
+        return $query->whereIn('status', self::MANAGED_STATUSES);
     }
 
     /**

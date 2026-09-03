@@ -34,7 +34,6 @@ class CreateCustomerWallesterCardAction
                     'type' => 'Virtual',
                     'name' => $name !== '' ? mb_substr($name, 0, 255) : 'Virtual Card',
                 ],
-                allowAdditionalCards: true,
             );
         } catch (ApiException|RuntimeException $exception) {
             throw ValidationException::withMessages([

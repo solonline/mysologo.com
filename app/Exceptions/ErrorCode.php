@@ -68,6 +68,12 @@ class ErrorCode
 
     const CARD_ALREADY_EXISTS = 'card_already_exists';
 
+    const CARD_NOT_BLOCKABLE = 'card_not_blockable';
+
+    const CARD_NOT_UNBLOCKABLE = 'card_not_unblockable';
+
+    const CARD_NOT_CLOSABLE = 'card_not_closable';
+
     const PHONE_SAME_AS_CURRENT = 'phone_same_as_current';
 
     const PHONE_VERIFICATION_INVALID = 'phone_verification_invalid';

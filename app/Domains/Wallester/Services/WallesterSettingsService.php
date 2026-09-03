@@ -80,6 +80,17 @@ class WallesterSettingsService
         return (int) $value;
     }
 
+    public function virtualCardValueCents(): int
+    {
+        $value = $this->settings->getByKey('wallester.virtual_card_value');
+
+        if ($value === null || trim((string) $value) === '') {
+            return 0;
+        }
+
+        return max(0, (int) round((float) $value));
+    }
+
     public function threeDsWebhookUsername(): string
     {
         return (string) ($this->settings->getByKey('wallester.3ds_webhook_username') ?? '');

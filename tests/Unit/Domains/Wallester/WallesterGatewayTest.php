@@ -258,6 +258,84 @@ class WallesterGatewayTest extends TestCase
         $this->assertSame('Active', $result['status']);
     }
 
+    public function test_block_card_unwraps_nested_card_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('blockCard')
+            ->once()
+            ->with('card_123', '42')
+            ->andReturn([
+                'card' => [
+                    'id' => 'card_123',
+                    'type' => 'Virtual',
+                    'status' => 'Blocked',
+                    'block_type' => 'BlockedByCardUser',
+                    'blocked_at' => '2026-09-03T10:00:00Z',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->blockCard('card_123', '42');
+
+        $this->assertSame('card_123', $result['id']);
+        $this->assertSame('Blocked', $result['status']);
+        $this->assertSame('BlockedByCardUser', $result['block_type']);
+    }
+
+    public function test_unblock_card_unwraps_nested_card_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('unblockCard')
+            ->once()
+            ->with('card_123', '42')
+            ->andReturn([
+                'card' => [
+                    'id' => 'card_123',
+                    'type' => 'Virtual',
+                    'status' => 'Active',
+                    'block_type' => null,
+                    'blocked_at' => null,
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->unblockCard('card_123', '42');
+
+        $this->assertSame('card_123', $result['id']);
+        $this->assertSame('Active', $result['status']);
+        $this->assertNull($result['block_type']);
+    }
+
+    public function test_close_card_unwraps_nested_card_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('closeCard')
+            ->once()
+            ->with('card_123', '42')
+            ->andReturn([
+                'card' => [
+                    'id' => 'card_123',
+                    'type' => 'Virtual',
+                    'status' => 'Closed',
+                    'close_reason' => 'ClosedByCardholder',
+                    'closed_at' => '2026-09-03T10:00:00Z',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->closeCard('card_123', '42');
+
+        $this->assertSame('card_123', $result['id']);
+        $this->assertSame('Closed', $result['status']);
+        $this->assertSame('ClosedByCardholder', $result['close_reason']);
+    }
+
     public function test_list_account_transactions_normalizes_response(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);

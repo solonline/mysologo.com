@@ -32,7 +32,17 @@ class WallesterSettingsServiceTest extends TestCase
         $this->assertSame('https://api-frontend.wallester.com/v1/', $service->baseUrl());
         $this->assertSame('Backend', $service->auditSourceType());
         $this->assertSame(300, $service->threeDsChallengeTtlSeconds());
+        $this->assertSame(0, $service->virtualCardValueCents());
         $this->assertTrue($service->hasCurrencyCredentials('EUR'));
+    }
+
+    public function test_virtual_card_value_is_read_as_cents(): void
+    {
+        Setting::query()->where('key', 'wallester.virtual_card_value')->update(['value' => '45']);
+
+        $service = app(WallesterSettingsService::class);
+
+        $this->assertSame(45, $service->virtualCardValueCents());
     }
 
     public function test_has_currency_credentials_without_product_code(): void

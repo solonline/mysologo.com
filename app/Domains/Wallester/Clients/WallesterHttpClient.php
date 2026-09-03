@@ -174,6 +174,39 @@ class WallesterHttpClient
         return $this->decodeJson($response->getBody()->getContents());
     }
 
+    public function blockCard(string $cardId, ?string $auditUserId = null): array
+    {
+        $response = $this->httpClient->patch("cards/{$cardId}/block", [
+            'headers' => $this->getRequestHeaders($auditUserId),
+            'json' => [
+                'block_type' => 'BlockedByCardUser',
+            ],
+        ]);
+
+        return $this->decodeJson($response->getBody()->getContents());
+    }
+
+    public function unblockCard(string $cardId, ?string $auditUserId = null): array
+    {
+        $response = $this->httpClient->patch("cards/{$cardId}/unblock", [
+            'headers' => $this->getRequestHeaders($auditUserId),
+        ]);
+
+        return $this->decodeJson($response->getBody()->getContents());
+    }
+
+    public function closeCard(string $cardId, ?string $auditUserId = null): array
+    {
+        $response = $this->httpClient->patch("cards/{$cardId}/close", [
+            'headers' => $this->getRequestHeaders($auditUserId),
+            'json' => [
+                'close_reason' => 'ClosedByCardholder',
+            ],
+        ]);
+
+        return $this->decodeJson($response->getBody()->getContents());
+    }
+
     /**
      * @param  array<string, mixed>  $query
      */
@@ -237,7 +270,7 @@ class WallesterHttpClient
     private function decodeJson(string $content): array
     {
         $decoded = json_decode($content, true);
-        
+
         return is_array($decoded) ? $decoded : [];
     }
 }

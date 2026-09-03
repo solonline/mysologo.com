@@ -2,6 +2,8 @@
 
 namespace App\Domains\Wallester\Controllers;
 
+use App\Domains\Auth\Services\DeviceAuthService;
+use App\Domains\Wallester\Http\Requests\BlockWallesterCardRequest;
 use App\Domains\Wallester\Http\Requests\CreateWallesterCardRequest;
 use App\Domains\Wallester\Http\Requests\RevealWallesterCardSensitiveRequest;
 use App\Domains\Wallester\Services\WallesterCardSensitiveService;
@@ -16,6 +18,7 @@ class WallesterCardController extends Controller
     public function __construct(
         protected WallesterService $wallesterService,
         protected WallesterCardSensitiveService $cardSensitiveService,
+        protected DeviceAuthService $deviceAuthService,
     ) {}
 
     /**
@@ -27,7 +30,7 @@ class WallesterCardController extends Controller
 
         $cards = CustomerWallesterCard::query()
             ->whereHas('wallesterAccount', fn ($query) => $query->where('customer_id', $customerId))
-            ->operational()
+            ->managed()
             ->orderByDesc('id')
             ->get()
             ->map(fn (CustomerWallesterCard $card) => $this->transformCard($card));
@@ -40,11 +43,26 @@ class WallesterCardController extends Controller
     /**
      * @hideFromApiDocs
      */
+    public function issuanceQuote(Request $request): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->wallesterService->issuanceQuoteForCustomer($request->user()),
+        ]);
+    }
+
+    /**
+     * @hideFromApiDocs
+     */  
     public function store(CreateWallesterCardRequest $request): JsonResponse
     {
+        $this->verifyCustomerPin($request);
+
+        $payload = $request->validated();
+        unset($payload['pin'], $payload['device_token']);
+
         $card = $this->wallesterService->createCardForCustomer(
             $request->user(),
-            $request->validated(),
+            $payload,
         );
 
         return response()->json([
@@ -91,6 +109,66 @@ class WallesterCardController extends Controller
         ]);
     }
 
+    /**
+     * @hideFromApiDocs
+     */
+    public function block(BlockWallesterCardRequest $request, CustomerWallesterCard $card): JsonResponse
+    {
+        $this->verifyCustomerPin($request);
+
+        $blockedCard = $this->wallesterService->blockCardForCustomer(
+            $request->user(),
+            $card,
+        );
+
+        return response()->json([
+            'data' => $this->transformCard($blockedCard),
+        ]);
+    }
+
+    /**
+     * @hideFromApiDocs
+     */
+    public function unblock(BlockWallesterCardRequest $request, CustomerWallesterCard $card): JsonResponse
+    {
+        $this->verifyCustomerPin($request);
+
+        $unblockedCard = $this->wallesterService->unblockCardForCustomer(
+            $request->user(),
+            $card,
+        );
+
+        return response()->json([
+            'data' => $this->transformCard($unblockedCard),
+        ]);
+    }
+
+    /**
+     * @hideFromApiDocs
+     */
+    public function close(BlockWallesterCardRequest $request, CustomerWallesterCard $card): JsonResponse
+    {
+        $this->verifyCustomerPin($request);
+
+        $closedCard = $this->wallesterService->closeCardForCustomer(
+            $request->user(),
+            $card,
+        );
+
+        return response()->json([
+            'data' => $this->transformCard($closedCard),
+        ]);
+    }
+
+    private function verifyCustomerPin(CreateWallesterCardRequest|BlockWallesterCardRequest $request): void
+    {
+        $this->deviceAuthService->verifyPin(
+            $request->user(),
+            (string) $request->validated('device_token'),
+            (string) $request->validated('pin'),
+        );
+    }
+
     /** @return array<string, mixed> */
     private function transformCard(CustomerWallesterCard $card): array
     {
@@ -105,6 +183,10 @@ class WallesterCardController extends Controller
             'security' => $card->security,
             'limits' => $card->limits,
             'three_d_secure_settings' => $card->three_d_secure_settings,
+            'block_type' => $card->block_type,
+            'blocked_at' => $card->blocked_at?->toIso8601String(),
+            'close_reason' => $card->close_reason,
+            'closed_at' => $card->closed_at?->toIso8601String(),
             'activated_at' => $card->activated_at?->toIso8601String(),
             'created_at' => $card->created_at?->toIso8601String(),
         ];

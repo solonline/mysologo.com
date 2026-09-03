@@ -26,6 +26,12 @@ interface WallesterGatewayInterface
      */
     public function getCard(string $cardId, ?string $auditUserId = null): array;
 
+    public function blockCard(string $cardId, ?string $auditUserId = null): array;
+
+    public function unblockCard(string $cardId, ?string $auditUserId = null): array;
+
+    public function closeCard(string $cardId, ?string $auditUserId = null): array;
+
     public function getEncryptedCardNumber(string $cardId, string $publicKeyBase64, ?string $auditUserId = null): string;
 
     public function getEncryptedCvv2(string $cardId, string $publicKeyBase64, ?string $auditUserId = null): string;

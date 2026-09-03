@@ -143,6 +143,36 @@ class WallesterGateway implements WallesterGatewayInterface
         return $this->normalizeCardResponse(is_array($response) ? $response : []);
     }
 
+    public function blockCard(string $cardId, ?string $auditUserId = null): array
+    {
+        $response = $this->run('blockCard', fn () => $this->client->blockCard($cardId, $auditUserId), [
+            'card_id' => $cardId,
+            'audit_user_id' => $auditUserId,
+        ]);
+
+        return $this->normalizeCardResponse(is_array($response) ? $response : []);
+    }
+
+    public function unblockCard(string $cardId, ?string $auditUserId = null): array
+    {
+        $response = $this->run('unblockCard', fn () => $this->client->unblockCard($cardId, $auditUserId), [
+            'card_id' => $cardId,
+            'audit_user_id' => $auditUserId,
+        ]);
+
+        return $this->normalizeCardResponse(is_array($response) ? $response : []);
+    }
+
+    public function closeCard(string $cardId, ?string $auditUserId = null): array
+    {
+        $response = $this->run('closeCard', fn () => $this->client->closeCard($cardId, $auditUserId), [
+            'card_id' => $cardId,
+            'audit_user_id' => $auditUserId,
+        ]);
+
+        return $this->normalizeCardResponse(is_array($response) ? $response : []);
+    }
+
     public function activateCard(string $cardId, ?string $auditUserId = null): array
     {
         $response = $this->run('activateCard', fn () => $this->client->activateCard($cardId, $auditUserId), [
