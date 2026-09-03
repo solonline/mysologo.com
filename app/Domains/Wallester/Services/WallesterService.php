@@ -10,6 +10,7 @@ use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
+use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -21,6 +22,7 @@ class WallesterService
         protected Wallester3dsService $threeDsService,
         protected WallesterSettingsService $wallesterSettings,
         protected WallesterFundingTransferDriver $fundingTransferDriver,
+        protected FundingPartnerMovementService $fundingMovementService,
     ) {}
 
     public function createAccount(array $data, string $currency = 'EUR'): array
@@ -75,7 +77,7 @@ class WallesterService
         );
 
         if ($isAdditionalVirtual && $feeCents > 0) {
-            $this->chargeAdditionalVirtualCardFee($customer, $account, $feeCents);
+            $this->chargeAdditionalVirtualCardFee($customer, $account, $feeCents, $card);
         }
 
         if ($card->type === 'Virtual' && $card->status === 'Created') {
@@ -271,9 +273,10 @@ class WallesterService
         CustomerWallesterAccount $account,
         int $feeCents,
     ): void {
+        // Validação baseada no saldo “live” da Wallester (cêntimos),
+        // não em balances/ledger local (que pode não estar pré-populado).
         $currency = (string) ($account->funding_currency ?? 'EUR');
         $availableCents = $this->fundingTransferDriver->getAvailableBalance($customer, $currency);
-
         if ($availableCents < $feeCents) {
             throw new ApiException(
                 ErrorCode::INSUFFICIENT_BALANCE,
@@ -287,19 +290,18 @@ class WallesterService
         Customer $customer,
         CustomerWallesterAccount $account,
         int $feeCents,
+        CustomerWallesterCard $createdCard,
     ): void {
         $currency = (string) ($account->funding_currency ?? 'EUR');
-        $feeAccount = $this->fundingTransferDriver->getPlatformFeeAccount($currency);
 
-        $this->fundingTransferDriver->executeTransfer(
-            fromAccount: $account,
-            toAccount: $feeAccount,
+        // Regista o movimento na plataforma e sincroniza as contas main/platform.
+        $this->fundingMovementService->transferFromCustomerToPlatformFees(
+            from: $customer,
             amountCents: $feeCents,
+            currency: $currency,
             description: 'Virtual card issuance fee',
-            auditUserId: (string) $customer->id,
+            idempotencyKey: 'virtual-card-issuance-fee:'.$customer->id.':'.$createdCard->id,
         );
-
-        $this->fundingTransferDriver->getAvailableBalance($customer, $currency);
     }
 
     private function ensureCardBlockable(CustomerWallesterCard $card): void

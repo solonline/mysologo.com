@@ -9,6 +9,7 @@ use App\Domains\Wallester\Services\Wallester3dsService;
 use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Domains\Wallester\Services\WallesterSettingsService;
+use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\CustomerWallesterCard;
@@ -717,6 +718,7 @@ class WallesterServiceTest extends TestCase
             app(Wallester3dsService::class),
             app(WallesterSettingsService::class),
             app(WallesterFundingTransferDriver::class),
+            app(FundingPartnerMovementService::class),
         );
     }
 }

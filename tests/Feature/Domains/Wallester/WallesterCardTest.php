@@ -91,7 +91,7 @@ class WallesterCardTest extends TestCase
             ->assertJsonPath('data.status', 'Active')
             ->assertJsonPath('data.name', 'Travel Card')
             ->assertJsonPath('data.masked_card_number', '****5678')
-            ->assertJsonPath('data.activated_at', '2026-07-01T12:00:00+00:00');
+            ->assertJsonPath('data.activated_at', '2026-07-01T12:00:00+01:00');
 
         $this->assertDatabaseHas('customer_wallester_cards', [
             'customer_wallester_account_id' => $account->id,
@@ -338,7 +338,7 @@ class WallesterCardTest extends TestCase
             ->postJson("/api/wallester/cards/{$localCard->id}/activate")
             ->assertOk()
             ->assertJsonPath('data.status', 'Active')
-            ->assertJsonPath('data.activated_at', '2026-07-01T13:00:00+00:00');
+            ->assertJsonPath('data.activated_at', '2026-07-01T13:00:00+01:00');
     }
 
     public function test_customer_cannot_activate_another_customers_card(): void

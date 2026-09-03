@@ -88,6 +88,7 @@ class WallesterSettingsService
             return 0;
         }
 
+        \Log::info('virtualCardValueCents', ['value' => $value]);
         return max(0, (int) round((float) $value));
     }
 
