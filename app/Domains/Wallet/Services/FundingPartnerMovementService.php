@@ -271,8 +271,8 @@ class FundingPartnerMovementService
         string $description,
         string $idempotencyKey,
         ?object $reference = null,
-    ): void {
-        $this->transferFromCustomerToPlatformAccount(
+    ): ?FundingPartnerMovement {
+        return $this->transferFromCustomerToPlatformAccount(
             from: $from,
             amountCents: $amountCents,
             currency: $currency,
@@ -377,9 +377,9 @@ class FundingPartnerMovementService
         string $idempotencyKey,
         ?object $reference,
         bool $toFeeAccount,
-    ): void {
+    ): ?FundingPartnerMovement {
         if ($this->hasCompletedMovement($idempotencyKey)) {
-            return;
+            return null;
         }
 
         $routingCurrency = $this->currencyResolver->resolve($currency);
@@ -421,7 +421,7 @@ class FundingPartnerMovementService
         });
 
         if ($pair === null) {
-            return;
+            return null;
         }
 
         [$outMovement, $inMovement] = $pair;
@@ -449,6 +449,8 @@ class FundingPartnerMovementService
 
             throw $exception;
         }
+
+        return $outMovement->fresh();
     }
 
     public function recordCardMovement(

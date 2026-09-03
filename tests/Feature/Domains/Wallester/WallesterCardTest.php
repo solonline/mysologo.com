@@ -475,6 +475,17 @@ class WallesterCardTest extends TestCase
             ])
             ->assertCreated()
             ->assertJsonPath('data.wallester_card_id', 'card_paid_api');
+
+        // Verifica que o customer_balances foi debitado pela taxa
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'entry_type' => 'platform_fee',
+            'amount' => 500,
+        ]);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'available' => -500,
+        ]);
     }
 
     public function test_customer_cannot_create_additional_virtual_card_without_balance(): void

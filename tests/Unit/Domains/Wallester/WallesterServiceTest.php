@@ -10,6 +10,7 @@ use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Domains\Wallester\Services\WallesterSettingsService;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
+use App\Domains\Wallet\Services\LedgerService;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\CustomerWallesterCard;
@@ -306,7 +307,7 @@ class WallesterServiceTest extends TestCase
                 return $payload['from_account_id'] === $account->wallester_account_id
                     && $payload['to_account_id'] === 'wal_fee_card'
                     && $payload['amount'] === 5.0
-                    && $payload['description'] === 'Virtual card issuance fee';
+                    && $payload['description'] === 'Taxa de emissão de cartão virtual';
             }), (string) $customer->id)
             ->andReturn(['id' => 'pay_card_fee']);
         $gateway->shouldReceive('activateCard')
@@ -719,6 +720,7 @@ class WallesterServiceTest extends TestCase
             app(WallesterSettingsService::class),
             app(WallesterFundingTransferDriver::class),
             app(FundingPartnerMovementService::class),
+            app(LedgerService::class),
         );
     }
 }

@@ -10,7 +10,9 @@ use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
+use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
+use App\Domains\Wallet\Services\LedgerService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -23,6 +25,7 @@ class WallesterService
         protected WallesterSettingsService $wallesterSettings,
         protected WallesterFundingTransferDriver $fundingTransferDriver,
         protected FundingPartnerMovementService $fundingMovementService,
+        protected LedgerService $ledger,
     ) {}
 
     public function createAccount(array $data, string $currency = 'EUR'): array
@@ -294,14 +297,28 @@ class WallesterService
     ): void {
         $currency = (string) ($account->funding_currency ?? 'EUR');
 
+        $idempotencyKey = 'virtual-card-issuance-fee:'.$customer->id.':'.$createdCard->id;
+
         // Regista o movimento na plataforma e sincroniza as contas main/platform.
-        $this->fundingMovementService->transferFromCustomerToPlatformFees(
+        $outMovement = $this->fundingMovementService->transferFromCustomerToPlatformFees(
             from: $customer,
             amountCents: $feeCents,
             currency: $currency,
-            description: 'Virtual card issuance fee',
-            idempotencyKey: 'virtual-card-issuance-fee:'.$customer->id.':'.$createdCard->id,
+            description: 'Taxa de emissão de cartão virtual',
+            idempotencyKey: $idempotencyKey,
         );
+
+        // Regista a saída no ledger interno (customer_balances) — idempotente.
+        if ($outMovement !== null) {
+            $this->ledger->record(
+                customerId: (int) $customer->id,
+                currency: $currency,
+                entryType: LedgerEntryType::PLATFORM_FEE,
+                amount: $feeCents,
+                reference: $outMovement,
+                description: 'Taxa de emissão de cartão virtual',
+            );
+        }
     }
 
     private function ensureCardBlockable(CustomerWallesterCard $card): void
