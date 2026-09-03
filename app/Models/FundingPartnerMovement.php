@@ -160,6 +160,7 @@ class FundingPartnerMovement extends Model
             FundingPartnerMovementType::CardRefund => 'Reembolso cartão',
             FundingPartnerMovementType::InboundPayment => 'Entrada',
             FundingPartnerMovementType::Fee => 'Câmbio',
+            FundingPartnerMovementType::VirtualCardIssuanceFee => 'Taxa emissão cartão virtual',
             default => $this->type?->value ?? 'Wallester',
         };
     }
