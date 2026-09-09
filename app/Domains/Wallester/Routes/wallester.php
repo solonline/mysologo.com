@@ -32,6 +32,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->name('wallester.cards.show');
         Route::post('/cards/{card}/sensitive', [WallesterCardController::class, 'sensitive'])
             ->name('wallester.cards.sensitive');
+        Route::post('/cards/{card}/encrypted-pin', [WallesterCardController::class, 'encryptedPin'])
+            ->name('wallester.cards.encrypted-pin');
         Route::post('/cards/{card}/activate', [WallesterCardController::class, 'activate'])
             ->name('wallester.cards.activate');
         Route::post('/cards/{card}/block', [WallesterCardController::class, 'block'])

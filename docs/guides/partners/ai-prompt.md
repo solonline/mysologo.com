@@ -26,7 +26,7 @@ Copie o bloco completo.
    - Card: largura máx. 384px; iframe sugerido `width="400"` `height="720"` (altura dinâmica)
    - Em iframe: usar `?embed=1`; sucesso fica no iframe; ouvir `postMessage` (`source=yoop-pay`, `type=payment_request.completed`); não esperar `return_url` no iframe
    - Full-page opcional: `?return_url=https://loja.../obrigado` (só fora de iframe)
-4. Rate limit ≈ 10 pedidos/minuto → tratar 429
+4. Rate limit: 120 pedidos/minuto **por merchant** → tratar 429
 
 ## B) Webhook quando o pagamento completa
 - Yoop faz `POST` para o `webhook_url` do pedido (ou do merchant) com tipo `payment_request.completed`
@@ -47,10 +47,13 @@ Copie o bloco completo.
 - Responder 2xx só após processar; erros 4xx (exceto 408/429) não são reintentados
 
 ## C) Terminal POS (opcional, se o produto tiver TPA)
-1. `POST /merchant/terminal/connection-token` → `secret` para o SDK do terminal
-2. `POST /merchant/terminal/create-intent` com `Idempotency-Key` (UUID) e body `{ tpa_serial_number, amount, currency }`
+- O TPA liga-se ao **customer** dono do merchant: `POST /tpa/link` `{ email, password, tpa_serial }` (não uses `X-Merchant-Key` neste passo)
+- Sessões seguintes do equipamento: `POST /auth/login-tpa` com os mesmos campos
+1. `POST /merchant/terminal/connection-token` (`X-Merchant-Key`) → `secret` para o SDK do terminal (60/min por merchant)
+2. `POST /merchant/terminal/create-intent` com `Idempotency-Key` (UUID) e body `{ tpa_serial_number, amount, currency }` — o serial tem de pertencer ao customer do merchant (60/min por merchant)
 3. Usar `client_secret` no SDK para cobrar no reader
 4. `payment_intent.id` é o ID interno Yoop
+5. `POST /stripe/terminal/{payment_intent.id}/capture` com Bearer Sanctum do **customer** (conta ACTIVE), não com a API key
 
 ## Regras
 - Não uses Bearer token nestes endpoints de parceiro

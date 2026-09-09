@@ -28,14 +28,16 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('merchant.customer.credentials.rotate');
     Route::post('/{merchant}/payment-requests', [CustomerMerchantController::class, 'createPaymentRequest'])
         ->where('merchant', '[0-9]+')
-        ->middleware('throttle:stripe-intent')
+        ->middleware('throttle:merchant-payment-requests')
         ->name('merchant.customer.payment-requests');
 });
 
-Route::middleware(['auth.merchant', 'throttle:stripe-intent'])->group(function () {
+Route::middleware('auth.merchant')->group(function () {
     Route::post('/payment-requests', [MerchantController::class, 'createPaymentRequest'])
+        ->middleware('throttle:merchant-payment-requests')
         ->name('merchant.payment-requests');
-    Route::post('/terminal/connection-token', [StripeController::class, 'terminalConnectionToken']);
+    Route::post('/terminal/connection-token', [StripeController::class, 'terminalConnectionToken'])
+        ->middleware('throttle:merchant-terminal-token');
     Route::post('/terminal/create-intent', [StripeController::class, 'createTerminal'])
-        ->middleware('idempotency');
+        ->middleware(['idempotency', 'throttle:merchant-terminal-intent']);
 });

@@ -4,6 +4,8 @@
 
 Autenticar um utilizador e fazer a primeira chamada autenticada à API.
 
+📖 **Jornada completa (todos os endpoints):** [Lógica do sistema](/docs/guides/logica-sistema)
+
 ## Base URL
 
 Todas as rotas REST vivem em `/api/{dominio}/*`. Exemplo:
@@ -48,6 +50,8 @@ A resposta **AuthSession** inclui:
 
 📖 **Referência completa:** [AuthSession — campos JSON](/docs/guides/auth-session) · [Ciclo de vida](/docs/guides/onboarding-lifecycle) · [API Auth](/docs)
 
+O token de login por password ou PIN expira em **~10 minutos**. Renove com novo login ou `login-pin`.
+
 ## 2. Chamadas autenticadas
 
 Header obrigatório:
@@ -64,10 +68,10 @@ Exemplo: `GET /api/customer/me` — perfil com flags de verificação.
 | Estado lifecycle | Acção |
 |------------------|--------|
 | `PENDING_EMAIL_VERIFICATION` | Validar email (link) ou `POST /customer/send-validation-email` |
-| `PENDING_PHONE_VERIFICATION` | `POST /onboarding/phone/send` → `validate` |
+| `PENDING_PHONE_VERIFICATION` | `POST /onboarding/phone/send` → `validate` (`phone` opcional para corrigir número ainda não verificado) |
 | `PENDING_IDENTITY_VERIFICATION` | `POST /kyc/identity/session` → Didit |
-| `PROVISIONING` | Aguardar webhooks Ebury/Wallester/Stripe |
-| `ACTIVE` | Wallet, top-up, P2P |
+| `PROVISIONING` | Aguardar webhooks Wallester/Stripe (Ebury quando activo) |
+| `ACTIVE` | PIN (`POST /auth/create-pin`), wallet, top-up, P2P |
 
 ## Erros comuns
 

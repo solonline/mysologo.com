@@ -146,6 +146,18 @@ class WallesterHttpClient
         return $this->decodeJson($response->getBody()->getContents());
     }
 
+    public function getEncryptedPinCard(string $cardId, string $publicKeyBase64, ?string $auditUserId = null): array
+    {
+        $response = $this->httpClient->post("cards/{$cardId}/encrypted-pin", [
+            'headers' => $this->getRequestHeaders($auditUserId),
+            'json' => [
+                'public_key' => $publicKeyBase64,
+            ],
+        ]);
+
+        return $this->decodeJson($response->getBody()->getContents());
+    }
+
     public function getCard(string $cardId, ?string $auditUserId = null): array
     {
         $response = $this->httpClient->get("cards/{$cardId}", [
@@ -165,9 +177,30 @@ class WallesterHttpClient
         return $this->decodeJson($response->getBody()->getContents());
     }
 
+    public function listCardDispatchMethods(string $countryCode, ?string $auditUserId = null): array
+    {
+        $response = $this->httpClient->get('cards-dispatch-methods', [
+            'headers' => $this->getRequestHeaders($auditUserId),
+            'query' => [
+                'country_code' => $countryCode,
+            ],
+        ]);
+
+        return $this->decodeJson($response->getBody()->getContents());
+    }
+
     public function activateCard(string $cardId, ?string $auditUserId = null): array
     {
         $response = $this->httpClient->patch("cards/{$cardId}/activate", [
+            'headers' => $this->getRequestHeaders($auditUserId),
+        ]);
+
+        return $this->decodeJson($response->getBody()->getContents());
+    }
+
+    public function linkCardToAccount(string $cardId, string $accountId, ?string $auditUserId = null): array
+    {
+        $response = $this->httpClient->patch("cards/{$cardId}/link-to-account/{$accountId}", [
             'headers' => $this->getRequestHeaders($auditUserId),
         ]);
 

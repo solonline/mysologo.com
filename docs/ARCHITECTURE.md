@@ -473,4 +473,7 @@ idempotency_keys                      (previne duplicação de requests)
 | `customer.document.approved` | `EnsureCustomerDocumentApprovedMiddleware` | Rotas pós-KYC |
 | `maintenance` | `MaintenanceModeMiddleware` | Todas as rotas API (global) |
 | `throttle:api` | Laravel RateLimit | 60 req/min por utilizador |
-| `throttle:stripe-intent` | Laravel RateLimit | 10 req/min — criação de intents |
+| `throttle:stripe-intent` | Laravel RateLimit | 10 req/min — top-up da app (por utilizador) |
+| `throttle:merchant-payment-requests` | Laravel RateLimit | 120 req/min — criar payment request (por merchant) |
+| `throttle:merchant-terminal-token` | Laravel RateLimit | 60 req/min — connection token POS (por merchant) |
+| `throttle:merchant-terminal-intent` | Laravel RateLimit | 60 req/min — create-intent POS (por merchant) |

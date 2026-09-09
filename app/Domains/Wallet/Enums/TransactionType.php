@@ -72,7 +72,7 @@ enum TransactionType: string
             self::ALIPAY => 'Alipay',
             self::WECHAT_PAY => 'WeChat Pay',
             self::GRABPAY => 'GrabPay',
-            self::P2P => 'P2P',
+            self::P2P => 'Transferência entre contas',
             self::TOPUP => 'Carregamento',
             self::MERCHANT_PAYMENT => 'Venda SecurePay',
             self::CUSTOMER_BALANCE => 'Saldo do Cliente',

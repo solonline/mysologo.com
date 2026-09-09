@@ -464,8 +464,7 @@ class CustomerBalanceAdjustmentTest extends TestCase
             ->assertOk()
             ->assertSee('Últimos Movimentos')
             ->assertDontSee('Histórico da Plataforma')
-            ->assertSee('Banco da Plataforma')
-            ->assertSee('Débito manual')
+            ->assertSee('Débito Yoop')
             ->assertSee('Ajuste manual do banco da plataforma')
             ->assertSee('12,50');
     }

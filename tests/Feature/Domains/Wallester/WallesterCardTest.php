@@ -6,6 +6,7 @@ use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Services\WallesterCardSensitiveService;
+use App\Domains\Wallester\Services\WallesterService;
 use App\Models\CustomerDevice;
 use App\Models\CustomerWallesterCard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -280,6 +281,61 @@ class WallesterCardTest extends TestCase
             ->assertJsonPath('reason', 'invalid_credentials');
     }
 
+    public function test_customer_can_reveal_card_pin_with_password(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_pin');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_pin',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Travel Card',
+        ]);
+
+        $wallesterService = Mockery::mock(WallesterService::class);
+        $wallesterService->shouldReceive('getEncryptedPinForCustomer')
+            ->once()
+            ->with(
+                Mockery::on(fn ($value) => $value->id === $customer->id),
+                Mockery::on(fn ($value) => $value->id === $localCard->id),
+            )
+            ->andReturn('4321');
+
+        $this->app->instance(WallesterService::class, $wallesterService);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson("/api/wallester/cards/{$localCard->id}/encrypted-pin", [
+                'password' => 'password',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.pin', '4321');
+    }
+
+    public function test_card_pin_requires_password_or_pin(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_pin_missing');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_pin_missing',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Travel Card',
+        ]);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson("/api/wallester/cards/{$localCard->id}/encrypted-pin", [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['password', 'pin']);
+    }
+
     public function test_customer_cannot_show_another_customers_card(): void
     {
         $owner = $this->createActiveCustomer();
@@ -364,6 +420,85 @@ class WallesterCardTest extends TestCase
         $this->withToken($token)
             ->postJson("/api/wallester/cards/{$card->id}/activate")
             ->assertForbidden();
+    }
+
+    public function test_customer_can_create_physical_card_without_auto_activation(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_card_phys_api');
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('createCard')
+            ->once()
+            ->with(Mockery::on(function (array $payload) use ($account): bool {
+                return $payload['account_id'] === $account->wallester_account_id
+                    && $payload['type'] === 'ChipAndPin'
+                    && $payload['name'] === 'Physical Card'
+                    && is_array($payload['delivery_address'] ?? null)
+                    && $payload['delivery_address']['country_code'] === 'PRT'
+                    && $payload['delivery_address']['dispatch_method'] === 'DHLGlobalMail';
+            }), (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_phys_api_1',
+                'type' => 'Physical',
+                'status' => 'Created',
+                'name' => 'Physical Card',
+                'masked_card_number' => '****4321',
+            ]);
+        $gateway->shouldNotReceive('activateCard');
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $token = $customer->createToken('test')->plainTextToken;
+        $pin = $this->attachDevicePin($customer);
+
+        $this->withToken($token)
+            ->postJson('/api/wallester/cards', [
+                'type' => 'Physical',
+                'name' => 'Physical Card',
+                'delivery_address' => [
+                    'address' => 'Rua das Flores 1',
+                    'city' => 'Lisboa',
+                    'state' => 'Lisboa',
+                    'country' => 'PT',
+                    'first_name' => 'Joao',
+                    'last_name' => 'Silva',
+                    'phone' => '+351912345678',
+                    'postal_code' => '1000-001',
+                ],
+                ...$pin,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.wallester_card_id', 'card_phys_api_1')
+            ->assertJsonPath('data.type', 'Physical')
+            ->assertJsonPath('data.status', 'Created')
+            ->assertJsonPath('data.activated_at', null)
+            ->assertJsonPath('data.delivery_address.address', 'Rua das Flores 1')
+            ->assertJsonPath('data.delivery_address.city', 'Lisboa')
+            ->assertJsonPath('data.delivery_address.state', 'Lisboa')
+            ->assertJsonPath('data.delivery_address.country', 'PT')
+            ->assertJsonPath('data.delivery_address.first_name', 'Joao')
+            ->assertJsonPath('data.delivery_address.last_name', 'Silva')
+            ->assertJsonPath('data.delivery_address.phone', '+351912345678')
+            ->assertJsonPath('data.delivery_address.postal_code', '1000-001');
+
+        $this->assertDatabaseHas('customer_wallester_cards', [
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_phys_api_1',
+            'type' => 'Physical',
+            'status' => 'Created',
+        ]);
+        $this->assertDatabaseHas('customer_card_delivery_addresses', [
+            'customer_id' => $customer->id,
+            'address' => 'Rua das Flores 1',
+            'city' => 'Lisboa',
+            'state' => 'Lisboa',
+            'country' => 'PT',
+            'first_name' => 'Joao',
+            'last_name' => 'Silva',
+            'phone' => '+351912345678',
+            'postal_code' => '1000-001',
+        ]);
+        $this->assertSame(1, $account->fresh()->cards_count);
     }
 
     public function test_customer_can_create_additional_card(): void
@@ -770,6 +905,33 @@ class WallesterCardTest extends TestCase
             ->postJson('/api/wallester/cards', [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['type', 'name', 'pin', 'device_token']);
+    }
+
+    public function test_create_physical_card_validates_delivery_address(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE);
+        $token = $customer->createToken('test')->plainTextToken;
+        $pin = $this->attachDevicePin($customer);
+
+        $this->withToken($token)
+            ->postJson('/api/wallester/cards', [
+                'type' => 'Physical',
+                'name' => 'Physical Card',
+                ...$pin,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'delivery_address',
+                'delivery_address.address',
+                'delivery_address.city',
+                'delivery_address.state',
+                'delivery_address.country',
+                'delivery_address.first_name',
+                'delivery_address.last_name',
+                'delivery_address.phone',
+                'delivery_address.postal_code',
+            ]);
     }
 
     public function test_create_card_requires_active_wallester_account(): void
@@ -1275,6 +1437,7 @@ class WallesterCardTest extends TestCase
     {
         $this->seedWallesterSettings([
             'wallester.virtual_card_value' => '45',
+            'wallester.physical_card_value' => '1500',
         ]);
 
         $customer = $this->createActiveCustomer();
@@ -1288,14 +1451,15 @@ class WallesterCardTest extends TestCase
             ->assertJsonPath('data.currency', 'EUR')
             ->assertJsonPath('data.virtual.fee_cents', 45)
             ->assertJsonPath('data.virtual.will_charge', false)
-            ->assertJsonPath('data.physical.fee_cents', 0)
-            ->assertJsonPath('data.physical.will_charge', false);
+            ->assertJsonPath('data.physical.fee_cents', 1500)
+            ->assertJsonPath('data.physical.will_charge', true);
     }
 
     public function test_issuance_quote_is_free_when_existing_card_is_closed(): void
     {
         $this->seedWallesterSettings([
             'wallester.virtual_card_value' => '45',
+            'wallester.physical_card_value' => '1500',
         ]);
 
         $customer = $this->createActiveCustomer();
@@ -1315,13 +1479,16 @@ class WallesterCardTest extends TestCase
             ->getJson('/api/wallester/cards/issuance-quote')
             ->assertOk()
             ->assertJsonPath('data.virtual.fee_cents', 45)
-            ->assertJsonPath('data.virtual.will_charge', false);
+            ->assertJsonPath('data.virtual.will_charge', false)
+            ->assertJsonPath('data.physical.fee_cents', 1500)
+            ->assertJsonPath('data.physical.will_charge', true);
     }
 
     public function test_issuance_quote_charges_additional_virtual_card(): void
     {
         $this->seedWallesterSettings([
             'wallester.virtual_card_value' => '45',
+            'wallester.physical_card_value' => '1500',
         ]);
 
         $customer = $this->createActiveCustomer();
@@ -1342,8 +1509,8 @@ class WallesterCardTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.virtual.fee_cents', 45)
             ->assertJsonPath('data.virtual.will_charge', true)
-            ->assertJsonPath('data.physical.fee_cents', 0)
-            ->assertJsonPath('data.physical.will_charge', false);
+            ->assertJsonPath('data.physical.fee_cents', 1500)
+            ->assertJsonPath('data.physical.will_charge', true);
     }
 
     /**

@@ -122,6 +122,7 @@ wallester-cards-store:
 
       **Comportamento:**
       - Cartões **Virtual** em estado `Created` são **activados automaticamente** após criação
+      - Cartões **Physical** ficam em `Created` — não são activados neste endpoint
       - OOB 3DS é configurado com o `wallester_oob_id` da conta Wallester do customer
       - `internet_purchase_enabled` fica activo por defeito
 
@@ -148,6 +149,29 @@ wallester-cards-store:
               security:
                 type: object
                 additionalProperties: true
+              delivery_address:
+                type: object
+                description: Morada real do customer. Obrigatória se `type` for Physical. Não é enviada à Wallester.
+                required: [address, city, first_name, last_name, phone, postal_code]
+                properties:
+                  address:
+                    type: string
+                    maxLength: 255
+                  city:
+                    type: string
+                    maxLength: 255
+                  first_name:
+                    type: string
+                    maxLength: 255
+                  last_name:
+                    type: string
+                    maxLength: 255
+                  phone:
+                    type: string
+                    maxLength: 255
+                  postal_code:
+                    type: string
+                    maxLength: 255
           example:
             type: Virtual
             name: Travel Card
@@ -256,6 +280,69 @@ wallester-cards-sensitive:
               properties:
                 data:
                   $ref: '../components/schemas.yaml#/WallesterCardSensitive'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        description: Cartão inactivo ou indisponível
+
+wallester-cards-encrypted-pin:
+  post:
+    tags: [Wallester]
+    summary: Revelar PIN do cartão
+    operationId: wallesterCardsEncryptedPin
+    description: |
+      Obtém o PIN do cartão via `POST /v1/cards/{id}/encrypted-pin` da Wallester.
+
+      O backend envia a chave pública RSA (`WALLESTER_CARD_RSA_PRIVATE_KEY`), desencripta o payload OAEP (`PIN`) e devolve o PIN em plain text sobre HTTPS.
+
+      Requer confirmação de identidade com **password da conta** ou **PIN do dispositivo** (`pin` + `device_token`).
+
+      **Pré-requisitos:** cartão `Active` e pertencente ao customer autenticado.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: card
+        in: path
+        required: true
+        description: ID local do cartão (`customer_wallester_cards.id`)
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - type: object
+                required: [password]
+                properties:
+                  password:
+                    type: string
+                    format: password
+                    description: Password da conta Yoop
+              - type: object
+                required: [pin, device_token]
+                properties:
+                  pin:
+                    type: string
+                    pattern: '^[0-9]{4}$'
+                    description: PIN de 4 dígitos do dispositivo
+                  device_token:
+                    type: string
+                    description: Token do dispositivo registado com PIN
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCardPin'
       '401':
         $ref: '../components/responses.yaml#/Unauthorized'
       '403':

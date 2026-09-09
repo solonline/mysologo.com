@@ -2,11 +2,20 @@ openapi: 3.1.0
 
 info:
   title: Yoop API — Parceiros
-  version: 1.0.0
+  version: 1.1.0
+  x-logo:
+    url: /yoop.jpeg
+    altText: Yoop
+    href: /docs/partners
   description: |
     # API para integradores externos
 
-    Documentação pública dos endpoints que merchants e parceiros podem consumir.
+    Endpoints que merchants e parceiros podem consumir.
+    A `api_key` é emitida na app Yoop após activação do merchant.
+
+    Guias: [payment requests](/docs/partners/guides/payment-requests),
+    [terminal POS](/docs/partners/guides/terminal-topup),
+    [prompt para IA](/docs/partners/guides/ai-prompt).
 
     ## Autenticação
 
@@ -16,204 +25,81 @@ info:
     X-Merchant-Key: {sua_api_key}
     ```
 
-    A API key é fornecida pela equipa Yoop após activação do merchant.
+    Não usar Bearer/Sanctum nestes endpoints.
 
     ## Base URL
 
     ```
-    https://api.seudominio.com/api
+    https://api.yooppayments.eu/api
     ```
 
-    ## Suporte
+    ## Rate limits
 
-    Para novos endpoints ou ambientes de sandbox, contacte a equipa Yoop.
-    Guias: payment requests, terminal POS e prompt para IA em `/docs/partners/guides`.
+    | Rota | Limite (por merchant) |
+    |------|--------|
+    | `POST /merchant/payment-requests` | 120/min |
+    | `POST /merchant/terminal/connection-token` | 60/min |
+    | `POST /merchant/terminal/create-intent` | 60/min |
 
-    ## Fluxo Payment Request
+    Resposta `429` com `Retry-After` se exceder. Os limites são por merchant, não por IP.
 
-    1. `POST /merchant/payment-requests` → recebe `url`
-    2. Redireccione o pagador para `url` (browser ou iframe)
-    3. Opcional: use `webhook_url` para notificação HMAC
+    ## Payment request
 
-    ### Embutir (iframe)
+    1. `POST /merchant/payment-requests` → recebe `uuid` e `url`
+    2. Abrir `url` no browser ou iframe (`?embed=1`)
+    3. Quando o pagamento completa, a Yoop envia `POST` HMAC para `webhook_url`
+
+    ### Iframe
 
     Card de pagamento: largura máx. **384px**. Iframe sugerido: `width=400`, `height=720`
     (altura dinâmica — aumentar com muitos `items`).
 
-    ### Settlement (fundos)
+    Em embed, o sucesso fica no iframe. Ouvir `postMessage` (`source=yoop-pay`).
+    `return_url` só é honrada em full-page.
 
-    Quando o pagamento é concluído (`status=completed`):
+    ### Webhook
 
-    - O valor fica na wallet Yoop do merchant como **pending** até liquidação (`settlement_status=pending`, `funds_available=false` no webhook).
-    - A disponibilização (`settlement_status=available`) ocorre após liquidação (fase futura).
+    Headers: `X-Yoop-Timestamp`, `X-Yoop-Signature` (`v1=` + HMAC-SHA256), `X-Yoop-Delivery-Id`.
 
-    ## Fluxo Terminal (POS)
+    Assinatura: `HMAC_SHA256(webhook_secret, "{timestamp}.{raw_body}")`.
+    Rejeitar se `|now - timestamp| > 300s`. Até 10 retries com backoff.
+
+    O primeiro webhook pode ter `fee_total`, `net_amount` e `funds_available_at` a `null`.
+    Quando o Stripe confirma as taxas, a Yoop **reenvia** o mesmo evento — ser idempotente por `data.uuid`.
+
+    ### Settlement
+
+    Quando `status=completed`:
+
+    | Campo | Significado |
+    |-------|-------------|
+    | `settlement_status=pending` / `funds_available=false` | Pago, fundos ainda a liquidar |
+    | `settlement_status=available` / `funds_available=true` | Disponíveis na wallet Yoop do merchant |
+    | `funds_available_at` | Data prevista (`YYYY-MM-DD`), ou `null` até o Stripe informar |
+
+    ## Terminal (POS)
 
     1. `POST /merchant/terminal/connection-token` → `secret` para o SDK do terminal
-    2. `POST /merchant/terminal/create-intent` com `Idempotency-Key`
-    3. Passar `client_secret` ao reader no POS
+    2. `POST /merchant/terminal/create-intent` com `Idempotency-Key` (UUID)
+    3. Capture: `POST /stripe/terminal/{id}/capture` com Bearer do **customer** dono (não é esta API de parceiros — ver [guia](/docs/partners/guides/terminal-topup))
+
+  contact:
+    name: Equipa Yoop
+    email: hello@yooppayments.eu
 
 servers:
+  - url: https://api.yooppayments.eu/api
+    description: Produção
   - url: /api
-    description: API no host actual
+    description: Host actual (esta página de docs)
 
 tags:
   - name: Merchant
-    description: Pagamentos e terminal para merchants integrados.
+    description: Payment requests, webhooks HMAC e terminal POS.
 
 paths:
   /merchant/payment-requests:
-    post:
-      tags: [Merchant]
-      summary: Criar pedido de pagamento
-      operationId: merchantCreatePaymentRequest
-      description: |
-        Cria um link de pagamento publico (/pay/{uuid}) para o merchant autenticado.
-
-        Autenticacao: X-Merchant-Key (nao usar Bearer neste endpoint).
-
-        Rate limit: 10 pedidos/minuto.
-
-        Fluxo tipico:
-        1. Criar payment request e receber url
-        2. Redirecionar cliente para url (browser ou iframe)
-        3. Cliente paga na pagina Yoop
-      security:
-        - merchantKey: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [amount]
-              properties:
-                amount:
-                  type: integer
-                  minimum: 1
-                  description: Valor em centimos
-                description:
-                  type: string
-                  maxLength: 500
-                external_reference:
-                  type: string
-                  maxLength: 255
-                payer_name:
-                  type: string
-                payer_email:
-                  type: string
-                  format: email
-                payer_phone:
-                  type: string
-                webhook_url:
-                  type: string
-                  format: uri
-                metadata:
-                  type: object
-                  additionalProperties: true
-                items:
-                  type: array
-                  items:
-                    type: object
-                    required: [name, quantity, unit_price]
-                    properties:
-                      name:
-                        type: string
-                      quantity:
-                        type: number
-                      unit_price:
-                        type: integer
-                        minimum: 0
-                expires_in:
-                  type: integer
-                  minimum: 5
-                  maximum: 1440
-                language:
-                  type: string
-                  maxLength: 5
-                payment_method_types:
-                  type: array
-                  items:
-                    type: string
-                    enum: [card, mb_way]
-            example:
-              amount: 5000
-              description: "Order #123"
-              external_reference: ORD-123
-              items:
-                - name: Cafe
-                  quantity: 2
-                  unit_price: 150
-                - name: Croissant
-                  quantity: 1
-                  unit_price: 200
-      responses:
-        "201":
-          description: Payment request criado
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  uuid:
-                    type: string
-                    format: uuid
-                  amount:
-                    type: integer
-                  currency:
-                    type: string
-                  description:
-                    type: string
-                    nullable: true
-                  external_reference:
-                    type: string
-                    nullable: true
-                  payment_method_types:
-                    type: array
-                    nullable: true
-                    items:
-                      type: string
-                  status:
-                    type: string
-                  settlement_status:
-                    type: string
-                    nullable: true
-                  url:
-                    type: string
-                    format: uri
-                  paid_at:
-                    type: string
-                    format: date-time
-                    nullable: true
-                  expires_at:
-                    type: string
-                    format: date-time
-                    nullable: true
-                  created_at:
-                    type: string
-                    format: date-time
-                    nullable: true
-              example:
-                uuid: "9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8"
-                amount: 5000
-                currency: EUR
-                description: "Order #123"
-                external_reference: ORD-123
-                payment_method_types:
-                  - card
-                  - mb_way
-                status: pending
-                settlement_status: null
-                url: "https://yooppayments.eu/pay/9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8"
-                paid_at: null
-                expires_at: "2026-07-23T13:00:00+01:00"
-                created_at: "2026-07-23T12:00:00+01:00"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "422":
-          $ref: "#/components/responses/ValidationError"
-        "429":
-          $ref: "#/components/responses/RateLimited"
+    $ref: './paths/merchant.yaml#/merchant-payment-requests'
   /merchant/terminal/connection-token:
     $ref: './paths/merchant.yaml#/merchant-terminal-connection-token'
   /merchant/terminal/create-intent:
@@ -230,6 +116,8 @@ components:
       $ref: './components/schemas.yaml#/ValidationError'
     MerchantPaymentRequest:
       $ref: './components/schemas.yaml#/MerchantPaymentRequest'
+    MerchantPaymentWebhook:
+      $ref: './components/schemas.yaml#/MerchantPaymentWebhook'
     TerminalConnectionToken:
       $ref: './components/schemas.yaml#/TerminalConnectionToken'
     TerminalPaymentIntent:

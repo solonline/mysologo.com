@@ -5,6 +5,7 @@ namespace App\Domains\Onboarding\Controllers;
 use App\Domains\Onboarding\Services\PhoneVerificationService;
 use App\Domains\Sms\Support\SmsLogger;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Onboarding\SendOnboardingPhoneRequest;
 use App\Http\Resources\SmsValidationResource;
 use App\Models\Customer;
 use Illuminate\Http\Request;
@@ -17,21 +18,25 @@ class PhoneVerificationController extends Controller
     /**
      * Send Phone Verification Code
      *
-     * Sends a one-time SMS code to the customer's registered phone number.
+     * Sends a one-time SMS code to the customer's phone. Optional `phone` corrects
+     * an unverified number from registration before sending.
      *
      * @tags Onboarding
      */
-    public function send(Request $request)
+    public function send(SendOnboardingPhoneRequest $request)
     {
-        $request->validate([
-            'phone' => 'required|string',
-        ]);
-
         /** @var Customer $customer */
         $customer = Auth::user();
-        $sent = $this->service->sendSms($customer, $customer->phone);
+        $sent = $this->service->sendForOnboarding($customer, $request->validated('phone'));
+        $customer->refresh();
 
-        $msg = $sent ? 'Verification code sent.' : 'Phone already verified.';
+        if ($sent) {
+            $msg = 'Verification code sent.';
+        } elseif ($this->service->isVerified($customer, (string) $customer->phone)) {
+            $msg = 'Phone already verified.';
+        } else {
+            $msg = 'Unable to send verification code.';
+        }
 
         SmsLogger::info('onboarding_phone_send_endpoint', [
             'customer_id' => $customer->id,
@@ -40,10 +45,17 @@ class PhoneVerificationController extends Controller
             'message' => $msg,
         ]);
 
-        return SmsValidationResource::make([
+        $resource = SmsValidationResource::make([
             'message' => $msg,
             'status' => $sent ? 'success' : 'failed',
+            'phone' => $customer->phone,
         ]);
+
+        if ($sent || $this->service->isVerified($customer, (string) $customer->phone)) {
+            return $resource;
+        }
+
+        return $resource->response()->setStatusCode(502);
     }
 
     /**

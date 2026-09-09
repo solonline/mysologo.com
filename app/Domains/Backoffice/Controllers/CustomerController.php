@@ -6,6 +6,7 @@ use App\Domains\Backoffice\Actions\CancelCustomerBalanceAdjustmentAction;
 use App\Domains\Backoffice\Actions\ConfirmCustomerBalanceAdjustmentAction;
 use App\Domains\Backoffice\Actions\CreateCustomerFromBackofficeAction;
 use App\Domains\Backoffice\Actions\CreateCustomerWallesterCardAction;
+use App\Domains\Backoffice\Actions\LinkCustomerWallesterCardAction;
 use App\Domains\Backoffice\Actions\RequestCustomerBalanceAdjustmentAction;
 use App\Domains\Backoffice\Actions\ResendCustomerBalanceAdjustmentOtpAction;
 use App\Domains\Backoffice\Actions\RetryCustomerProvisioningAction;
@@ -16,9 +17,10 @@ use App\Domains\Backoffice\DTOs\UpdateCustomerFromBackofficeData;
 use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentStatus;
 use App\Domains\Backoffice\Queries\GetCustomerActivityTimelineQuery;
 use App\Domains\Backoffice\Queries\GetCustomerDetailQuery;
-use App\Domains\Backoffice\Queries\GetRecentCustomerMovementsQuery;
 use App\Domains\Backoffice\Queries\ListCustomersQuery;
+use App\Domains\Backoffice\Queries\SearchCustomersByUsernameQuery;
 use App\Domains\Backoffice\Requests\ConfirmCustomerBalanceAdjustmentRequest;
+use App\Domains\Backoffice\Requests\LinkCustomerWallesterCardRequest;
 use App\Domains\Backoffice\Requests\RequestCustomerBalanceAdjustmentRequest;
 use App\Domains\Backoffice\Requests\StoreCustomerRequest;
 use App\Domains\Backoffice\Requests\UpdateCustomerRequest;
@@ -32,6 +34,7 @@ use App\Http\Requests\Customer\ChangeCustomerPhoneRequest;
 use App\Http\Requests\Customer\ConfirmPendingCustomerPhoneRequest;
 use App\Models\Customer;
 use App\Models\CustomerBalanceAdjustment;
+use App\Models\CustomerWallesterCard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -42,12 +45,13 @@ class CustomerController extends Controller
         protected ListCustomersQuery $listCustomers,
         protected GetCustomerDetailQuery $customerDetail,
         protected GetCustomerActivityTimelineQuery $customerActivityTimeline,
-        protected GetRecentCustomerMovementsQuery $recentCustomerMovements,
+        protected SearchCustomersByUsernameQuery $searchCustomersByUsername,
         protected CreateCustomerFromBackofficeAction $createCustomer,
         protected UpdateCustomerFromBackofficeAction $updateCustomer,
         protected RetryCustomerProvisioningAction $retryProvisioning,
         protected RetryStripeFundingAction $retryStripeFunding,
         protected CreateCustomerWallesterCardAction $createWallesterCard,
+        protected LinkCustomerWallesterCardAction $linkCustomerWallesterCard,
         protected CustomerPhoneChangeService $phoneChange,
         protected RequestCustomerBalanceAdjustmentAction $requestBalanceAdjustment,
         protected ConfirmCustomerBalanceAdjustmentAction $confirmBalanceAdjustment,
@@ -66,6 +70,16 @@ class CustomerController extends Controller
             'customerStatuses' => CustomerLifecycleStatus::cases(),
             'documentStatuses' => DocumentStatus::cases(),
         ]);
+    }
+
+    public function searchUsernames(Request $request): JsonResponse
+    {
+        $results = $this->searchCustomersByUsername->execute(
+            query: (string) $request->query('q', ''),
+            excludeId: $request->integer('exclude') ?: null,
+        );
+
+        return response()->json(['data' => $results]);
     }
 
     public function show(Customer $customer)
@@ -212,6 +226,29 @@ class CustomerController extends Controller
         }
 
         return back()->with('success', 'Cartão virtual criado com sucesso.');
+    }
+
+    public function linkWallesterCard(
+        LinkCustomerWallesterCardRequest $request,
+        Customer $customer,
+    ) {
+        $card = CustomerWallesterCard::query()->findOrFail((int) $request->validated('card_id'));
+
+        try {
+            $this->linkCustomerWallesterCard->execute(
+                $customer,
+                $card,
+                (string) $request->validated('target_customer'),
+            );
+        } catch (ValidationException $exception) {
+            return back()->withInput()->with('error', collect($exception->errors())->flatten()->first());
+        } catch (ApiException $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
+        } catch (\Throwable $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'Cartão transferido para o cliente de destino.');
     }
 
     public function retryStripeFunding(Customer $customer)

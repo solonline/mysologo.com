@@ -438,13 +438,13 @@ MerchantPaymentRequest:
       nullable: true
       enum: [pending, available]
       description: |
-        Presente quando `status=completed`.
-        `pending` = pago pelo cliente, fundos ainda a aguardar liquidação (ainda não disponíveis).
-        `available` = liquidado e disponível na wallet (fase futura de payout).
+        Presente quando `status=completed`. `null` enquanto o pedido está `pending`.
+        `pending` = pago pelo cliente, fundos ainda a aguardar liquidação.
+        `available` = liquidado e disponível na wallet Yoop do merchant.
     url:
       type: string
       format: uri
-      description: URL pública de pagamento (`/pay/{uuid}`)
+      description: URL pública de pagamento (`https://api.yooppayments.eu/pay/{uuid}`)
     paid_at:
       type: string
       format: date-time
@@ -457,6 +457,82 @@ MerchantPaymentRequest:
       type: string
       format: date-time
       nullable: true
+
+MerchantPaymentWebhook:
+  type: object
+  description: |
+    Payload `POST` enviado para `webhook_url` quando o payment request muda de estado
+    (tipicamente `payment_request.completed`). Assinado com HMAC se o merchant tiver `webhook_secret`.
+  properties:
+    id:
+      type: string
+      description: Identificador do evento (`evt_{uuid}`)
+      example: evt_9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8
+    type:
+      type: string
+      description: `payment_request.{status}`
+      example: payment_request.completed
+    created:
+      type: integer
+      description: Unix timestamp da geração do evento
+    data:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: completed
+        settlement_status:
+          type: string
+          nullable: true
+          enum: [pending, available]
+        funds_available:
+          type: boolean
+          description: `true` quando os fundos já estão disponíveis na wallet
+        external_reference:
+          type: string
+          nullable: true
+        amount:
+          type: integer
+          description: Valor cobrado ao pagador, em cêntimos
+        fee_total:
+          type: integer
+          nullable: true
+          description: Taxas (Stripe + plataforma) em cêntimos. `null` até o Stripe confirmar
+        net_amount:
+          type: integer
+          nullable: true
+          description: Líquido para o merchant (`amount - fee_total`). `null` até as taxas existirem
+        currency:
+          type: string
+          example: EUR
+        paid_at:
+          type: string
+          format: date-time
+          nullable: true
+        funds_available_at:
+          type: string
+          format: date
+          nullable: true
+          description: Data prevista (`YYYY-MM-DD`) em que os fundos ficam disponíveis
+  example:
+    id: evt_9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8
+    type: payment_request.completed
+    created: 1716547200
+    data:
+      uuid: 9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8
+      status: completed
+      settlement_status: pending
+      funds_available: false
+      external_reference: ORD-123
+      amount: 5000
+      fee_total: 200
+      net_amount: 4800
+      currency: EUR
+      paid_at: "2026-07-23T12:05:00+01:00"
+      funds_available_at: "2026-07-28"
 
 TerminalConnectionToken:
   type: object
@@ -590,6 +666,25 @@ SmsValidationResult:
     status:
       type: string
       enum: [success, failed]
+    phone:
+      type: string
+      description: Número para o qual o SMS foi enviado (`POST /onboarding/phone/send`).
+
+PhoneChangeResult:
+  type: object
+  description: Resposta de `POST /customer/phone` (pedido de alteração, perfil ainda não actualizado).
+  properties:
+    status:
+      type: string
+      enum: [success, failed]
+    phone:
+      type: string
+      description: Novo número para o qual o SMS foi enviado.
+    phone_verified:
+      type: boolean
+      description: Estado do telefone **actual** da conta (ainda o antigo até ao confirm).
+    message:
+      type: string
 
 WalletDashboard:
   type: object
@@ -622,6 +717,9 @@ Transaction:
       type: integer
     type:
       type: string
+    type_label:
+      type: string
+      description: Nome de apresentação (ex. Transferência entre contas, Carregamento)
     direction:
       type: string
     amount:
@@ -667,6 +765,14 @@ FundingPartnerMovement:
     type:
       type: string
       enum: [card_purchase, card_refund, account_transfer, inbound_payment, fee]
+    type_label:
+      type: string
+      description: Nome de apresentação (ex. Transferência entre contas, Crédito Yoop, Compra cartão)
+    source_label:
+      type: string
+      description: Origem visível (Wallester, Crédito Yoop, Débito Yoop)
+    is_p2p:
+      type: boolean
     amount:
       type: integer
       description: Total debitado/creditado na moeda da conta (cêntimos). Compra FX = compra convertida + taxa.
@@ -695,6 +801,23 @@ FundingPartnerMovement:
     counterparty_external_account_id:
       type: string
       nullable: true
+    counterparty:
+      type: object
+      nullable: true
+      description: Contraparte em transferências entre contas (P2P)
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        username:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [sender, recipient]
     partner_external_id:
       type: string
       nullable: true
@@ -890,6 +1013,13 @@ WallesterCardSensitive:
       format: date-time
       nullable: true
 
+WallesterCardPin:
+  type: object
+  properties:
+    pin:
+      type: string
+      example: '1234'
+
 WallesterCardApi:
   type: object
   description: Cartão devolvido pela API Wallester (passthrough)
@@ -977,6 +1107,23 @@ WallesterCard:
       type: object
       additionalProperties: true
       nullable: true
+    delivery_address:
+      type: object
+      nullable: true
+      description: Morada de entrega do customer (cartão físico)
+      properties:
+        address:
+          type: string
+        city:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone:
+          type: string
+        postal_code:
+          type: string
     activated_at:
       type: string
       format: date-time

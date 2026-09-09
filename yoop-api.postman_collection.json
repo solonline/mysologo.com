@@ -1,1076 +1,1631 @@
 {
-	"info": {
-		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-		"name": "Yoop API",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-	},
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://yoop.test/api",
-			"type": "string"
-		},
-		{
-			"key": "token",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "merchant_api_key",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "wallester_base_url",
-			"value": "https://api-frontend.wallester.com/v1",
-			"type": "string"
-		},
-		{
-			"key": "wallester_jwt",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "wallester_product_code",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "wallester_audit_source_type",
-			"value": "Backend",
-			"type": "string"
-		},
-		{
-			"key": "wallester_audit_user_id",
-			"value": "postman-test-user",
-			"type": "string"
-		},
-		{
-			"key": "wallester_account_id",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "wallester_card_id",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "wallester_oob_id",
-			"value": "00000000-0000-4000-8000-000000000001",
-			"type": "string"
-		}
-	],
-	"auth": {
-		"type": "bearer",
-		"bearer": [
-			{
-				"key": "token",
-				"value": "{{token}}",
-				"type": "string"
-			}
-		]
-	},
-	"item": [
-		{
-			"name": "Authentication",
-			"item": [
-				{
-					"name": "Register Retail",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"name\": \"John Doe\",\n\t\"email\": \"john@example.com\",\n\t\"username\": \"johndoe\",\n\t\"password\": \"secret123\",\n\t\"phone\": \"351912345678\",\n\t\"currency\": \"EUR\",\n\t\"language\": \"en\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/register-retail",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "register-retail"]
-						}
-					}
-				},
-				{
-					"name": "Register Corporate",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"name\": \"Acme Corp\",\n\t\"username\": \"acmecorp\",\n\t\"email\": \"admin@acme.com\",\n\t\"tax_id\": \"PT123456789\",\n\t\"password\": \"secret123\",\n\t\"country_code\": \"PT\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/register-corporate",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "register-corporate"]
-						}
-					}
-				},
-				{
-					"name": "Login",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"var json = pm.response.json();",
-									"if (json.data && json.data.token) {",
-									"    pm.collectionVariables.set('token', json.data.token);",
-									"}"
-								]
-							}
-						}
-					],
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"password\": \"secret123\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/login",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "login"]
-						}
-					}
-				},
-				{
-					"name": "Login with PIN",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"device_token\": \"DEVICE_TOKEN_HERE\",\n\t\"pin\": \"1234\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/login-pin",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "login-pin"]
-						}
-					}
-				},
-				{
-					"name": "Login via TPA",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"password\": \"secret123\",\n\t\"tpa_serial\": \"TPA_SERIAL_HERE\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/login-tpa",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "login-tpa"]
-						}
-					}
-				},
-				{
-					"name": "Link TPA",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"tpa_serial\": \"TPA_SERIAL_HERE\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/tpa/link",
-							"host": ["{{base_url}}"],
-							"path": ["tpa", "link"]
-						}
-					}
-				},
-				{
-					"name": "Logout",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/auth/logout",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "logout"]
-						}
-					}
-				},
-				{
-					"name": "Forgot Password",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"email\": \"john@example.com\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/forgot-password",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "forgot-password"]
-						}
-					}
-				},
-				{
-					"name": "Reset Password",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"email\": \"john@example.com\",\n\t\"token\": \"RESET_TOKEN_HERE\",\n\t\"password\": \"newpassword123\",\n\t\"password_confirmation\": \"newpassword123\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/reset-password",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "reset-password"]
-						}
-					}
-				},
-				{
-					"name": "Create Identity Session",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/kyc/identity/session",
-							"host": ["{{base_url}}"],
-							"path": ["kyc", "identity", "session"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "PIN",
-			"item": [
-				{
-					"name": "Create PIN",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"device_token\": \"UNIQUE_DEVICE_TOKEN\",\n\t\"device_name\": \"My iPhone 14\",\n\t\"pin\": \"1234\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/create-pin",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "create-pin"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Profile",
-			"item": [
-				{
-					"name": "Get My Profile",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/customer/me",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "me"]
-						}
-					}
-				},
-				{
-					"name": "Update Profile",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"name\": \"John Updated\",\n\t\"username\": \"johndoe_new\",\n\t\"phone\": \"351987654321\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/customer/update",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "update"]
-						}
-					}
-				},
-				{
-					"name": "Upload Avatar",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "avatar",
-									"type": "file",
-									"description": "JPG, JPEG, PNG ou WEBP - max 2MB"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{base_url}}/customer/upload-avatar",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "upload-avatar"]
-						}
-					}
-				},
-				{
-					"name": "Find Customer by Username",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/customer/find/johndoe",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "find", "johndoe"]
-						}
-					}
-				},
-				{
-					"name": "Send Validation Email",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/customer/send-validation-email",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "send-validation-email"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Phone Verification",
-			"item": [
-				{
-					"name": "Send Verification Code",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"phone\": \"351912345678\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/onboarding/phone/send",
-							"host": ["{{base_url}}"],
-							"path": ["onboarding", "phone", "send"]
-						}
-					}
-				},
-				{
-					"name": "Validate Phone Code",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"code\": \"123456\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/onboarding/phone/validate",
-							"host": ["{{base_url}}"],
-							"path": ["onboarding", "phone", "validate"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "KYC",
-			"item": [
-				{
-					"name": "Create Corporate Responsible",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"name\": \"Jane Smith\",\n\t\"username\": \"janesmith\",\n\t\"email\": \"jane@acme.com\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/customer/create-corporate-responsible",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "create-corporate-responsible"]
-						}
-					}
-				},
-				{
-					"name": "Submit Corporate Document",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "document",
-									"type": "file",
-									"description": "PDF apenas"
-								},
-								{
-									"key": "country",
-									"value": "PT",
-									"type": "text",
-									"description": "Codigo de pais ISO 3166-1 alpha-2"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{base_url}}/customer/submit-corporate-documents",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "submit-corporate-documents"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Wallet",
-			"item": [
-				{
-					"name": "Get Summary",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/wallet/dashboard/summary",
-							"host": ["{{base_url}}"],
-							"path": ["wallet", "dashboard", "summary"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Account",
-			"item": [
-				{
-					"name": "Get Account",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/wallet/account",
-							"host": ["{{base_url}}"],
-							"path": ["wallet", "account"]
-						}
-					}
-				},
-				{
-					"name": "Get Balance",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/wallet/account/balance",
-							"host": ["{{base_url}}"],
-							"path": ["wallet", "account", "balance"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Transactions",
-			"item": [
-				{
-					"name": "List Transactions",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/wallet/transactions?per_page=15",
-							"host": ["{{base_url}}"],
-							"path": ["wallet", "transactions"],
-							"query": [
-								{ "key": "per_page", "value": "15" }
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Transaction",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/wallet/transactions/1",
-							"host": ["{{base_url}}"],
-							"path": ["wallet", "transactions", "1"]
-						}
-					}
-				},
-				{
-					"name": "P2P Transfer",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"recipient_username\": \"janedoe\",\n\t\"amount\": 1000,\n\t\"currency\": \"EUR\",\n\t\"description\": \"Pagamento almoco\",\n\t\"device_token\": \"DEVICE_TOKEN_HERE\",\n\t\"pin\": \"1234\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/wallet/transactions/p2p",
-							"host": ["{{base_url}}"],
-							"path": ["wallet", "transactions", "p2p"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Stripe",
-			"item": [
-				{
-					"name": "List Payment Methods",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/stripe/payment-methods?currency=EUR",
-							"host": ["{{base_url}}"],
-							"path": ["stripe", "payment-methods"],
-							"query": [
-								{ "key": "currency", "value": "EUR" }
-							]
-						}
-					}
-				},
-				{
-					"name": "Fee Estimates",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/stripe/fee-estimates?currency=EUR",
-							"host": ["{{base_url}}"],
-							"path": ["stripe", "fee-estimates"],
-							"query": [
-								{ "key": "currency", "value": "EUR" }
-							]
-						}
-					}
-				},
-				{
-					"name": "Create Payment Intent",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" },
-							{ "key": "Idempotency-Key", "value": "{{$guid}}", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"amount\": 1000,\n\t\"payment_method_id\": 1,\n\t\"currency\": \"EUR\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/stripe/create-intent-payment",
-							"host": ["{{base_url}}"],
-							"path": ["stripe", "create-intent-payment"]
-						}
-					}
-				},
-				{
-					"name": "Create Funding (Bank Transfer)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" },
-							{ "key": "Idempotency-Key", "value": "{{$guid}}", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"amount\": 5000,\n\t\"currency\": \"EUR\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/stripe/create-funding",
-							"host": ["{{base_url}}"],
-							"path": ["stripe", "create-funding"]
-						}
-					}
-				},
-				{
-					"name": "Get Funding Instructions",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/stripe/get-funding-instructions",
-							"host": ["{{base_url}}"],
-							"path": ["stripe", "get-funding-instructions"]
-						}
-					}
-				},
-				{
-					"name": "Create Terminal Payment Intent",
-					"request": {
-						"auth": {
-							"type": "apikey",
-							"apikey": [
-								{ "key": "key", "value": "X-Merchant-Key", "type": "string" },
-								{ "key": "value", "value": "{{merchant_api_key}}", "type": "string" },
-								{ "key": "in", "value": "header", "type": "string" }
-							]
-						},
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" },
-							{ "key": "Idempotency-Key", "value": "{{$guid}}", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"tpa_serial_number\": \"TPA_SERIAL_HERE\",\n\t\"amount\": 2000,\n\t\"currency\": \"EUR\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/merchant/terminal/create-intent",
-							"host": ["{{base_url}}"],
-							"path": ["merchant", "terminal", "create-intent"]
-						}
-					}
-				},
-				{
-					"name": "Capture Terminal Payment",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/stripe/terminal/1/capture",
-							"host": ["{{base_url}}"],
-							"path": ["stripe", "terminal", "1", "capture"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Notifications",
-			"item": [
-				{
-					"name": "List Notifications",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/customer/notifications",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "notifications"]
-						}
-					}
-				},
-				{
-					"name": "Mark Notification as Read",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/customer/notifications/NOTIFICATION_UUID/read",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "notifications", "NOTIFICATION_UUID", "read"]
-						}
-					}
-				},
-				{
-					"name": "Mark All Notifications as Read",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/customer/notifications/read-all",
-							"host": ["{{base_url}}"],
-							"path": ["customer", "notifications", "read-all"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Settings",
-			"item": [
-				{
-					"name": "List Settings",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/settings",
-							"host": ["{{base_url}}"],
-							"path": ["settings"]
-						}
-					}
-				},
-				{
-					"name": "Get Setting",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/settings/maintenance_mode",
-							"host": ["{{base_url}}"],
-							"path": ["settings", "maintenance_mode"]
-						}
-					}
-				},
-				{
-					"name": "Set Setting",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"value\": \"false\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/settings/maintenance_mode",
-							"host": ["{{base_url}}"],
-							"path": ["settings", "maintenance_mode"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Merchant",
-			"item": [
-				{
-					"name": "Create Payment Request",
-					"request": {
-						"auth": {
-							"type": "apikey",
-							"apikey": [
-								{ "key": "key", "value": "X-Merchant-Key", "type": "string" },
-								{ "key": "value", "value": "{{merchant_api_key}}", "type": "string" },
-								{ "key": "in", "value": "header", "type": "string" }
-							]
-						},
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"amount\": 5000,\n\t\"currency\": \"EUR\",\n\t\"description\": \"Order #123\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/merchant/payment-requests",
-							"host": ["{{base_url}}"],
-							"path": ["merchant", "payment-requests"]
-						}
-					}
-				},
-				{
-					"name": "Register as Merchant",
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"business_name\": \"My Shop\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/merchant/register",
-							"host": ["{{base_url}}"],
-							"path": ["merchant", "register"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Webhooks",
-			"item": [
-				{
-					"name": "Didit Webhook",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"session_id\": \"SESSION_ID\",\n\t\"status\": \"APPROVED\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/webhooks/didit",
-							"host": ["{{base_url}}"],
-							"path": ["webhooks", "didit"]
-						}
-					}
-				},
-				{
-					"name": "Stripe Webhook",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" },
-							{ "key": "Stripe-Signature", "value": "t=...,v1=...", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"type\": \"payment_intent.succeeded\",\n\t\"data\": {}\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/webhooks/stripe",
-							"host": ["{{base_url}}"],
-							"path": ["webhooks", "stripe"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "System",
-			"item": [
-				{
-					"name": "Basic System Info",
-					"request": {
-						"auth": { "type": "noauth" },
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" }
-						],
-						"url": {
-							"raw": "{{base_url}}/settings/system-info",
-							"host": ["{{base_url}}"],
-							"path": ["settings", "system-info"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Wallester Direct",
-			"description": "API Wallester directa. Antes: php postman/scripts/sync-postman-env.php e importar wallester-sandbox.local.postman_environment.json",
-			"auth": {
-				"type": "bearer",
-				"bearer": [
-					{
-						"key": "token",
-						"value": "{{wallester_jwt}}",
-						"type": "string"
-					}
-				]
-			},
-			"item": [
-				{
-					"name": "Create Account",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"var json = pm.response.json();",
-									"var account = json.account || json;",
-									"if (account.id) { pm.environment.set('wallester_account_id', account.id); }"
-								]
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" },
-							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
-							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
-							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"name\": \"Postman Test Account\"\n}"
-						},
-						"url": {
-							"raw": "{{wallester_base_url}}/accounts",
-							"host": ["{{wallester_base_url}}"],
-							"path": ["accounts"]
-						}
-					}
-				},
-				{
-					"name": "Create Card Virtual",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"var json = pm.response.json();",
-									"var card = json.card || json;",
-									"if (card.id) { pm.environment.set('wallester_card_id', card.id); }"
-								]
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "Content-Type", "value": "application/json", "type": "text" },
-							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
-							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
-							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n\t\"account_id\": \"{{wallester_account_id}}\",\n\t\"type\": \"Virtual\",\n\t\"name\": \"Postman Virtual Card\",\n\t\"3d_secure_settings\": {\n\t\t\"out_of_band_enabled\": true,\n\t\t\"out_of_band_id\": \"{{wallester_oob_id}}\"\n\t},\n\t\"security\": {\n\t\t\"contactless_enabled\": true,\n\t\t\"withdrawal_enabled\": false,\n\t\t\"internet_purchase_enabled\": true\n\t}\n}"
-						},
-						"url": {
-							"raw": "{{wallester_base_url}}/cards",
-							"host": ["{{wallester_base_url}}"],
-							"path": ["cards"]
-						}
-					}
-				},
-				{
-					"name": "Activate Card",
-					"request": {
-						"method": "PATCH",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
-							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
-							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
-						],
-						"url": {
-							"raw": "{{wallester_base_url}}/cards/{{wallester_card_id}}/activate",
-							"host": ["{{wallester_base_url}}"],
-							"path": ["cards", "{{wallester_card_id}}", "activate"]
-						}
-					}
-				},
-				{
-					"name": "List Account Transactions",
-					"request": {
-						"method": "GET",
-						"header": [
-							{ "key": "Accept", "value": "application/json", "type": "text" },
-							{ "key": "X-Product-Code", "value": "{{wallester_product_code}}", "type": "text" },
-							{ "key": "X-Audit-Source-Type", "value": "{{wallester_audit_source_type}}", "type": "text" },
-							{ "key": "X-Audit-User-Id", "value": "{{wallester_audit_user_id}}", "type": "text" }
-						],
-						"url": {
-							"raw": "{{wallester_base_url}}/accounts/{{wallester_account_id}}/transactions?from_record=0&records_count=15",
-							"host": ["{{wallester_base_url}}"],
-							"path": ["accounts", "{{wallester_account_id}}", "transactions"],
-							"query": [
-								{ "key": "from_record", "value": "0" },
-								{ "key": "records_count", "value": "15" }
-							]
-						}
-					}
-				}
-			]
-		}
-	]
+    "info": {
+        "_postman_id": "8f1a2b3c-4d5e-4678-9abc-def012345678",
+        "name": "Yoop API",
+        "description": "API REST Yoop. Corre Auth > Login para gravar o token.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "https://dashboard.yooppayments.eu/api",
+            "type": "string"
+        },
+        {
+            "key": "token",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "merchant_api_key",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "device_token",
+            "value": "postman-device-1",
+            "type": "string"
+        },
+        {
+            "key": "username",
+            "value": "johndoe",
+            "type": "string"
+        },
+        {
+            "key": "card_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "funding_account_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "transaction_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "payment_intent_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "payment_method_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "merchant_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "news_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "notification_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "tpa_serial",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/health",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "Register Retail",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/register-retail",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"username\": \"johndoe\",\n    \"password\": \"secret123\",\n    \"phone\": \"351912345678\",\n    \"currency\": \"EUR\",\n    \"language\": \"pt\"\n}"
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "var json = pm.response.json();",
+                                    "var token = (json.data && json.data.token) ? json.data.token : json.token;",
+                                    "if (token) { pm.collectionVariables.set('token', token); }"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Register Corporate",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/register-corporate",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Acme Corp\",\n    \"username\": \"acmecorp\",\n    \"email\": \"admin@acme.com\",\n    \"tax_id\": \"PT123456789\",\n    \"password\": \"secret123\",\n    \"country_code\": \"PT\"\n}"
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "var json = pm.response.json();",
+                                    "var token = (json.data && json.data.token) ? json.data.token : json.token;",
+                                    "if (token) { pm.collectionVariables.set('token', token); }"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/login",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"password\": \"secret123\"\n}"
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "var json = pm.response.json();",
+                                    "var token = (json.data && json.data.token) ? json.data.token : json.token;",
+                                    "if (token) { pm.collectionVariables.set('token', token); }"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login with PIN",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/login-pin",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"device_token\": \"{{device_token}}\",\n    \"pin\": \"1234\"\n}"
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "var json = pm.response.json();",
+                                    "var token = (json.data && json.data.token) ? json.data.token : json.token;",
+                                    "if (token) { pm.collectionVariables.set('token', token); }"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login via TPA",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/login-tpa",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"password\": \"secret123\",\n    \"tpa_serial\": \"{{tpa_serial}}\"\n}"
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "var json = pm.response.json();",
+                                    "var token = (json.data && json.data.token) ? json.data.token : json.token;",
+                                    "if (token) { pm.collectionVariables.set('token', token); }"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/logout"
+                    }
+                },
+                {
+                    "name": "Forgot Password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/forgot-password",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john@example.com\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Reset Password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/reset-password",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"token\": \"RESET_TOKEN\",\n    \"password\": \"newsecret123\"\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "PIN",
+            "item": [
+                {
+                    "name": "Create PIN",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/create-pin",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"device_token\": \"{{device_token}}\",\n    \"device_name\": \"Postman\",\n    \"pin\": \"1234\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Reset PIN",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/auth/reset-pin",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"device_token\": \"{{device_token}}\",\n    \"pin\": \"4321\",\n    \"current_pin\": \"1234\"\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Onboarding",
+            "item": [
+                {
+                    "name": "Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/onboarding/health",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "Send Phone Code",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/onboarding/phone/send"
+                    }
+                },
+                {
+                    "name": "Validate Phone Code",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/onboarding/phone/validate",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"code\": \"123456\"\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "KYC",
+            "item": [
+                {
+                    "name": "Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/kyc/health",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "Create Identity Session",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/kyc/identity/session"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "TPA",
+            "item": [
+                {
+                    "name": "Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/tpa/health",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "Link TPA",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/tpa/link",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"password\": \"secret123\",\n    \"tpa_serial\": \"{{tpa_serial}}\"\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Customer",
+            "item": [
+                {
+                    "name": "Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/health",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "Get My Profile",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/me"
+                    }
+                },
+                {
+                    "name": "Update Profile",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/update",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"John Doe\",\n    \"username\": \"{{username}}\",\n    \"show_profile_pic\": true\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Upload Avatar",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/upload-avatar",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "avatar",
+                                    "type": "file",
+                                    "src": ""
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Find by Username",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/find/{{username}}"
+                    }
+                },
+                {
+                    "name": "Favorites",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/favorites"
+                    }
+                },
+                {
+                    "name": "Add Favorite",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/favorites",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"username\": \"{{username}}\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Remove Favorite",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/favorites/{{username}}"
+                    }
+                },
+                {
+                    "name": "Send Validation Email",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/send-validation-email"
+                    }
+                },
+                {
+                    "name": "Create Corporate Responsible",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/create-corporate-responsible",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Maria Silva\",\n    \"username\": \"mariasilva\",\n    \"email\": \"maria@acme.com\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Request Phone Change",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/phone",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"phone\": \"351912345678\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Confirm Phone Change",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/phone/confirm",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"phone\": \"351912345678\",\n    \"code\": \"123456\"\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "News",
+            "item": [
+                {
+                    "name": "List News",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/news"
+                    }
+                },
+                {
+                    "name": "Show News",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/news/{{news_id}}"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Notifications",
+            "item": [
+                {
+                    "name": "List Notifications",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/notifications"
+                    }
+                },
+                {
+                    "name": "Mark as Read",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/notifications/{{notification_id}}/read"
+                    }
+                },
+                {
+                    "name": "Mark All as Read",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/customer/notifications/read-all"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Wallet",
+            "item": [
+                {
+                    "name": "Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/wallet/health",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "Dashboard",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/wallet/dashboard"
+                    }
+                },
+                {
+                    "name": "Dashboard Summary",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/wallet/dashboard/summary"
+                    }
+                },
+                {
+                    "name": "Get Account",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/wallet/account"
+                    }
+                },
+                {
+                    "name": "Get Balance",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/wallet/account/balance"
+                    }
+                },
+                {
+                    "name": "List Funding Account Movements",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/wallet/funding-accounts/{{funding_account_id}}/movements?per_page=15"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Transactions",
+            "item": [
+                {
+                    "name": "List Transactions",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/wallet/transactions?per_page=15"
+                    }
+                },
+                {
+                    "name": "Get Transaction",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/wallet/transactions/{{transaction_id}}"
+                    }
+                },
+                {
+                    "name": "P2P Transfer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Idempotency-Key",
+                                "value": "{{$guid}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/wallet/transactions/p2p",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"recipient_username\": \"{{username}}\",\n    \"amount\": 100,\n    \"currency\": \"EUR\",\n    \"description\": \"Transferencia entre contas\",\n    \"device_token\": \"{{device_token}}\",\n    \"pin\": \"1234\",\n    \"favorite\": false\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Stripe",
+            "item": [
+                {
+                    "name": "Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/stripe/health",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "List Payment Methods",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/stripe/payment-methods?currency=EUR"
+                    }
+                },
+                {
+                    "name": "Fee Estimates",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/stripe/fee-estimates?currency=EUR"
+                    }
+                },
+                {
+                    "name": "Create Payment Intent",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Idempotency-Key",
+                                "value": "{{$guid}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/stripe/create-intent-payment",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 5000,\n    \"payment_method_id\": \"{{payment_method_id}}\",\n    \"currency\": \"EUR\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Show Payment Intent",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/stripe/payment-intents/{{payment_intent_id}}"
+                    }
+                },
+                {
+                    "name": "Create Funding",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/stripe/create-funding",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 5000,\n    \"currency\": \"EUR\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Get Funding Instructions",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/stripe/get-funding-instructions"
+                    }
+                },
+                {
+                    "name": "Capture Terminal Payment",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/stripe/terminal/{{payment_intent_id}}/capture"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Merchant",
+            "item": [
+                {
+                    "name": "Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/health",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "List My Merchants",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant"
+                    }
+                },
+                {
+                    "name": "Register Merchant",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/register",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"My Shop\",\n    \"mode\": \"test\",\n    \"webhook_url\": \"https://example.com/webhooks/yoop\",\n    \"allowed_currencies\": [\n        \"EUR\"\n    ]\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Update Merchant",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/{{merchant_id}}",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"My Shop\",\n    \"mode\": \"test\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Show Credentials",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/{{merchant_id}}/credentials"
+                    }
+                },
+                {
+                    "name": "Rotate Credentials",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/{{merchant_id}}/credentials/rotate"
+                    }
+                },
+                {
+                    "name": "List Payment Requests",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/payment-requests"
+                    }
+                },
+                {
+                    "name": "Create Payment Request (customer)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/{{merchant_id}}/payment-requests",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 2500,\n    \"description\": \"Order #123\",\n    \"payment_method_types\": [\n        \"card\",\n        \"mb_way\"\n    ]\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Create Payment Request (partner)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/payment-requests",
+                        "auth": {
+                            "type": "apikey",
+                            "apikey": [
+                                {
+                                    "key": "key",
+                                    "value": "X-Merchant-Key",
+                                    "type": "string"
+                                },
+                                {
+                                    "key": "value",
+                                    "value": "{{merchant_api_key}}",
+                                    "type": "string"
+                                },
+                                {
+                                    "key": "in",
+                                    "value": "header",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 5000,\n    \"description\": \"Order #123\",\n    \"external_reference\": \"ext-123\",\n    \"payment_method_types\": [\n        \"card\",\n        \"mb_way\"\n    ]\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Terminal Connection Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/terminal/connection-token",
+                        "auth": {
+                            "type": "apikey",
+                            "apikey": [
+                                {
+                                    "key": "key",
+                                    "value": "X-Merchant-Key",
+                                    "type": "string"
+                                },
+                                {
+                                    "key": "value",
+                                    "value": "{{merchant_api_key}}",
+                                    "type": "string"
+                                },
+                                {
+                                    "key": "in",
+                                    "value": "header",
+                                    "type": "string"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Create Terminal Payment Intent",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Idempotency-Key",
+                                "value": "{{$guid}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "X-Merchant-Key",
+                                "value": "{{merchant_api_key}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/merchant/terminal/create-intent",
+                        "auth": {
+                            "type": "apikey",
+                            "apikey": [
+                                {
+                                    "key": "key",
+                                    "value": "X-Merchant-Key",
+                                    "type": "string"
+                                },
+                                {
+                                    "key": "value",
+                                    "value": "{{merchant_api_key}}",
+                                    "type": "string"
+                                },
+                                {
+                                    "key": "in",
+                                    "value": "header",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"tpa_serial_number\": \"{{tpa_serial}}\",\n    \"amount\": 2000,\n    \"currency\": \"EUR\"\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Settings",
+            "item": [
+                {
+                    "name": "Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/settings/health",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "System Info",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/settings/system-info",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "List Settings",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/settings"
+                    }
+                },
+                {
+                    "name": "Get Setting",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/settings/maintenance_mode"
+                    }
+                },
+                {
+                    "name": "Set Setting",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/settings/maintenance_mode",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"value\": \"false\"\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Webhooks",
+            "item": [
+                {
+                    "name": "Didit",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/webhooks/didit",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"session_id\": \"SESSION_ID\",\n    \"status\": \"Approved\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Stripe",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Stripe-Signature",
+                                "value": "t=...,v1=...",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/webhooks/stripe",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"type\": \"payment_intent.succeeded\",\n    \"data\": {}\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "Ebury",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": "{{base_url}}/webhooks/ebury",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        }
+                    }
+                }
+            ]
+        }
+    ]
 }

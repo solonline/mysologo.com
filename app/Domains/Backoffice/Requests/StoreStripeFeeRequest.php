@@ -3,6 +3,7 @@
 namespace App\Domains\Backoffice\Requests;
 
 use App\Domains\Backoffice\Queries\GetAcceptedCurrenciesQuery;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreStripeFeeRequest extends FormRequest

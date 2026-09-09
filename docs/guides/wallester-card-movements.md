@@ -77,4 +77,4 @@ No backoffice o montante é o total (`4,63 EUR`); se houver câmbio aparece `3,8
 
 Código: `WallesterCardMovementIngestService`, `WallesterCardMovementPayloadMapper`, `NormalizeSwallowedWallesterFxPurchasesService`.
 
-📖 **Relacionado:** [Webhooks](/docs/guides/webhooks) · [Ciclo de vida](/docs/guides/onboarding-lifecycle)
+📖 **Relacionado:** [Lógica do sistema — extractos](/docs/guides/logica-sistema) · [Webhooks](/docs/guides/webhooks) · [Ciclo de vida](/docs/guides/onboarding-lifecycle)

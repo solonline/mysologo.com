@@ -64,6 +64,84 @@ customer-update:
       '422':
         $ref: '../components/responses.yaml#/ValidationError'
 
+customer-phone-request:
+  post:
+    tags: [Customer]
+    summary: Pedir alteração de telefone
+    operationId: customerPhoneRequest
+    description: |
+      Envia um OTP por SMS para o **novo** número. O perfil só actualiza após
+      `POST /customer/phone/confirm`.
+
+      Usar quando o telefone actual **já está verificado**. Durante o onboarding,
+      se o número ainda não estiver verificado, corrigir com `POST /onboarding/phone/send`.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [phone]
+            properties:
+              phone:
+                type: string
+                description: Novo número, só dígitos
+                example: '351922222222'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/PhoneChangeResult'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+      '502':
+        description: Falha ao enviar o SMS
+
+customer-phone-confirm:
+  post:
+    tags: [Customer]
+    summary: Confirmar alteração de telefone
+    operationId: customerPhoneConfirm
+    description: |
+      Valida o código SMS enviado ao novo número e só então actualiza `customer.phone`.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [phone, code]
+            properties:
+              phone:
+                type: string
+                example: '351922222222'
+              code:
+                type: string
+                example: '123456'
+    responses:
+      '200':
+        description: Telefone actualizado
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                customer:
+                  $ref: '../components/schemas.yaml#/Customer'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
 customer-upload-avatar:
   post:
     tags: [Customer]
@@ -112,6 +190,99 @@ customer-find-by-username:
               $ref: '../components/schemas.yaml#/PublicCustomer'
       '404':
         $ref: '../components/responses.yaml#/NotFound'
+
+customer-favorites:
+  get:
+    tags: [Customer]
+    summary: Listar favoritos P2P
+    operationId: customerFavoritesList
+    description: |
+      Perfis públicos dos customers guardados como favoritos. Mais recentes primeiro.
+
+      Contas inactivas ou sem KYC aprovado são omitidas.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/PublicCustomer'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+  post:
+    tags: [Customer]
+    summary: Adicionar favorito P2P
+    operationId: customerFavoritesAdd
+    description: |
+      Guarda um customer activo e com KYC aprovado como favorito, sem fazer transferência.
+
+      Idempotente. No P2P, `favorite: true` continua a gravar o destinatário automaticamente.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [username]
+            properties:
+              username:
+                type: string
+                pattern: '^[a-zA-Z0-9_]+$'
+                example: janedoe
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/PublicCustomer'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+
+customer-favorites-remove:
+  delete:
+    tags: [Customer]
+    summary: Remover favorito P2P
+    operationId: customerFavoritesRemove
+    description: |
+      Remove um favorito pelo username. Idempotente se o customer já não for favorito.
+      Permite limpar favoritos mesmo que a conta deixe de estar activa.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: username
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^[a-zA-Z0-9_]+$'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: Favorite removed successfully
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
 
 customer-send-validation-email:
   post:

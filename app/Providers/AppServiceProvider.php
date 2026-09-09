@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Merchant;
+use Closure;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -25,10 +27,54 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('stripe-intent', function (Request $request) {
             return Limit::perMinute(10)
                 ->by($request->user()?->id ?? $request->ip())
-                ->response(fn () => response()->json([
-                    'message' => 'Muitas tentativas. Tente novamente em breve.',
-                ], 429));
+                ->response($this->tooManyAttemptsResponse());
         });
+
+        RateLimiter::for('merchant-payment-requests', function (Request $request) {
+            return Limit::perMinute(120)
+                ->by($this->merchantLimitKey($request, 'payment-requests'))
+                ->response($this->tooManyAttemptsResponse());
+        });
+
+        RateLimiter::for('merchant-terminal-token', function (Request $request) {
+            return Limit::perMinute(60)
+                ->by($this->merchantLimitKey($request, 'terminal-token'))
+                ->response($this->tooManyAttemptsResponse());
+        });
+
+        RateLimiter::for('merchant-terminal-intent', function (Request $request) {
+            return Limit::perMinute(60)
+                ->by($this->merchantLimitKey($request, 'terminal-intent'))
+                ->response($this->tooManyAttemptsResponse());
+        });
+    }
+
+    private function merchantLimitKey(Request $request, string $prefix): string
+    {
+        $merchant = $request->attributes->get('merchant');
+
+        if ($merchant instanceof Merchant) {
+            return $prefix.':merchant:'.$merchant->id;
+        }
+
+        $routeMerchant = $request->route('merchant');
+
+        if ($routeMerchant instanceof Merchant) {
+            return $prefix.':merchant:'.$routeMerchant->id;
+        }
+
+        if (is_numeric($routeMerchant)) {
+            return $prefix.':merchant:'.$routeMerchant;
+        }
+
+        return $prefix.':'.($request->user()?->id ?? $request->ip());
+    }
+
+    private function tooManyAttemptsResponse(): Closure
+    {
+        return fn () => response()->json([
+            'message' => 'Muitas tentativas. Tente novamente em breve.',
+        ], 429);
     }
 
     private function ensureLogDirectories(): void

@@ -2,7 +2,11 @@ openapi: 3.1.0
 
 info:
   title: Yoop API
-  version: 1.0.0
+  version: 1.1.0
+  x-logo:
+    url: /yoop.jpeg
+    altText: Yoop
+    href: /docs
   description: |
     # Documentação interna Yoop
 
@@ -35,8 +39,11 @@ info:
 
     | Limite | Rotas | Máx. |
     |--------|-------|------|
-    | `api` | Geral | 60/min |
-    | `stripe-intent` | Payment intents, terminal merchant | 10/min |
+    | `api` | Geral | 60/min por utilizador |
+    | `stripe-intent` | Top-up app (`/stripe/create-intent-payment`, capture terminal) | 10/min por utilizador |
+    | `merchant-payment-requests` | Criar payment request | 120/min por merchant |
+    | `merchant-terminal-token` | Connection token POS | 60/min por merchant |
+    | `merchant-terminal-intent` | Create-intent POS | 60/min por merchant |
 
     ## Idempotência
 
@@ -59,11 +66,13 @@ info:
 
   contact:
     name: Equipa Yoop
-    email: dev@yoop.test
+    email: hello@yooppayments.eu
 
 servers:
+  - url: https://api.yooppayments.eu/api
+    description: Produção
   - url: /api
-    description: API no host actual (usa o mesmo protocolo da página de docs)
+    description: Host actual (esta página de docs)
 
 x-tagGroups:
   - name: Autenticação & Onboarding
@@ -87,7 +96,7 @@ tags:
   - name: Tpa
     description: Terminais físicos — associação e login.
   - name: Customer
-    description: Perfil, documentos corporate, notificações.
+    description: Perfil, telefone, documentos corporate, notificações.
   - name: Wallet
     description: Dashboard, conta, transacções, P2P e movimentos de funding (Wallester).
   - name: Stripe
@@ -151,10 +160,18 @@ paths:
     $ref: './paths/customer.yaml#/customer-me'
   /customer/update:
     $ref: './paths/customer.yaml#/customer-update'
+  /customer/phone:
+    $ref: './paths/customer.yaml#/customer-phone-request'
+  /customer/phone/confirm:
+    $ref: './paths/customer.yaml#/customer-phone-confirm'
   /customer/upload-avatar:
     $ref: './paths/customer.yaml#/customer-upload-avatar'
   /customer/find/{username}:
     $ref: './paths/customer.yaml#/customer-find-by-username'
+  /customer/favorites:
+    $ref: './paths/customer.yaml#/customer-favorites'
+  /customer/favorites/{username}:
+    $ref: './paths/customer.yaml#/customer-favorites-remove'
   /customer/send-validation-email:
     $ref: './paths/customer.yaml#/customer-send-validation-email'
   /customer/create-corporate-responsible:
@@ -217,6 +234,8 @@ paths:
     $ref: './paths/wallester.yaml#/wallester-cards-show'
   /wallester/cards/{card}/sensitive:
     $ref: './paths/wallester.yaml#/wallester-cards-sensitive'
+  /wallester/cards/{card}/encrypted-pin:
+    $ref: './paths/wallester.yaml#/wallester-cards-encrypted-pin'
   /wallester/cards/{card}/activate:
     $ref: './paths/wallester.yaml#/wallester-cards-activate'
   /wallester/3ds-challenges/pending:
@@ -293,6 +312,8 @@ components:
       $ref: './components/schemas.yaml#/IdentitySession'
     SmsValidationResult:
       $ref: './components/schemas.yaml#/SmsValidationResult'
+    PhoneChangeResult:
+      $ref: './components/schemas.yaml#/PhoneChangeResult'
     WalletDashboard:
       $ref: './components/schemas.yaml#/WalletDashboard'
     AccountDetails:
@@ -313,6 +334,8 @@ components:
       $ref: './components/schemas.yaml#/Notification'
     MerchantPaymentRequest:
       $ref: './components/schemas.yaml#/MerchantPaymentRequest'
+    MerchantPaymentWebhook:
+      $ref: './components/schemas.yaml#/MerchantPaymentWebhook'
     TerminalConnectionToken:
       $ref: './components/schemas.yaml#/TerminalConnectionToken'
     TerminalPaymentIntent:

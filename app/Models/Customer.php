@@ -197,6 +197,11 @@ class Customer extends Model
         return $this->hasMany(Merchant::class);
     }
 
+    public function cardDeliveryAddresses(): HasMany
+    {
+        return $this->hasMany(CustomerCardDeliveryAddress::class);
+    }
+
     public function favorites(): HasMany
     {
         return $this->hasMany(CustomerFavorite::class);

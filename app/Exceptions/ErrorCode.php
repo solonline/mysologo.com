@@ -58,6 +58,8 @@ class ErrorCode
 
     const P2P_SELF_TRANSFER = 'p2p_self_transfer';
 
+    const FAVORITE_SELF = 'favorite_self';
+
     const PIN_NOT_CONFIGURED = 'pin_not_configured';
 
     const TPA_NOT_FOUND = 'tpa_not_found';
@@ -74,7 +76,13 @@ class ErrorCode
 
     const CARD_NOT_CLOSABLE = 'card_not_closable';
 
+    const CARD_NOT_LINKABLE = 'card_not_linkable';
+
+    const DELIVERY_ADDRESS_REQUIRED = 'delivery_address_required';
+
     const PHONE_SAME_AS_CURRENT = 'phone_same_as_current';
+
+    const PHONE_ALREADY_VERIFIED = 'phone_already_verified';
 
     const PHONE_VERIFICATION_INVALID = 'phone_verification_invalid';
 

@@ -59,7 +59,7 @@ class WallesterCardSensitiveService
     /**
      * @param  array{password?: string, pin?: string, device_token?: string}  $stepUpCredentials
      */
-    private function verifyStepUpCredentials(Customer $customer, array $stepUpCredentials): void
+    public function verifyStepUpCredentials(Customer $customer, array $stepUpCredentials): void
     {
         if (isset($stepUpCredentials['password'])) {
             if (! Hash::check($stepUpCredentials['password'], $customer->password)) {

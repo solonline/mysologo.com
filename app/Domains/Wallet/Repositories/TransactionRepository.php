@@ -3,6 +3,7 @@
 namespace App\Domains\Wallet\Repositories;
 
 use App\Domains\Wallet\Contracts\TransactionRepositoryInterface;
+use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
 use App\Models\StripeTransaction;
@@ -22,7 +23,10 @@ class TransactionRepository implements TransactionRepositoryInterface
     public function getRecent(Customer $customer, int $limit = 10): Collection
     {
         return StripeTransaction::where('customer_id', $customer->id)
-            ->where('type', '!=', \App\Domains\Wallet\Enums\TransactionType::MERCHANT_PAYMENT->value)
+            ->whereNotIn('type', [
+                TransactionType::MERCHANT_PAYMENT,
+                TransactionType::P2P,
+            ])
             ->with('relatedStripeTransaction.customer')
             ->latest()
             ->limit($limit)
@@ -32,7 +36,10 @@ class TransactionRepository implements TransactionRepositoryInterface
     public function getPaginated(Customer $customer, int $perPage = 15): LengthAwarePaginator
     {
         return StripeTransaction::where('customer_id', $customer->id)
-            ->where('type', '!=', \App\Domains\Wallet\Enums\TransactionType::MERCHANT_PAYMENT->value)
+            ->whereNotIn('type', [
+                TransactionType::MERCHANT_PAYMENT,
+                TransactionType::P2P,
+            ])
             ->with('relatedStripeTransaction.customer')
             ->latest()
             ->paginate($perPage);

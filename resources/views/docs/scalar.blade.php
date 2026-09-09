@@ -1,7 +1,7 @@
 @extends('docs.layout')
 
 @push('head')
-    <style>.scalar-container { height: calc(100vh - 57px); }</style>
+    <style>.scalar-container { height: calc(100vh - 64px); }</style>
 @endpush
 
 @section('content')

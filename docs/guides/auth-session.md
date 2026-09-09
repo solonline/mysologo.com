@@ -15,6 +15,8 @@ Use esta página como contrato para o front-end e integradores. O backend é a f
 | `POST` | `/api/auth/register-corporate` |
 | `POST` | `/api/auth/login-pin` |
 
+`POST /api/auth/login-tpa` **não** devolve AuthSession — ver [Terminal / POS](/docs/partners/guides/terminal-topup).
+
 ## Estrutura de topo
 
 ```json
@@ -261,6 +263,8 @@ Enquanto o responsável não concluir KYC, `identity_verification` pode referir-
 | `identity_verification.session` | Completo quando aplicável | Pode vir só `status` sem URL |
 | Quando URL em falta | — | Chamar `POST /kyc/identity/session` |
 
+`POST /auth/create-pin` e `reset-pin` exigem conta **ACTIVE** (email + KYC). Sem PIN neste device, `login-pin` falha.
+
 ---
 
 ### Fluxo recomendado no front
@@ -488,6 +492,7 @@ flowchart TD
 
 ## Relacionado
 
+- [Lógica do sistema](/docs/guides/logica-sistema)
 - [Primeiros passos](/docs/guides/getting-started)
 - [Ciclo de vida](/docs/guides/onboarding-lifecycle)
 - [Conta pronta](/docs/guides/account-ready)

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -93,6 +94,11 @@ class CustomerWallesterCard extends Model
     public function wallesterAccount(): BelongsTo
     {
         return $this->belongsTo(CustomerWallesterAccount::class, 'customer_wallester_account_id');
+    }
+
+    public function customerDeliveryAddress(): HasOne
+    {
+        return $this->hasOne(CustomerCardDeliveryAddress::class);
     }
 
     public function isOperational(): bool

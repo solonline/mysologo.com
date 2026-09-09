@@ -192,6 +192,42 @@ class WallesterGatewayTest extends TestCase
         $this->assertSame('Active', $result['status']);
     }
 
+    public function test_list_card_dispatch_methods_normalizes_response(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('listCardDispatchMethods')
+            ->once()
+            ->with('PRT', '42')
+            ->andReturn([
+                'dispatch_methods' => [
+                    [
+                        'dispatch_method' => 'DHLGlobalMail',
+                        'price' => 5,
+                        'description' => 'Standard',
+                    ],
+                    'DHLExpress',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->listCardDispatchMethods('PRT', '42');
+
+        $this->assertSame([
+            [
+                'dispatch_method' => 'DHLGlobalMail',
+                'price' => 5.0,
+                'description' => 'Standard',
+            ],
+            [
+                'dispatch_method' => 'DHLExpress',
+                'price' => null,
+                'description' => '',
+            ],
+        ], $result);
+    }
+
     public function test_get_card_unwraps_nested_card_payload(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);
@@ -232,6 +268,49 @@ class WallesterGatewayTest extends TestCase
         $result = $gateway->getEncryptedCardNumber('card_123', 'public-key', '42');
 
         $this->assertSame('-----BEGIN CardNumber MESSAGE-----', $result);
+    }
+
+    public function test_get_encrypted_pin_returns_payload_field(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('getEncryptedPinCard')
+            ->once()
+            ->with('card_123', 'public-key', '42')
+            ->andReturn([
+                'encrypted_pin' => '-----BEGIN PIN MESSAGE-----',
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->getEncryptedPinCard('card_123', 'public-key', '42');
+
+        $this->assertSame('-----BEGIN PIN MESSAGE-----', $result);
+    }
+
+    public function test_link_card_to_account_unwraps_nested_card_payload(): void
+    {
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('linkCardToAccount')
+            ->once()
+            ->with('card_123', 'acc_456', '42')
+            ->andReturn([
+                'card' => [
+                    'id' => 'card_123',
+                    'account_id' => 'acc_456',
+                    'type' => 'Virtual',
+                    'status' => 'Active',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->linkCardToAccount('card_123', 'acc_456', '42');
+
+        $this->assertSame('card_123', $result['id']);
+        $this->assertSame('acc_456', $result['account_id']);
+        $this->assertSame('Active', $result['status']);
     }
 
     public function test_activate_card_unwraps_nested_card_payload(): void

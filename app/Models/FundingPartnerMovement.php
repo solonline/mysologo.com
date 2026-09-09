@@ -122,6 +122,26 @@ class FundingPartnerMovement extends Model
         return $key !== '' && str_starts_with($key, 'fx-platform:');
     }
 
+    public function isP2pTransfer(): bool
+    {
+        $key = (string) $this->idempotency_key;
+
+        return $key !== '' && str_starts_with($key, 'p2p:');
+    }
+
+    public function isPlatformBalanceAdjustment(): bool
+    {
+        $key = (string) $this->idempotency_key;
+        if ($key !== '' && str_starts_with($key, 'manual_adj:')) {
+            return true;
+        }
+
+        $type = (string) $this->reference_type;
+
+        return $type === CustomerBalanceAdjustment::class
+            || $type === (new CustomerBalanceAdjustment)->getMorphClass();
+    }
+
     public function isStripePlatformFeeTransfer(): bool
     {
         $key = (string) $this->idempotency_key;
@@ -131,7 +151,8 @@ class FundingPartnerMovement extends Model
 
     /**
      * Débito fx-platform no cliente retail duplica a linha Câmbio.
-     * O crédito na master (:in) deve aparecer na conta plataforma.
+     * O débito physical-card-platform-fee duplica a taxa de emissão (o customer vê só o total).
+     * O crédito na master/subconta (:in) deve aparecer na conta plataforma.
      *
      * @param  Builder<self>  $query
      * @return Builder<self>
@@ -140,12 +161,26 @@ class FundingPartnerMovement extends Model
     {
         return $query->where(function ($visible): void {
             $visible->whereNull('idempotency_key')
-                ->orWhere('idempotency_key', 'not like', 'fx-platform:%:out');
+                ->orWhere(function ($visible): void {
+                    $visible
+                        ->where('idempotency_key', 'not like', 'fx-platform:%:out')
+                        ->where('idempotency_key', 'not like', 'physical-card-platform-fee:%:out');
+                });
         });
     }
 
     public function displayTypeLabel(): string
     {
+        if ($this->isP2pTransfer()) {
+            return 'Transferência entre contas';
+        }
+
+        if ($this->isPlatformBalanceAdjustment()) {
+            return $this->direction === FundingPartnerMovementDirection::In
+                ? 'Crédito Yoop'
+                : 'Débito Yoop';
+        }
+
         if ($this->isInternalPlatformFxTransfer()) {
             return 'Câmbio Yoop';
         }
@@ -161,8 +196,20 @@ class FundingPartnerMovement extends Model
             FundingPartnerMovementType::InboundPayment => 'Entrada',
             FundingPartnerMovementType::Fee => 'Câmbio',
             FundingPartnerMovementType::VirtualCardIssuanceFee => 'Taxa emissão cartão virtual',
+            FundingPartnerMovementType::PhysicalCardIssuanceFee => 'Taxa emissão cartão físico',
             default => $this->type?->value ?? 'Wallester',
         };
+    }
+
+    public function displaySourceLabel(): string
+    {
+        if ($this->isPlatformBalanceAdjustment()) {
+            return $this->direction === FundingPartnerMovementDirection::In
+                ? 'Crédito Yoop'
+                : 'Débito Yoop';
+        }
+
+        return 'Wallester';
     }
 
     public function displayDescription(): ?string

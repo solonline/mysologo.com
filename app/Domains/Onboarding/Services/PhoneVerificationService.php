@@ -6,6 +6,8 @@ use App\Domains\Onboarding\Contracts\PhoneVerificationRepositoryInterface;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Sms\Contracts\SmsGatewayInterface;
 use App\Domains\Sms\Support\SmsLogger;
+use App\Exceptions\ApiException;
+use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\PhoneVerification;
 
@@ -36,6 +38,42 @@ class PhoneVerificationService
     public function isVerified(Customer $customer, string $phone): bool
     {
         return $this->repository->isVerified($customer, $phone);
+    }
+
+    /**
+     * Envia OTP no onboarding. Sem `phone` reenvia para o número da conta.
+     * Com um número diferente, corrige o telefone ainda não verificado e envia para o novo.
+     *
+     * @return bool true se SMS enviado, false se o telefone da conta já estava verificado
+     */
+    public function sendForOnboarding(Customer $customer, ?string $requestedPhone = null): bool
+    {
+        $requestedPhone = $this->normalizePhone((string) $requestedPhone);
+        $currentPhone = $this->normalizePhone((string) $customer->phone);
+
+        if ($requestedPhone !== '' && $requestedPhone !== $currentPhone) {
+            if ($currentPhone !== '' && $this->isVerified($customer, $currentPhone)) {
+                throw new ApiException(
+                    ErrorCode::PHONE_ALREADY_VERIFIED,
+                    422,
+                    'O telefone actual já está verificado. Use POST /api/customer/phone para o alterar.',
+                );
+            }
+
+            $customer->update(['phone' => $requestedPhone]);
+            $currentPhone = $requestedPhone;
+
+            SmsLogger::info('onboarding_phone_corrected', [
+                'customer_id' => $customer->id,
+                'phone' => $currentPhone,
+            ]);
+        }
+
+        if ($currentPhone === '') {
+            throw new ApiException(ErrorCode::INTERNAL_ERROR, 422, 'Phone number is required.');
+        }
+
+        return $this->sendSms($customer, $currentPhone);
     }
 
     /**
@@ -85,5 +123,10 @@ class PhoneVerificationService
         }
 
         return true;
+    }
+
+    private function normalizePhone(string $phone): string
+    {
+        return preg_replace('/\D+/', '', trim($phone)) ?? '';
     }
 }

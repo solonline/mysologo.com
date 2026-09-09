@@ -1429,8 +1429,9 @@
 
         {{-- Conta Wallester --}}
         @if ($customer->wallesterAccount)
-        <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm p-5"
+        <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm overflow-hidden"
              x-data="{
+                 sectionOpen: {{ $pendingBalanceAdjustmentPayload ? 'true' : 'false' }},
                  showBalanceModal: false,
                  showSmsModal: {{ $pendingBalanceAdjustmentPayload ? 'true' : 'false' }},
                  balanceDirection: 'credit',
@@ -1544,15 +1545,34 @@
                      }
                  }
              }">
-            <h2 class="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            @php $wallesterCardCount = $customer->wallesterAccount->cards->count(); @endphp
+            <button type="button"
+                    @click="sectionOpen = !sectionOpen"
+                    class="w-full px-5 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition-colors"
+                    :class="sectionOpen ? 'border-b border-slate-100' : ''">
+                <div class="flex items-center gap-2 min-w-0">
+                    <svg class="w-4 h-4 text-violet-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                    </svg>
+                    <div class="min-w-0">
+                        <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                            Conta Wallester
+                            @if ($wallesterFailed)
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">FAILED</span>
+                            @endif
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-0.5 truncate">
+                            {{ $wallesterCardCount === 1 ? '1 cartão' : $wallesterCardCount.' cartões' }}
+                            · {{ $customer->wallesterAccount->wallester_account_id ?? '—' }}
+                        </p>
+                    </div>
+                </div>
+                <svg class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="sectionOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                 </svg>
-                Conta Wallester
-                @if ($wallesterFailed)
-                <span class="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">FAILED</span>
-                @endif
-            </h2>
+            </button>
+
+            <div x-show="sectionOpen" x-cloak class="p-5">
             <div class="space-y-3 text-sm">
                 <div class="flex justify-between">
                     <span class="text-slate-500">Account ID</span>
@@ -1599,6 +1619,11 @@
                 @endif
 
                 <div class="pt-3 mt-1 border-t border-slate-100 space-y-3">
+                    @php
+                        $linkableWallesterCards = $customer->wallesterAccount->cards
+                            ->filter(fn ($card) => (string) ($card->status ?? '') !== 'Closed')
+                            ->values();
+                    @endphp
                     <div class="flex items-center justify-between gap-2">
                         <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cartões</p>
                         @can('customers.edit')
@@ -1617,6 +1642,112 @@
                         @endif
                         @endcan
                     </div>
+                    @can('customers.edit')
+                    @if ($linkableWallesterCards->isNotEmpty())
+                    <form method="POST"
+                          action="{{ route('dashboard.customers.wallester-cards.link', $customer) }}"
+                          class="rounded-xl border border-slate-200 bg-white p-2.5 space-y-2"
+                          data-search-url="{{ route('dashboard.customers.username-search', ['exclude' => $customer->id]) }}"
+                          data-initial-query="{{ old('target_customer', '') }}"
+                          x-data="{
+                              query: $el.dataset.initialQuery || '',
+                              results: [],
+                              open: false,
+                              loading: false,
+                              searchUrl: $el.dataset.searchUrl,
+                              async search() {
+                                  const term = this.query.trim().replace(/^@/, '');
+                                  if (term.length < 2) {
+                                      this.results = [];
+                                      this.open = false;
+                                      return;
+                                  }
+                                  this.loading = true;
+                                  try {
+                                      const url = new URL(this.searchUrl, window.location.origin);
+                                      url.searchParams.set('q', term);
+                                      const response = await fetch(url.toString(), {
+                                          headers: {
+                                              'Accept': 'application/json',
+                                              'X-Requested-With': 'XMLHttpRequest',
+                                          },
+                                      });
+                                      const json = await response.json().catch(() => ({ data: [] }));
+                                      this.results = Array.isArray(json.data) ? json.data : [];
+                                      this.open = true;
+                                  } finally {
+                                      this.loading = false;
+                                  }
+                              },
+                              select(user) {
+                                  this.query = user.username;
+                                  this.results = [];
+                                  this.open = false;
+                              }
+                          }"
+                          @click.outside="open = false"
+                          onsubmit="return confirm('Transferir o cartão selecionado para este username? O cartão passa a debitar a conta Wallester do destinatário.')">
+                        @csrf
+                        <select name="card_id"
+                                required
+                                class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
+                            <option value="">Selecionar cartão</option>
+                            @foreach ($linkableWallesterCards as $linkableCard)
+                            @php
+                                $linkableLabel = trim(
+                                    ($linkableCard->masked_card_number ?: 'Cartão #'.$linkableCard->id)
+                                    .' · '
+                                    .($linkableCard->name ?: ($linkableCard->type ?: 'Virtual'))
+                                );
+                            @endphp
+                            <option value="{{ $linkableCard->id }}" @selected((string) old('card_id') === (string) $linkableCard->id)>
+                                {{ $linkableLabel }}
+                            </option>
+                            @endforeach
+                        </select>
+                        <div class="relative">
+                            <input type="text"
+                                   name="target_customer"
+                                   x-model="query"
+                                   @input.debounce.300ms="search()"
+                                   @focus="if (results.length) open = true"
+                                   autocomplete="off"
+                                   required
+                                   maxlength="255"
+                                   placeholder="Username do destinatário"
+                                   class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
+                            <div x-show="open"
+                                 x-cloak
+                                 class="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                                <p x-show="loading" class="px-2.5 py-2 text-xs text-slate-400">A procurar…</p>
+                                <p x-show="!loading && results.length === 0" class="px-2.5 py-2 text-xs text-slate-400">Nenhum username encontrado.</p>
+                                <ul x-show="!loading && results.length" class="max-h-40 overflow-auto py-1">
+                                    <template x-for="user in results" :key="user.id">
+                                        <li>
+                                            <button type="button"
+                                                    class="w-full px-2.5 py-1.5 text-left hover:bg-indigo-50"
+                                                    @click="select(user)">
+                                                <span class="block text-xs font-semibold text-slate-800" x-text="'@' + user.username"></span>
+                                                <span class="block text-[11px] text-slate-500 truncate" x-text="user.name"></span>
+                                            </button>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </div>
+                        @error('card_id')
+                        <p class="text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                        @error('target_customer')
+                        <p class="text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                        <button type="submit"
+                                class="w-full px-2.5 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+                            Transferir cartão
+                        </button>
+                    </form>
+                    @endif
+                    @endcan
                     @forelse ($customer->wallesterAccount->cards as $card)
                     @php
                         $cardStatus = (string) ($card->status ?? '');
@@ -1657,6 +1788,7 @@
                     @endforelse
                 </div>
             </div>
+            </div>{{-- fim sectionOpen --}}
 
             @if ($canAdjustBalance && ! $pendingBalanceAdjustment)
             <template x-teleport="body">

@@ -12,6 +12,7 @@ use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Kyc\Services\IdentityVerificationService;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Http\Requests\CreateResponsibleRequest;
+use App\Http\Requests\Customer\AddCustomerFavoriteRequest;
 use App\Http\Requests\Customer\FindByUsernameRequest;
 use App\Http\Requests\Customer\UpdateCustomerRequest;
 use App\Http\Requests\Customer\UploadAvatarRequest;
@@ -170,6 +171,42 @@ class CustomerController extends Controller
         return PublicCustomerResource::collection(
             $this->favoriteCustomers->list($request->user()),
         );
+    }
+
+    /**
+     * Add Favorite Customer
+     *
+     * Saves an active, KYC-approved customer as a P2P favorite. Idempotent.
+     *
+     * @tags Profile
+     */
+    public function addFavorite(AddCustomerFavoriteRequest $request): JsonResponse
+    {
+        $favorite = $this->favoriteCustomers->addByUsername(
+            $request->user(),
+            $request->validated('username'),
+        );
+
+        return response()->json(new PublicCustomerResource($favorite), 201);
+    }
+
+    /**
+     * Remove Favorite Customer
+     *
+     * Removes a saved P2P favorite by username. Idempotent if the customer is not a favorite.
+     *
+     * @tags Profile
+     */
+    public function removeFavorite(FindByUsernameRequest $request): JsonResponse
+    {
+        $this->favoriteCustomers->removeByUsername(
+            $request->user(),
+            $request->validated('username'),
+        );
+
+        return response()->json([
+            'message' => 'Favorite removed successfully',
+        ]);
     }
 
     /**

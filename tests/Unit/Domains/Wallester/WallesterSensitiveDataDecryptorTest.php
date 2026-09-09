@@ -48,6 +48,25 @@ class WallesterSensitiveDataDecryptorTest extends TestCase
         $this->assertSame('4302631234561795', $decryptor->decryptCardNumber($payload));
     }
 
+    public function test_decrypts_pin_payload_when_openssl_key_generation_is_available(): void
+    {
+        $keyPair = $this->generateKeyPair();
+
+        if ($keyPair === null) {
+            $this->markTestSkipped('OpenSSL key generation is unavailable in this environment.');
+        }
+
+        [$privateKeyPem, $publicKeyPem] = $keyPair;
+        $this->seedWallesterSettings([
+            'wallester.card_rsa_private_key' => $privateKeyPem,
+        ]);
+
+        $payload = $this->wrapEncryptedPayload($publicKeyPem, '4321', 'PIN');
+        $decryptor = new WallesterSensitiveDataDecryptor(app(WallesterCardRsaKeyService::class));
+
+        $this->assertSame('4321', $decryptor->decryptPin($payload));
+    }
+
     private function fixturePrivateKeyPem(): string
     {
         return <<<'PEM'

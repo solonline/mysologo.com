@@ -2,13 +2,15 @@
 
 ## Objetivo
 
-Saber quando um customer pode usar wallet, top-up e P2P.
+Saber quando um customer pode usar wallet, top-up, P2P, cartões e PIN.
+
+📖 **Jornada e cada endpoint:** [Lógica do sistema](/docs/guides/logica-sistema)
 
 ## Checklist
 
 | Requisito | Onde verificar |
 |-----------|----------------|
-| Lifecycle `ACTIVE` | `lifecycle.status` no login ou `GET /customer/me` → `status` |
+| Lifecycle `ACTIVE` | Login: `lifecycle.status`. `GET /customer/me`: campo `status` (o mesmo valor) |
 | Email verificado | `verification.email` ou `email_verified_at` |
 | Telefone verificado | `verification.phone` ou `phone_verified` |
 | KYC aprovado | `verification.identity` / `kyc_status` |
@@ -26,11 +28,12 @@ Não é necessário ter Ebury **e** Wallester ao mesmo tempo.
 
 ## Middlewares da API
 
-Endpoints de wallet e stripe exigem **todos**:
+Wallet, Stripe, Wallester, PIN e notificações exigem **todos** (a tríade + Bearer):
 
-- `customer.active`
+- `auth:sanctum`
+- `customer.active` — lifecycle `ACTIVE`
 - `customer.email.verified`
-- `customer.document.approved`
+- `customer.document.approved` — KYC aprovado
 
 Se falhar → **403** com mensagem no JSON.
 
@@ -53,4 +56,4 @@ Se falhar → **403** com mensagem no JSON.
 | `EBURY_REJECTED` mas conta activa | Wallester aprovado — fluxo normal |
 | `BLOCKED` | Ambos funding partners recusados |
 
-📖 **Seguinte:** [Top-up com cartão](/docs/guides/topup-card) · [Ciclo de vida](/docs/guides/onboarding-lifecycle)
+📖 **Seguinte:** [Lógica do sistema](/docs/guides/logica-sistema) · [Top-up com cartão](/docs/guides/topup-card) · [Ciclo de vida](/docs/guides/onboarding-lifecycle)

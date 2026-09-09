@@ -88,6 +88,7 @@ class SettingsSeeder extends Seeder
             ['key' => 'wallester.3ds_webhook_username',    'label' => '3DS Webhook Username',        'type' => 'secret',   'value' => ''],
             ['key' => 'wallester.3ds_webhook_password',    'label' => '3DS Webhook Password',        'type' => 'secret',   'value' => ''],
             ['key' => 'wallester.virtual_card_value',      'label' => 'Taxa do cartão virtual adicional (cêntimos)', 'type' => 'number', 'value' => (string) env('WALLESTER_VIRTUAL_CARD_VALUE', '0')],
+            ['key' => 'wallester.physical_card_value',     'label' => 'Taxa do cartão físico adicional (cêntimos)',  'type' => 'number', 'value' => (string) env('WALLESTER_PHYSICAL_CARD_VALUE', '0')],
             // Wallester — EUR
             ['key' => 'wallester.eur.api_key',                     'label' => 'API Key',                     'type' => 'secret',   'value' => env('WALLESTER_API_KEY', '')],
             ['key' => 'wallester.eur.private_key',                 'label' => 'Private Key (PEM)',           'type' => 'textarea', 'value' => env('WALLESTER_PRIVATE_KEY', '')],

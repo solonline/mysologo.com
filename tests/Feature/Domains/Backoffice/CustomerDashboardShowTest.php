@@ -15,6 +15,7 @@ use App\Models\CustomerBalance;
 use App\Models\CustomerDiditSession;
 use App\Models\CustomerRetailDocument;
 use App\Models\CustomerWallesterAccount;
+use App\Models\CustomerWallesterCard;
 use App\Models\FundingPartnerMovement;
 use App\Models\Merchant;
 use App\Models\MerchantPaymentRequest;
@@ -160,6 +161,8 @@ class CustomerDashboardShowTest extends TestCase
             ->get(route('dashboard.customers.show', $customer));
 
         $response->assertOk();
+        $response->assertSee('Conta Wallester');
+        $response->assertSee('0 cartões');
         $response->assertSee('Adicionar cartão');
         $response->assertSee(route('dashboard.customers.wallester-cards.store', $customer), false);
         $response->assertSee('Nenhum cartão emitido.');
@@ -177,6 +180,66 @@ class CustomerDashboardShowTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('Adicionar cartão');
         $response->assertDontSee(route('dashboard.customers.wallester-cards.store', $customer), false);
+        $response->assertDontSee('Transferir cartão');
+    }
+
+    public function test_customer_show_displays_link_card_form_for_open_card(): void
+    {
+        $user = User::factory()->create();
+        $user->givePermissionTo([
+            Permission::findByName('customers.view', 'web'),
+            Permission::findByName('customers.edit', 'web'),
+        ]);
+
+        $customer = $this->createRetailCustomer(['name' => 'Cliente Com Cartao']);
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_show_link_card');
+        $card = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_show_link',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Cartao Ativo',
+            'masked_card_number' => '****1111',
+        ]);
+
+        $response = $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertSee('Selecionar cartão');
+        $response->assertSee('Username do destinatário');
+        $response->assertSee('Transferir cartão');
+        $response->assertSee(route('dashboard.customers.wallester-cards.link', $customer), false);
+        $response->assertSee('username-search');
+        $response->assertSee('value="'.$card->id.'"', false);
+    }
+
+    public function test_customer_show_hides_link_card_form_for_closed_card(): void
+    {
+        $user = User::factory()->create();
+        $user->givePermissionTo([
+            Permission::findByName('customers.view', 'web'),
+            Permission::findByName('customers.edit', 'web'),
+        ]);
+
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_show_closed_card');
+        $card = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_show_closed',
+            'type' => 'Virtual',
+            'status' => 'Closed',
+            'name' => 'Cartao Encerrado',
+        ]);
+
+        $response = $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $response->assertSee('Encerrado');
+        $response->assertDontSee('Transferir cartão');
+        $response->assertDontSee('Selecionar cartão');
+        $response->assertDontSee(route('dashboard.customers.wallester-cards.link', $customer), false);
     }
 
     public function test_customer_show_displays_unified_movements_with_card_purchase(): void
@@ -239,6 +302,91 @@ class CustomerDashboardShowTest extends TestCase
         $response->assertSee('MCC 7339');
         $response->assertSee('+1 entradas');
         $response->assertSee('−1 saídas');
+    }
+
+    public function test_customer_show_displays_wallester_account_transfer_like_api(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+        $customer = $this->createRetailCustomer(['name' => 'Cliente Transferência']);
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_show_transfer');
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::In,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 7_500,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'show-transfer:in',
+            'description' => 'Funding Wallester',
+        ]);
+
+        $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $customer))
+            ->assertOk()
+            ->assertSee('Funding Wallester')
+            ->assertSee('Transferência')
+            ->assertSee('75,00')
+            ->assertSee('+1 entradas');
+    }
+
+    public function test_customer_show_does_not_duplicate_p2p_as_stripe_and_wallester(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+        $recipient = $this->createRetailCustomer([
+            'name' => 'Destinatario Show P2P',
+            'username' => 'dest_show_p2p',
+        ]);
+        $sender = $this->createRetailCustomer([
+            'name' => 'Remetente Show P2P',
+            'username' => 'rem_show_p2p',
+        ]);
+        $recipientAccount = $this->createWallesterAccount($recipient, IntegrationAccountStatus::ACTIVE, 'wal_show_p2p_in');
+        $senderAccount = $this->createWallesterAccount($sender, IntegrationAccountStatus::ACTIVE, 'wal_show_p2p_out');
+
+        StripeTransaction::query()->create([
+            'customer_id' => $recipient->id,
+            'type' => TransactionType::P2P,
+            'payment_method_type' => 'p2p',
+            'direction' => 'credit',
+            'amount' => 1,
+            'stripe_fee' => 0,
+            'platform_fee' => 0,
+            'net_amount' => 1,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'P2P transfer nao duplicar',
+            'stripe_created_at' => now(),
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $recipientAccount::class,
+            'funding_account_id' => $recipientAccount->id,
+            'external_account_id' => $recipientAccount->wallester_account_id,
+            'counterparty_external_account_id' => $senderAccount->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::In,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 1,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'p2p:show-no-dup:in',
+            'description' => 'P2P transfer nao duplicar',
+        ]);
+
+        $response = $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $recipient));
+
+        $response->assertOk();
+        $this->assertSame(1, substr_count($response->getContent(), 'data-customer-movement'));
+        $this->assertSame(1, substr_count($response->getContent(), 'P2P transfer nao duplicar'));
+        $response->assertSee('@rem_show_p2p');
+        $response->assertSee('Remetente Show P2P');
     }
 
     public function test_customer_show_displays_unified_fx_card_purchase(): void

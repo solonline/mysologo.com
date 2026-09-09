@@ -19,6 +19,7 @@ trait InteractsWithWallesterSettings
             ['key' => 'wallester.3ds_webhook_username', 'label' => '3DS Username', 'type' => 'secret', 'value' => 'test-user'],
             ['key' => 'wallester.3ds_webhook_password', 'label' => '3DS Password', 'type' => 'secret', 'value' => 'test-pass'],
             ['key' => 'wallester.virtual_card_value', 'label' => 'Taxa do cartão virtual adicional (cêntimos)', 'type' => 'number', 'value' => '0'],
+            ['key' => 'wallester.physical_card_value', 'label' => 'Taxa do cartão físico adicional (cêntimos)', 'type' => 'number', 'value' => '0'],
             ['key' => 'wallester.eur.api_key', 'label' => 'EUR API Key', 'type' => 'secret', 'value' => 'eur-api-key'],
             ['key' => 'wallester.eur.private_key', 'label' => 'EUR Private Key', 'type' => 'textarea', 'value' => "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAK5...\n-----END RSA PRIVATE KEY-----"],
             ['key' => 'wallester.eur.product_code', 'label' => 'EUR Product Code', 'type' => 'text', 'value' => 'EUR-PRODUCT'],
@@ -54,6 +55,13 @@ trait InteractsWithWallesterSettings
             'available_amount' => 0,
             'balance' => 0,
             'blocked_amount' => 0,
+        ])->byDefault();
+        $gateway->shouldReceive('listCardDispatchMethods')->andReturn([
+            [
+                'dispatch_method' => 'DHLGlobalMail',
+                'price' => 5.0,
+                'description' => 'Standard',
+            ],
         ])->byDefault();
 
         return $gateway;

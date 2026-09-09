@@ -26,6 +26,8 @@ interface WallesterGatewayInterface
      */
     public function getCard(string $cardId, ?string $auditUserId = null): array;
 
+    public function getEncryptedPinCard(string $cardId, string $publicKeyBase64, ?string $auditUserId = null): string;
+
     public function blockCard(string $cardId, ?string $auditUserId = null): array;
 
     public function unblockCard(string $cardId, ?string $auditUserId = null): array;
@@ -38,7 +40,14 @@ interface WallesterGatewayInterface
 
     public function createCard(array $data, ?string $auditUserId = null): array;
 
+    /**
+     * @return list<array{dispatch_method: string, price: float|null, description: string}>
+     */
+    public function listCardDispatchMethods(string $countryCode, ?string $auditUserId = null): array;
+
     public function activateCard(string $cardId, ?string $auditUserId = null): array;
+
+    public function linkCardToAccount(string $cardId, string $accountId, ?string $auditUserId = null): array;
 
     /**
      * @param  array<string, mixed>  $query

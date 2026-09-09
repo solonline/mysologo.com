@@ -6,14 +6,18 @@ use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Services\Wallester3dsService;
+use App\Domains\Wallester\Services\WallesterCardRsaKeyService;
 use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
+use App\Domains\Wallester\Services\WallesterSensitiveDataDecryptor;
 use App\Domains\Wallester\Services\WallesterService;
+use App\Domains\Settings\Services\SettingsService;
 use App\Domains\Wallester\Services\WallesterSettingsService;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\CustomerWallesterCard;
+use App\Models\FundingPartnerMovement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use RuntimeException;
@@ -146,6 +150,175 @@ class WallesterServiceTest extends TestCase
         $this->assertSame('card_oob', $card->wallester_card_id);
         $this->assertSame('Active', $card->status);
         $this->assertNotNull($card->activated_at);
+    }
+
+    public function test_create_card_for_customer_does_not_activate_physical_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_phys');
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('createCard')
+            ->once()
+            ->with(Mockery::on(function (array $payload) use ($account): bool {
+                return $payload['account_id'] === $account->wallester_account_id
+                    && $payload['type'] === 'ChipAndPin'
+                    && $payload['name'] === 'Physical Card'
+                    && is_array($payload['delivery_address'] ?? null)
+                    && $payload['delivery_address']['country_code'] === 'PRT'
+                    && $payload['delivery_address']['dispatch_method'] === 'DHLGlobalMail'
+                    && $payload['delivery_address']['company_name'] === 'TAMIETTO JUNIOR UNIPESSOAL LDA';
+            }), (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_phys',
+                'type' => 'Physical',
+                'status' => 'Created',
+                'name' => 'Physical Card',
+            ]);
+        $gateway->shouldNotReceive('activateCard');
+        $gateway->shouldNotReceive('accountTransfer');
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->createCardForCustomer($customer, [
+            'type' => 'Physical',
+            'name' => 'Physical Card',
+            'delivery_address' => [
+                'address' => 'Rua das Flores 1',
+                'city' => 'Lisboa',
+                'state' => 'Lisboa',
+                'country' => 'PT',
+                'first_name' => 'Joao',
+                'last_name' => 'Silva',
+                'phone' => '+351912345678',
+                'postal_code' => '1000-001',
+            ],
+        ]);
+
+        $this->assertSame('card_phys', $card->wallester_card_id);
+        $this->assertSame('Physical', $card->type);
+        $this->assertSame('Created', $card->status);
+        $this->assertNull($card->activated_at);
+        $this->assertDatabaseHas('customer_card_delivery_addresses', [
+            'customer_id' => $customer->id,
+            'customer_wallester_card_id' => $card->id,
+            'address' => 'Rua das Flores 1',
+            'city' => 'Lisboa',
+            'state' => 'Lisboa',
+            'country' => 'PT',
+            'first_name' => 'Joao',
+            'last_name' => 'Silva',
+            'phone' => '+351912345678',
+            'postal_code' => '1000-001',
+        ]);
+    }
+
+    public function test_create_physical_card_uses_cheapest_allowed_dispatch_method(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_phys_dhl');
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('listCardDispatchMethods')
+            ->once()
+            ->with('PRT', (string) $customer->id)
+            ->andReturn([
+                [
+                    'dispatch_method' => 'DHLExpress',
+                    'price' => 20.0,
+                    'description' => 'Express',
+                ],
+                [
+                    'dispatch_method' => 'DHLGlobalMailTracked',
+                    'price' => 8.5,
+                    'description' => 'Tracked',
+                ],
+                [
+                    'dispatch_method' => 'DHLExpress',
+                    'price' => 20.0,
+                    'description' => 'Express dup',
+                ],
+            ]);
+        $gateway->shouldReceive('createCard')
+            ->once()
+            ->with(Mockery::on(function (array $payload): bool {
+                return $payload['type'] === 'ChipAndPin'
+                    && $payload['delivery_address']['dispatch_method'] === 'DHLGlobalMailTracked';
+            }), (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_phys_cheap',
+                'type' => 'ChipAndPin',
+                'status' => 'Created',
+                'name' => 'Physical Card',
+            ]);
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->createCardForCustomer($customer, [
+            'type' => 'Physical',
+            'name' => 'Physical Card',
+            'delivery_address' => [
+                'address' => 'Rua das Flores 1',
+                'city' => 'Lisboa',
+                'state' => 'Lisboa',
+                'country' => 'PT',
+                'first_name' => 'Joao',
+                'last_name' => 'Silva',
+                'phone' => '+351912345678',
+                'postal_code' => '1000-001',
+            ],
+        ]);
+
+        $this->assertSame('card_phys_cheap', $card->wallester_card_id);
+    }
+
+    public function test_create_physical_card_fails_when_no_dispatch_methods_are_available(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_phys_no_dispatch');
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('listCardDispatchMethods')->once()->andReturn([]);
+        $gateway->shouldNotReceive('createCard');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Wallester has no dispatch methods for country [PRT].');
+
+        $service->createCardForCustomer($customer, [
+            'type' => 'Physical',
+            'name' => 'Physical Card',
+            'delivery_address' => [
+                'address' => 'Rua das Flores 1',
+                'city' => 'Lisboa',
+                'state' => 'Lisboa',
+                'country' => 'PT',
+                'first_name' => 'Joao',
+                'last_name' => 'Silva',
+                'phone' => '+351912345678',
+                'postal_code' => '1000-001',
+            ],
+        ]);
+    }
+
+    public function test_create_physical_card_requires_delivery_address(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_phys_no_addr');
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('createCard');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('Delivery address is required to create a physical card.');
+
+        $service->createCardForCustomer($customer, [
+            'type' => 'Physical',
+            'name' => 'Physical Card',
+        ]);
     }
 
     public function test_activate_virtual_card_for_customer_updates_local_card(): void
@@ -362,6 +535,272 @@ class WallesterServiceTest extends TestCase
             $service->createCardForCustomer($customer, [
                 'type' => 'Virtual',
                 'name' => 'Second Card',
+            ]);
+            $this->fail('Expected ApiException was not thrown.');
+        } catch (ApiException $exception) {
+            $this->assertSame(ErrorCode::INSUFFICIENT_BALANCE, $exception->reason);
+            $this->assertSame(422, $exception->getCode());
+        }
+    }
+
+    public function test_create_additional_physical_card_charges_fee_when_balance_covers_it(): void
+    {
+        $this->seedWallesterSettings([
+            'wallester.physical_card_value' => '1500',
+            'wallester.eur.platform_fee_account_id' => 'wal_fee_phys',
+        ]);
+
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_fee_phys_from');
+        $this->createWallesterAccount($this->createRetailCustomer(), IntegrationAccountStatus::ACTIVE, 'wal_fee_phys');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_existing_phys_fee',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')
+            ->with('wal_fee_phys_from', (string) $customer->id)
+            ->andReturn(['available_amount' => 20.00, 'balance' => 20.00]);
+        $gateway->shouldReceive('createCard')->once()->andReturn([
+            'id' => 'card_paid_phys',
+            'type' => 'Physical',
+            'status' => 'Created',
+            'name' => 'Physical Card',
+        ]);
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(function (array $payload) use ($account): bool {
+                return $payload['from_account_id'] === $account->wallester_account_id
+                    && $payload['to_account_id'] === 'wal_fee_phys'
+                    && $payload['amount'] === 10.0
+                    && $payload['description'] === 'Taxa de emissão de cartão físico';
+            }), (string) $customer->id)
+            ->andReturn(['id' => 'pay_phys_fee']);
+        $gateway->shouldNotReceive('activateCard');
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->createCardForCustomer($customer, [
+            'type' => 'Physical',
+            'name' => 'Physical Card',
+            'delivery_address' => [
+                'address' => 'Rua das Flores 1',
+                'city' => 'Lisboa',
+                'state' => 'Lisboa',
+                'country' => 'PT',
+                'first_name' => 'Joao',
+                'last_name' => 'Silva',
+                'phone' => '+351912345678',
+                'postal_code' => '1000-001',
+            ],
+        ]);
+
+        $this->assertSame('card_paid_phys', $card->wallester_card_id);
+        $this->assertSame('Created', $card->status);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'entry_type' => 'physical_card_issuance_fee',
+            'amount' => 1500,
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'type' => 'physical_card_issuance_fee',
+            'amount' => 1500,
+            'idempotency_key' => 'physical-card-issuance-fee:'.$customer->id.':'.$card->id.':out',
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'type' => 'physical_card_issuance_fee',
+            'amount' => 1000,
+            'idempotency_key' => 'physical-card-platform-fee:'.$customer->id.':'.$card->id.':out',
+        ]);
+    }
+
+    public function test_create_first_physical_card_charges_remaining_fee_after_dispatch(): void
+    {
+        $this->seedWallesterSettings([
+            'wallester.physical_card_value' => '850',
+            'wallester.eur.platform_fee_account_id' => 'wal_fee_first_phys',
+        ]);
+
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_first_phys_from');
+        $this->createWallesterAccount($this->createRetailCustomer(), IntegrationAccountStatus::ACTIVE, 'wal_fee_first_phys');
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')
+            ->with('wal_first_phys_from', (string) $customer->id)
+            ->andReturn(['available_amount' => 20.00, 'balance' => 20.00]);
+        $gateway->shouldReceive('createCard')->once()->andReturn([
+            'id' => 'card_first_phys',
+            'type' => 'ChipAndPin',
+            'status' => 'Created',
+            'name' => 'Physical Card',
+        ]);
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(function (array $payload) use ($account): bool {
+                return $payload['from_account_id'] === $account->wallester_account_id
+                    && $payload['to_account_id'] === 'wal_fee_first_phys'
+                    && $payload['amount'] === 3.5
+                    && $payload['description'] === 'Taxa de emissão de cartão físico';
+            }), (string) $customer->id)
+            ->andReturn(['id' => 'pay_first_phys_fee']);
+        $gateway->shouldNotReceive('activateCard');
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->createCardForCustomer($customer, [
+            'type' => 'Physical',
+            'name' => 'Physical Card',
+            'delivery_address' => [
+                'address' => 'Rua das Flores 1',
+                'city' => 'Lisboa',
+                'state' => 'Lisboa',
+                'country' => 'PT',
+                'first_name' => 'Joao',
+                'last_name' => 'Silva',
+                'phone' => '+351912345678',
+                'postal_code' => '1000-001',
+            ],
+        ]);
+
+        $this->assertSame('card_first_phys', $card->wallester_card_id);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'entry_type' => 'physical_card_issuance_fee',
+            'amount' => 850,
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'type' => 'physical_card_issuance_fee',
+            'amount' => 850,
+            'idempotency_key' => 'physical-card-issuance-fee:'.$customer->id.':'.$card->id.':out',
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'type' => 'physical_card_issuance_fee',
+            'amount' => 350,
+            'idempotency_key' => 'physical-card-platform-fee:'.$customer->id.':'.$card->id.':out',
+        ]);
+    }
+
+    public function test_create_physical_card_does_not_transfer_when_dispatch_covers_settings(): void
+    {
+        $this->seedWallesterSettings([
+            'wallester.physical_card_value' => '850',
+            'wallester.eur.platform_fee_account_id' => 'wal_fee_phys_full',
+        ]);
+
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_phys_full_from');
+        $this->createWallesterAccount($this->createRetailCustomer(), IntegrationAccountStatus::ACTIVE, 'wal_fee_phys_full');
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('listCardDispatchMethods')
+            ->once()
+            ->andReturn([
+                [
+                    'dispatch_method' => 'DHLGlobalMailTracked',
+                    'price' => 8.5,
+                    'description' => 'Tracked',
+                ],
+            ]);
+        $gateway->shouldReceive('getAccount')
+            ->with('wal_phys_full_from', (string) $customer->id)
+            ->andReturn(['available_amount' => 20.00, 'balance' => 20.00]);
+        $gateway->shouldReceive('createCard')->once()->andReturn([
+            'id' => 'card_phys_full',
+            'type' => 'ChipAndPin',
+            'status' => 'Created',
+            'name' => 'Physical Card',
+            'delivery_address' => [
+                'dispatch_method' => 'DHLGlobalMailTracked',
+                'country_code' => 'PRT',
+            ],
+        ]);
+        $gateway->shouldNotReceive('accountTransfer');
+        $gateway->shouldNotReceive('activateCard');
+
+        $service = $this->makeService($gateway);
+
+        $card = $service->createCardForCustomer($customer, [
+            'type' => 'Physical',
+            'name' => 'Physical Card',
+            'delivery_address' => [
+                'address' => 'Rua das Flores 1',
+                'city' => 'Lisboa',
+                'state' => 'Lisboa',
+                'country' => 'PT',
+                'first_name' => 'Joao',
+                'last_name' => 'Silva',
+                'phone' => '+351912345678',
+                'postal_code' => '1000-001',
+            ],
+        ]);
+
+        $this->assertSame('card_phys_full', $card->wallester_card_id);
+        $visibleMovement = FundingPartnerMovement::query()
+            ->where('idempotency_key', 'physical-card-issuance-fee:'.$customer->id.':'.$card->id.':out')
+            ->first();
+        $this->assertNotNull($visibleMovement);
+        $this->assertSame(850, (int) $visibleMovement->amount);
+        $this->assertNull($visibleMovement->fees_amount);
+        $this->assertNull($visibleMovement->platform_fees_amount);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'entry_type' => 'physical_card_issuance_fee',
+            'amount' => 850,
+            'reference_type' => $visibleMovement->getMorphClass(),
+            'reference_id' => $visibleMovement->id,
+        ]);
+        $this->assertDatabaseMissing('funding_partner_movements', [
+            'idempotency_key' => 'physical-card-platform-fee:'.$customer->id.':'.$card->id.':out',
+        ]);
+    }
+
+    public function test_create_additional_physical_card_rejects_insufficient_balance(): void
+    {
+        $this->seedWallesterSettings([
+            'wallester.physical_card_value' => '1500',
+        ]);
+
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_phys_low');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_existing_phys_low',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')
+            ->once()
+            ->with('wal_phys_low', (string) $customer->id)
+            ->andReturn(['available_amount' => 10.00, 'balance' => 10.00]);
+        $gateway->shouldNotReceive('createCard');
+        $gateway->shouldNotReceive('accountTransfer');
+
+        $service = $this->makeService($gateway);
+
+        try {
+            $service->createCardForCustomer($customer, [
+                'type' => 'Physical',
+                'name' => 'Physical Card',
+                'delivery_address' => [
+                    'address' => 'Rua das Flores 1',
+                    'city' => 'Lisboa',
+                    'state' => 'Lisboa',
+                    'country' => 'PT',
+                    'first_name' => 'Joao',
+                    'last_name' => 'Silva',
+                    'phone' => '+351912345678',
+                    'postal_code' => '1000-001',
+                ],
             ]);
             $this->fail('Expected ApiException was not thrown.');
         } catch (ApiException $exception) {
@@ -709,6 +1148,185 @@ class WallesterServiceTest extends TestCase
         $service->closeCardForCustomer($customer, $localCard);
     }
 
+    public function test_get_encrypted_pin_for_customer_decrypts_wallester_payload(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_pin');
+        $card = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_pin_1',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Travel Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getEncryptedPinCard')
+            ->once()
+            ->with('card_pin_1', 'public-key-base64', (string) $customer->id)
+            ->andReturn('encrypted-pin');
+
+        $rsaKeys = Mockery::mock(WallesterCardRsaKeyService::class);
+        $rsaKeys->shouldReceive('publicKeyBase64')->once()->with('EUR')->andReturn('public-key-base64');
+
+        $decryptor = Mockery::mock(WallesterSensitiveDataDecryptor::class);
+        $decryptor->shouldReceive('decryptPin')
+            ->once()
+            ->with('encrypted-pin', 'EUR')
+            ->andReturn('1234');
+
+        $service = new WallesterService(
+            $gateway,
+            app(WallesterAccountRepositoryInterface::class),
+            app(Wallester3dsService::class),
+            app(WallesterSettingsService::class),
+            app(WallesterFundingTransferDriver::class),
+            app(FundingPartnerMovementService::class),
+            app(LedgerService::class),
+            app(SettingsService::class),
+            $rsaKeys,
+            $decryptor,
+        );
+
+        $this->assertSame('1234', $service->getEncryptedPinForCustomer($customer, $card));
+    }
+
+    public function test_get_encrypted_pin_for_customer_rejects_inactive_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_pin_inactive');
+        $card = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_pin_inactive',
+            'type' => 'Virtual',
+            'status' => 'Created',
+            'name' => 'Travel Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('getEncryptedPinCard');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('Sensitive card data is only available for active cards.');
+
+        $service->getEncryptedPinForCustomer($customer, $card);
+    }
+
+    public function test_link_card_to_another_customer_moves_local_card_and_counts(): void
+    {
+        $owner = $this->createRetailCustomer();
+        $target = $this->createRetailCustomer();
+        $sourceAccount = $this->createWallesterAccount($owner, IntegrationAccountStatus::ACTIVE, 'wal_link_from', [
+            'cards_count' => 1,
+        ]);
+        $targetAccount = $this->createWallesterAccount($target, IntegrationAccountStatus::ACTIVE, 'wal_link_to');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $sourceAccount->id,
+            'wallester_card_id' => 'card_link_1',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Travel Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('linkCardToAccount')
+            ->once()
+            ->with('card_link_1', 'wal_link_to', (string) $owner->id)
+            ->andReturn([
+                'id' => 'card_link_1',
+                'account_id' => 'wal_link_to',
+                'type' => 'Virtual',
+                'status' => 'Active',
+                'name' => 'Travel Card',
+            ]);
+
+        $service = $this->makeService($gateway);
+        $linked = $service->linkCardToAnotherCustomer($owner, $localCard, $target);
+
+        $this->assertSame($targetAccount->id, $linked->customer_wallester_account_id);
+        $this->assertSame(0, $sourceAccount->fresh()->cards_count);
+        $this->assertSame(1, $targetAccount->fresh()->cards_count);
+    }
+
+    public function test_link_card_to_another_customer_rejects_closed_card(): void
+    {
+        $owner = $this->createRetailCustomer();
+        $target = $this->createRetailCustomer();
+        $sourceAccount = $this->createWallesterAccount($owner, IntegrationAccountStatus::ACTIVE, 'wal_link_closed');
+        $this->createWallesterAccount($target, IntegrationAccountStatus::ACTIVE, 'wal_link_closed_to');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $sourceAccount->id,
+            'wallester_card_id' => 'card_link_closed',
+            'type' => 'Virtual',
+            'status' => 'Closed',
+            'name' => 'Travel Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('linkCardToAccount');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('This card cannot be linked in its current status.');
+
+        $service->linkCardToAnotherCustomer($owner, $localCard, $target);
+    }
+
+    public function test_link_card_to_another_customer_rejects_same_customer(): void
+    {
+        $owner = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($owner, IntegrationAccountStatus::ACTIVE, 'wal_link_same');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_link_same',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Travel Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('linkCardToAccount');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('Cannot link a card to the same customer.');
+
+        $service->linkCardToAnotherCustomer($owner, $localCard, $owner);
+    }
+
+    public function test_link_card_to_another_customer_rejects_inactive_target_account(): void
+    {
+        $owner = $this->createRetailCustomer();
+        $target = $this->createRetailCustomer();
+        $sourceAccount = $this->createWallesterAccount($owner, IntegrationAccountStatus::ACTIVE, 'wal_link_inactive_from');
+        $this->createWallesterAccount($target, IntegrationAccountStatus::FAILED, 'wal_link_inactive_to');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $sourceAccount->id,
+            'wallester_card_id' => 'card_link_inactive',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Travel Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('linkCardToAccount');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('Wallester account not found or not active for the target customer.');
+
+        $service->linkCardToAnotherCustomer($owner, $localCard, $target);
+    }
+
     private function makeService($gateway): WallesterService
     {
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
@@ -721,6 +1339,9 @@ class WallesterServiceTest extends TestCase
             app(WallesterFundingTransferDriver::class),
             app(FundingPartnerMovementService::class),
             app(LedgerService::class),
+            app(SettingsService::class),
+            app(WallesterCardRsaKeyService::class),
+            app(WallesterSensitiveDataDecryptor::class),
         );
     }
 }

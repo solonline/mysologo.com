@@ -80,15 +80,14 @@ class WallesterSettingsService
         return (int) $value;
     }
 
-    public function virtualCardValueCents(): int
+    public function cardValueCents(bool $isVirtual): int
     {
-        $value = $this->settings->getByKey('wallester.virtual_card_value');
+        $value = $this->settings->getByKey($isVirtual ? 'wallester.virtual_card_value' : 'wallester.physical_card_value');
 
         if ($value === null || trim((string) $value) === '') {
             return 0;
         }
 
-        \Log::info('virtualCardValueCents', ['value' => $value]);
         return max(0, (int) round((float) $value));
     }
 

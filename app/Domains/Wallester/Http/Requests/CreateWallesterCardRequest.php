@@ -24,6 +24,15 @@ class CreateWallesterCardRequest extends FormRequest
             'security' => ['sometimes', 'array'],
             'pin' => ['required', 'digits:4'],
             'device_token' => ['required', 'string'],
+            'delivery_address' => ['required_if:type,Physical', 'array'],
+            'delivery_address.address' => ['required_if:type,Physical', 'string', 'max:255'],
+            'delivery_address.city' => ['required_if:type,Physical', 'string', 'max:255'],
+            'delivery_address.state' => ['required_if:type,Physical', 'string', 'max:255'],
+            'delivery_address.country' => ['required_if:type,Physical', 'string', 'size:2', 'regex:/^[A-Za-z]{2}$/'],
+            'delivery_address.first_name' => ['required_if:type,Physical', 'string', 'max:255'],
+            'delivery_address.last_name' => ['required_if:type,Physical', 'string', 'max:255'],
+            'delivery_address.phone' => ['required_if:type,Physical', 'string', 'max:255'],
+            'delivery_address.postal_code' => ['required_if:type,Physical', 'string', 'max:255'],
         ];
     }
 }

@@ -6,9 +6,12 @@ Enviar dinheiro de um utilizador para outro pelo `username`.
 
 ## Pré-requisitos
 
-- Conta **ACTIVE**
+- Conta **ACTIVE** (tríade: email + KYC + lifecycle)
 - PIN criado (`POST /api/auth/create-pin`) no dispositivo actual
 - Saldo suficiente na moeda
+- Header `Idempotency-Key` (UUID) no POST
+
+O dinheiro move-se no **parceiro de funding (Wallester)**, não só no ledger local.
 
 ## Fluxo
 
@@ -20,7 +23,7 @@ sequenceDiagram
     App->>API: GET /customer/find/{username}
     API-->>App: Dados públicos do destinatário
     App->>API: POST /wallet/transactions/p2p
-    Note over App,API: device_token + pin
+    Note over App,API: device_token + pin + Idempotency-Key
     API-->>App: debit + credit transactions
 ```
 
@@ -38,6 +41,7 @@ Devolve `name`, `username`, `avatar_url` — sem dados sensíveis.
 
 ```
 POST /api/wallet/transactions/p2p
+Idempotency-Key: {uuid}
 ```
 
 ```json
@@ -47,7 +51,8 @@ POST /api/wallet/transactions/p2p
   "currency": "EUR",
   "description": "Almoço",
   "device_token": "DEVICE_TOKEN",
-  "pin": "1234"
+  "pin": "1234",
+  "favorite": false
 }
 ```
 
@@ -63,7 +68,10 @@ Resposta `201`:
 ## Segurança
 
 - `device_token` + `pin` validam que és tu no dispositivo registado
-- Não é possível transferir para o próprio username
+- Header `Idempotency-Key` obrigatório
+- Não é possível transferir para o próprio username nem para contas `platform`
+- `favorite: true` (opcional) guarda o destinatário em `GET /customer/favorites`
+- Sem transferência: `POST /customer/favorites` (`{ "username": "janedoe" }`) e `DELETE /customer/favorites/{username}`
 
 ## Erros comuns
 
@@ -73,4 +81,4 @@ Resposta `201`:
 | 422 | PIN errado, saldo insuficiente, ou validação |
 | 403 | Conta não elegível |
 
-📖 **API:** `POST /wallet/transactions/p2p` na [referência](/docs)
+📖 **API:** `POST /wallet/transactions/p2p` na [referência](/docs) · [Lógica do sistema — P2P](/docs/guides/logica-sistema)

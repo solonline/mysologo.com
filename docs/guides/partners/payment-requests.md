@@ -72,7 +72,7 @@ Resposta `201`:
 ```json
 {
   "uuid": "...",
-  "url": "https://yoop.test/pay/...",
+  "url": "https://api.yooppayments.eu/pay/...",
   "status": "pending",
   "amount": 5000,
   "currency": "EUR"
@@ -141,6 +141,7 @@ Notas:
 - A página tem fundo cinza claro à volta do card; o iframe deve ter altura suficiente para não cortar o formulário de pagamento
 - Preferir redirecionamento full-page se o site não precisar de checkout embutido
 - Incluir `?embed=1` no `src` do iframe (recomendado) para o comportamento acima ficar explícito
+
 ## Webhook
 
 Quando o pagamento fica `completed`, a Yoop envia `POST` para o `webhook_url` do pedido (ou, se não existir, o `webhook_url` do merchant).
@@ -218,7 +219,7 @@ Até **10** tentativas com backoff: 30s → 1m → 2m → 5m → 10m → 15m →
 
 ## Rate limit
 
-10 pedidos/minuto.
+120 criações/minuto **por merchant** (não por IP). Resposta `429` com `Retry-After`.
 
 ## Erros
 
@@ -269,7 +270,7 @@ Implementa a integração merchant Yoop no nosso backend (e, se fizer sentido, n
 - `settlement_status=available` / `funds_available=true` = fundos disponíveis
 
 ## Restrições
-- Rate limit: ~10 criações/minuto
+- Rate limit: 120 criações/minuto por merchant (tratar 429)
 - Não inventes endpoints fora desta API de parceiros
 - Não exponhas `api_key` / `webhook_secret` no frontend
 
@@ -280,4 +281,4 @@ Implementa a integração merchant Yoop no nosso backend (e, se fizer sentido, n
 4. Variáveis de ambiente documentadas: `YOOP_BASE_URL`, `YOOP_MERCHANT_API_KEY`, `YOOP_WEBHOOK_SECRET`
 ````
 
-📖 **API:** [referência parceiros](/docs/partners) · [Prompt IA (guia)](/docs/partners/guides/ai-prompt)
+📖 **API:** [referência parceiros](/docs/partners) · [Prompt IA (guia)](/docs/partners/guides/ai-prompt) · [Lógica do sistema — merchant](/docs/guides/logica-sistema)

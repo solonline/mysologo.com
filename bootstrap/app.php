@@ -71,6 +71,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append([
             CorsMiddleware::class,
         ]);
+
+        $middleware->prependToPriorityList(
+            [
+                \Illuminate\Routing\Middleware\ThrottleRequests::class,
+                \Illuminate\Routing\Middleware\ThrottleRequestsWithRedis::class,
+            ],
+            AuthMerchant::class,
+        );
     })
     // Configura o tratamento de exceções globais
     ->withExceptions(function (Exceptions $exceptions): void {

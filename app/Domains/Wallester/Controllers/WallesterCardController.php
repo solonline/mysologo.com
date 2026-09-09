@@ -29,6 +29,7 @@ class WallesterCardController extends Controller
         $customerId = $request->user()->id;
 
         $cards = CustomerWallesterCard::query()
+            ->with('customerDeliveryAddress')
             ->whereHas('wallesterAccount', fn ($query) => $query->where('customer_id', $customerId))
             ->managed()
             ->orderByDesc('id')
@@ -52,7 +53,7 @@ class WallesterCardController extends Controller
 
     /**
      * @hideFromApiDocs
-     */  
+     */
     public function store(CreateWallesterCardRequest $request): JsonResponse
     {
         $this->verifyCustomerPin($request);
@@ -91,6 +92,23 @@ class WallesterCardController extends Controller
                 $card,
                 $request->validated(),
             ),
+        ]);
+    }
+
+    /**
+     * @hideFromApiDocs
+     */
+    public function encryptedPin(RevealWallesterCardSensitiveRequest $request, CustomerWallesterCard $card): JsonResponse
+    {
+        $this->cardSensitiveService->verifyStepUpCredentials(
+            $request->user(),
+            $request->validated(),
+        );
+
+        return response()->json([
+            'data' => [
+                'pin' => $this->wallesterService->getEncryptedPinForCustomer($request->user(), $card),
+            ],
         ]);
     }
 
@@ -172,6 +190,9 @@ class WallesterCardController extends Controller
     /** @return array<string, mixed> */
     private function transformCard(CustomerWallesterCard $card): array
     {
+        $card->loadMissing('customerDeliveryAddress');
+        $address = $card->customerDeliveryAddress;
+
         return [
             'id' => $card->id,
             'wallester_card_id' => $card->wallester_card_id,
@@ -183,6 +204,16 @@ class WallesterCardController extends Controller
             'security' => $card->security,
             'limits' => $card->limits,
             'three_d_secure_settings' => $card->three_d_secure_settings,
+            'delivery_address' => $address === null ? null : [
+                'address' => $address->address,
+                'city' => $address->city,
+                'state' => $address->state,
+                'country' => $address->country,
+                'first_name' => $address->first_name,
+                'last_name' => $address->last_name,
+                'phone' => $address->phone,
+                'postal_code' => $address->postal_code,
+            ],
             'block_type' => $card->block_type,
             'blocked_at' => $card->blocked_at?->toIso8601String(),
             'close_reason' => $card->close_reason,

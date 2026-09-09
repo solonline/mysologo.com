@@ -20,6 +20,11 @@ class WallesterSensitiveDataDecryptor
         return $this->decrypt($encryptedPayload, 'CVV2', $currency);
     }
 
+    public function decryptPin(string $encryptedPayload, string $currency = 'eur'): string
+    {
+        return $this->decrypt($encryptedPayload, 'PIN', $currency);
+    }
+
     private function decrypt(string $encryptedPayload, string $messageLabel, string $currency): string
     {
         $ciphertext = $this->extractCiphertext($encryptedPayload, $messageLabel);
@@ -40,6 +45,7 @@ class WallesterSensitiveDataDecryptor
         if (is_array($encryptedPayload)) {
             $encryptedPayload = $encryptedPayload['encrypted_card_number']
                 ?? $encryptedPayload['encrypted_cvv2']
+                ?? $encryptedPayload['encrypted_pin']
                 ?? $encryptedPayload['payload']
                 ?? $encryptedPayload['value']
                 ?? '';

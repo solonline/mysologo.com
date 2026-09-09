@@ -263,18 +263,20 @@ merchant-payment-requests:
 
       **Autenticação:** `X-Merchant-Key` (não usar Bearer neste endpoint).
 
-      **Rate limit:** 10 pedidos/minuto.
+      **Rate limit:** 120 pedidos/minuto **por merchant**.
 
       **Fluxo típico:**
       1. Criar payment request → receber `url`
-      2. Redirecionar cliente para `url` (browser ou iframe)
-      3. Cliente paga na página Yoop
+      2. Redireccionar o pagador para `url` (browser ou iframe `?embed=1`)
+      3. Cliente paga na página Yoop; a loja confirma no webhook HMAC
 
       **Iframe:** card com largura máx. 384px; sugerido `width=400`, `height=720`
-      (altura dinâmica — ver guia payment-requests).
+      (altura dinâmica — ver [guia payment-requests](/docs/partners/guides/payment-requests)).
 
-      **Settlement:** após pagamento, o webhook inclui `settlement_status=pending` e
-      `funds_available=false` até liquidação dos fundos.
+      **Settlement:** o webhook de `completed` inclui `settlement_status` (`pending` até
+      liquidação, `available` quando os fundos estão na wallet) e `funds_available`.
+      O primeiro envio pode ter `fee_total` / `net_amount` / `funds_available_at` a `null`;
+      a Yoop reenvia quando o Stripe confirma as taxas.
     security:
       - merchantKey: []
     requestBody:
@@ -341,8 +343,14 @@ merchant-payment-requests:
               language:
                 type: string
                 maxLength: 5
+              payment_method_type:
+                type: string
+                description: Alias singular de `payment_method_types` (`card` ou `mb_way`; aliases `mbway`, `mb-way`).
               payment_method_types:
                 type: array
+                description: |
+                  Opcional. `card` e/ou `mb_way`. Se omitido, a página de pagamento
+                  apresenta os métodos disponíveis automaticamente.
                 items:
                   type: string
                   enum: [card, mb_way]
@@ -363,47 +371,7 @@ merchant-payment-requests:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                uuid:
-                  type: string
-                  format: uuid
-                amount:
-                  type: integer
-                  description: Valor em centimos
-                currency:
-                  type: string
-                description:
-                  type: string
-                  nullable: true
-                external_reference:
-                  type: string
-                  nullable: true
-                payment_method_types:
-                  type: array
-                  nullable: true
-                  items:
-                    type: string
-                status:
-                  type: string
-                settlement_status:
-                  type: string
-                  nullable: true
-                url:
-                  type: string
-                  format: uri
-                paid_at:
-                  type: string
-                  format: date-time
-                  nullable: true
-                expires_at:
-                  type: string
-                  format: date-time
-                  nullable: true
-                created_at:
-                  type: string
-                  format: date-time
-                  nullable: true
+              $ref: '../components/schemas.yaml#/MerchantPaymentRequest'
             example:
               uuid: "9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8"
               amount: 5000
@@ -415,7 +383,7 @@ merchant-payment-requests:
                 - mb_way
               status: pending
               settlement_status: null
-              url: "https://yooppayments.eu/pay/9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8"
+              url: "https://api.yooppayments.eu/pay/9f3c2a1b-4d5e-6f70-8192-a3b4c5d6e7f8"
               paid_at: null
               expires_at: "2026-07-23T13:00:00+01:00"
               created_at: "2026-07-23T12:00:00+01:00"
@@ -436,6 +404,8 @@ merchant-terminal-connection-token:
       Obtém `secret` para inicializar o SDK do terminal no POS.
 
       Enviar `currency` opcional (default `eur`).
+
+      **Rate limit:** 60 pedidos/minuto **por merchant**.
     security:
       - merchantKey: []
     requestBody:
@@ -470,6 +440,8 @@ merchant-terminal-create-intent:
       **Headers obrigatórios:**
       - `X-Merchant-Key`
       - `Idempotency-Key` (UUID único por tentativa)
+
+      **Rate limit:** 60 pedidos/minuto **por merchant**.
 
       **Valores:** `amount` em menor unidade monetária (cêntimos).
     security:

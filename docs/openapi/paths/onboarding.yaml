@@ -18,21 +18,30 @@ onboarding-phone-send:
     description: |
       Envia OTP para o telefone do customer autenticado.
 
-      **Nota:** o número é o registado no perfil; o body confirma/recebe `phone` mas o envio usa o telefone da conta.
+      **`phone` é opcional.** Sem body (ou com o mesmo número da conta) reenvia
+      para o telefone já registado.
 
-      Se o telefone já estiver verificado, retorna `status: failed` com mensagem informativa.
+      Se `phone` for um número **diferente** e o actual **ainda não estiver verificado**,
+      o sistema corrige `customer.phone` e envia o SMS para o novo número
+      (segunda hipótese quando o utilizador se enganou no registo).
+
+      Se o telefone actual já estiver verificado, um número diferente devolve `422`
+      (`phone_already_verified`) — nesse caso usar `POST /customer/phone`.
+
+      Reenvio para um número já verificado devolve `status: failed` com mensagem informativa.
+      Falha do gateway SMS → `502`.
     security:
       - bearerAuth: []
     requestBody:
-      required: true
+      required: false
       content:
         application/json:
           schema:
             type: object
-            required: [phone]
             properties:
               phone:
                 type: string
+                description: Só dígitos. Omitir para reenviar ao número da conta; enviar outro para corrigir um número ainda não verificado.
                 example: '351912345678'
     responses:
       '200':
@@ -42,6 +51,10 @@ onboarding-phone-send:
               $ref: '../components/schemas.yaml#/SmsValidationResult'
       '401':
         $ref: '../components/responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses.yaml#/ValidationError'
+      '502':
+        description: Falha ao enviar o SMS
 
 onboarding-phone-validate:
   post:

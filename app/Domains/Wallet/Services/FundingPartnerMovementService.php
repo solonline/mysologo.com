@@ -285,6 +285,51 @@ class FundingPartnerMovementService
         );
     }
 
+    /**
+     * @param  array<string, mixed>|null  $metadata
+     */
+    public function recordLocalCompletedMovement(
+        CustomerWallesterAccount $account,
+        FundingPartnerMovementType $type,
+        FundingPartnerMovementDirection $direction,
+        int $amountCents,
+        string $currency,
+        string $idempotencyKey,
+        string $description,
+        ?CustomerWallesterCard $card = null,
+        ?array $metadata = null,
+        ?object $reference = null,
+    ): FundingPartnerMovement {
+        $existing = FundingPartnerMovement::query()
+            ->where('idempotency_key', $idempotencyKey)
+            ->first();
+
+        if ($existing instanceof FundingPartnerMovement) {
+            return $existing;
+        }
+
+        $resolvedReference = $reference ?? $card;
+
+        return FundingPartnerMovement::query()->create([
+            'provider' => IntegrationProvider::WALLESTER,
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => $direction,
+            'type' => $type,
+            'amount' => $amountCents,
+            'currency' => strtoupper($currency),
+            'customer_wallester_card_id' => $card?->id,
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => $idempotencyKey,
+            'description' => $description,
+            'reference_type' => $resolvedReference instanceof Model ? $resolvedReference->getMorphClass() : null,
+            'reference_id' => $resolvedReference instanceof Model ? $resolvedReference->getKey() : null,
+            'metadata' => $metadata,
+        ]);
+    }
+
     public function transferFromMasterToPlatformFees(
         int $amountCents,
         string $currency,
@@ -840,6 +885,7 @@ class FundingPartnerMovementService
             ->customerVisible()
             ->where('funding_account_type', $fundingAccount::class)
             ->where('funding_account_id', $fundingAccount->id)
+            ->with(['reference', 'counterpartyWallesterAccount.customer'])
             ->latest('id')
             ->paginate($perPage);
     }

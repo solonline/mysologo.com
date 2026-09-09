@@ -40,17 +40,31 @@
         min-width: 0;
     }
 
-    .docs-logo {
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, var(--yoop-accent), #a855f7);
+    .docs-brand-logo {
+        height: 36px;
+        width: auto;
+        display: block;
+        flex-shrink: 0;
+        mix-blend-mode: screen;
+    }
+
+    .docs-brand-text {
+        min-width: 0;
+    }
+
+    .docs-header-right {
         display: flex;
         align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 0.875rem;
+        gap: 1rem;
         flex-shrink: 0;
+    }
+
+    .docs-securepay {
+        height: 28px;
+        width: auto;
+        display: block;
+        flex-shrink: 0;
+        mix-blend-mode: screen;
     }
 
     .docs-title {
@@ -103,13 +117,13 @@
     }
 
     .scalar-container {
-        height: calc(100vh - 57px);
+        height: calc(100vh - 64px);
     }
 
     .guides-layout {
         display: grid;
         grid-template-columns: 260px 1fr;
-        min-height: calc(100vh - 57px);
+        min-height: calc(100vh - 64px);
     }
 
     .guides-sidebar {
@@ -117,8 +131,8 @@
         background: var(--yoop-surface);
         padding: 1.25rem 1rem;
         position: sticky;
-        top: 57px;
-        height: calc(100vh - 57px);
+        top: 64px;
+        height: calc(100vh - 64px);
         overflow-y: auto;
     }
 
@@ -286,5 +300,7 @@
         .guides-main { padding: 1.5rem; }
         .docs-header { flex-wrap: wrap; }
         .docs-subtitle { display: none; }
+        .docs-header-right { width: 100%; justify-content: space-between; }
+        .docs-securepay { height: 24px; }
     }
 </style>

@@ -119,6 +119,20 @@ class WallesterGateway implements WallesterGatewayInterface
         return $this->normalizeEncryptedSensitiveValue(is_array($response) ? $response : [], 'encrypted_card_number');
     }
 
+    public function getEncryptedPinCard(string $cardId, string $publicKeyBase64, ?string $auditUserId = null): string
+    {
+        $response = $this->run(
+            'getEncryptedPinCard',
+            fn () => $this->client->getEncryptedPinCard($cardId, $publicKeyBase64, $auditUserId),
+            [
+                'card_id' => $cardId,
+                'audit_user_id' => $auditUserId,
+            ],
+        );
+
+        return $this->normalizeEncryptedSensitiveValue(is_array($response) ? $response : [], 'encrypted_pin');
+    }
+
     public function getEncryptedCvv2(string $cardId, string $publicKeyBase64, ?string $auditUserId = null): string
     {
         $response = $this->run(
@@ -141,6 +155,23 @@ class WallesterGateway implements WallesterGatewayInterface
         ]);
 
         return $this->normalizeCardResponse(is_array($response) ? $response : []);
+    }
+
+    /**
+     * @return list<array{dispatch_method: string, price: float|null, description: string}>
+     */
+    public function listCardDispatchMethods(string $countryCode, ?string $auditUserId = null): array
+    {
+        $response = $this->run(
+            'listCardDispatchMethods',
+            fn () => $this->client->listCardDispatchMethods($countryCode, $auditUserId),
+            [
+                'country_code' => $countryCode,
+                'audit_user_id' => $auditUserId,
+            ],
+        );
+
+        return $this->normalizeDispatchMethodsResponse(is_array($response) ? $response : []);
     }
 
     public function blockCard(string $cardId, ?string $auditUserId = null): array
@@ -183,6 +214,21 @@ class WallesterGateway implements WallesterGatewayInterface
         return $this->normalizeCardResponse(is_array($response) ? $response : []);
     }
 
+    public function linkCardToAccount(string $cardId, string $accountId, ?string $auditUserId = null): array
+    {
+        $response = $this->run(
+            'linkCardToAccount',
+            fn () => $this->client->linkCardToAccount($cardId, $accountId, $auditUserId),
+            [
+                'card_id' => $cardId,
+                'account_id' => $accountId,
+                'audit_user_id' => $auditUserId,
+            ],
+        );
+
+        return $this->normalizeCardResponse(is_array($response) ? $response : []);
+    }
+
     /**
      * @param  array<string, mixed>  $response
      * @return array<string, mixed>
@@ -194,6 +240,48 @@ class WallesterGateway implements WallesterGatewayInterface
         }
 
         return $response;
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     * @return list<array{dispatch_method: string, price: float|null, description: string}>
+     */
+    private function normalizeDispatchMethodsResponse(array $response): array
+    {
+        $items = is_array($response['dispatch_methods'] ?? null) ? $response['dispatch_methods'] : [];
+        $normalized = [];
+
+        foreach ($items as $item) {
+            if (is_string($item) && $item !== '') {
+                $normalized[] = [
+                    'dispatch_method' => $item,
+                    'price' => null,
+                    'description' => '',
+                ];
+
+                continue;
+            }
+
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $method = trim((string) ($item['dispatch_method'] ?? ''));
+
+            if ($method === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'dispatch_method' => $method,
+                'price' => array_key_exists('price', $item) && $item['price'] !== null
+                    ? (float) $item['price']
+                    : null,
+                'description' => (string) ($item['description'] ?? ''),
+            ];
+        }
+
+        return $normalized;
     }
 
     /**

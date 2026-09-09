@@ -22,6 +22,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/news', [NewsController::class, 'index'])->name('customer.news.index');
     Route::get('/news/{news}', [NewsController::class, 'show'])->name('customer.news.show');
     Route::get('/favorites', [CustomerController::class, 'favorites'])->name('customer.favorites');
+    Route::post('/favorites', [CustomerController::class, 'addFavorite'])->name('customer.favorites.add');
+    Route::delete('/favorites/{username}', [CustomerController::class, 'removeFavorite'])
+        ->where('username', '[a-zA-Z0-9_]+')
+        ->name('customer.favorites.remove');
     Route::get('/find/{username}', [CustomerController::class, 'findByUsername'])
         ->where('username', '[a-zA-Z0-9_]+')
         ->name('customer.find-by-username');

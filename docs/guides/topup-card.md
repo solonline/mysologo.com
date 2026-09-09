@@ -145,4 +145,4 @@ Poll `GET /api/stripe/payment-intents/{id}` até `stripe_transaction_id` estar p
 | Pagamento OK mas saldo não muda | Aguardar webhook; verificar logs `stripe` |
 | Retry após falha | **Novo** `Idempotency-Key` |
 
-📖 **API:** [Stripe no Scalar](/docs) · [Webhooks](/docs/guides/webhooks)
+📖 **API:** [Stripe no Scalar](/docs) · [Lógica do sistema — top-up cartão](/docs/guides/logica-sistema) · [Webhooks](/docs/guides/webhooks)

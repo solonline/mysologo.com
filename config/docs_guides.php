@@ -9,6 +9,12 @@ return [
 
     'internal' => [
         [
+            'slug' => 'logica-sistema',
+            'title' => 'Lógica do sistema (por endpoint)',
+            'description' => 'Jornada completa: registo, verificações, KYC, PIN, login, dashboard e operações — o que cada endpoint faz.',
+            'file' => 'logica-sistema.md',
+        ],
+        [
             'slug' => 'getting-started',
             'title' => 'Primeiros passos',
             'description' => 'Autenticação, token e primeira chamada à API.',
@@ -47,7 +53,7 @@ return [
         [
             'slug' => 'webhooks',
             'title' => 'Webhooks (inbound)',
-            'description' => 'Didit, Stripe, Ebury e Wallester — o que cada um altera.',
+            'description' => 'Didit, Stripe, Ebury, Wallester e 3DS — o que cada um altera.',
             'file' => 'webhooks.md',
         ],
         [
@@ -68,7 +74,7 @@ return [
         [
             'slug' => 'terminal-topup',
             'title' => 'Terminal (POS)',
-            'description' => 'Connection token e intent no TPA.',
+            'description' => 'Emparelhar TPA, connection token, intent e captura.',
             'file' => 'partners/terminal-topup.md',
         ],
         [

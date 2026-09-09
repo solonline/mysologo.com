@@ -13,6 +13,7 @@ class DashboardTransactionResource extends JsonResource
         return [
             'id' => $this->id,
             'type' => $this->type,
+            'type_label' => $this->type?->label() ?? ($this->payment_method_type ?? 'Stripe'),
             'direction' => $this->direction,
             'amount' => $this->amount,
             'net_amount' => $this->resolvedNetAmount(),

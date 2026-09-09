@@ -4,6 +4,8 @@
 
 Entender os estados de uma conta desde o registo até poder movimentar dinheiro.
 
+📖 **Texto de cada endpoint na ordem da jornada:** [Lógica do sistema](/docs/guides/logica-sistema)
+
 ## Visão geral
 
 ```mermaid
@@ -57,8 +59,9 @@ Só fica **BLOCKED** se **ambos** Ebury e Wallester forem rejeitados.
 
 ### 3. Telefone
 
-- `POST /api/onboarding/phone/send`
+- `POST /api/onboarding/phone/send` — sem `phone` reenvia para o número do registo; com outro número **ainda não verificado**, corrige a conta e envia para o novo
 - `POST /api/onboarding/phone/validate` com `code`
+- Número já verificado: `POST /api/customer/phone` + `/phone/confirm`
 
 ### 4. Identidade (KYC)
 
@@ -67,31 +70,34 @@ Só fica **BLOCKED** se **ambos** Ebury e Wallester forem rejeitados.
 
 ### 5. Provisioning (automático)
 
-Após KYC aprovado, o backend:
+Após KYC aprovado, o backend provisiona **Wallester** e, quando um funding partner está aprovado, cria a conta **Stripe**.
 
-- Submete **Ebury** e/ou provisiona **Wallester**
-- Cria conta **Stripe** quando um funding partner está aprovado
+**Ebury** está desactivado no código até estar pronto (`provisionEbury` comentado). A regra de `ACTIVE` continua a ser **Ebury OU Wallester** + Stripe — o caminho típico hoje é Wallester + Stripe.
 
 Webhooks:
 
-- `POST /api/webhooks/ebury`
 - `POST /api/webhooks/wallester`
+- `POST /api/webhooks/stripe`
+- `POST /api/webhooks/ebury` (quando Ebury voltar a ser usado)
 
 ### 6. ACTIVE
 
 Quando `lifecycle.status === 'ACTIVE'` e `capabilities` permitirem:
 
+- `POST /api/auth/create-pin` (PIN **só** com conta ACTIVE)
 - `GET /api/wallet/dashboard`
 - Top-up, P2P, gastos de cartão Wallester
 
-📖 **Relacionado:** [Conta pronta](/docs/guides/account-ready) · [Webhooks](/docs/guides/webhooks) · [Compras Wallester e câmbio](/docs/guides/wallester-card-movements)
+📖 **Relacionado:** [Lógica do sistema](/docs/guides/logica-sistema) · [Conta pronta](/docs/guides/account-ready) · [Webhooks](/docs/guides/webhooks) · [Compras Wallester e câmbio](/docs/guides/wallester-card-movements)
 
 ## Corporate
 
 Contas `corporate` podem precisar de:
 
-- `POST /api/customer/create-corporate-responsible`
-- `POST /api/customer/submit-corporate-documents` (PDF)
+- `POST /api/customer/create-corporate-responsible` — representante legal
+- KYC Didit do responsável, depois KyB da empresa (`POST /api/kyc/identity/session`)
+
+Não existe `POST /api/customer/submit-corporate-documents` na API actual.
 
 ## O que mostrar no app
 

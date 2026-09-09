@@ -11,7 +11,9 @@ Perceber o que cada webhook externo altera no sistema — **não são endpoints 
 | Didit (KYC) | `POST /api/webhooks/didit` |
 | Stripe | `POST /api/webhooks/stripe` |
 | Ebury | `POST /api/webhooks/ebury` |
-| Wallester | `POST /api/webhooks/wallester` |
+| Wallester (conta / cartão) | `POST /api/webhooks/wallester` |
+| Wallester 3DS | `POST /api/webhooks/wallester/3ds/initiate-action-event` |
+| Wallester 3DS validate | `POST /api/webhooks/wallester/3ds/validate-event` |
 
 ## Didit — identidade
 
@@ -19,7 +21,7 @@ Perceber o que cada webhook externo altera no sistema — **não são endpoints 
 
 **Efeito típico:**
 
-- Aprovado → submete Ebury, provisiona Wallester, avança lifecycle
+- Aprovado → provisiona **Wallester** (Ebury está desactivado no código até estar pronto), avança lifecycle para `PROVISIONING`
 - Recusado → `IDENTITY_REJECTED`
 
 **Doc interna:** equipa de infra configura URL no painel Didit.
@@ -62,6 +64,16 @@ Numa compra com câmbio chegam **dois** webhooks; a Yoop unifica-os num só movi
 
 Ver [Compras Wallester e câmbio](/docs/guides/wallester-card-movements).
 
+## Wallester 3DS
+
+**Quando:** compra online que exige confirmação na app.
+
+1. `POST /api/webhooks/wallester/3ds/initiate-action-event` — cria challenge `Pending`
+2. A app lista/aprova/rejeita em `/api/wallester/3ds-challenges/*`
+3. `POST /api/webhooks/wallester/3ds/validate-event` — Wallester pergunta se já há decisão
+
+Fluxo completo: [Lógica do sistema — 3DS](/docs/guides/logica-sistema).
+
 ## Diagrama simplificado
 
 ```mermaid
@@ -71,6 +83,7 @@ flowchart TB
         Stripe
         Ebury
         Wallester
+        Wallester3DS[Wallester 3DS]
     end
     subgraph yoop
         WH[POST /api/webhooks/*]
@@ -81,6 +94,7 @@ flowchart TB
     Stripe --> WH
     Ebury --> WH
     Wallester --> WH
+    Wallester3DS --> WH
     WH --> LC
     WH --> WAL
 ```
@@ -91,4 +105,4 @@ flowchart TB
 - Em local, usar Stripe CLI / túneis para testar
 - Não documentar webhooks na API pública de parceiros — só uso interno
 
-📖 **Relacionado:** [Ciclo de vida](/docs/guides/onboarding-lifecycle) · [Compras Wallester e câmbio](/docs/guides/wallester-card-movements)
+📖 **Relacionado:** [Lógica do sistema](/docs/guides/logica-sistema) · [Ciclo de vida](/docs/guides/onboarding-lifecycle) · [Compras Wallester e câmbio](/docs/guides/wallester-card-movements)

@@ -705,6 +705,12 @@ body {
   padding-right: 40px;
 }
 
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .method-hint {
   font-size: 12px;
   color: var(--slate-400);
@@ -1124,11 +1130,17 @@ body {
 .card-preview-meta {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: rgba(255,255,255,.72);
+}
+
+.card-preview-meta .card-preview-secret {
+  font-family: 'Consolas', monospace;
+  letter-spacing: .16em;
 }
 
 .card-preview-meta strong {
@@ -2157,6 +2169,11 @@ body {
   box-shadow: 0 12px 32px rgba(51,65,85,.28);
 }
 
+.card-preview.physical:not(.blocked) {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 48%, #0284c7 100%);
+  box-shadow: 0 12px 32px rgba(2,132,199,.28);
+}
+
 .card-blocked-badge {
   position: absolute;
   top: 12px;
@@ -2353,6 +2370,8 @@ body {
             <option value="EUR">EUR — Euro</option>
             <option value="USD">USD — Dólar</option>
             <option value="GBP">GBP — Libra</option>
+            <option value="CHF">CHF — Franco suíço</option>
+
           </select>
         </div>
         <button class="btn-primary" id="register-btn" onclick="doRegister()">Criar conta</button>
@@ -2600,6 +2619,7 @@ body {
             <option value="eur" selected>EUR — Euro</option>
             <option value="usd">USD — Dólar americano</option>
             <option value="gbp">GBP — Libra</option>
+            <option value="chf">CHF — Franco suíço</option>
           </select>
         </div>
 
@@ -2715,10 +2735,54 @@ body {
 
         <div class="form-field">
           <label class="form-label">Tipo</label>
-          <select class="form-input form-select" id="card-type" onchange="refreshCardIssuanceHint()">
+          <select class="form-input form-select" id="card-type" onchange="onCardTypeChange()">
             <option value="Virtual" selected>Virtual</option>
-            <option value="Physical">Physical</option>
+            <option value="Physical">Físico</option>
           </select>
+        </div>
+
+        <div id="card-delivery-fields" hidden>
+          <div class="hint-box" style="margin-bottom:14px">
+            Indique a morada para onde o cartão físico deve ser enviado até si.
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label class="form-label">Nome</label>
+              <input class="form-input" id="card-addr-first-name" type="text" placeholder="João" maxlength="255" autocomplete="given-name" />
+            </div>
+            <div class="form-field">
+              <label class="form-label">Apelido</label>
+              <input class="form-input" id="card-addr-last-name" type="text" placeholder="Silva" maxlength="255" autocomplete="family-name" />
+            </div>
+          </div>
+          <div class="form-field">
+            <label class="form-label">Morada</label>
+            <input class="form-input" id="card-addr-address" type="text" placeholder="Rua das Flores, 1" maxlength="255" autocomplete="street-address" />
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label class="form-label">Cidade</label>
+              <input class="form-input" id="card-addr-city" type="text" placeholder="Lisboa" maxlength="255" autocomplete="address-level2" />
+            </div>
+            <div class="form-field">
+              <label class="form-label">Distrito / Estado</label>
+              <input class="form-input" id="card-addr-state" type="text" placeholder="Lisboa" maxlength="255" autocomplete="address-level1" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label class="form-label">País</label>
+              <input class="form-input" id="card-addr-country" type="text" placeholder="PT" maxlength="2" autocomplete="country" style="text-transform:uppercase" />
+            </div>
+            <div class="form-field">
+              <label class="form-label">Código postal</label>
+              <input class="form-input" id="card-addr-postal" type="text" placeholder="1000-001" maxlength="255" autocomplete="postal-code" />
+            </div>
+          </div>
+          <div class="form-field">
+            <label class="form-label">Telefone</label>
+            <input class="form-input" id="card-addr-phone" type="tel" placeholder="+351912345678" maxlength="255" autocomplete="tel" />
+          </div>
         </div>
 
         <div id="card-create-result" class="result-card"></div>
@@ -2759,11 +2823,16 @@ body {
           <div class="card-preview-meta">
             <div>Titular<strong id="card-preview-name">—</strong></div>
             <div>Validade<strong id="card-preview-expiry">—</strong></div>
-            <div>Status<strong id="card-preview-status">—</strong></div>
+            <div>CVV<strong id="card-preview-cvv" class="card-preview-secret">•••</strong></div>
+            <div>PIN<strong id="card-preview-pin" class="card-preview-secret">••••</strong></div>
           </div>
         </div>
 
         <div class="info-card" id="card-detail-info">
+          <div class="info-row">
+            <span class="info-row-label">Estado</span>
+            <span class="info-row-value" id="card-detail-status">—</span>
+          </div>
           <div class="info-row">
             <span class="info-row-label">Tipo</span>
             <span class="info-row-value" id="card-detail-type">—</span>
@@ -2776,6 +2845,29 @@ body {
             <span class="info-row-label">Bloqueio</span>
             <span class="info-row-value" id="card-detail-block-type">—</span>
           </div>
+        </div>
+
+        <div class="info-card" id="card-delivery-info" hidden>
+          <div class="info-row">
+            <span class="info-row-label">Entrega</span>
+            <span class="info-row-value" id="card-delivery-name">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-row-label">Morada</span>
+            <span class="info-row-value" id="card-delivery-street">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-row-label">Localidade</span>
+            <span class="info-row-value" id="card-delivery-city">—</span>
+          </div>
+          <div class="info-row">
+            <span class="info-row-label">Telefone</span>
+            <span class="info-row-value" id="card-delivery-phone">—</span>
+          </div>
+        </div>
+
+        <div class="hint-box" id="card-physical-hint" hidden>
+          O cartão físico foi pedido e será enviado. Fica pendente até ser activado.
         </div>
 
         <div class="hint-box" id="card-blocked-hint" hidden>
@@ -2794,6 +2886,9 @@ body {
 
           <button class="btn-action" id="card-reveal-btn" onclick="doRevealCard()" style="margin-top:0">
             Revelar número e CVV
+          </button>
+          <button class="btn-action" id="card-reveal-pin-btn" onclick="startRevealCardPin()" style="margin-top:10px">
+            Revelar PIN do cartão
           </button>
         </div>
 
@@ -3645,11 +3740,24 @@ function isP2pWalletMovement(item) {
   return type === 'p2p' || method === 'p2p';
 }
 
-function p2pPartnerLooksDuplicate(partner, p2pWalletItems) {
-  if (String(partner?.type || '').toLowerCase() !== 'account_transfer') return false;
+function isP2pPartnerMovement(item) {
+  if (item?.raw?.is_p2p) return true;
+  const key = String(item?.raw?.idempotency_key || '');
+  return key.startsWith('p2p:');
+}
 
-  const desc = String(partner?.description || partner?.raw?.description || '').toLowerCase();
-  if (desc.includes('p2p')) return true;
+function p2pPartnerLooksDuplicate(partner, p2pWalletItems) {
+  if (!p2pWalletItems.length) return false;
+
+  const isP2p = isP2pPartnerMovement(partner)
+    || String(partner?.type || '').toLowerCase() === 'account_transfer';
+
+  if (!isP2p) return false;
+
+  if (!isP2pPartnerMovement(partner)) {
+    const desc = String(partner?.description || partner?.raw?.description || '').toLowerCase();
+    if (!desc.includes('p2p')) return false;
+  }
 
   return p2pWalletItems.some((wallet) => {
     if (wallet.isIn !== partner.isIn) return false;
@@ -5239,7 +5347,7 @@ const PAYMENT_METHOD_LABELS = {
   link: 'Link',
   revolut_pay: 'Revolut Pay',
   klarna: 'Klarna',
-  p2p: 'P2P',
+  p2p: 'Transferência entre contas',
 };
 
 const WALLESTER_TYPE_LABELS = {
@@ -5275,10 +5383,9 @@ function isBankTransferTransaction(t) {
 function stripeMovementTypeLabel(t) {
   const type = String(t?.type?.value ?? t?.type ?? '').toLowerCase();
   const method = String(t?.payment_method_type || '').toLowerCase();
-  const direction = txDirectionValue(t?.direction);
 
   if (type === 'p2p') {
-    return direction === 'credit' || direction === 'in' ? 'Recebimento P2P' : 'Envio P2P';
+    return t?.type_label || 'Transferência entre contas';
   }
 
   // Recebimentos por transferência (VIBAN / SEPA) — mesmo que o type interno seja topup
@@ -5297,9 +5404,12 @@ function stripeMovementTypeLabel(t) {
 }
 
 function wallesterMovementTypeLabel(m) {
+  if (m?.type_label) return m.type_label;
+
   const type = String(m?.type?.value ?? m?.type ?? '').toLowerCase();
   const direction = txDirectionValue(m?.direction);
 
+  if (m?.is_p2p) return 'Transferência entre contas';
   if (type === 'account_transfer') {
     return direction === 'in' || direction === 'credit' ? 'Transferência recebida' : 'Transferência enviada';
   }
@@ -5316,7 +5426,7 @@ function friendlyMovementDescription(text, { isBankTransfer = false } = {}) {
   if (isBankTransfer || lower.includes('bank transfer top-up') || lower.includes('bank transfer topup')) {
     return 'Recebimento por transferência bancária';
   }
-  if (lower.includes('p2p transfer')) return 'Transferência P2P';
+  if (lower.includes('p2p transfer')) return 'Transferência entre contas';
   return raw;
 }
 
@@ -5340,7 +5450,7 @@ function normalizeStripeMovement(t) {
   const baseDescription = friendlyMovementDescription(t.description, { isBankTransfer: bankTransfer });
   // Preferir contraparte P2P; se a descrição for só o default, não duplicar
   const description = p2pLabel
-    || (baseDescription && baseDescription.toLowerCase() !== 'transferência p2p' ? baseDescription : '');
+    || (baseDescription && baseDescription.toLowerCase() !== 'transferência entre contas' ? baseDescription : '');
   return {
     key: movementKey('wallet', t.id),
     source: 'wallet',
@@ -5392,7 +5502,9 @@ function normalizeWallesterMovement(m) {
   const direction = txDirectionValue(m.direction);
   const isIn = direction === 'in' || direction === 'credit';
   const type = String(m.type || 'movimento').toLowerCase();
-  const sourceLabel = (type === 'card_purchase' || type === 'card_refund') ? 'Cartão' : 'Wallester';
+  const sourceLabel = m.source_label
+    || ((type === 'card_purchase' || type === 'card_refund') ? 'Cartão' : 'Wallester');
+  const p2pLabel = p2pCounterpartyLabel(m);
   return {
     key: movementKey('card', m.id),
     source: 'card',
@@ -5410,7 +5522,8 @@ function normalizeWallesterMovement(m) {
     status: String(m.status || 'pending').toLowerCase(),
     type,
     typeLabel: wallesterMovementTypeLabel(m),
-    description: friendlyMovementDescription(m.description),
+    description: p2pLabel || friendlyMovementDescription(m.description),
+    counterpartyLabel: p2pLabel,
     paymentMethod: m.source || '',
     paymentMethodLabel: paymentMethodLabel(m.source),
     createdAt: m.created_at || null,
@@ -6669,6 +6782,12 @@ function cardStatusClass(status) {
   return 'created';
 }
 
+function cardTypeLabel(type) {
+  if (type === 'Physical' || type === 'ChipAndPin' || type === 'ChipAndPinAnonymous') return 'Físico';
+  if (type === 'Virtual') return 'Virtual';
+  return type || '—';
+}
+
 async function loadCustomerCards() {
   const { ok, data } = await api('GET', '/wallester/cards');
   if (!ok) {
@@ -6708,7 +6827,7 @@ async function loadCardList() {
         <div class="card-list-mini ${blocked ? 'blocked' : ''}"></div>
         <div class="card-list-body">
           <div class="card-list-name">${card.name || 'Cartão'}</div>
-          <div class="card-list-num">${masked}</div>
+          <div class="card-list-num">${cardTypeLabel(card.type)} · ${masked}</div>
         </div>
         <span class="card-status-badge ${cardStatusClass(card.status)}">${cardStatusLabel(card.status)}</span>
       </button>`;
@@ -6735,8 +6854,59 @@ function openCardCreate() {
   document.getElementById('card-create-result').className = 'result-card';
   document.getElementById('card-name').value = '';
   document.getElementById('card-type').value = 'Virtual';
+  clearCardDeliveryFields();
+  toggleCardDeliveryFields();
   navigate('card-create');
   refreshCardIssuanceHint();
+}
+
+function onCardTypeChange() {
+  toggleCardDeliveryFields();
+  refreshCardIssuanceHint();
+}
+
+function toggleCardDeliveryFields() {
+  const physical = document.getElementById('card-type')?.value === 'Physical';
+  const fields = document.getElementById('card-delivery-fields');
+  if (fields) fields.hidden = !physical;
+}
+
+function clearCardDeliveryFields() {
+  ['card-addr-first-name', 'card-addr-last-name', 'card-addr-address', 'card-addr-city', 'card-addr-state', 'card-addr-country', 'card-addr-postal', 'card-addr-phone']
+    .forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+}
+
+function readCardDeliveryAddress() {
+  return {
+    first_name: document.getElementById('card-addr-first-name')?.value.trim() || '',
+    last_name: document.getElementById('card-addr-last-name')?.value.trim() || '',
+    address: document.getElementById('card-addr-address')?.value.trim() || '',
+    city: document.getElementById('card-addr-city')?.value.trim() || '',
+    state: document.getElementById('card-addr-state')?.value.trim() || '',
+    country: (document.getElementById('card-addr-country')?.value.trim() || '').toUpperCase(),
+    postal_code: document.getElementById('card-addr-postal')?.value.trim() || '',
+    phone: document.getElementById('card-addr-phone')?.value.trim() || '',
+  };
+}
+
+function validateCardDeliveryAddress(address) {
+  const missing = Object.entries({
+    first_name: 'nome',
+    last_name: 'apelido',
+    address: 'morada',
+    city: 'cidade',
+    state: 'distrito/estado',
+    country: 'país',
+    postal_code: 'código postal',
+    phone: 'telefone',
+  }).filter(([key]) => !address[key]);
+
+  if (!missing.length) return true;
+  showToast('Preencha a morada de entrega: ' + missing.map(([, label]) => label).join(', ') + '.', 'error');
+  return false;
 }
 
 function cardIssuanceQuoteForType(quote, type) {
@@ -6789,7 +6959,10 @@ async function openCardDetail(cardId) {
 
   const detail = await api('GET', `/wallester/cards/${local.id}`);
   if (detail.ok) {
-    currentCard = { local, api: unwrap(detail.data) };
+    currentCard = {
+      local,
+      api: { ...unwrap(detail.data), delivery_address: local.delivery_address || unwrap(detail.data)?.delivery_address },
+    };
   }
 
   renderCardDetail(currentCard);
@@ -6814,6 +6987,7 @@ function formatExpiry(value) {
   return String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + String(d.getUTCFullYear()).slice(-2);
 }
 let revealedCardNumber = null;
+let revealedCardPin = null;
 
 function renderCardDetail(card) {
   const data = card?.api ?? card;
@@ -6825,16 +6999,20 @@ function renderCardDetail(card) {
   const canClose = status === 'Active' || status === 'Blocked';
 
   revealedCardNumber = null;
+  revealedCardPin = null;
   document.getElementById('copy-card-btn').disabled = true;
 
   document.getElementById('card-preview').classList.toggle('blocked', blocked);
+  document.getElementById('card-preview').classList.toggle('physical', ['Physical', 'ChipAndPin', 'ChipAndPinAnonymous'].includes(data.type || card?.local?.type));
   document.getElementById('card-blocked-badge').hidden = !blocked;
   document.getElementById('card-preview-number').textContent =
     formatCardNumber(data.masked_card_number);
   document.getElementById('card-preview-name').textContent = data.name || '—';
   document.getElementById('card-preview-expiry').textContent = formatExpiry(data.expiry_date);
-  document.getElementById('card-preview-status').textContent = cardStatusLabel(status);
-  document.getElementById('card-detail-type').textContent = data.type || '—';
+  document.getElementById('card-preview-cvv').textContent = '•••';
+  document.getElementById('card-preview-pin').textContent = '••••';
+  document.getElementById('card-detail-status').textContent = cardStatusLabel(status);
+  document.getElementById('card-detail-type').textContent = cardTypeLabel(data.type || card?.local?.type);
   document.getElementById('card-detail-wid').textContent = data.wallester_card_id || data.id || '—';
 
   const blockRow = document.getElementById('card-detail-block-row');
@@ -6842,8 +7020,28 @@ function renderCardDetail(card) {
   blockRow.hidden = !blocked;
   document.getElementById('card-detail-block-type').textContent = blockType || '—';
 
+  const delivery = card?.local?.delivery_address || data.delivery_address || null;
+  const deliveryInfo = document.getElementById('card-delivery-info');
+  const physicalHint = document.getElementById('card-physical-hint');
+  const isPhysical = ['Physical', 'ChipAndPin', 'ChipAndPinAnonymous'].includes(data.type || card?.local?.type);
+  physicalHint.hidden = !(isPhysical && status === 'Created');
+
+  if (delivery && (delivery.address || delivery.city || delivery.first_name)) {
+    deliveryInfo.hidden = false;
+    document.getElementById('card-delivery-name').textContent =
+      [delivery.first_name, delivery.last_name].filter(Boolean).join(' ') || '—';
+    document.getElementById('card-delivery-street').textContent = delivery.address || '—';
+    document.getElementById('card-delivery-city').textContent =
+      [delivery.postal_code, delivery.city, delivery.state, delivery.country].filter(Boolean).join(' · ') || '—';
+    document.getElementById('card-delivery-phone').textContent = delivery.phone || '—';
+  } else {
+    deliveryInfo.hidden = true;
+  }
+
   document.getElementById('card-blocked-hint').hidden = !blocked;
   document.getElementById('card-reveal-section').hidden = !canReveal;
+  document.getElementById('card-reveal-btn').textContent = 'Revelar número e CVV';
+  document.getElementById('card-reveal-pin-btn').textContent = 'Revelar PIN do cartão';
   document.getElementById('card-block-btn').hidden = !canBlock;
   document.getElementById('card-unblock-btn').hidden = !canUnblock;
   document.getElementById('card-close-btn').hidden = !canClose;
@@ -6853,25 +7051,32 @@ function renderCardDetail(card) {
 }
 
 async function doCreateCard(pin) {
-  const name = document.getElementById('card-name').value.trim();
-  const type = document.getElementById('card-type').value;
+  const pending = pendingCardCreate;
+  const name = pending?.name || document.getElementById('card-name').value.trim();
+  const type = pending?.type || document.getElementById('card-type').value;
+  const deliveryAddress = pending?.delivery_address || (type === 'Physical' ? readCardDeliveryAddress() : null);
+  pendingCardCreate = null;
   const btn = document.getElementById('card-create-btn');
   const result = document.getElementById('card-create-result');
 
   if (!name) { showToast('Informe o nome do cartão', 'error'); return; }
   if (!pin) { showToast('PIN obrigatório', 'error'); return; }
+  if (type === 'Physical' && !validateCardDeliveryAddress(deliveryAddress || {})) return;
 
   btn.disabled = true;
   btn.innerHTML = '<div class="spin"></div> Criando...';
   result.className = 'result-card';
 
   try {
-    const { ok, data, status } = await api('POST', '/wallester/cards', {
+    const payload = {
       type,
       name,
       pin,
       device_token: deviceToken,
-    });
+    };
+    if (type === 'Physical') payload.delivery_address = deliveryAddress;
+
+    const { ok, data, status } = await api('POST', '/wallester/cards', payload);
     const card = unwrap(data);
 
     if (!ok) {
@@ -6884,21 +7089,21 @@ async function doCreateCard(pin) {
     currentCard = { local: card, api: card };
     result.classList.add('show', 'success');
     result.textContent = JSON.stringify(card, null, 2);
-    showToast('Cartão criado!', 'success');
+    showToast(type === 'Physical' ? 'Cartão físico pedido!' : 'Cartão criado!', 'success');
 
     const detail = await api('GET', `/wallester/cards/${card.id}`);
     if (detail.ok) {
-      currentCard = { local: card, api: unwrap(detail.data) };
+      currentCard = { local: card, api: { ...unwrap(detail.data), delivery_address: card.delivery_address } };
     }
 
     renderCardDetail(currentCard);
     navigate('card-detail');
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Criar cartão';
   }
-
-  btn.disabled = false;
-  btn.textContent = 'Criar cartão';
 }
 
 let pendingCardCreate = null;
@@ -6908,7 +7113,10 @@ async function startCreateCard() {
   const type = document.getElementById('card-type')?.value || 'Virtual';
   if (!name) { showToast('Informe o nome do cartão', 'error'); return; }
 
-  pendingCardCreate = { name, type };
+  const delivery_address = type === 'Physical' ? readCardDeliveryAddress() : null;
+  if (type === 'Physical' && !validateCardDeliveryAddress(delivery_address)) return;
+
+  pendingCardCreate = { name, type, delivery_address };
 
   let fee = null;
   try {
@@ -6930,8 +7138,10 @@ async function startCreateCard() {
 }
 
 function openCardFeeModal(name, fee) {
+  const type = pendingCardCreate?.type || document.getElementById('card-type')?.value || 'Virtual';
+  const kind = type === 'Physical' ? 'físico' : 'virtual';
   document.getElementById('card-fee-text').textContent =
-    `A emissão de um novo cartão virtual tem uma taxa que será debitada da sua conta.`;
+    `A emissão de um novo cartão ${kind} tem uma taxa que será debitada da sua conta.`;
   document.getElementById('card-fee-amount').textContent = formatMoney(fee.fee_cents, fee.currency);
   document.getElementById('card-fee-overlay').classList.add('show');
 }
@@ -6952,9 +7162,10 @@ function confirmCardFeeModal() {
 
 function openCreateCardPin() {
   const name = pendingCardCreate?.name || document.getElementById('card-name')?.value.trim();
-  pendingCardCreate = null;
+  const type = pendingCardCreate?.type || document.getElementById('card-type')?.value || 'Virtual';
   if (!name) { showToast('Informe o nome do cartão', 'error'); return; }
-  openCardPin('create', 'Confirmar cartão', `Criar “${name}”`);
+  const label = type === 'Physical' ? 'cartão físico' : 'cartão';
+  openCardPin('create', 'Confirmar cartão', `Criar ${label} “${name}”`);
 }
 
 function startBlockCard() {
@@ -7012,6 +7223,7 @@ async function submitCardPin(pin) {
   if (action === 'block') await doBlockCard(pin);
   if (action === 'unblock') await doUnblockCard(pin);
   if (action === 'close') await doCloseCard(pin);
+  if (action === 'reveal-pin') await doRevealCardPin({ pin, device_token: deviceToken });
 }
 
 async function doBlockCard(pin) {
@@ -7156,20 +7368,78 @@ async function doRevealCard() {
 
     document.getElementById('card-preview-number').textContent =
       formatCardNumber(null, sensitive.card_number);
-      revealedCardNumber = sensitive.card_number;
+    revealedCardNumber = sensitive.card_number;
     document.getElementById('copy-card-btn').disabled = false;
     document.getElementById('card-preview-expiry').textContent = formatExpiry(sensitive.expiry_date);
+    document.getElementById('card-preview-cvv').textContent = sensitive.cvv || '•••';
+
+    let pinLine = '';
+    const pinResponse = await api('POST', `/wallester/cards/${currentCard.local.id}/encrypted-pin`, { password });
+    const pinPayload = unwrap(pinResponse.data);
+    if (pinResponse.ok && pinPayload?.pin) {
+      applyRevealedCardPin(pinPayload.pin);
+      pinLine = `\nPIN: ${pinPayload.pin}`;
+    }
 
     result.classList.add('show', 'success');
     result.textContent =
-      `Número: ${sensitive.card_number}\nCVV: ${sensitive.cvv}\nValidade: ${formatExpiry(sensitive.expiry_date)}`;
-    showToast('Dados revelados', 'success');
+      `Número: ${sensitive.card_number}\nCVV: ${sensitive.cvv}\nValidade: ${formatExpiry(sensitive.expiry_date)}${pinLine}`;
+    showToast(pinLine ? 'Dados e PIN revelados' : 'Dados revelados', 'success');
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
   }
 
   btn.disabled = false;
   btn.textContent = 'Revelar número e CVV';
+}
+
+function startRevealCardPin() {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  const password = document.getElementById('card-reveal-password').value;
+  if (password) {
+    doRevealCardPin({ password });
+    return;
+  }
+  const name = currentCard?.api?.name || currentCard?.local?.name || 'este cartão';
+  openCardPin('reveal-pin', 'Revelar PIN do cartão', `Introduza o PIN da app para ver o PIN de “${name}”`);
+}
+
+async function doRevealCardPin(credentials) {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+
+  const btn = document.getElementById('card-reveal-pin-btn');
+  const result = document.getElementById('card-sensitive-result');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> A revelar PIN...';
+  result.className = 'result-card';
+
+  try {
+    const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/encrypted-pin`, credentials);
+    const payload = unwrap(data);
+
+    if (!ok || !payload?.pin) {
+      result.classList.add('show', 'error');
+      result.textContent = JSON.stringify(data, null, 2);
+      showToast(data?.message || `Erro ${status || ''}`.trim() || 'Não foi possível revelar o PIN', 'error');
+      return;
+    }
+
+    applyRevealedCardPin(payload.pin);
+    result.classList.add('show', 'success');
+    result.textContent = `PIN do cartão: ${payload.pin}`;
+    showToast('PIN do cartão revelado', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro de conexão', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Revelar PIN do cartão';
+}
+
+function applyRevealedCardPin(pin) {
+  revealedCardPin = String(pin);
+  document.getElementById('card-preview-pin').textContent = revealedCardPin;
 }
 
 // ── Copiar Dados ──────────────────────────────────────

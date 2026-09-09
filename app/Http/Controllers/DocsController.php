@@ -138,6 +138,7 @@ class DocsController extends Controller
                 'hideModels' => false,
                 'defaultOpenAllTags' => false,
                 'searchHotKey' => 'k',
+                'favicon' => url('/yoop.jpeg'),
                 'metaData' => ['title' => $title],
                 'authentication' => ['preferredSecurityScheme' => $preferredSecurityScheme],
             ],

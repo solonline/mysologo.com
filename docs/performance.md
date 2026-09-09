@@ -6,7 +6,7 @@
 |---|---|---|
 | **Webhooks Stripe** | Job assíncrono na fila `stripe-webhooks` | Implementado |
 | **Cache de dados estáticos** | `Cache::remember` (5 min) em payment methods e fees | Implementado |
-| **Rate Limiting** | Throttle named `stripe-intent` (10 req/min por utilizador) | Implementado |
+| **Rate Limiting** | `stripe-intent` (10/min por user); merchants: 120/min payment requests, 60/min terminal (por merchant) | Implementado |
 | **Gestão de filas** | Laravel Horizon | **Pendente para produção** |
 | **Throughput do servidor** | Laravel Octane (FrankenPHP) | **Pendente para produção** |
 
@@ -25,46 +25,54 @@ Utilizador A → 10ª request  [■■■■■■■■■■] 10/10
 Utilizador A → 11ª request  → HTTP 429  Retry-After: 38s
 ```
 
-A chave é **por `user_id`**, não por IP — evita bloquear múltiplos utilizadores na mesma rede (escritório, 4G partilhado).
+A chave do top-up da app é **por `user_id`**. Nas rotas merchant (`X-Merchant-Key`) a chave é **por `merchant_id`**, para um servidor/NAT não partilhar o balde entre lojas.
 
 ### Onde está configurado
 
 **`app/Providers/AppServiceProvider.php`** — define os limiters:
 
 ```php
-// Limite geral da API: 60 req/min por utilizador+IP
-RateLimiter::for('api', function (Request $request) {
-    return $request->user()
-        ? Limit::perMinute(60)->by($request->user()->id . '|' . $request->ip())
-        : Limit::perMinute(60)->by($request->ip());
-});
-
-// Limite para criação de payment intents: 10 req/min por utilizador
+// Top-up da app: 10 req/min por utilizador
 RateLimiter::for('stripe-intent', function (Request $request) {
     return Limit::perMinute(10)
-        ->by($request->user()?->id ?? $request->ip())
-        ->response(fn () => response()->json([
-            'message' => 'Muitas tentativas. Tente novamente em breve.',
-        ], 429));
+        ->by($request->user()?->id ?? $request->ip());
 });
+
+// Payment requests: 120/min por merchant
+RateLimiter::for('merchant-payment-requests', function (Request $request) {
+    return Limit::perMinute(120)->by(/* merchant_id */);
+});
+
+// Terminal POS: 60/min por merchant (token e create-intent são baldes separados)
+RateLimiter::for('merchant-terminal-token', ...);
+RateLimiter::for('merchant-terminal-intent', ...);
 ```
 
-**`routes/api.php`** — aplica o middleware nas rotas:
+**Rotas Stripe (app)** — `throttle:stripe-intent`:
 
 ```php
 Route::post('/create-intent-payment', [...])
     ->middleware(['idempotency', 'throttle:stripe-intent']);
-Route::post('/terminal/create-intent', [...])
-    ->middleware(['idempotency', 'throttle:stripe-intent']);
-Route::post('/terminal/{transaction}/capture', [...])
-    ->middleware('throttle:stripe-intent');
 Route::post('/create-funding', [...])
     ->middleware('throttle:stripe-intent');
+Route::post('/terminal/{paymentIntent}/capture', [...])
+    ->middleware('throttle:stripe-intent');
+```
+
+**Rotas merchant (parceiros)** — `app/Domains/Merchant/Routes/merchant.php`:
+
+```php
+Route::post('/payment-requests', [...])
+    ->middleware('throttle:merchant-payment-requests');
+Route::post('/terminal/connection-token', [...])
+    ->middleware('throttle:merchant-terminal-token');
+Route::post('/terminal/create-intent', [...])
+    ->middleware(['idempotency', 'throttle:merchant-terminal-intent']);
 ```
 
 ### Ajustar limites
 
-Para mudar o limite de 10 para outro valor, basta alterar `perMinute(10)` no `AppServiceProvider`. Para criar um limiter diferente (ex: para P2P), segue o mesmo padrão:
+Altera `perMinute(N)` no limiter correspondente em `AppServiceProvider`. Para criar um limiter diferente (ex: para P2P), segue o mesmo padrão:
 
 ```php
 RateLimiter::for('p2p', function (Request $request) {
@@ -335,6 +343,6 @@ sudo systemctl restart yoop-reverb
 | Jobs da fila `stripe-webhooks` não processam | Horizon/queue worker não está a correr | `supervisorctl status yoop-horizon` |
 | Stripe reenvia webhooks repetidamente | Controller demorou > 30s a responder | Confirma que o Job é despachado e retorna 200 imediato |
 | Cache desactualizado após mudar fees | Cache não foi invalidado | Chama `Cache::forget("payment_methods:{$currency}")` |
-| `429 Too Many Requests` inesperado | Limite `stripe-intent` atingido | Verifica o header `Retry-After`; ajusta `perMinute(N)` se necessário |
+| `429 Too Many Requests` inesperado | Limite `stripe-intent` (app) ou merchant (120/60) atingido | Verifica `Retry-After`; ajusta `perMinute(N)` no limiter certo |
 | Octane: dados de utilizador anteriores na request | Singleton com estado mutável | Muda para `bind` no `AppServiceProvider` ou usa `ScopedInstance` |
 | `/horizon` retorna 403 | Email não está na gate | Adiciona o email em `HorizonServiceProvider::gate()` |

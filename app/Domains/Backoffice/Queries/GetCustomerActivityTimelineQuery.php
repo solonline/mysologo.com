@@ -6,7 +6,6 @@ use App\Domains\Backoffice\DTOs\CustomerActivityItem;
 use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentDirection;
 use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
-use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Customer;
 use App\Models\CustomerBalanceAdjustment;
@@ -24,9 +23,13 @@ class GetCustomerActivityTimelineQuery
     {
         $stripeItems = StripeTransaction::query()
             ->where('customer_id', $customer->id)
-            ->where('type', '!=', TransactionType::MERCHANT_PAYMENT->value)
+            ->whereNotIn('type', [
+                TransactionType::MERCHANT_PAYMENT,
+                TransactionType::P2P,
+            ])
             ->with('relatedStripeTransaction.customer')
             ->latest('stripe_created_at')
+            ->latest('id')
             ->limit($limit)
             ->get()
             ->map(fn (StripeTransaction $transaction): CustomerActivityItem => $this->fromStripeTransaction($transaction));
@@ -35,26 +38,28 @@ class GetCustomerActivityTimelineQuery
             ->where('customer_id', $customer->id)
             ->pluck('id');
 
+        $adjustmentMorph = (new CustomerBalanceAdjustment)->getMorphClass();
+
         $wallesterItems = collect();
 
         if ($wallesterAccountIds->isNotEmpty()) {
-            $types = [
-                FundingPartnerMovementType::CardPurchase,
-                FundingPartnerMovementType::CardRefund,
-                FundingPartnerMovementType::Fee,
-            ];
-
-            if ($customer->type === 'platform') {
-                $types[] = FundingPartnerMovementType::AccountTransfer;
-            }
-
             $wallesterItems = FundingPartnerMovement::query()
                 ->customerVisible()
                 ->where('funding_account_type', CustomerWallesterAccount::class)
                 ->whereIn('funding_account_id', $wallesterAccountIds)
-                ->whereIn('type', $types)
-                ->with(['wallesterCard', 'reference'])
+                ->where(function ($query) use ($customer, $adjustmentMorph): void {
+                    $query->whereNull('reference_type')
+                        ->orWhere('reference_type', '!=', $adjustmentMorph)
+                        ->orWhereNotIn(
+                            'reference_id',
+                            CustomerBalanceAdjustment::query()
+                                ->where('customer_id', $customer->id)
+                                ->select('id'),
+                        );
+                })
+                ->with(['wallesterCard', 'reference', 'counterpartyWallesterAccount.customer'])
                 ->latest('created_at')
+                ->latest('id')
                 ->limit($limit)
                 ->get()
                 ->map(fn (FundingPartnerMovement $movement): CustomerActivityItem => $this->fromWallesterMovement($movement));
@@ -113,6 +118,9 @@ class GetCustomerActivityTimelineQuery
             ?? $card?->masked_card_number
             ?? (is_string($metadata['card_id'] ?? null) ? substr($metadata['card_id'], 0, 8).'…' : null);
 
+        $isP2p = $movement->isP2pTransfer();
+        $counterparty = $isP2p ? $movement->counterpartyWallesterAccount?->customer : null;
+
         return new CustomerActivityItem(
             source: 'wallester',
             occurredAt: $movement->created_at,
@@ -123,11 +131,16 @@ class GetCustomerActivityTimelineQuery
             typeLabel: $typeLabel,
             status: $movement->status?->value ?? (string) $movement->status,
             description: $movement->displayDescription(),
+            p2pCounterpartyName: $counterparty?->name,
+            p2pCounterpartyUsername: $counterparty?->username,
+            p2pCounterpartyRole: $isP2p
+                ? ($direction === FundingPartnerMovementDirection::In ? 'sender' : 'recipient')
+                : null,
             wallesterMovement: $movement,
             cardLabel: $cardLabel,
             merchantCity: is_string($metadata['merchant_city'] ?? null) ? $metadata['merchant_city'] : null,
             merchantCategoryCode: is_string($metadata['merchant_category_code'] ?? null) ? $metadata['merchant_category_code'] : null,
-            sourceLabel: 'Wallester',
+            sourceLabel: $movement->displaySourceLabel(),
             fxDetailLabel: $movement->fxDetailLabel(),
         );
     }
@@ -143,10 +156,10 @@ class GetCustomerActivityTimelineQuery
             amountCents: (int) $adjustment->amount_cents,
             netAmountCents: null,
             currency: strtoupper((string) $adjustment->currency),
-            typeLabel: $isCredit ? 'Crédito manual' : 'Débito manual',
+            typeLabel: $isCredit ? 'Crédito Yoop' : 'Débito Yoop',
             status: 'Executado',
             description: $adjustment->description,
-            sourceLabel: 'Banco da Plataforma',
+            sourceLabel: $isCredit ? 'Crédito Yoop' : 'Débito Yoop',
         );
     }
 }

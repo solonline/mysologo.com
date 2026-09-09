@@ -38,6 +38,7 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
     Route::get('/customers', [CustomerController::class, 'index'])->name('.customers')->middleware('can:customers.view');
     Route::get('/customers/create', [CustomerController::class, 'create'])->name('.customers.create')->middleware('can:customers.create');
     Route::post('/customers', [CustomerController::class, 'store'])->name('.customers.store')->middleware('can:customers.create');
+    Route::get('/customers/username-search', [CustomerController::class, 'searchUsernames'])->name('.customers.username-search')->middleware('can:customers.view');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('.customers.show')->middleware('can:customers.view');
     Route::get('/customers/{customer}/transactions', [TransactionController::class, 'customer'])->name('.customers.transactions')->middleware('can:customers.view');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('.customers.update')->middleware('can:customers.edit');
@@ -50,6 +51,7 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
     Route::post('/customers/{customer}/retry-provisioning', [CustomerController::class, 'retryProvisioning'])->name('.customers.retry-provisioning')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/retry-stripe-funding', [CustomerController::class, 'retryStripeFunding'])->name('.customers.retry-stripe-funding')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/wallester-cards', [CustomerController::class, 'storeWallesterCard'])->name('.customers.wallester-cards.store')->middleware('can:customers.edit');
+    Route::post('/customers/{customer}/wallester-cards/link', [CustomerController::class, 'linkWallesterCard'])->name('.customers.wallester-cards.link')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/balance-adjustments', [CustomerController::class, 'requestBalanceAdjustment'])->name('.customers.balance-adjustments.request');
     Route::post('/customers/{customer}/balance-adjustments/{adjustment}/confirm', [CustomerController::class, 'confirmBalanceAdjustment'])->name('.customers.balance-adjustments.confirm');
     Route::post('/customers/{customer}/balance-adjustments/{adjustment}/resend', [CustomerController::class, 'resendBalanceAdjustment'])->name('.customers.balance-adjustments.resend');

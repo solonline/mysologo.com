@@ -9,4 +9,6 @@ enum FundingPartnerMovementType: string
     case CardRefund = 'card_refund';
     case InboundPayment = 'inbound_payment';
     case Fee = 'fee';
+    case VirtualCardIssuanceFee = 'virtual_card_issuance_fee';
+    case PhysicalCardIssuanceFee = 'physical_card_issuance_fee';
 }

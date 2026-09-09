@@ -6,6 +6,7 @@ use App\Domains\Backoffice\Actions\CancelAccountPayableAction;
 use App\Domains\Backoffice\Actions\CreateAccountPayableAction;
 use App\Domains\Backoffice\Actions\CreateCustomerFromBackofficeAction;
 use App\Domains\Backoffice\Actions\CreateCustomerWallesterCardAction;
+use App\Domains\Backoffice\Actions\LinkCustomerWallesterCardAction;
 use App\Domains\Backoffice\Actions\CreateNewsAction;
 use App\Domains\Backoffice\Actions\CreateRoleAction;
 use App\Domains\Backoffice\Actions\CreateStaffUserAction;
@@ -42,6 +43,7 @@ use App\Domains\Backoffice\Queries\GetWallesterFundingOverviewQuery;
 use App\Domains\Backoffice\Queries\ListAccountsPayableQuery;
 use App\Domains\Backoffice\Queries\ListAuditLogsQuery;
 use App\Domains\Backoffice\Queries\ListCustomersQuery;
+use App\Domains\Backoffice\Queries\SearchCustomersByUsernameQuery;
 use App\Domains\Backoffice\Queries\ListFundingPartnerMovementsQuery;
 use App\Domains\Backoffice\Queries\ListNewsQuery;
 use App\Domains\Backoffice\Queries\ListRolesQuery;
@@ -66,6 +68,7 @@ class BackofficeServiceProvider extends ServiceProvider
         GetWallesterFundingOverviewQuery::class,
         GetAcceptedCurrenciesQuery::class,
         ListCustomersQuery::class,
+        SearchCustomersByUsernameQuery::class,
         GetCustomerDetailQuery::class,
         ListUsersQuery::class,
         ListRolesQuery::class,
@@ -81,6 +84,7 @@ class BackofficeServiceProvider extends ServiceProvider
         RetryCustomerProvisioningAction::class,
         RetryStripeFundingAction::class,
         CreateCustomerWallesterCardAction::class,
+        LinkCustomerWallesterCardAction::class,
         RetryAwaitingWallesterTopupsAction::class,
         UnlinkCustomerTpaAction::class,
         UpsertTpaPaymentMethodFeeAction::class,

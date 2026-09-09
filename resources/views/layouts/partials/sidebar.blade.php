@@ -22,12 +22,9 @@
     {{-- Logo --}}
     <div class="flex items-center h-[64px] px-4 flex-shrink-0" style="border-bottom: 1px solid rgba(255,255,255,.06);">
         <div class="flex items-center gap-3 min-w-0 flex-1">
-            <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                 style="background: linear-gradient(135deg,#7c3aed,#6d28d9); box-shadow: 0 4px 14px rgba(124,58,237,.45);">
-                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
-            </div>
+            <img src="{{ asset('yoop.jpeg') }}" alt="Yoop"
+                 class="w-8 h-8 rounded-xl object-cover flex-shrink-0"
+                 style="box-shadow: 0 4px 14px rgba(14,165,233,.4);">
             <div x-show="!sidebarCollapsed" x-cloak class="min-w-0">
                 <span class="text-white font-bold text-lg tracking-tight">Yoop</span>
                 <span class="text-[10px] font-medium block" style="color:rgba(167,139,250,.6);margin-top:-2px;letter-spacing:.08em">DASHBOARD</span>
