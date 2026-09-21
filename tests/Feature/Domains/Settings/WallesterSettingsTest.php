@@ -28,37 +28,40 @@ class WallesterSettingsTest extends TestCase
         $user = $this->userWithPermissions(['settings.view', 'settings.edit']);
 
         $this->withoutVite()
-            ->actingAs($user)
+            ->actingAs($user, 'web')
             ->get(route('dashboard.settings'))
             ->assertOk()
             ->assertSee('Wallester')
             ->assertSee('API Key')
+            ->assertSee('Wallester RSA Public Key')
             ->assertSee('id="retry-wallester-topups-form"', false)
             ->assertSee('form="retry-wallester-topups-form"', false)
             ->assertSee('Actualizar main e reprocessar top-ups');
 
-        $this->actingAs($user)
+        $this->actingAs($user, 'web')
             ->post(route('dashboard.settings.update'), [
                 'settings' => [
-                    'wallester.eur.api_key' => 'dashboard-eur-key',
-                    'wallester.usd.product_code' => 'dashboard-usd-product',
+                    'wallester.api_key' => 'dashboard-api-key',
+                    'wallester.product_code' => 'dashboard-product',
                 ],
             ])
             ->assertRedirect(route('dashboard.settings'));
 
-        $this->assertSame('dashboard-eur-key', Setting::query()->where('key', 'wallester.eur.api_key')->value('value'));
-        $this->assertSame('dashboard-usd-product', Setting::query()->where('key', 'wallester.usd.product_code')->value('value'));
+        $this->assertSame('dashboard-api-key', Setting::query()->where('key', 'wallester.api_key')->value('value'));
+        $this->assertSame('dashboard-product', Setting::query()->where('key', 'wallester.product_code')->value('value'));
     }
 
     /** @param list<string> $permissions */
     private function userWithPermissions(array $permissions): User
     {
         foreach ($permissions as $permission) {
-            Permission::findOrCreate($permission);
+            Permission::findOrCreate($permission, 'web');
         }
 
         $user = User::factory()->create();
-        $user->givePermissionTo($permissions);
+        $user->givePermissionTo(
+            collect($permissions)->map(fn (string $permission) => Permission::findByName($permission, 'web'))->all()
+        );
 
         return $user;
     }

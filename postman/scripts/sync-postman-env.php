@@ -22,13 +22,13 @@ $settings = app(WallesterSettingsService::class);
 
 try {
     $baseUrl = rtrim($settings->baseUrl(), '/');
-    $apiKey = $settings->apiKey($currency);
-    $privateKey = $settings->privateKey($currency);
-    $productCode = $settings->productCode($currency);
+    $apiKey = $settings->apiKey();
+    $privateKey = $settings->privateKey();
+    $productCode = $settings->productCode();
     $auditSourceType = $settings->auditSourceType();
 } catch (Throwable $exception) {
     fwrite(STDERR, 'ERRO: '.$exception->getMessage()."\n");
-    fwrite(STDERR, "Configure as settings Wallester (wallester.{$currency}.*) no backoffice ou via SettingsSeeder.\n");
+    fwrite(STDERR, "Configure as settings Wallester (wallester.api_key, wallester.private_key, wallester.product_code) no backoffice ou via SettingsSeeder.\n");
     exit(1);
 }
 

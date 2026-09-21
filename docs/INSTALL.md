@@ -243,15 +243,13 @@ Muitas chaves são lidas do env no seed e depois vivem em `settings` (editáveis
 | Variável | Função |
 |---|---|
 | `WALLESTER_BASE_URL` | API Wallester |
-| `WALLESTER_API_KEY` | API key EUR |
-| `WALLESTER_PRIVATE_KEY` | chave privada PEM EUR |
-| `WALLESTER_PRODUCT_CODE` | product code EUR |
+| `WALLESTER_API_KEY` | API key (todas as moedas) |
+| `WALLESTER_PRIVATE_KEY` | chave privada PEM (JWT) |
+| `WALLESTER_PRODUCT_CODE` | product code |
 | `WALLESTER_PLATFORM_MASTER_EUR` | conta master EUR |
-| `WALLESTER_USD_API_KEY` | API key USD |
-| `WALLESTER_USD_PRIVATE_KEY` | chave privada PEM USD |
-| `WALLESTER_USD_PRODUCT_CODE` | product code USD |
 | `WALLESTER_PLATFORM_MASTER_USD` | conta master USD |
 | `WALLESTER_CARD_RSA_PRIVATE_KEY` | desencriptar PAN / dados de cartão |
+| `WALLESTER_RSA_PUBLIC_KEY` | chave pública PEM da Wallester (cifrar CVV/PIN enviados) |
 | `WALLESTER_AUDIT_SOURCE_TYPE` | default `Backend` |
 | `WALLESTER_3DS_CHALLENGE_TTL` | TTL do desafio 3DS (segundos) |
 

@@ -14,26 +14,10 @@ class WallesterCardRsaKeyService
 
     public function publicKeyBase64(string $currency = 'eur'): string
     {
-        $publicKeyPem = $this->publicKeyPem($currency);
-
-        return base64_encode($publicKeyPem);
+        return base64_encode($this->publicKeyPem($currency));
     }
 
-    public function privateKeyPem(string $currency = 'eur'): string
-    {
-        try {
-            return $this->wallesterSettings->cardRsaPrivateKey($currency);
-        } catch (RuntimeException $exception) {
-            throw new ApiException(
-                ErrorCode::INTERNAL_ERROR,
-                500,
-                'Wallester card RSA private key is not configured.',
-                previous: $exception,
-            );
-        }
-    }
-
-    private function publicKeyPem(string $currency = 'eur'): string
+    public function publicKeyPem(string $currency = 'eur'): string
     {
         $privateKey = openssl_pkey_get_private($this->privateKeyPem($currency));
 
@@ -48,5 +32,19 @@ class WallesterCardRsaKeyService
         }
 
         return $details['key'];
+    }
+
+    public function privateKeyPem(string $currency = 'eur'): string
+    {
+        try {
+            return $this->wallesterSettings->cardRsaPrivateKey($currency);
+        } catch (RuntimeException $exception) {
+            throw new ApiException(
+                ErrorCode::INTERNAL_ERROR,
+                500,
+                'Wallester card RSA private key is not configured.',
+                previous: $exception,
+            );
+        }
     }
 }

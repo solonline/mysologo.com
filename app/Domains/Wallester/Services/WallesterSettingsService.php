@@ -11,20 +11,19 @@ class WallesterSettingsService
         private readonly SettingsService $settings,
     ) {}
 
-    public function apiKey(string $currency): string
+    public function apiKey(): string
     {
-        return $this->requiredCurrencySetting($currency, 'api_key');
+        return $this->requiredGlobalSetting('api_key');
     }
 
-    public function privateKey(string $currency): string
+    public function privateKey(): string
     {
-        return str_replace('\\n', "\n", trim($this->requiredCurrencySetting($currency, 'private_key')));
+        return str_replace('\\n', "\n", trim($this->requiredGlobalSetting('private_key')));
     }
 
-    public function productCode(string $currency): string
+    public function productCode(): string
     {
-        $key = 'wallester.'.strtolower($currency).'.product_code';
-        $value = $this->settings->getByKey($key);
+        $value = $this->settings->getByKey('wallester.product_code');
 
         return $value === null ? '' : trim((string) $value);
     }
@@ -66,7 +65,18 @@ class WallesterSettingsService
             return str_replace('\\n', "\n", trim($value));
         }
 
-        return $this->privateKey($currency);
+        return $this->privateKey();
+    }
+
+    public function rsaPublicKey(): string
+    {
+        $value = $this->settings->getByKey('wallester.rsa_public_key');
+
+        if ($value !== null && trim($value) !== '') {
+            return str_replace('\\n', "\n", trim($value));
+        }
+
+        throw new RuntimeException('Wallester RSA public key is not configured.');
     }
 
     public function threeDsChallengeTtlSeconds(): int
@@ -101,12 +111,10 @@ class WallesterSettingsService
         return (string) ($this->settings->getByKey('wallester.3ds_webhook_password') ?? '');
     }
 
-    public function hasCurrencyCredentials(string $currency): bool
+    public function hasCredentials(): bool
     {
-        $currency = strtolower($currency);
-
         foreach (['api_key', 'private_key'] as $suffix) {
-            $value = $this->settings->getByKey("wallester.{$currency}.{$suffix}");
+            $value = $this->settings->getByKey("wallester.{$suffix}");
 
             if ($value === null || $value === '') {
                 return false;

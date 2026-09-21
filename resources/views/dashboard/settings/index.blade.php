@@ -37,19 +37,6 @@ foreach ($tabs as $group => $meta) {
         foreach ($byCurrency as $currency => $currencySettings) {
             $panels[$group][] = ['title' => $currency, 'badge' => $currency, 'settings' => $currencySettings];
         }
-    } elseif ($group === 'wallester') {
-        $wallesterSettings = $grouped->get('wallester', collect());
-        $byCurrency = $wallesterSettings
-            ->filter(fn ($s) => in_array(strtolower(explode('.', $s->key)[1] ?? ''), ['eur', 'usd'], true))
-            ->groupBy(fn ($s) => strtoupper(explode('.', $s->key)[1]));
-        foreach ($byCurrency as $currency => $currencySettings) {
-            $panels[$group][] = ['title' => "Wallester {$currency}", 'badge' => $currency, 'settings' => $currencySettings];
-        }
-        $globalSettings = $wallesterSettings
-            ->reject(fn ($s) => in_array(strtolower(explode('.', $s->key)[1] ?? ''), ['eur', 'usd'], true));
-        if ($globalSettings->isNotEmpty()) {
-            $panels[$group][] = ['title' => 'Wallester Global', 'badge' => null, 'settings' => $globalSettings];
-        }
     } else {
         $panels[$group][] = ['title' => $meta['title'], 'badge' => null, 'settings' => $grouped->get($group, collect())];
     }

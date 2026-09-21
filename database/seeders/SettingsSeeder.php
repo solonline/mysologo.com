@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class SettingsSeeder extends Seeder
 {
+    // comando para executar o seeder: php artisan db:seed --class=SettingsSeeder
     private const DEFAULT_WALLESTER_MASTER_EUR = '75d92dc4-6de9-4580-8b62-3cbd3513af56';
 
     private const DEFAULT_WALLESTER_FEE_EUR = '626c80a3-f8e7-4627-8bcf-ca73f9944abf';
@@ -84,23 +85,20 @@ class SettingsSeeder extends Seeder
             ['key' => 'wallester.base_url',                  'label' => 'Base URL',                    'type' => 'url',      'value' => env('WALLESTER_BASE_URL', 'https://api-frontend.wallester.com/v1/')],
             ['key' => 'wallester.audit_source_type',         'label' => 'Audit Source Type',           'type' => 'text',     'value' => env('WALLESTER_AUDIT_SOURCE_TYPE', 'Backend')],
             ['key' => 'wallester.card_rsa_private_key',    'label' => 'Card RSA Private Key (PEM)',  'type' => 'textarea', 'value' => env('WALLESTER_CARD_RSA_PRIVATE_KEY', '')],
+            ['key' => 'wallester.rsa_public_key',          'label' => 'Wallester RSA Public Key (PEM)', 'type' => 'textarea', 'value' => env('WALLESTER_RSA_PUBLIC_KEY', '')],
             ['key' => 'wallester.3ds_challenge_ttl_seconds', 'label' => '3DS Challenge TTL (seconds)', 'type' => 'number', 'value' => (string) env('WALLESTER_3DS_CHALLENGE_TTL', 300)],
             ['key' => 'wallester.3ds_webhook_username',    'label' => '3DS Webhook Username',        'type' => 'secret',   'value' => ''],
             ['key' => 'wallester.3ds_webhook_password',    'label' => '3DS Webhook Password',        'type' => 'secret',   'value' => ''],
             ['key' => 'wallester.virtual_card_value',      'label' => 'Taxa do cartão virtual adicional (cêntimos)', 'type' => 'number', 'value' => (string) env('WALLESTER_VIRTUAL_CARD_VALUE', '0')],
             ['key' => 'wallester.physical_card_value',     'label' => 'Taxa do cartão físico adicional (cêntimos)',  'type' => 'number', 'value' => (string) env('WALLESTER_PHYSICAL_CARD_VALUE', '0')],
-            // Wallester — EUR
-            ['key' => 'wallester.eur.api_key',                     'label' => 'API Key',                     'type' => 'secret',   'value' => env('WALLESTER_API_KEY', '')],
-            ['key' => 'wallester.eur.private_key',                 'label' => 'Private Key (PEM)',           'type' => 'textarea', 'value' => env('WALLESTER_PRIVATE_KEY', '')],
-            ['key' => 'wallester.eur.product_code',                'label' => 'Product Code',                'type' => 'text',     'value' => env('WALLESTER_PRODUCT_CODE', '')],
-            ['key' => 'wallester.eur.platform_master_account_id',  'label' => 'Platform Master Account ID',  'type' => 'text',     'value' => env('WALLESTER_PLATFORM_MASTER_EUR', env('WALLESTER_PLATFORM_MASTER_ACCOUNT_ID', self::DEFAULT_WALLESTER_MASTER_EUR))],
-            ['key' => 'wallester.eur.platform_fee_account_id',     'label' => 'Sub Conta Master (lucro)',    'type' => 'text',     'value' => env('WALLESTER_PLATFORM_FEE_EUR', self::DEFAULT_WALLESTER_FEE_EUR)],
-            // Wallester — USD
-            ['key' => 'wallester.usd.api_key',                     'label' => 'API Key',                     'type' => 'secret',   'value' => env('WALLESTER_USD_API_KEY', '')],
-            ['key' => 'wallester.usd.private_key',                 'label' => 'Private Key (PEM)',           'type' => 'textarea', 'value' => env('WALLESTER_USD_PRIVATE_KEY', '')],
-            ['key' => 'wallester.usd.product_code',                'label' => 'Product Code',                'type' => 'text',     'value' => env('WALLESTER_USD_PRODUCT_CODE', '')],
-            ['key' => 'wallester.usd.platform_master_account_id',  'label' => 'Platform Master Account ID',  'type' => 'text',     'value' => env('WALLESTER_PLATFORM_MASTER_USD', '')],
-            ['key' => 'wallester.usd.platform_fee_account_id',     'label' => 'Sub Conta Master USD (taxas)', 'type' => 'text',    'value' => env('WALLESTER_PLATFORM_FEE_USD', '')],
+            ['key' => 'wallester.api_key',                 'label' => 'API Key',                     'type' => 'secret',   'value' => env('WALLESTER_API_KEY', '')],
+            ['key' => 'wallester.private_key',             'label' => 'Private Key (PEM)',           'type' => 'textarea', 'value' => env('WALLESTER_PRIVATE_KEY', '')],
+            ['key' => 'wallester.product_code',            'label' => 'Product Code',                'type' => 'text',     'value' => env('WALLESTER_PRODUCT_CODE', '')],
+            // Wallester — contas por moeda
+            ['key' => 'wallester.eur.platform_master_account_id',  'label' => 'Platform Master Account ID (EUR)',  'type' => 'text',     'value' => env('WALLESTER_PLATFORM_MASTER_EUR', env('WALLESTER_PLATFORM_MASTER_ACCOUNT_ID', self::DEFAULT_WALLESTER_MASTER_EUR))],
+            ['key' => 'wallester.eur.platform_fee_account_id',     'label' => 'Sub Conta Master (lucro) (EUR)',    'type' => 'text',     'value' => env('WALLESTER_PLATFORM_FEE_EUR', self::DEFAULT_WALLESTER_FEE_EUR)],
+            ['key' => 'wallester.usd.platform_master_account_id',  'label' => 'Platform Master Account ID (USD)',  'type' => 'text',     'value' => env('WALLESTER_PLATFORM_MASTER_USD', '')],
+            ['key' => 'wallester.usd.platform_fee_account_id',     'label' => 'Sub Conta Master (taxas) (USD)',    'type' => 'text',     'value' => env('WALLESTER_PLATFORM_FEE_USD', '')],
             // Câmbio (AwesomeAPI hoje)
             ['key' => 'fx.base_url',           'label' => 'URL Base',                      'type' => 'url',    'value' => env('FX_BASE_URL', 'https://economia.awesomeapi.com.br')],
             ['key' => 'fx.api_key',            'label' => 'API Key (x-api-key)',           'type' => 'secret', 'value' => env('FX_API_KEY', '')],
@@ -108,11 +106,17 @@ class SettingsSeeder extends Seeder
             ['key' => 'fx.percentage',         'label' => 'Percentagem da plataforma',    'type' => 'text',    'value' => env('FX_PERCENTAGE', '')],
         ];
 
+        $existingKeys = DB::table('settings')->pluck('key')->flip();
+
         foreach ($settings as $setting) {
-            DB::table('settings')->updateOrInsert(
-                ['key' => $setting['key']],
-                array_merge($setting, ['updated_at' => now(), 'created_at' => now()])
-            );
+            if (isset($existingKeys[$setting['key']])) {
+                continue;
+            }
+
+            DB::table('settings')->insert(array_merge($setting, [
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
         }
     }
 }

@@ -21,20 +21,19 @@ class WallesterSettingsServiceTest extends TestCase
         $this->seedWallesterSettings();
     }
 
-    public function test_reads_per_currency_and_global_settings(): void
+    public function test_reads_global_and_per_currency_account_settings(): void
     {
         $service = app(WallesterSettingsService::class);
 
-        $this->assertSame('eur-api-key', $service->apiKey('EUR'));
-        $this->assertSame('usd-api-key', $service->apiKey('usd'));
-        $this->assertSame('EUR-PRODUCT', $service->productCode('EUR'));
+        $this->assertSame('wallester-api-key', $service->apiKey());
+        $this->assertSame('WALLESTER-PRODUCT', $service->productCode());
         $this->assertSame('75d92dc4-6de9-4580-8b62-3cbd3513af56', $service->platformMasterAccountId('EUR'));
         $this->assertSame('https://api-frontend.wallester.com/v1/', $service->baseUrl());
         $this->assertSame('Backend', $service->auditSourceType());
         $this->assertSame(300, $service->threeDsChallengeTtlSeconds());
         $this->assertSame(0, $service->cardValueCents(true));
         $this->assertSame(0, $service->cardValueCents(false));
-        $this->assertTrue($service->hasCurrencyCredentials('EUR'));
+        $this->assertTrue($service->hasCredentials());
     }
 
     public function test_virtual_card_value_is_read_as_cents(): void
@@ -57,38 +56,64 @@ class WallesterSettingsServiceTest extends TestCase
         $this->assertSame(0, $service->cardValueCents(true));
     }
 
-    public function test_has_currency_credentials_without_product_code(): void
+    public function test_has_credentials_without_product_code(): void
     {
-        Setting::query()->where('key', 'wallester.eur.product_code')->update(['value' => '']);
+        Setting::query()->where('key', 'wallester.product_code')->update(['value' => '']);
 
         $service = app(WallesterSettingsService::class);
 
-        $this->assertSame('', $service->productCode('EUR'));
-        $this->assertTrue($service->hasCurrencyCredentials('EUR'));
+        $this->assertSame('', $service->productCode());
+        $this->assertTrue($service->hasCredentials());
     }
 
-    public function test_card_rsa_private_key_falls_back_to_currency_private_key(): void
+    public function test_card_rsa_private_key_falls_back_to_private_key(): void
     {
         Setting::query()->where('key', 'wallester.card_rsa_private_key')->update(['value' => '']);
 
         $service = app(WallesterSettingsService::class);
 
         $this->assertSame(
-            str_replace('\\n', "\n", trim(Setting::query()->where('key', 'wallester.eur.private_key')->value('value'))),
+            str_replace('\\n', "\n", trim(Setting::query()->where('key', 'wallester.private_key')->value('value'))),
             $service->cardRsaPrivateKey('EUR'),
         );
     }
 
-    public function test_throws_when_currency_setting_missing(): void
+    public function test_rsa_public_key_is_read_from_settings(): void
     {
-        Setting::query()->where('key', 'wallester.usd.api_key')->delete();
+        Setting::query()->where('key', 'wallester.rsa_public_key')->update([
+            'value' => '-----BEGIN PUBLIC KEY-----\\nMIIB\\n-----END PUBLIC KEY-----',
+        ]);
+
+        $service = app(WallesterSettingsService::class);
+
+        $this->assertSame(
+            "-----BEGIN PUBLIC KEY-----\nMIIB\n-----END PUBLIC KEY-----",
+            $service->rsaPublicKey(),
+        );
+    }
+
+    public function test_throws_when_rsa_public_key_is_missing(): void
+    {
+        Setting::query()->where('key', 'wallester.rsa_public_key')->update(['value' => '']);
 
         $service = app(WallesterSettingsService::class);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('wallester.usd.api_key');
+        $this->expectExceptionMessage('Wallester RSA public key is not configured.');
 
-        $service->apiKey('USD');
+        $service->rsaPublicKey();
+    }
+
+    public function test_throws_when_api_key_is_missing(): void
+    {
+        Setting::query()->where('key', 'wallester.api_key')->delete();
+
+        $service = app(WallesterSettingsService::class);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('wallester.api_key');
+
+        $service->apiKey();
     }
 
     public function test_three_ds_webhook_credentials_are_read_from_settings(): void
