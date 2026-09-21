@@ -776,6 +776,8 @@ body {
 .btn-action:active { transform: scale(.98); }
 .btn-action:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
+[hidden] { display: none !important; }
+
 /* ── Notifications screen ─────────────────────────── */
 #screen-notifications { background: #fff; }
 
@@ -1245,6 +1247,8 @@ body {
 
 .onboarding-step.step-done { border-color: #a7f3d0; }
 .onboarding-step.step-active { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+.onboarding-step.step-clickable { cursor: pointer; }
+.onboarding-step.step-clickable:hover { border-color: var(--indigo); }
 
 .step-header {
   display: flex;
@@ -2076,6 +2080,28 @@ body {
 
 .kyc-fallback .btn-action { max-width: 280px; }
 
+.kyc-close-bar {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--slate-100);
+  background: #fff;
+  flex-shrink: 0;
+  z-index: 3;
+}
+
+.kyc-close-bar.show { display: flex; }
+
+.kyc-close-bar p {
+  font-size: 13px;
+  color: var(--slate-600);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.kyc-close-bar .btn-action { margin-top: 0; }
+
 /* ── Mobile: ecrã completo (sem frame de telemóvel) ── */
 @media (max-width: 640px) {
   body {
@@ -2130,6 +2156,10 @@ body {
   .kyc-header {
     padding-top: max(12px, env(safe-area-inset-top));
   }
+
+  .kyc-close-bar {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
 }
 
 .card-preview {
@@ -2164,12 +2194,22 @@ body {
   cursor: not-allowed;
 }
 
-.card-preview.blocked {
+.card-preview.blocked,
+.card-preview.closed {
   background: linear-gradient(135deg, #334155 0%, #475569 55%, #64748b 100%);
   box-shadow: 0 12px 32px rgba(51,65,85,.28);
 }
 
-.card-preview.physical:not(.blocked) {
+.card-preview.closed {
+  opacity: .88;
+}
+
+.card-preview.dispatched:not(.blocked):not(.closed) {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 48%, #0369a1 100%);
+  box-shadow: 0 12px 32px rgba(3,105,161,.28);
+}
+
+.card-preview.physical:not(.blocked):not(.closed) {
   background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 48%, #0284c7 100%);
   box-shadow: 0 12px 32px rgba(2,132,199,.28);
 }
@@ -2186,6 +2226,14 @@ body {
   color: #fff;
   border-radius: 999px;
   padding: 4px 8px;
+}
+
+.card-blocked-badge.closed {
+  background: rgba(15,23,42,.88);
+}
+
+.card-blocked-badge.dispatched {
+  background: rgba(2,132,199,.92);
 }
 
 .card-list {
@@ -2218,8 +2266,13 @@ body {
   position: relative;
 }
 
-.card-list-mini.blocked {
+.card-list-mini.blocked,
+.card-list-mini.closed {
   background: linear-gradient(135deg, #475569, #64748b);
+}
+
+.card-list-mini.dispatched {
+  background: linear-gradient(135deg, #0f172a, #0284c7);
 }
 
 .card-list-mini::after {
@@ -2248,6 +2301,8 @@ body {
 .card-status-badge.active { background: #d1fae5; color: #047857; }
 .card-status-badge.blocked { background: #fee2e2; color: #b91c1c; }
 .card-status-badge.created { background: #fef3c7; color: #b45309; }
+.card-status-badge.dispatched { background: #e0f2fe; color: #0369a1; }
+.card-status-badge.closed { background: #e2e8f0; color: #475569; }
 
 .btn-action.danger {
   background: linear-gradient(135deg, #ef4444, #dc2626);
@@ -2459,7 +2514,7 @@ body {
         <span class="spin" id="kyc-status-spin" style="width:14px;height:14px;border-width:2px;border-color:var(--slate-200);border-top-color:var(--indigo)"></span>
       </div>
       <div class="kyc-frame-wrap">
-        <iframe id="kyc-iframe" title="Verificação Didit" allow="camera; microphone; geolocation" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-top-navigation"></iframe>
+        <iframe id="kyc-iframe" title="Verificação Didit" allow="camera; microphone; geolocation" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"></iframe>
         <div class="kyc-fallback" id="kyc-fallback">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--indigo)" stroke-width="1.5" style="opacity:.6">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -2468,6 +2523,10 @@ body {
           <button class="btn-action" onclick="openKycExternal()">Abrir verificação Didit</button>
           <button class="btn-step" onclick="pollKycStatus(true)">Já concluí — verificar estado</button>
         </div>
+      </div>
+      <div class="kyc-close-bar" id="kyc-close-bar">
+        <p id="kyc-close-msg">Verificação concluída. Pode fechar este ecrã.</p>
+        <button class="btn-action" onclick="finishKycScreen()">Fechar</button>
       </div>
     </div>
 
@@ -2871,10 +2930,43 @@ body {
         </div>
 
         <div class="hint-box" id="card-blocked-hint" hidden>
-          Este cartão está congelado. Desbloqueie para voltar a usá-lo e revelar os dados.
+          Este cartão está congelado. Desbloqueie para voltar a usá-lo.
         </div>
 
-        <div id="card-reveal-section">
+        <div class="hint-box" id="card-dispatched-hint" hidden>
+          O cartão físico foi enviado. Introduza o CVV impresso e o PIN da app para o activar.
+        </div>
+
+        <div class="hint-box" id="card-closed-hint" hidden>
+          Este cartão está fechado. Já não é possível bloquear, desbloquear nem revelar dados.
+        </div>
+
+        <div id="card-activate-cvv-section" hidden>
+          <div class="divider"></div>
+
+          <div class="form-field">
+            <label class="form-label">CVV impresso no cartão</label>
+            <input
+              class="form-input"
+              id="card-activate-cvv"
+              type="password"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              maxlength="3"
+              placeholder="3 dígitos"
+              autocomplete="off"
+              oninput="this.value=this.value.replace(/\D/g,'').slice(0,3)"
+            />
+          </div>
+
+          <div id="card-activate-result" class="result-card"></div>
+
+          <button class="btn-action" id="card-activate-cvv-btn" onclick="startActivateCardByCvv()" style="margin-top:0">
+            Activar com CVV
+          </button>
+        </div>
+
+        <div id="card-reveal-section" hidden>
           <div class="divider"></div>
 
           <div class="form-field">
@@ -2894,8 +2986,8 @@ body {
 
         <div id="card-block-result" class="result-card"></div>
 
-        <button class="btn-action danger" id="card-block-btn" onclick="startBlockCard()">
-          Bloquear cartão
+        <button class="btn-action danger" id="card-block-btn" onclick="startBlockCard()" hidden>
+          Bloquear / congelar
         </button>
 
         <button class="btn-action" id="card-unblock-btn" onclick="startUnblockCard()" hidden>
@@ -3411,6 +3503,7 @@ let pinConfigured = localStorage.getItem('yoop_sim_pin_set') === '1';
 let savedEmail = localStorage.getItem('yoop_sim_email') || '';
 
 const AUTH_SCREENS = ['welcome', 'login', 'register', 'pin-login'];
+const ONBOARDING_ALLOWED_SCREENS = ['welcome', 'login', 'register', 'pin-login', 'onboarding', 'kyc'];
 const NO_NAV_SCREENS = [
   'welcome', 'login', 'register', 'pin-login', 'pin-setup', 'pin-reset', 'onboarding', 'kyc',
   'deposit', 'payment', 'notifications', 'card-list', 'card-create', 'card-detail',
@@ -3451,6 +3544,10 @@ function showToast(msg, type = '') {
 function navigate(screen) {
   closeCardPin();
   prevScreen = currentScreen;
+
+  if (token && authSession && needsOnboarding(authSession) && !ONBOARDING_ALLOWED_SCREENS.includes(screen)) {
+    screen = 'onboarding';
+  }
 
   const cur = document.getElementById('screen-' + currentScreen);
   if (cur) {
@@ -3551,7 +3648,18 @@ function goBack() {
     closeKycScreen();
     return;
   }
+  if (currentScreen === 'onboarding') {
+    return;
+  }
+  if (currentScreen === 'pin-setup' && needsOnboarding(authSession)) {
+    navigate('onboarding');
+    return;
+  }
   if (AUTH_SCREENS.includes(prevScreen) || prevScreen === 'onboarding' || prevScreen === 'pin-setup') {
+    if (needsOnboarding(authSession)) {
+      navigate('onboarding');
+      return;
+    }
     navigate('home');
     return;
   }
@@ -3839,18 +3947,60 @@ function isPhoneVerified(session) {
   return !!(session?.verification?.phone || session?.user?.phone_verified);
 }
 
-/** Conta pronta para dashboard: lifecycle ACTIVE + email + telefone verificados. */
+function identityStatus(session) {
+  return session?.verification?.identity
+    ?? session?.user?.document_verified
+    ?? session?.user?.kyc_status
+    ?? session?.user?.doc_status
+    ?? null;
+}
+
+function isDocumentApproved(session) {
+  const raw = identityStatus(session);
+  if (raw === true || raw === 1) return true;
+  return isDocApproved(raw);
+}
+
+function isIdentityUnderReview(session) {
+  if (lifecycleStatus(session) === 'IDENTITY_UNDER_REVIEW') return true;
+  if (normalizeStatus(identityStatus(session)) === 'ANALYSING') return true;
+  const sessionStatus = String(session?.identity_verification?.status || '');
+  return sessionStatus === 'In Review';
+}
+
+/** Conta pronta para dashboard/PIN: lifecycle ACTIVE + email + telefone + documento. */
 function isAccountReady(session) {
   return lifecycleStatus(session) === 'ACTIVE'
     && isEmailVerified(session)
-    && isPhoneVerified(session);
+    && isPhoneVerified(session)
+    && isDocumentApproved(session);
 }
 
 function needsOnboarding(session) {
   const status = lifecycleStatus(session);
   if (['BLOCKED', 'SUSPENDED', 'IDENTITY_REJECTED', 'EBURY_REJECTED'].includes(status)) return true;
-  if (!isEmailVerified(session) || !isPhoneVerified(session)) return true;
+  if (!isEmailVerified(session) || !isPhoneVerified(session) || !isDocumentApproved(session)) return true;
   return status !== 'ACTIVE';
+}
+
+function applyCustomerProfileToSession(customer) {
+  if (!customer) return;
+  authSession = authSession || { token, user: customer };
+  authSession.user = { ...authSession.user, ...customer };
+  authSession.lifecycle = authSession.lifecycle || {};
+  if (customer.status) {
+    authSession.lifecycle.status = normalizeStatus(customer.status);
+  }
+  authSession.verification = {
+    email: !!(customer.email_verified || customer.email_verified_at),
+    phone: !!customer.phone_verified,
+    identity: customer.document_verified ?? customer.kyc_status ?? authSession.verification?.identity ?? null,
+  };
+  if (token && !authSession.token) authSession.token = token;
+  if (customer.didit_session) {
+    authSession.identity_verification = authSession.identity_verification || {};
+    authSession.identity_verification.session = customer.didit_session;
+  }
 }
 
 function saveAuthSession(session) {
@@ -4737,9 +4887,9 @@ async function doRegister() {
 // ── Onboarding hub ────────────────────────────────────
 function onboardingStepState(session, step) {
   const status = lifecycleStatus(session);
-  const verification = session?.verification || {};
   const emailOk = isEmailVerified(session);
   const phoneOk = isPhoneVerified(session);
+  const docOk = isDocumentApproved(session);
 
   switch (step) {
     case 'email':
@@ -4750,14 +4900,12 @@ function onboardingStepState(session, step) {
       if (!emailOk) return 'pending';
       return 'active';
     case 'identity':
-      if (isDocApproved(verification.identity) || isDocApproved(session?.user?.kyc_status) || isDocApproved(session?.user?.document_verified) || ['ACTIVE', 'PROVISIONING'].includes(status)) return 'done';
+      if (docOk) return 'done';
       if (!emailOk || !phoneOk) return 'pending';
-      if (status === 'IDENTITY_UNDER_REVIEW') return 'active';
-      if (['PENDING_IDENTITY_VERIFICATION'].includes(status)) return 'active';
-      return 'pending';
+      return 'active';
     case 'provisioning':
-      if (status === 'ACTIVE' && emailOk && phoneOk) return 'done';
-      if (status === 'PROVISIONING' && emailOk && phoneOk) return 'active';
+      if (status === 'ACTIVE' && emailOk && phoneOk && docOk) return 'done';
+      if (status === 'PROVISIONING' && emailOk && phoneOk && docOk) return 'active';
       return 'pending';
     default:
       return 'pending';
@@ -4784,9 +4932,9 @@ function renderOnboardingHub(session) {
     return;
   }
 
-  const kycStatus = authSession?.user?.kyc_status || authSession?.identity_verification?.status || '';
+  const kycStatus = identityStatus(session) || authSession?.identity_verification?.status || '';
   const kycLabel = kycStatusLabel(kycStatus);
-  const isUnderReview = status === 'IDENTITY_UNDER_REVIEW';
+  const isUnderReview = isIdentityUnderReview(session);
 
   const steps = [
     {
@@ -4812,14 +4960,14 @@ function renderOnboardingHub(session) {
       id: 'identity', num: 3, title: 'Verificação de identidade (Didit)',
       desc: isUnderReview
         ? `Documentos em análise (${kycLabel}) — aguarde o resultado`
-        : 'Verificação real obrigatória — documento + selfie via Didit',
+        : 'Toque neste cartão para abrir a verificação Didit (documento + selfie)',
       state: onboardingStepState(session, 'identity'),
       actions: isUnderReview ? `
         <div class="hint-box">A sua verificação foi submetida e está a ser analisada. Este passo actualiza automaticamente.</div>
-        <button class="btn-step primary" onclick="pollKycStatus(true)">Verificar estado</button>` : `
-        <div class="hint-box">Deve completar o formulário Didit com documento válido e selfie. Não é possível saltar este passo.</div>
-        <button class="btn-step primary" onclick="resumeKycFromSession()">${getExistingKycUrl() ? 'Continuar verificação Didit' : 'Iniciar verificação Didit'}</button>
-        <button class="btn-step" onclick="pollKycStatus(true)">Já concluí — verificar estado</button>`,
+        <button class="btn-step primary" onclick="event.stopPropagation(); pollKycStatus(true)">Verificar estado</button>` : `
+        <div class="hint-box">E-mail e telefone confirmados. Falta validar a identidade no Didit.</div>
+        <button class="btn-step primary" onclick="event.stopPropagation(); resumeKycFromSession()">${getExistingKycUrl() ? 'Continuar verificação Didit' : 'Iniciar verificação Didit'}</button>
+        <button class="btn-step" onclick="event.stopPropagation(); pollKycStatus(true)">Já concluí — verificar estado</button>`,
     },
     {
       id: 'provisioning', num: 4, title: 'Activar conta',
@@ -4830,8 +4978,10 @@ function renderOnboardingHub(session) {
     },
   ];
 
-  container.innerHTML = steps.map(s => `
-    <div class="onboarding-step ${s.state === 'done' ? 'step-done' : ''} ${s.state === 'active' ? 'step-active' : ''}">
+  container.innerHTML = steps.map(s => {
+    const identityClickable = s.id === 'identity' && s.state === 'active' && !isUnderReview;
+    return `
+    <div class="onboarding-step ${s.state === 'done' ? 'step-done' : ''} ${s.state === 'active' ? 'step-active' : ''} ${identityClickable ? 'step-clickable' : ''}"${identityClickable ? ' onclick="onIdentityCardClick(event)"' : ''}>
       <div class="step-header">
         <div class="step-icon">${s.state === 'done' ? '✓' : s.num}</div>
         <div>
@@ -4839,8 +4989,9 @@ function renderOnboardingHub(session) {
           <div class="step-desc">${s.desc}</div>
         </div>
       </div>
-      ${s.state !== 'done' ? `<div class="step-actions">${s.actions}</div>` : ''}
-    </div>`).join('');
+      ${s.state === 'active' ? `<div class="step-actions">${s.actions}</div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 async function refreshOnboarding() {
@@ -4850,20 +5001,7 @@ async function refreshOnboarding() {
     return;
   }
   const customer = unwrap(data);
-  if (authSession) {
-    authSession.user = { ...authSession.user, ...customer };
-    authSession.lifecycle = authSession.lifecycle || {};
-    authSession.lifecycle.status = normalizeStatus(customer.status);
-    authSession.verification = {
-      email: !!customer.email_verified,
-      phone: !!customer.phone_verified,
-      identity: isDocApproved(customer.document_verified),
-    };
-    if (customer.didit_session) {
-      authSession.identity_verification = authSession.identity_verification || {};
-      authSession.identity_verification.session = customer.didit_session;
-    }
-  }
+  applyCustomerProfileToSession(customer);
   if (isAccountReady(authSession)) {
     stopOnboardingPolling();
     showToast('Conta activa!', 'success');
@@ -4881,6 +5019,10 @@ async function resendValidationEmail() {
 }
 
 async function sendPhoneCode() {
+  if (!isEmailVerified(authSession)) {
+    showToast('Verifique o e-mail primeiro', 'error');
+    return;
+  }
   const phone = authSession?.user?.phone || '';
   const { ok, data } = await api('POST', '/onboarding/phone/send', { phone });
   showToast(ok ? 'SMS enviado' : (data?.message || 'Erro ao enviar SMS'), ok ? 'success' : 'error');
@@ -4902,14 +5044,48 @@ function isDocApproved(val) {
   return normalizeStatus(val) === 'APPROVED';
 }
 
+function unwrapResource(value) {
+  if (!value || typeof value !== 'object') return value;
+  return value.data && typeof value.data === 'object' && !Array.isArray(value.data)
+    ? value.data
+    : value;
+}
+
+function pickKycUrl(obj) {
+  const node = unwrapResource(obj);
+  if (!node || typeof node !== 'object') return null;
+  const candidates = [
+    node.verification_url,
+    node.session_url,
+    node.url,
+    node.session?.verification_url,
+    node.session?.session_url,
+    node.session?.url,
+    unwrapResource(node.session)?.verification_url,
+    unwrapResource(node.session)?.session_url,
+  ];
+  return candidates.find(v => typeof v === 'string' && /^https?:\/\//.test(v)) || null;
+}
+
 function getExistingKycUrl() {
-  return authSession?.user?.didit_session?.session_url
-    || authSession?.user?.didit_session?.verification_url
-    || authSession?.identity_verification?.session?.verification_url
+  return pickKycUrl(authSession?.identity_verification)
+    || pickKycUrl(authSession?.identity_verification?.session)
+    || pickKycUrl(authSession?.user?.didit_session)
+    || pickKycUrl(authSession?.user?.didit_session?.session)
     || null;
 }
 
+function onIdentityCardClick(event) {
+  if (event.target.closest('button, input, a, .step-actions')) return;
+  resumeKycFromSession();
+}
+
 function resumeKycFromSession() {
+  if (!isEmailVerified(authSession) || !isPhoneVerified(authSession)) {
+    showToast('Verifique o e-mail e o telefone primeiro', 'error');
+    navigate('onboarding');
+    return;
+  }
   const url = getExistingKycUrl();
   if (url) {
     navigate('kyc');
@@ -4936,15 +5112,9 @@ function kycStatusLabel(status) {
 }
 
 function extractKycUrl(data) {
-  const d = unwrap(data);
-  if (!d) return null;
-  return d.session_url
-    || d.verification_url
-    || d.session?.session_url
-    || authSession?.identity_verification?.session?.verification_url
-    || authSession?.user?.didit_session?.session_url
-    || authSession?.user?.didit_session?.verification_url
-    || null;
+  return pickKycUrl(unwrap(data))
+    || pickKycUrl(data)
+    || getExistingKycUrl();
 }
 
 function extractKycSessionStatus(data) {
@@ -4979,11 +5149,35 @@ function showKycFallback(show) {
   if (fallback) fallback.classList.toggle('show', show);
 }
 
+function showKycCloseBar(message) {
+  const bar = document.getElementById('kyc-close-bar');
+  const msg = document.getElementById('kyc-close-msg');
+  if (msg && message) msg.textContent = message;
+  if (bar) bar.classList.add('show');
+}
+
+function hideKycCloseBar() {
+  const bar = document.getElementById('kyc-close-bar');
+  if (bar) bar.classList.remove('show');
+}
+
+function finishKycScreen() {
+  stopKycPolling();
+  hideKycCloseBar();
+  if (!isEmailVerified(authSession) || !isPhoneVerified(authSession) || !isDocumentApproved(authSession)) {
+    navigate('onboarding');
+    startOnboardingPolling();
+    return;
+  }
+  routePostAuth(authSession);
+}
+
 function loadKycIframe(url) {
   currentKycUrl = url;
   const iframe = document.getElementById('kyc-iframe');
   if (!iframe) return;
 
+  hideKycCloseBar();
   showKycFallback(false);
   setKycStatusBar('polling', 'Complete a verificação no formulário abaixo');
 
@@ -5028,6 +5222,7 @@ function resumeKycScreen() {
 
 function closeKycScreen() {
   stopKycPolling();
+  hideKycCloseBar();
   navigate('onboarding');
 }
 
@@ -5044,8 +5239,7 @@ let onboardingPollTimer = null;
 
 function startOnboardingPolling() {
   if (onboardingPollTimer) return;
-  const status = lifecycleStatus(authSession);
-  if (!['PENDING_IDENTITY_VERIFICATION', 'IDENTITY_UNDER_REVIEW', 'PROVISIONING'].includes(status)) return;
+  if (isAccountReady(authSession)) return;
   onboardingPollTimer = setInterval(() => pollKycStatus(false), 8000);
 }
 
@@ -5060,20 +5254,7 @@ async function pollKycStatus(manual) {
   if (!ok) return;
 
   const customer = unwrap(data);
-  if (authSession) {
-    authSession.user = { ...authSession.user, ...customer };
-    authSession.lifecycle = authSession.lifecycle || {};
-    authSession.lifecycle.status = normalizeStatus(customer.status);
-    authSession.verification = {
-      email: !!customer.email_verified,
-      phone: !!customer.phone_verified,
-      identity: isDocApproved(customer.document_verified),
-    };
-    if (customer.didit_session) {
-      authSession.identity_verification = authSession.identity_verification || {};
-      authSession.identity_verification.session = customer.didit_session;
-    }
-  }
+  applyCustomerProfileToSession(customer);
 
   const lifecycle = lifecycleStatus(authSession);
   const kycStatus = customer.kyc_status || customer.document_verified;
@@ -5084,13 +5265,15 @@ async function pollKycStatus(manual) {
       setKycStatusBar('done', 'Verificação concluída!');
       stopKycPolling();
       showToast('KYC concluído!', 'success');
-      setTimeout(() => routePostAuth(authSession), 1200);
+      showKycCloseBar('Verificação concluída. Feche para continuar.');
       return;
     }
     if (kycDone === 'review') {
       setKycStatusBar('review', 'Documentos em análise — aguarde');
+      showKycCloseBar('Validação submetida. Feche para voltar ao onboarding.');
     } else if (kycDone === 'declined') {
       setKycStatusBar('', 'Verificação recusada — tente novamente');
+      showKycCloseBar('A verificação foi recusada. Feche para voltar ou tente novamente no Didit.');
     } else if (manual) {
       showToast('KYC ainda pendente — complete o formulário', 'error');
     }
@@ -5109,6 +5292,11 @@ async function pollKycStatus(manual) {
 }
 
 async function startKycSession() {
+  if (!isEmailVerified(authSession) || !isPhoneVerified(authSession)) {
+    showToast('Verifique o e-mail e o telefone primeiro', 'error');
+    navigate('onboarding');
+    return;
+  }
   setKycStatusBar('polling', 'A criar sessão Didit…');
 
   const { ok, data } = await api('POST', '/kyc/identity/session');
@@ -5200,6 +5388,11 @@ let pinResetCurrent = null;
 let pinResetFirst = null;
 
 function initPinSetupScreen() {
+  if (needsOnboarding(authSession)) {
+    showToast('Complete o onboarding antes de criar o PIN', 'error');
+    navigate('onboarding');
+    return;
+  }
   pinSetupFirst = null;
   document.getElementById('pin-setup-subtitle').textContent = 'Escolha um PIN de 4 dígitos';
   if (pinSetupController) pinSetupController.reset();
@@ -5218,7 +5411,7 @@ function initPinSetupScreen() {
         reset();
         return;
       }
-      const { ok, data } = await api('POST', '/auth/create-pin', {
+      const { ok, data, status } = await api('POST', '/auth/create-pin', {
         device_token: deviceToken,
         device_name: 'App Sim',
         pin,
@@ -5227,10 +5420,18 @@ function initPinSetupScreen() {
         pinConfigured = true;
         localStorage.setItem('yoop_sim_pin_set', '1');
         showToast('PIN criado!', 'success');
+        if (needsOnboarding(authSession)) {
+          navigate('onboarding');
+          return;
+        }
         navigate('home');
         loadHomeData();
       } else {
         showToast(data?.message || 'Erro ao criar PIN', 'error');
+        if (status === 403) {
+          navigate('onboarding');
+          return;
+        }
         pinSetupFirst = null;
         document.getElementById('pin-setup-subtitle').textContent = 'Escolha um PIN de 4 dígitos';
         reset();
@@ -6481,6 +6682,12 @@ async function loadHomeData() {
 
     if (meRes.ok) {
       const c = unwrap(meRes.data);
+      applyCustomerProfileToSession(c);
+      if (needsOnboarding(authSession)) {
+        navigate('onboarding');
+        startOnboardingPolling();
+        return;
+      }
       const name = c?.name || authSession?.user?.name || 'Usuário';
       document.getElementById('home-name').textContent = name.split(' ')[0];
     }
@@ -6769,17 +6976,61 @@ async function doConfirmPayment() {
 
 // ── Wallester cards ───────────────────────────────────
 function cardStatusLabel(status) {
-  if (status === 'Active') return 'Ativo';
-  if (status === 'Blocked') return 'Bloqueado';
-  if (status === 'Created') return 'Pendente';
-  if (status === 'Closed' || status === 'Closing') return 'Fechado';
-  return status || '—';
+  const normalized = normalizeCardStatus(status);
+  if (normalized === 'Active') return 'Ativo';
+  if (normalized === 'Blocked') return 'Bloqueado';
+  if (normalized === 'Created') return 'Pendente';
+  if (normalized === 'Personalized') return 'Personalizado';
+  if (normalized === 'Dispatched') return 'Enviado';
+  if (normalized === 'Closed' || normalized === 'Closing') return 'Fechado';
+  return normalized || status || '—';
 }
 
 function cardStatusClass(status) {
-  if (status === 'Active') return 'active';
-  if (status === 'Blocked') return 'blocked';
+  const normalized = normalizeCardStatus(status);
+  if (normalized === 'Active') return 'active';
+  if (normalized === 'Blocked') return 'blocked';
+  if (normalized === 'Dispatched' || normalized === 'Personalized') return 'dispatched';
+  if (normalized === 'Closed' || normalized === 'Closing') return 'closed';
   return 'created';
+}
+
+function normalizeCardStatus(status) {
+  if (!status) return '';
+  const raw = typeof status === 'object' && status.value != null
+    ? String(status.value)
+    : String(status);
+  const key = raw.trim();
+  if (!key) return '';
+  const map = {
+    active: 'Active',
+    blocked: 'Blocked',
+    created: 'Created',
+    personalized: 'Personalized',
+    dispatched: 'Dispatched',
+    closed: 'Closed',
+    closing: 'Closing',
+  };
+  return map[key.toLowerCase()] || key;
+}
+
+function setHidden(id, hide) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.hidden = !!hide;
+}
+
+function cardPreviewBadge(status) {
+  const normalized = normalizeCardStatus(status);
+  if (normalized === 'Blocked') return { text: 'Bloqueado', className: '' };
+  if (normalized === 'Dispatched') return { text: 'Enviado', className: 'dispatched' };
+  if (normalized === 'Personalized') return { text: 'Personalizado', className: 'dispatched' };
+  if (normalized === 'Closed' || normalized === 'Closing') return { text: 'Fechado', className: 'closed' };
+  return null;
+}
+
+function isPhysicalCardType(type) {
+  return ['Physical', 'ChipAndPin', 'ChipAndPinAnonymous'].includes(type);
 }
 
 function cardTypeLabel(type) {
@@ -6820,16 +7071,16 @@ async function loadCardList() {
   }
 
   list.innerHTML = customerCards.map(card => {
-    const blocked = card.status === 'Blocked';
+    const statusClass = cardStatusClass(card.status);
     const masked = formatCardNumber(card.masked_card_number);
     return `
       <button type="button" class="card-list-item" onclick="openCardDetail(${Number(card.id)})">
-        <div class="card-list-mini ${blocked ? 'blocked' : ''}"></div>
+        <div class="card-list-mini ${statusClass}"></div>
         <div class="card-list-body">
           <div class="card-list-name">${card.name || 'Cartão'}</div>
           <div class="card-list-num">${cardTypeLabel(card.type)} · ${masked}</div>
         </div>
-        <span class="card-status-badge ${cardStatusClass(card.status)}">${cardStatusLabel(card.status)}</span>
+        <span class="card-status-badge ${statusClass}">${cardStatusLabel(card.status)}</span>
       </button>`;
   }).join('');
 }
@@ -6988,43 +7239,60 @@ function formatExpiry(value) {
 }
 let revealedCardNumber = null;
 let revealedCardPin = null;
+let pendingActivateCvv = null;
 
 function renderCardDetail(card) {
   const data = card?.api ?? card;
-  const status = data.status || '';
+  const status = normalizeCardStatus(data.status || card?.local?.status);
+  const cardType = data.type || card?.local?.type;
   const blocked = status === 'Blocked';
-  const canReveal = status === 'Active';
+  const closed = status === 'Closed' || status === 'Closing';
+  const dispatched = status === 'Dispatched' || status === 'Personalized';
+  const isPhysical = isPhysicalCardType(cardType);
+  const canReveal = status === 'Active' || status === 'Blocked';
   const canBlock = status === 'Active';
   const canUnblock = status === 'Blocked';
   const canClose = status === 'Active' || status === 'Blocked';
+  const canActivateByCvv = dispatched && isPhysical;
 
   revealedCardNumber = null;
   revealedCardPin = null;
   document.getElementById('copy-card-btn').disabled = true;
 
-  document.getElementById('card-preview').classList.toggle('blocked', blocked);
-  document.getElementById('card-preview').classList.toggle('physical', ['Physical', 'ChipAndPin', 'ChipAndPinAnonymous'].includes(data.type || card?.local?.type));
-  document.getElementById('card-blocked-badge').hidden = !blocked;
+  const preview = document.getElementById('card-preview');
+  preview.classList.toggle('blocked', blocked);
+  preview.classList.toggle('closed', closed);
+  preview.classList.toggle('dispatched', dispatched);
+  preview.classList.toggle('physical', isPhysical);
+
+  const badge = document.getElementById('card-blocked-badge');
+  const badgeInfo = cardPreviewBadge(status);
+  badge.hidden = !badgeInfo;
+  badge.textContent = badgeInfo?.text || '';
+  badge.classList.toggle('closed', badgeInfo?.className === 'closed');
+  badge.classList.toggle('dispatched', badgeInfo?.className === 'dispatched');
+
   document.getElementById('card-preview-number').textContent =
-    formatCardNumber(data.masked_card_number);
-  document.getElementById('card-preview-name').textContent = data.name || '—';
-  document.getElementById('card-preview-expiry').textContent = formatExpiry(data.expiry_date);
+    formatCardNumber(data.masked_card_number || card?.local?.masked_card_number);
+  document.getElementById('card-preview-name').textContent = data.name || card?.local?.name || '—';
+  document.getElementById('card-preview-expiry').textContent = formatExpiry(data.expiry_date || card?.local?.expiry_date);
   document.getElementById('card-preview-cvv').textContent = '•••';
   document.getElementById('card-preview-pin').textContent = '••••';
   document.getElementById('card-detail-status').textContent = cardStatusLabel(status);
-  document.getElementById('card-detail-type').textContent = cardTypeLabel(data.type || card?.local?.type);
-  document.getElementById('card-detail-wid').textContent = data.wallester_card_id || data.id || '—';
+  document.getElementById('card-detail-type').textContent = cardTypeLabel(cardType);
+  document.getElementById('card-detail-wid').textContent = data.wallester_card_id || card?.local?.wallester_card_id || data.id || '—';
 
   const blockRow = document.getElementById('card-detail-block-row');
-  const blockType = data.block_type || '';
+  const blockType = data.block_type || card?.local?.block_type || '';
   blockRow.hidden = !blocked;
   document.getElementById('card-detail-block-type').textContent = blockType || '—';
 
   const delivery = card?.local?.delivery_address || data.delivery_address || null;
   const deliveryInfo = document.getElementById('card-delivery-info');
-  const physicalHint = document.getElementById('card-physical-hint');
-  const isPhysical = ['Physical', 'ChipAndPin', 'ChipAndPinAnonymous'].includes(data.type || card?.local?.type);
-  physicalHint.hidden = !(isPhysical && status === 'Created');
+  setHidden('card-physical-hint', !(isPhysical && status === 'Created'));
+  setHidden('card-blocked-hint', !blocked);
+  setHidden('card-dispatched-hint', !canActivateByCvv);
+  setHidden('card-closed-hint', !closed);
 
   if (delivery && (delivery.address || delivery.city || delivery.first_name)) {
     deliveryInfo.hidden = false;
@@ -7038,16 +7306,29 @@ function renderCardDetail(card) {
     deliveryInfo.hidden = true;
   }
 
-  document.getElementById('card-blocked-hint').hidden = !blocked;
-  document.getElementById('card-reveal-section').hidden = !canReveal;
-  document.getElementById('card-reveal-btn').textContent = 'Revelar número e CVV';
-  document.getElementById('card-reveal-pin-btn').textContent = 'Revelar PIN do cartão';
-  document.getElementById('card-block-btn').hidden = !canBlock;
-  document.getElementById('card-unblock-btn').hidden = !canUnblock;
-  document.getElementById('card-close-btn').hidden = !canClose;
-  document.getElementById('card-sensitive-result').className = 'result-card';
-  document.getElementById('card-block-result').className = 'result-card';
-  document.getElementById('card-reveal-password').value = '';
+  setHidden('card-reveal-section', !canReveal);
+  setHidden('card-activate-cvv-section', !canActivateByCvv);
+  setHidden('card-block-btn', !canBlock);
+  setHidden('card-unblock-btn', !canUnblock);
+  setHidden('card-close-btn', !canClose);
+
+  const revealBtn = document.getElementById('card-reveal-btn');
+  if (revealBtn) revealBtn.textContent = 'Revelar número e CVV';
+  const revealPinBtn = document.getElementById('card-reveal-pin-btn');
+  if (revealPinBtn) revealPinBtn.textContent = 'Revelar PIN do cartão';
+  const activateBtn = document.getElementById('card-activate-cvv-btn');
+  if (activateBtn) activateBtn.textContent = 'Activar com CVV';
+
+  const sensitiveResult = document.getElementById('card-sensitive-result');
+  if (sensitiveResult) sensitiveResult.className = 'result-card';
+  const blockResult = document.getElementById('card-block-result');
+  if (blockResult) blockResult.className = 'result-card';
+  const activateResult = document.getElementById('card-activate-result');
+  if (activateResult) activateResult.className = 'result-card';
+  const revealPassword = document.getElementById('card-reveal-password');
+  if (revealPassword) revealPassword.value = '';
+  const activateCvv = document.getElementById('card-activate-cvv');
+  if (activateCvv) activateCvv.value = '';
 }
 
 async function doCreateCard(pin) {
@@ -7170,7 +7451,7 @@ function openCreateCardPin() {
 
 function startBlockCard() {
   if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
-  if (currentCard?.api?.status === 'Blocked' || currentCard?.local?.status === 'Blocked') {
+  if (currentCardStatus() !== 'Active') {
     renderCardDetail(currentCard);
     return;
   }
@@ -7180,7 +7461,7 @@ function startBlockCard() {
 
 function startUnblockCard() {
   if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
-  if (currentCard?.api?.status === 'Active' || currentCard?.local?.status === 'Active') {
+  if (currentCardStatus() !== 'Blocked') {
     renderCardDetail(currentCard);
     return;
   }
@@ -7190,7 +7471,7 @@ function startUnblockCard() {
 
 function startCloseCard() {
   if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
-  const status = currentCard?.api?.status || currentCard?.local?.status;
+  const status = currentCardStatus();
   if (status !== 'Active' && status !== 'Blocked') {
     renderCardDetail(currentCard);
     return;
@@ -7214,22 +7495,26 @@ function closeCardPin() {
   document.getElementById('card-pin-overlay')?.classList.remove('show');
   if (cardPinController) cardPinController.reset();
   cardPinAction = null;
+  pendingActivateCvv = null;
 }
 
 async function submitCardPin(pin) {
   const action = cardPinAction;
+  const cvv = pendingActivateCvv;
   closeCardPin();
+  pendingActivateCvv = null;
   if (action === 'create') await doCreateCard(pin);
   if (action === 'block') await doBlockCard(pin);
   if (action === 'unblock') await doUnblockCard(pin);
   if (action === 'close') await doCloseCard(pin);
   if (action === 'reveal-pin') await doRevealCardPin({ pin, device_token: deviceToken });
+  if (action === 'activate-cvv') await doActivateCardByCvv(pin, cvv);
 }
 
 async function doBlockCard(pin) {
   if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
   if (!pin) { showToast('PIN obrigatório', 'error'); return; }
-  if (currentCard?.api?.status === 'Blocked' || currentCard?.local?.status === 'Blocked') {
+  if (currentCardStatus() !== 'Active') {
     renderCardDetail(currentCard);
     return;
   }
@@ -7263,13 +7548,13 @@ async function doBlockCard(pin) {
   }
 
   btn.disabled = false;
-  btn.textContent = 'Bloquear cartão';
+  btn.textContent = 'Bloquear / congelar';
 }
 
 async function doUnblockCard(pin) {
   if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
   if (!pin) { showToast('PIN obrigatório', 'error'); return; }
-  if (currentCard?.api?.status === 'Active' || currentCard?.local?.status === 'Active') {
+  if (currentCardStatus() !== 'Blocked') {
     renderCardDetail(currentCard);
     return;
   }
@@ -7340,6 +7625,72 @@ async function doCloseCard(pin) {
 
   btn.disabled = false;
   btn.textContent = 'Fechar cartão';
+}
+
+function currentCardStatus() {
+  return normalizeCardStatus(currentCard?.api?.status || currentCard?.local?.status);
+}
+
+function startActivateCardByCvv() {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  const status = currentCardStatus();
+  if (status !== 'Dispatched' && status !== 'Personalized') {
+    renderCardDetail(currentCard);
+    return;
+  }
+
+  const cvvInput = document.getElementById('card-activate-cvv');
+  const cvv = String(cvvInput?.value || '').replace(/\D/g, '');
+  if (cvvInput) cvvInput.value = cvv;
+  if (!/^\d{3}$/.test(cvv)) {
+    showToast('Informe o CVV de 3 dígitos impresso no cartão', 'error');
+    return;
+  }
+
+  pendingActivateCvv = cvv;
+  const name = currentCard?.api?.name || currentCard?.local?.name || 'este cartão';
+  openCardPin('activate-cvv', 'Activar cartão', `Activar “${name}” com o CVV`);
+}
+
+async function doActivateCardByCvv(pin, cvv) {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
+  if (!/^\d{3}$/.test(String(cvv || ''))) {
+    showToast('Informe o CVV de 3 dígitos impresso no cartão', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('card-activate-cvv-btn');
+  const result = document.getElementById('card-activate-result');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> A activar...';
+  result.className = 'result-card';
+
+  try {
+    const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/activate-by-cvv`, {
+      pin,
+      device_token: deviceToken,
+      cvv,
+    });
+    const card = unwrap(data);
+
+    if (!ok) {
+      result.classList.add('show', 'error');
+      result.textContent = JSON.stringify(data, null, 2);
+      showToast(data?.message || `Erro ${status}`, 'error');
+      return;
+    }
+
+    currentCard = { local: { ...currentCard.local, ...card }, api: { ...currentCard.api, ...card } };
+    renderCardDetail(currentCard);
+    showToast('Cartão activado', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro de conexão', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Activar com CVV';
 }
 
 async function doRevealCard() {
@@ -7656,36 +8007,9 @@ async function tryAutoLogin() {
   if (!ok) return; // 401 → handleUnauthorized já redireccionou para login
 
   const customer = unwrap(data);
-  authSession = authSession || { token, user: customer };
-  authSession.user = { ...authSession.user, ...customer };
-  authSession.lifecycle = authSession.lifecycle || {};
-  authSession.lifecycle.status = normalizeStatus(customer.status);
-  authSession.verification = {
-    email: !!customer.email_verified,
-    phone: !!customer.phone_verified,
-    identity: isDocApproved(customer.document_verified),
-  };
-
-  if (needsOnboarding(authSession)) {
-    renderOnboardingHub(authSession);
-    navigate('onboarding');
-    startOnboardingPolling();
-    return;
-  }
-
-  if (!pinConfigured) {
-    navigate('pin-setup');
-    return;
-  }
-
-  navigate('home');
-  loadHomeData();
-
-  api('GET', '/wallet/account').then(async ({ ok: accOk, data: accData }) => {
-    if (!accOk) return;
-    const w = unwrap(accData)?.wallester;
-    wallesterReady = !!(w?.wallester_account_id && integrationStatusValue(w?.status) === 'ACTIVE');
-  });
+  applyCustomerProfileToSession(customer);
+  if (authSession && token && !authSession.token) authSession.token = token;
+  routePostAuth(authSession);
 }
 
 tryAutoLogin();
