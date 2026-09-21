@@ -57,6 +57,12 @@ return [
             'file' => 'webhooks.md',
         ],
         [
+            'slug' => 'wallester-cards',
+            'title' => 'Cartões Wallester',
+            'description' => 'Emitir virtual e físico, revelar dados, congelar, fechar e activar com CVV.',
+            'file' => 'wallester-cards.md',
+        ],
+        [
             'slug' => 'wallester-card-movements',
             'title' => 'Compras Wallester e câmbio',
             'description' => 'Um movimento por compra: total na conta, valor original e taxa FX.',

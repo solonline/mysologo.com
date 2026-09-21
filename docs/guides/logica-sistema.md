@@ -12,6 +12,7 @@ Este guia é a leitura contínua. Contratos JSON e fluxos isolados:
 - [Top-up com cartão](/docs/guides/topup-card)
 - [P2P](/docs/guides/p2p-transfer)
 - [Webhooks](/docs/guides/webhooks)
+- [Cartões Wallester](/docs/guides/wallester-cards)
 - [Compras Wallester](/docs/guides/wallester-card-movements)
 
 Não hardcode a sequência no front: a fonte de verdade é `lifecycle`, `capabilities`, `verification` e `identity_verification` devolvidos no login e em `GET /customer/me`.
@@ -592,9 +593,43 @@ Guia: [Compras Wallester e câmbio](/docs/guides/wallester-card-movements).
 
 ## 13. Cartões Wallester
 
-Emissão e gestão do cartão. Exigem tríade. Criar / bloquear / fechar pedem PIN do **device Yoop** (não o PIN do cartão, excepto `encrypted-pin`).
+Emissão e gestão do cartão. Exigem tríade. Criar / activar-por-CVV / bloquear / desbloquear / fechar pedem PIN do **device Yoop** (não o PIN do cartão, excepto `encrypted-pin`).
+
+Guia: [Cartões Wallester](/docs/guides/wallester-cards).
 
 Compras online com 3DS: secção seguinte. Extrato de gastos: [Extractos](#12-extractos).
+
+### Estados e acções na app
+
+| Status | O que a app mostra |
+|--------|-------------------|
+| `Active` | Revelar dados (`sensitive` / `encrypted-pin`), congelar (`block`), fechar (`close`) |
+| `Blocked` | Revelar dados, descongelar (`unblock`), fechar (`close`) |
+| `Dispatched` | Só activar com CVV impresso (`activate-by-cvv`: PIN + CVV) |
+| `Created` (físico) | Pendente de envio — sem acções de gestão |
+| `Closed` / `Closing` | Nenhuma acção |
+
+Cartão **Virtual** em `Created` activa-se com `POST .../activate` (a criação já o faz automaticamente). Cartão **Physical** só fica `Active` depois de `activate-by-cvv`.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant API as Yoop API
+    participant W as Wallester
+    App->>API: POST /wallester/cards (Physical)
+    API->>W: createCard
+    W-->>API: Created
+    Note over W: produção e envio
+    W-->>API: status Dispatched
+    App->>API: POST /wallester/cards/{card}/activate-by-cvv
+    Note over App,API: pin + device_token + cvv (3 dígitos)
+    API->>API: verifica PIN do device
+    API->>W: GET card (sync status)
+    API->>API: cifra CVV RSA-OAEP
+    API->>W: PATCH activate-by-cvv
+    W-->>API: Active
+    API-->>App: cartão local Active
+```
 
 ### `GET /api/wallester/accounts`
 
@@ -620,29 +655,39 @@ Compras online com 3DS: secção seguinte. Extrato de gastos: [Extractos](#12-ex
 
 **Pré-requisitos:** PIN + `device_token`. Body: `type` (`Virtual` \| `Physical`), `name`, `pin`, `device_token`, `limits?`, `security?`. `delivery_address` obrigatório se Physical.
 
-**O que o sistema faz:** cria o cartão no Wallester, cobra fee se `will_charge`, e se for virtual em estado `Created` **activa logo**.
+**O que o sistema faz:** cria o cartão no Wallester, cobra fee se `will_charge`, e se for virtual em estado `Created` **activa logo**. Físico fica `Created` até ser enviado e activado por CVV.
 
 ### `GET /api/wallester/cards`
 
 **Quando:** lista «os meus cartões».
 
-**O que o sistema faz:** cartões `managed()` locais do customer (não um dump live completo).
+**O que o sistema faz:** cartões `managed()` locais do customer (`Active`, `Created`, `Blocked`, `Dispatched`, `Closed`) — não um dump live completo.
 
 ### `GET /api/wallester/cards/{card}`
 
 **Quando:** detalhe de um cartão (ownership).
 
-**O que o sistema faz:** detalhe live Wallester.
+**O que o sistema faz:** detalhe live Wallester (passthrough). Usar o `status` desta resposta para decidir os botões de gestão.
 
 ### `POST /api/wallester/cards/{card}/activate`
 
-**Quando:** cartão virtual ainda não activo (se a criação não o activou).
+**Quando:** cartão **Virtual** ainda não activo (se a criação não o activou). Idempotente se já `Active`. Physical não é suportado aqui.
+
+### `POST /api/wallester/cards/{card}/activate-by-cvv`
+
+**Quando:** cartão físico recebido (`Dispatched`, também `Created` / `Personalized`), para activar com o CVV impresso.
+
+**Pré-requisitos:** PIN do device + `device_token` + `cvv` (3 dígitos em claro). Tipos: `Physical`, `ChipAndPin`, `ChipAndPinAnonymous`.
+
+**O que o sistema faz:** sincroniza o status local (`GET card`), cifra o CVV com RSA-OAEP SHA-256 (label vazio) com `wallester.rsa_public_key`, envolve em `BEGIN/END MESSAGE`, envia o PEM em Base64 à Wallester (`PATCH activate-by-cvv`) e grava `Active`. Idempotente se já estiver `Active`.
+
+**Não usar** em `Blocked` / `Closed` — isso não é descongelar. Descongelar é `POST .../unblock`.
 
 ### `POST /api/wallester/cards/{card}/sensitive`
 
 **Quando:** mostrar PAN + CVV na app.
 
-**Pré-requisitos:** password **ou** PIN+device. Só cartão `Active`. O servidor desencripta e devolve os dados — tratar como ecrã sensível.
+**Pré-requisitos:** password **ou** PIN+device. Cartão `Active` **ou** `Blocked`. O servidor desencripta e devolve os dados — tratar como ecrã sensível.
 
 ### `POST /api/wallester/cards/{card}/encrypted-pin`
 
@@ -652,15 +697,15 @@ Compras online com 3DS: secção seguinte. Extrato de gastos: [Extractos](#12-ex
 
 ### `POST /api/wallester/cards/{card}/block`
 
-**Quando:** congelar o cartão. Exige PIN do device.
+**Quando:** congelar um cartão `Active`. Exige PIN do device. Idempotente se já `Blocked`.
 
 ### `POST /api/wallester/cards/{card}/unblock`
 
-**Quando:** descongelar. Exige PIN.
+**Quando:** descongelar um cartão `Blocked`. Exige PIN. Idempotente se já `Active`.
 
 ### `POST /api/wallester/cards/{card}/close`
 
-**Quando:** encerrar (`Closed` / `Closing`). Exige PIN. Irreversível do ponto de vista de produto.
+**Quando:** encerrar (`Closed` / `Closing`) um cartão `Active` ou `Blocked`. Exige PIN. Irreversível do ponto de vista de produto. Depois disto, nenhuma acção de gestão.
 
 ---
 
@@ -936,7 +981,7 @@ Públicos, sem lógica de negócio. Úteis para load balancer e smoke tests:
 | Carregar cartão | fees → `create-intent-payment` → SDK → poll PI |
 | Carregar IBAN | `create-funding` / `get-funding-instructions` |
 | Enviar P2P | `find/{username}` → `POST /wallet/transactions/p2p` |
-| Cartões | quote → `POST /wallester/cards` → activate / sensitive |
+| Cartões | quote → `POST /wallester/cards` → (físico `Dispatched`: `activate-by-cvv`) / (virtual: `activate`) → `sensitive` / `block` / `unblock` / `close` |
 | 3DS | pending → approve/reject (webhooks Wallester 3DS) |
 | Extrato | `GET /wallet/funding-accounts/{id}/movements` |
 | Terminal POS | `tpa/link` → `login-tpa` → `connection-token` → `create-intent` → `capture` |

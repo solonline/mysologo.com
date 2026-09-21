@@ -229,7 +229,12 @@ paths:
   /wallester/accounts/{account}:
     $ref: './paths/wallester.yaml#/wallester-accounts-show'
   /wallester/cards:
-    $ref: './paths/wallester.yaml#/wallester-cards-store'
+    get:
+      $ref: './paths/wallester.yaml#/wallester-cards-index/get'
+    post:
+      $ref: './paths/wallester.yaml#/wallester-cards-store/post'
+  /wallester/cards/issuance-quote:
+    $ref: './paths/wallester.yaml#/wallester-cards-issuance-quote'
   /wallester/cards/{card}:
     $ref: './paths/wallester.yaml#/wallester-cards-show'
   /wallester/cards/{card}/sensitive:
@@ -238,6 +243,14 @@ paths:
     $ref: './paths/wallester.yaml#/wallester-cards-encrypted-pin'
   /wallester/cards/{card}/activate:
     $ref: './paths/wallester.yaml#/wallester-cards-activate'
+  /wallester/cards/{card}/activate-by-cvv:
+    $ref: './paths/wallester.yaml#/wallester-cards-activate-by-cvv'
+  /wallester/cards/{card}/block:
+    $ref: './paths/wallester.yaml#/wallester-cards-block'
+  /wallester/cards/{card}/unblock:
+    $ref: './paths/wallester.yaml#/wallester-cards-unblock'
+  /wallester/cards/{card}/close:
+    $ref: './paths/wallester.yaml#/wallester-cards-close'
   /wallester/3ds-challenges/pending:
     $ref: './paths/wallester.yaml#/wallester-3ds-challenges-pending'
   /wallester/3ds-challenges/{challenge}/approve:
@@ -348,6 +361,14 @@ components:
       $ref: './components/schemas.yaml#/HealthCheck'
     WallesterCard:
       $ref: './components/schemas.yaml#/WallesterCard'
+    WallesterCardIssuanceQuote:
+      $ref: './components/schemas.yaml#/WallesterCardIssuanceQuote'
+    WallesterCardSensitive:
+      $ref: './components/schemas.yaml#/WallesterCardSensitive'
+    WallesterCardPin:
+      $ref: './components/schemas.yaml#/WallesterCardPin'
+    WallesterCardApi:
+      $ref: './components/schemas.yaml#/WallesterCardApi'
     Wallester3dsChallenge:
       $ref: './components/schemas.yaml#/Wallester3dsChallenge'
     WallesterCardTransaction:

@@ -999,6 +999,31 @@ WallesterAccountList:
         total_records_number:
           type: integer
 
+WallesterCardIssuanceQuote:
+  type: object
+  properties:
+    currency:
+      type: string
+      example: EUR
+    virtual:
+      type: object
+      properties:
+        fee_cents:
+          type: integer
+          example: 0
+        will_charge:
+          type: boolean
+          description: True se já existir um cartão aberto e a taxa virtual for > 0
+    physical:
+      type: object
+      properties:
+        fee_cents:
+          type: integer
+          example: 990
+        will_charge:
+          type: boolean
+          description: True se a taxa física configurada for > 0
+
 WallesterCardSensitive:
   type: object
   properties:
@@ -1036,6 +1061,7 @@ WallesterCardApi:
       example: Virtual
     status:
       type: string
+      description: Estado Wallester live (`Active`, `Created`, `Blocked`, `Dispatched`, `Personalized`, `Closed`, `Closing`)
       example: Active
     name:
       type: string
@@ -1081,9 +1107,10 @@ WallesterCard:
       format: uuid
     type:
       type: string
-      enum: [Virtual, Physical]
+      enum: [Virtual, Physical, ChipAndPin, ChipAndPinAnonymous]
     status:
       type: string
+      enum: [Active, Created, Blocked, Dispatched, Personalized, Closed, Closing]
       example: Active
     name:
       type: string
@@ -1116,6 +1143,10 @@ WallesterCard:
           type: string
         city:
           type: string
+        state:
+          type: string
+        country:
+          type: string
         first_name:
           type: string
         last_name:
@@ -1124,6 +1155,21 @@ WallesterCard:
           type: string
         postal_code:
           type: string
+    block_type:
+      type: string
+      nullable: true
+      example: BlockedByCardUser
+    blocked_at:
+      type: string
+      format: date-time
+      nullable: true
+    close_reason:
+      type: string
+      nullable: true
+    closed_at:
+      type: string
+      format: date-time
+      nullable: true
     activated_at:
       type: string
       format: date-time

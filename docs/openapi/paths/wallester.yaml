@@ -112,6 +112,58 @@ wallester-accounts-show:
       '404':
         $ref: '../components/responses.yaml#/NotFound'
 
+wallester-cards-index:
+  get:
+    tags: [Wallester]
+    summary: Listar os meus cartões
+    operationId: wallesterCardsIndex
+    description: |
+      Lista os cartões **locais** do customer autenticado (`managed()`): `Active`, `Created`, `Blocked`, `Dispatched`, `Closed`.
+
+      Não é um dump live da Wallester. Use `GET /wallester/cards/{card}` para o detalhe live.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/WallesterCard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+wallester-cards-issuance-quote:
+  get:
+    tags: [Wallester]
+    summary: Cotação de emissão de cartão
+    operationId: wallesterCardsIssuanceQuote
+    description: |
+      Devolve as taxas de emissão (virtual e físico) e se serão cobradas (`will_charge`).
+
+      Virtual só cobra se **já** existir um cartão aberto. Físico cobra sempre que a taxa configurada for > 0.
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCardIssuanceQuote'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
 wallester-cards-store:
   post:
     tags: [Wallester]
@@ -122,11 +174,13 @@ wallester-cards-store:
 
       **Comportamento:**
       - Cartões **Virtual** em estado `Created` são **activados automaticamente** após criação
-      - Cartões **Physical** ficam em `Created` — não são activados neste endpoint
+      - Cartões **Physical** ficam em `Created` — a activação é `POST /wallester/cards/{card}/activate-by-cvv` quando o plástico chega (`Dispatched`)
       - OOB 3DS é configurado com o `wallester_oob_id` da conta Wallester do customer
       - `internet_purchase_enabled` fica activo por defeito
 
       **Pré-requisitos:** conta Wallester `ACTIVE`, lifecycle `ACTIVE`, email e documento verificados.
+
+      **PIN:** `pin` (4 dígitos do device) + `device_token` são obrigatórios.
     security:
       - bearerAuth: []
     requestBody:
@@ -135,7 +189,7 @@ wallester-cards-store:
         application/json:
           schema:
             type: object
-            required: [type, name]
+            required: [type, name, pin, device_token]
             properties:
               type:
                 type: string
@@ -143,6 +197,13 @@ wallester-cards-store:
               name:
                 type: string
                 maxLength: 255
+              pin:
+                type: string
+                pattern: '^[0-9]{4}$'
+                description: PIN de 4 dígitos do dispositivo
+              device_token:
+                type: string
+                description: Token do dispositivo registado com PIN
               limits:
                 type: object
                 additionalProperties: true
@@ -160,6 +221,14 @@ wallester-cards-store:
                   city:
                     type: string
                     maxLength: 255
+                  state:
+                    type: string
+                    maxLength: 255
+                  country:
+                    type: string
+                    minLength: 2
+                    maxLength: 2
+                    description: ISO 3166-1 alpha-2 (ex. PT)
                   first_name:
                     type: string
                     maxLength: 255
@@ -175,6 +244,8 @@ wallester-cards-store:
           example:
             type: Virtual
             name: Travel Card
+            pin: '1234'
+            device_token: dev_xxx
     responses:
       '201':
         description: Cartão criado (e activado se Virtual)
@@ -238,7 +309,7 @@ wallester-cards-sensitive:
 
       Requer `WALLESTER_CARD_RSA_PRIVATE_KEY` configurada no servidor. O backend desencripta e devolve os dados em plain text sobre HTTPS.
 
-      **Pré-requisitos:** cartão `Active` e pertencente ao customer autenticado.
+      **Pré-requisitos:** cartão `Active` ou `Blocked` e pertencente ao customer autenticado.
     security:
       - bearerAuth: []
     parameters:
@@ -287,7 +358,7 @@ wallester-cards-sensitive:
       '404':
         $ref: '../components/responses.yaml#/NotFound'
       '422':
-        description: Cartão inactivo ou indisponível
+        description: Cartão não elegível (estado inválido — só `Active` ou `Blocked`)
 
 wallester-cards-encrypted-pin:
   post:
@@ -301,7 +372,7 @@ wallester-cards-encrypted-pin:
 
       Requer confirmação de identidade com **password da conta** ou **PIN do dispositivo** (`pin` + `device_token`).
 
-      **Pré-requisitos:** cartão `Active` e pertencente ao customer autenticado.
+      **Pré-requisitos:** cartão `Active` ou `Blocked` e pertencente ao customer autenticado.
     security:
       - bearerAuth: []
     parameters:
@@ -350,7 +421,7 @@ wallester-cards-encrypted-pin:
       '404':
         $ref: '../components/responses.yaml#/NotFound'
       '422':
-        description: Cartão inactivo ou indisponível
+        description: Cartão não elegível (estado inválido — só `Active` ou `Blocked`)
 
 wallester-cards-activate:
   post:
@@ -360,7 +431,7 @@ wallester-cards-activate:
     description: |
       Activa manualmente um cartão **Virtual** em estado `Created`.
 
-      Idempotente se o cartão já estiver `Active`. Cartões **Physical** não são suportados neste endpoint.
+      Idempotente se o cartão já estiver `Active`. Cartões **Physical** usam `POST /wallester/cards/{card}/activate-by-cvv`.
     security:
       - bearerAuth: []
     parameters:
@@ -387,6 +458,232 @@ wallester-cards-activate:
         $ref: '../components/responses.yaml#/NotFound'
       '422':
         description: Cartão não activável (tipo ou estado inválido)
+
+wallester-cards-activate-by-cvv:
+  post:
+    tags: [Wallester]
+    summary: Activar cartão físico por CVV
+    operationId: wallesterCardsActivateByCvv
+    description: |
+      Activa um cartão **Physical** / **ChipAndPin** / **ChipAndPinAnonymous** com o CVV impresso no plástico.
+
+      **Quando usar:** o cartão físico foi enviado (`Dispatched`) e o utilizador o recebeu. Também aceite em `Created` e `Personalized`. Idempotente se já estiver `Active`.
+
+      **O que o sistema faz:**
+      1. Sincroniza o status local com `GET /v1/cards/{id}` na Wallester
+      2. Cifra o `cvv` (3 dígitos em claro) com RSA-OAEP SHA-256 (label vazio) usando `wallester.rsa_public_key`
+      3. Envolve o ciphertext em `BEGIN/END MESSAGE` e Base64-encode o envelope PEM
+      4. Chama `PATCH /v1/cards/{id}/activate-by-cvv` na Wallester
+      5. Actualiza o cartão local para `Active`
+
+      **Pré-requisitos:** tríade + ownership. Body: `pin` (device), `device_token`, `cvv` (3 dígitos).
+
+      **Não activável** em `Blocked`, `Closed` ou `Closing`. Cartões **Virtual** usam `POST .../activate`.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: card
+        in: path
+        required: true
+        description: ID local do cartão (`customer_wallester_cards.id`)
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [pin, device_token, cvv]
+            properties:
+              pin:
+                type: string
+                pattern: '^[0-9]{4}$'
+                description: PIN de 4 dígitos do dispositivo (não o PIN do cartão)
+              device_token:
+                type: string
+                description: Token do dispositivo registado com PIN
+              cvv:
+                type: string
+                pattern: '^[0-9]{3}$'
+                description: CVV impresso no cartão (3 dígitos, em claro). O servidor cifra antes de enviar à Wallester.
+          example:
+            pin: '1234'
+            device_token: dev_xxx
+            cvv: '123'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        description: Cartão não activável (tipo Virtual, ou estado Blocked/Closed)
+
+wallester-cards-block:
+  post:
+    tags: [Wallester]
+    summary: Bloquear / congelar cartão
+    operationId: wallesterCardsBlock
+    description: |
+      Congela um cartão em estado `Active` (`BlockedByCardUser`). Idempotente se já estiver `Blocked`.
+
+      Exige PIN do device. Depois de bloqueado, o utilizador pode desbloquear (`POST .../unblock`) e ainda revelar dados (`sensitive` / `encrypted-pin`).
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: card
+        in: path
+        required: true
+        description: ID local do cartão (`customer_wallester_cards.id`)
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [pin, device_token]
+            properties:
+              pin:
+                type: string
+                pattern: '^[0-9]{4}$'
+              device_token:
+                type: string
+          example:
+            pin: '1234'
+            device_token: dev_xxx
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        description: Cartão não bloqueável no estado actual (só `Active`)
+
+wallester-cards-unblock:
+  post:
+    tags: [Wallester]
+    summary: Desbloquear cartão
+    operationId: wallesterCardsUnblock
+    description: |
+      Descongela um cartão em estado `Blocked`. Idempotente se já estiver `Active`.
+
+      Exige PIN do device. Não aplica a cartões `Dispatched` — esses activam-se com `POST .../activate-by-cvv`.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: card
+        in: path
+        required: true
+        description: ID local do cartão (`customer_wallester_cards.id`)
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [pin, device_token]
+            properties:
+              pin:
+                type: string
+                pattern: '^[0-9]{4}$'
+              device_token:
+                type: string
+          example:
+            pin: '1234'
+            device_token: dev_xxx
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        description: Cartão não desbloqueável no estado actual (só `Blocked`)
+
+wallester-cards-close:
+  post:
+    tags: [Wallester]
+    summary: Fechar cartão
+    operationId: wallesterCardsClose
+    description: |
+      Encerra um cartão `Active` ou `Blocked` (`Closed` / `Closing`). Exige PIN do device.
+
+      Irreversível do ponto de vista de produto. Cartão `Closed` não pode ser bloqueado, desbloqueado, activado nem revelar dados.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: card
+        in: path
+        required: true
+        description: ID local do cartão (`customer_wallester_cards.id`)
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [pin, device_token]
+            properties:
+              pin:
+                type: string
+                pattern: '^[0-9]{4}$'
+              device_token:
+                type: string
+          example:
+            pin: '1234'
+            device_token: dev_xxx
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '../components/schemas.yaml#/WallesterCard'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
+      '422':
+        description: Cartão não fechável no estado actual (só `Active` ou `Blocked`)
 
 wallester-3ds-challenges-pending:
   get:
