@@ -47,6 +47,8 @@ interface WallesterGatewayInterface
 
     public function activateCard(string $cardId, ?string $auditUserId = null): array;
 
+    public function activateCardByCVV(string $cardId, string $cvv, ?string $auditUserId = null): array;
+
     public function linkCardToAccount(string $cardId, string $accountId, ?string $auditUserId = null): array;
 
     /**

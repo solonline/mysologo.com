@@ -214,6 +214,16 @@ class WallesterGateway implements WallesterGatewayInterface
         return $this->normalizeCardResponse(is_array($response) ? $response : []);
     }
 
+    public function activateCardByCVV(string $cardId, string $cvv, ?string $auditUserId = null): array
+    {
+        $response = $this->run('activateCardByCVV', fn () => $this->client->activateCardByCVV($cardId, $cvv, $auditUserId), [
+            'card_id' => $cardId,
+            'audit_user_id' => $auditUserId,
+        ]);
+
+        return $this->normalizeCardResponse(is_array($response) ? $response : []);
+    }
+
     public function linkCardToAccount(string $cardId, string $accountId, ?string $auditUserId = null): array
     {
         $response = $this->run(

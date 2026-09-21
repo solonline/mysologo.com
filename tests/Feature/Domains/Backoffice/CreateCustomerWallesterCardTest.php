@@ -69,6 +69,7 @@ class CreateCustomerWallesterCardTest extends TestCase
                 'name' => 'Mario Rossi',
                 'masked_card_number' => '****4242',
             ]);
+        $this->expectWallesterGetCard($gateway, 'card_bo_1');
         $gateway->shouldReceive('activateCard')
             ->once()
             ->with('card_bo_1', (string) $customer->id)

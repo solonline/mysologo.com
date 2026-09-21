@@ -31,13 +31,12 @@ class WallesterHttpClient
 
     public function forCurrency(string $currency): self
     {
-        $normalizedCurrency = strtolower($currency);
+        $this->currency = strtolower($currency);
 
-        if ($normalizedCurrency !== $this->currency || $this->apiKey === null) {
-            $this->currency = $normalizedCurrency;
-            $this->apiKey = $this->settings->apiKey($normalizedCurrency);
-            $this->privateKey = $this->settings->privateKey($normalizedCurrency);
-            $this->productCode = $this->settings->productCode($normalizedCurrency);
+        if ($this->apiKey === null) {
+            $this->apiKey = $this->settings->apiKey();
+            $this->privateKey = $this->settings->privateKey();
+            $this->productCode = $this->settings->productCode();
             $this->httpClient = new Client([
                 'base_uri' => $this->settings->baseUrl(),
                 'headers' => [
@@ -193,6 +192,18 @@ class WallesterHttpClient
     {
         $response = $this->httpClient->patch("cards/{$cardId}/activate", [
             'headers' => $this->getRequestHeaders($auditUserId),
+        ]);
+
+        return $this->decodeJson($response->getBody()->getContents());
+    }
+
+    public function activateCardByCVV(string $cardId, string $cvv, ?string $auditUserId = null): array
+    {
+        $response = $this->httpClient->patch("cards/{$cardId}/activate-by-cvv", [
+            'headers' => $this->getAuthHeaders(),
+            'json' => [
+                'cvv' => $cvv,
+            ],
         ]);
 
         return $this->decodeJson($response->getBody()->getContents());

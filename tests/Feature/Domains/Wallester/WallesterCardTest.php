@@ -6,6 +6,7 @@ use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Services\WallesterCardSensitiveService;
+use App\Domains\Wallester\Services\WallesterSensitiveDataEncryptor;
 use App\Domains\Wallester\Services\WallesterService;
 use App\Models\CustomerDevice;
 use App\Models\CustomerWallesterCard;
@@ -63,6 +64,7 @@ class WallesterCardTest extends TestCase
                 ],
             ]);
 
+        $this->expectWallesterGetCard($gateway, 'card_api_1');
         $gateway->shouldReceive('activateCard')
             ->once()
             ->with('card_api_1', (string) $customer->id)
@@ -375,6 +377,7 @@ class WallesterCardTest extends TestCase
         ]);
 
         $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_manual_activate');
         $gateway->shouldReceive('activateCard')
             ->once()
             ->with('card_manual_activate', (string) $customer->id)
@@ -420,6 +423,104 @@ class WallesterCardTest extends TestCase
         $this->withToken($token)
             ->postJson("/api/wallester/cards/{$card->id}/activate")
             ->assertForbidden();
+    }
+
+    public function test_customer_can_activate_physical_card_by_cvv(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_card_activate_cvv');
+        $pin = $this->attachDevicePin($customer);
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_manual_activate_cvv',
+            'type' => 'ChipAndPin',
+            'status' => 'Created',
+            'name' => 'Physical Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_manual_activate_cvv');
+        $gateway->shouldReceive('activateCardByCVV')
+            ->once()
+            ->with('card_manual_activate_cvv', 'encrypted-cvv', (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_manual_activate_cvv',
+                'type' => 'ChipAndPin',
+                'status' => 'Active',
+                'name' => 'Physical Card',
+                'masked_card_number' => '****4321',
+                'activated_at' => '2026-07-01T13:00:00Z',
+            ]);
+
+        $encryptor = Mockery::mock(WallesterSensitiveDataEncryptor::class);
+        $encryptor->shouldReceive('encryptCvv2')->once()->with('123')->andReturn('encrypted-cvv');
+
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+        $this->app->instance(WallesterSensitiveDataEncryptor::class, $encryptor);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson("/api/wallester/cards/{$localCard->id}/activate-by-cvv", [
+                ...$pin,
+                'cvv' => '123',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Active')
+            ->assertJsonPath('data.type', 'ChipAndPin')
+            ->assertJsonPath('data.activated_at', '2026-07-01T13:00:00+01:00');
+    }
+
+    public function test_activate_by_cvv_rejects_invalid_pin(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_activate_cvv_bad_pin');
+        $this->attachDevicePin($customer);
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_activate_cvv_bad_pin',
+            'type' => 'Physical',
+            'status' => 'Created',
+            'name' => 'Physical Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldNotReceive('activateCardByCVV');
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson("/api/wallester/cards/{$localCard->id}/activate-by-cvv", [
+                'pin' => '0000',
+                'device_token' => 'device-card-1',
+                'cvv' => '123',
+            ])
+            ->assertUnauthorized()
+            ->assertJsonPath('reason', 'invalid_pin');
+    }
+
+    public function test_activate_by_cvv_requires_pin_and_cvv(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_activate_cvv_no_pin');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_activate_cvv_no_pin',
+            'type' => 'Physical',
+            'status' => 'Created',
+            'name' => 'Physical Card',
+        ]);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson("/api/wallester/cards/{$localCard->id}/activate-by-cvv")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['pin', 'device_token', 'cvv']);
     }
 
     public function test_customer_can_create_physical_card_without_auto_activation(): void
@@ -524,6 +625,7 @@ class WallesterCardTest extends TestCase
                 'name' => 'Another Card',
                 'masked_card_number' => '****9999',
             ]);
+        $this->expectWallesterGetCard($gateway, 'card_additional_1');
         $gateway->shouldReceive('activateCard')
             ->once()
             ->andReturn([
@@ -589,6 +691,7 @@ class WallesterCardTest extends TestCase
                     && $payload['amount'] === 5.0;
             }), (string) $customer->id)
             ->andReturn(['id' => 'pay_card_fee_api']);
+        $this->expectWallesterGetCard($gateway, 'card_paid_api');
         $gateway->shouldReceive('activateCard')
             ->once()
             ->andReturn([
@@ -685,6 +788,7 @@ class WallesterCardTest extends TestCase
                 'name' => 'New Card',
                 'masked_card_number' => '****1234',
             ]);
+        $this->expectWallesterGetCard($gateway, 'card_replacement_1');
         $gateway->shouldReceive('activateCard')
             ->once()
             ->andReturn([

@@ -3,6 +3,7 @@
 namespace App\Domains\Wallester\Controllers;
 
 use App\Domains\Auth\Services\DeviceAuthService;
+use App\Domains\Wallester\Http\Requests\ActivateCardByCVVRequest;
 use App\Domains\Wallester\Http\Requests\BlockWallesterCardRequest;
 use App\Domains\Wallester\Http\Requests\CreateWallesterCardRequest;
 use App\Domains\Wallester\Http\Requests\RevealWallesterCardSensitiveRequest;
@@ -130,6 +131,24 @@ class WallesterCardController extends Controller
     /**
      * @hideFromApiDocs
      */
+    public function activateByCVV(ActivateCardByCVVRequest $request, CustomerWallesterCard $card): JsonResponse
+    {
+        $this->verifyCustomerPin($request);
+
+        $activatedCard = $this->wallesterService->activateCardByCVVForCustomer(
+            $request->user(),
+            $card,
+            (string) $request->validated('cvv'),
+        );
+
+        return response()->json([
+            'data' => $this->transformCard($activatedCard),
+        ]);
+    }
+
+    /**
+     * @hideFromApiDocs
+     */
     public function block(BlockWallesterCardRequest $request, CustomerWallesterCard $card): JsonResponse
     {
         $this->verifyCustomerPin($request);
@@ -178,7 +197,7 @@ class WallesterCardController extends Controller
         ]);
     }
 
-    private function verifyCustomerPin(CreateWallesterCardRequest|BlockWallesterCardRequest $request): void
+    private function verifyCustomerPin(CreateWallesterCardRequest|BlockWallesterCardRequest|ActivateCardByCVVRequest $request): void
     {
         $this->deviceAuthService->verifyPin(
             $request->user(),

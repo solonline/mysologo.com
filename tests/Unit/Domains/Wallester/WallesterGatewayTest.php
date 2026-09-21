@@ -337,6 +337,47 @@ class WallesterGatewayTest extends TestCase
         $this->assertSame('Active', $result['status']);
     }
 
+    public function test_activate_card_by_cvv_unwraps_nested_card_payload_without_logging_cvv(): void
+    {
+        $logged = [];
+        Log::listen(function (MessageLogged $event) use (&$logged): void {
+            $logged[] = [
+                'level' => $event->level,
+                'message' => $event->message,
+                'context' => $event->context,
+            ];
+        });
+
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('activateCardByCVV')
+            ->once()
+            ->with('card_123', 'encrypted-cvv', '42')
+            ->andReturn([
+                'card' => [
+                    'id' => 'card_123',
+                    'type' => 'ChipAndPin',
+                    'status' => 'Active',
+                    'activated_at' => '2026-07-01T12:00:00Z',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->activateCardByCVV('card_123', 'encrypted-cvv', '42');
+
+        $this->assertSame('card_123', $result['id']);
+        $this->assertSame('Active', $result['status']);
+        $this->assertTrue(
+            collect($logged)->contains(
+                fn (array $entry) => $entry['level'] === 'info'
+                    && $entry['message'] === 'wallester_api: activateCardByCVV'
+                    && ($entry['context']['card_id'] ?? null) === 'card_123'
+                    && ! array_key_exists('cvv', $entry['context']),
+            ),
+        );
+    }
+
     public function test_block_card_unwraps_nested_card_payload(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);

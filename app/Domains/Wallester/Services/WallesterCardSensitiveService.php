@@ -95,11 +95,11 @@ class WallesterCardSensitiveService
 
     private function ensureCardCanRevealSensitiveData(CustomerWallesterCard $card): void
     {
-        if ($card->status !== 'Active') {
+        if (! in_array($card->status, ['Active', 'Blocked'], true)) {
             throw new ApiException(
                 ErrorCode::ACCOUNT_NOT_ACTIVE,
                 422,
-                'Sensitive card data is only available for active cards.',
+                'Sensitive card data is only available for active or blocked cards.',
             );
         }
     }

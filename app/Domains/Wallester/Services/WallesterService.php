@@ -3,20 +3,20 @@
 namespace App\Domains\Wallester\Services;
 
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Settings\Services\SettingsService;
 use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
-use App\Domains\Settings\Services\SettingsService;
+use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
+use App\Domains\Wallet\Enums\FundingPartnerMovementType;
+use App\Domains\Wallet\Enums\LedgerEntryType;
+use App\Domains\Wallet\Services\FundingPartnerMovementService;
+use App\Domains\Wallet\Services\LedgerService;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
 use App\Models\LedgerEntry;
-use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
-use App\Domains\Wallet\Enums\FundingPartnerMovementType;
-use App\Domains\Wallet\Enums\LedgerEntryType;
-use App\Domains\Wallet\Services\FundingPartnerMovementService;
-use App\Domains\Wallet\Services\LedgerService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -33,6 +33,7 @@ class WallesterService
         protected SettingsService $settingsService,
         protected WallesterCardRsaKeyService $rsaKeys,
         protected WallesterSensitiveDataDecryptor $decryptor,
+        protected WallesterSensitiveDataEncryptor $encryptor,
     ) {}
 
     public function createAccount(array $data, string $currency = 'EUR'): array
@@ -243,6 +244,7 @@ class WallesterService
     public function activateVirtualCardForCustomer(Customer $customer, CustomerWallesterCard $card): CustomerWallesterCard
     {
         $this->ensureCustomerOwnsCard($customer, $card);
+        $card = $this->syncCardStatusFromWallester($customer, $card);
         $this->ensureVirtualCardActivatable($card);
 
         if ($card->status === 'Active') {
@@ -298,6 +300,36 @@ class WallesterService
 
             return $persistedCard;
         });
+    }
+
+    public function activateCardByCVVForCustomer(Customer $customer, CustomerWallesterCard $card, string $cvv): CustomerWallesterCard
+    {
+        $this->ensureCustomerOwnsCard($customer, $card);
+        $card = $this->syncCardStatusFromWallester($customer, $card);
+        $this->ensurePhysicalCardActivatable($card);
+
+        if ($card->status === 'Active') {
+            return $card;
+        }
+
+        $card->loadMissing('wallesterAccount');
+        $currency = (string) ($card->wallesterAccount?->funding_currency ?? 'EUR');
+
+        $wallesterCard = $this->gateway
+            ->forCurrency($currency)
+            ->activateCardByCVV(
+                $card->wallester_card_id,
+                $this->encryptor->encryptCvv2($cvv),
+                (string) $customer->id,
+            );
+
+        if (! isset($wallesterCard['id'])) {
+            throw new RuntimeException('Wallester card activation by CVV returned empty response.');
+        }
+
+        $card->update(CustomerWallesterCard::updatableAttributesFromWallesterResponse($wallesterCard));
+
+        return $card->fresh();
     }
 
     public function blockCardForCustomer(Customer $customer, CustomerWallesterCard $card): CustomerWallesterCard
@@ -780,13 +812,40 @@ class WallesterService
 
     private function ensureCardCanRevealSensitiveData(CustomerWallesterCard $card): void
     {
-        if ($card->status !== 'Active') {
+        if (! in_array($card->status, ['Active', 'Blocked'], true)) {
             throw new ApiException(
                 ErrorCode::ACCOUNT_NOT_ACTIVE,
                 422,
-                'Sensitive card data is only available for active cards.',
+                'Sensitive card data is only available for active or blocked cards.',
             );
         }
+    }
+
+    private function syncCardStatusFromWallester(Customer $customer, CustomerWallesterCard $card): CustomerWallesterCard
+    {
+        $card->loadMissing('wallesterAccount');
+        $currency = (string) ($card->wallesterAccount?->funding_currency ?? 'EUR');
+
+        $wallesterCard = $this->gateway
+            ->forCurrency($currency)
+            ->getCard($card->wallester_card_id, (string) $customer->id);
+
+        if (! isset($wallesterCard['id'])) {
+            throw new RuntimeException('Wallester card lookup returned empty response.');
+        }
+
+        $attributes = array_filter([
+            'status' => $wallesterCard['status'] ?? null,
+            'dispatched_at' => $wallesterCard['dispatched_at'] ?? null,
+            'activated_at' => $wallesterCard['activated_at'] ?? null,
+            'masked_card_number' => $wallesterCard['masked_card_number'] ?? null,
+        ], static fn ($value) => $value !== null && $value !== '');
+
+        if ($attributes !== []) {
+            $card->update($attributes);
+        }
+
+        return $card->fresh() ?? $card;
     }
 
     private function ensureVirtualCardActivatable(CustomerWallesterCard $card): void
@@ -800,6 +859,25 @@ class WallesterService
         }
 
         if ($card->status !== 'Created' && $card->status !== 'Active') {
+            throw new ApiException(
+                ErrorCode::ACCOUNT_NOT_ACTIVE,
+                422,
+                'This card cannot be activated in its current status.',
+            );
+        }
+    }
+
+    private function ensurePhysicalCardActivatable(CustomerWallesterCard $card): void
+    {
+        if (! in_array($card->type, ['Physical', 'ChipAndPin', 'ChipAndPinAnonymous'], true)) {
+            throw new ApiException(
+                ErrorCode::ACCOUNT_NOT_ACTIVE,
+                422,
+                'Only physical cards can be activated by CVV.',
+            );
+        }
+
+        if (! in_array($card->status, ['Created', 'Personalized', 'Dispatched', 'Active'], true)) {
             throw new ApiException(
                 ErrorCode::ACCOUNT_NOT_ACTIVE,
                 422,

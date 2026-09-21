@@ -3,14 +3,15 @@
 namespace Tests\Unit\Domains\Wallester;
 
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Settings\Services\SettingsService;
 use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Services\Wallester3dsService;
 use App\Domains\Wallester\Services\WallesterCardRsaKeyService;
 use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
 use App\Domains\Wallester\Services\WallesterSensitiveDataDecryptor;
+use App\Domains\Wallester\Services\WallesterSensitiveDataEncryptor;
 use App\Domains\Wallester\Services\WallesterService;
-use App\Domains\Settings\Services\SettingsService;
 use App\Domains\Wallester\Services\WallesterSettingsService;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
@@ -129,6 +130,7 @@ class WallesterServiceTest extends TestCase
                 'name' => 'Main Card',
             ]);
 
+        $this->expectWallesterGetCard($gateway, 'card_oob');
         $gateway->shouldReceive('activateCard')
             ->once()
             ->with('card_oob', (string) $customer->id)
@@ -335,6 +337,7 @@ class WallesterServiceTest extends TestCase
         ]);
 
         $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_activate_1');
         $gateway->shouldReceive('activateCard')
             ->once()
             ->with('card_activate_1', (string) $customer->id)
@@ -371,6 +374,7 @@ class WallesterServiceTest extends TestCase
         ]);
 
         $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_active_1', 'Active');
         $gateway->shouldNotReceive('activateCard');
 
         $service = $this->makeService($gateway);
@@ -378,6 +382,140 @@ class WallesterServiceTest extends TestCase
         $card = $service->activateVirtualCardForCustomer($customer, $localCard);
 
         $this->assertSame('Active', $card->status);
+    }
+
+    public function test_activate_physical_card_by_cvv_encrypts_payload_and_updates_local_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_activate_cvv');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_activate_cvv_1',
+            'type' => 'ChipAndPin',
+            'status' => 'Created',
+            'name' => 'Physical Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_activate_cvv_1');
+        $gateway->shouldReceive('activateCardByCVV')
+            ->once()
+            ->with('card_activate_cvv_1', 'encrypted-cvv', (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_activate_cvv_1',
+                'type' => 'ChipAndPin',
+                'status' => 'Active',
+                'name' => 'Physical Card',
+                'masked_card_number' => '****4321',
+                'activated_at' => '2026-07-01T12:30:00Z',
+            ]);
+
+        $encryptor = Mockery::mock(WallesterSensitiveDataEncryptor::class);
+        $encryptor->shouldReceive('encryptCvv2')->once()->with('123')->andReturn('encrypted-cvv');
+
+        $service = $this->makeService($gateway, $encryptor);
+
+        $card = $service->activateCardByCVVForCustomer($customer, $localCard, '123');
+
+        $this->assertSame('Active', $card->status);
+        $this->assertSame('****4321', $card->masked_card_number);
+        $this->assertNotNull($card->activated_at);
+    }
+
+    public function test_activate_physical_card_by_cvv_syncs_dispatched_status_before_activation(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_activate_cvv_dispatched');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_activate_cvv_dispatched',
+            'type' => 'ChipAndPin',
+            'status' => 'Created',
+            'name' => 'Physical Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_activate_cvv_dispatched', 'Dispatched', [
+            'dispatched_at' => '2026-09-17T10:00:00Z',
+            'masked_card_number' => '****1111',
+        ]);
+        $gateway->shouldReceive('activateCardByCVV')
+            ->once()
+            ->with('card_activate_cvv_dispatched', 'encrypted-cvv', (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_activate_cvv_dispatched',
+                'type' => 'ChipAndPin',
+                'status' => 'Active',
+                'name' => 'Physical Card',
+                'masked_card_number' => '****1111',
+                'activated_at' => '2026-09-17T12:00:00Z',
+            ]);
+
+        $encryptor = Mockery::mock(WallesterSensitiveDataEncryptor::class);
+        $encryptor->shouldReceive('encryptCvv2')->once()->with('123')->andReturn('encrypted-cvv');
+
+        $service = $this->makeService($gateway, $encryptor);
+
+        $card = $service->activateCardByCVVForCustomer($customer, $localCard, '123');
+
+        $this->assertSame('Active', $card->status);
+        $this->assertSame('****1111', $card->masked_card_number);
+        $this->assertNotNull($card->activated_at);
+    }
+
+    public function test_activate_physical_card_by_cvv_is_idempotent_when_already_active(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_active_cvv');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_active_cvv_1',
+            'type' => 'Physical',
+            'status' => 'Active',
+            'name' => 'Physical Card',
+            'activated_at' => now(),
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_active_cvv_1', 'Active');
+        $gateway->shouldNotReceive('activateCardByCVV');
+
+        $encryptor = Mockery::mock(WallesterSensitiveDataEncryptor::class);
+        $encryptor->shouldNotReceive('encryptCvv2');
+
+        $service = $this->makeService($gateway, $encryptor);
+
+        $card = $service->activateCardByCVVForCustomer($customer, $localCard, '123');
+
+        $this->assertSame('Active', $card->status);
+    }
+
+    public function test_activate_physical_card_by_cvv_rejects_virtual_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_virtual_cvv');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_virtual_cvv_1',
+            'type' => 'Virtual',
+            'status' => 'Created',
+            'name' => 'Main Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_virtual_cvv_1');
+        $gateway->shouldNotReceive('activateCardByCVV');
+
+        $service = $this->makeService($gateway);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('Only physical cards can be activated by CVV.');
+
+        $service->activateCardByCVVForCustomer($customer, $localCard, '123');
     }
 
     public function test_create_card_for_customer_allows_additional_card(): void
@@ -483,6 +621,7 @@ class WallesterServiceTest extends TestCase
                     && $payload['description'] === 'Taxa de emissão de cartão virtual';
             }), (string) $customer->id)
             ->andReturn(['id' => 'pay_card_fee']);
+        $this->expectWallesterGetCard($gateway, 'card_paid_second');
         $gateway->shouldReceive('activateCard')
             ->once()
             ->with('card_paid_second', (string) $customer->id)
@@ -1186,6 +1325,7 @@ class WallesterServiceTest extends TestCase
             app(SettingsService::class),
             $rsaKeys,
             $decryptor,
+            app(WallesterSensitiveDataEncryptor::class),
         );
 
         $this->assertSame('1234', $service->getEncryptedPinForCustomer($customer, $card));
@@ -1209,7 +1349,7 @@ class WallesterServiceTest extends TestCase
         $service = $this->makeService($gateway);
 
         $this->expectException(ApiException::class);
-        $this->expectExceptionMessage('Sensitive card data is only available for active cards.');
+        $this->expectExceptionMessage('Sensitive card data is only available for active or blocked cards.');
 
         $service->getEncryptedPinForCustomer($customer, $card);
     }
@@ -1327,7 +1467,7 @@ class WallesterServiceTest extends TestCase
         $service->linkCardToAnotherCustomer($owner, $localCard, $target);
     }
 
-    private function makeService($gateway): WallesterService
+    private function makeService($gateway, ?WallesterSensitiveDataEncryptor $encryptor = null): WallesterService
     {
         $this->app->instance(WallesterGatewayInterface::class, $gateway);
 
@@ -1342,6 +1482,7 @@ class WallesterServiceTest extends TestCase
             app(SettingsService::class),
             app(WallesterCardRsaKeyService::class),
             app(WallesterSensitiveDataDecryptor::class),
+            $encryptor ?? app(WallesterSensitiveDataEncryptor::class),
         );
     }
 }

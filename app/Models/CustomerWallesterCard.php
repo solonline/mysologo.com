@@ -27,10 +27,10 @@ class CustomerWallesterCard extends Model
     public const OPERATIONAL_STATUSES = ['Active', 'Created'];
 
     /** @var list<string> */
-    public const OPEN_STATUSES = ['Active', 'Created', 'Blocked'];
+    public const OPEN_STATUSES = ['Active', 'Created', 'Blocked' ];
 
     /** @var list<string> */
-    public const MANAGED_STATUSES = ['Active', 'Created', 'Blocked'];
+    public const MANAGED_STATUSES = ['Active', 'Created', 'Blocked', 'Closed', 'Dispatched'];
 
     protected $fillable = [
         'customer_wallester_account_id',

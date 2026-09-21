@@ -36,6 +36,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->name('wallester.cards.encrypted-pin');
         Route::post('/cards/{card}/activate', [WallesterCardController::class, 'activate'])
             ->name('wallester.cards.activate');
+        Route::post('/cards/{card}/activate-by-cvv', [WallesterCardController::class, 'activateByCVV'])
+            ->name('wallester.cards.activate-by-cvv');
         Route::post('/cards/{card}/block', [WallesterCardController::class, 'block'])
             ->name('wallester.cards.block');
         Route::post('/cards/{card}/unblock', [WallesterCardController::class, 'unblock'])
