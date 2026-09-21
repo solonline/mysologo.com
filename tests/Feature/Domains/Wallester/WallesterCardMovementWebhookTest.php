@@ -208,6 +208,9 @@ class WallesterCardMovementWebhookTest extends TestCase
                 'account_id' => 'wal_declined',
                 'account_amount' => -5.00,
                 'account_currency_code' => 'EUR',
+                'transaction_amount' => -4.29,
+                'transaction_currency_code' => 'GBP',
+                'fees_amount' => 0.10,
                 'merchant_name' => 'MesConvenienciaE',
                 'response_code' => 'NotSufficientFunds',
                 'is_declined' => true,
@@ -223,6 +226,10 @@ class WallesterCardMovementWebhookTest extends TestCase
             'partner_external_id' => 'txn_declined',
             'failure_reason' => 'NotSufficientFunds',
             'description' => 'MesConvenienciaE',
+        ]);
+        $this->assertDatabaseCount('funding_partner_movements', 1);
+        $this->assertDatabaseMissing('funding_partner_movements', [
+            'type' => FundingPartnerMovementType::Fee->value,
         ]);
         $this->assertDatabaseCount('ledger_entries', 0);
         $this->assertDatabaseHas('customer_balances', [
@@ -711,6 +718,205 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseCount('funding_partner_movements', 2);
     }
 
+    public function test_accepted_reversal_credits_customer_and_reverses_proportional_fx(): void
+    {
+        $this->seedWallesterSettings();
+        $this->setFxPercentage('0.01');
+
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, self::LIDL_ACCOUNT_ID);
+        $platform = $this->createPlatformMaster();
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 20000,
+            'pending' => 0,
+        ]);
+
+        $authId = '42682b3e-084d-4674-81ea-8d7450bd0495';
+        $reversalId = 'aa9481d9-92e1-4ad9-b1ed-3656d3ee9ba3';
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('getAccount')
+            ->with(self::LIDL_ACCOUNT_ID, (string) $customer->id)
+            ->andReturn(['available_amount' => 200.00, 'balance' => 200.00]);
+        $gateway->shouldReceive('getAccount')
+            ->with(self::MASTER_ACCOUNT_ID, 'platform')
+            ->andReturn(['available_amount' => 1000.00, 'balance' => 1000.00]);
+        $gateway->shouldReceive('getAccount')
+            ->with(self::MASTER_ACCOUNT_ID, (string) $platform->id)
+            ->andReturn(['available_amount' => 1000.00, 'balance' => 1000.00]);
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(function (array $payload): bool {
+                return $payload['from_account_id'] === self::LIDL_ACCOUNT_ID
+                    && $payload['to_account_id'] === self::MASTER_ACCOUNT_ID
+                    && $payload['description'] === 'Câmbio Yoop';
+            }), (string) $customer->id)
+            ->andReturn(['id' => 'pay_fx_out']);
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->with(Mockery::on(function (array $payload): bool {
+                return $payload['from_account_id'] === self::MASTER_ACCOUNT_ID
+                    && $payload['to_account_id'] === self::LIDL_ACCOUNT_ID
+                    && $payload['description'] === 'Câmbio Yoop (reversão)';
+            }), 'platform')
+            ->andReturn(['id' => 'pay_fx_rev']);
+
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $this->postJson('/api/webhooks/wallester', $this->asdaPetrolAuthorizationPayload($authId))->assertOk();
+        $this->postJson('/api/webhooks/wallester', $this->asdaPetrolReversalPayload($authId, $reversalId))->assertOk();
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'partner_external_id' => $authId,
+            'type' => FundingPartnerMovementType::CardPurchase->value,
+            'amount' => 11536,
+            'status' => FundingPartnerMovementStatus::Completed->value,
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'partner_external_id' => $reversalId,
+            'type' => FundingPartnerMovementType::CardRefund->value,
+            'amount' => 4682,
+            'status' => FundingPartnerMovementStatus::Completed->value,
+            'failure_reason' => null,
+        ]);
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'idempotency_key' => 'fx-platform-reversal:'.$reversalId.':out',
+            'status' => FundingPartnerMovementStatus::Completed->value,
+        ]);
+
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'entry_type' => LedgerEntryType::CARD_UNLOAD->value,
+            'amount' => 4682,
+        ]);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'entry_type' => LedgerEntryType::PAYMENT_REFUND->value,
+            'description' => 'Câmbio',
+            'amount' => 141,
+        ]);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 12941,
+        ]);
+    }
+
+    public function test_repair_command_completes_failed_accepted_reversal(): void
+    {
+        $this->seedWallesterSettings();
+
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, self::LIDL_ACCOUNT_ID);
+        $this->createPlatformMaster();
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 6854,
+            'pending' => 0,
+        ]);
+
+        $purchase = FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => 'out',
+            'type' => FundingPartnerMovementType::CardPurchase,
+            'amount' => 11536,
+            'currency' => 'EUR',
+            'original_amount' => 9900,
+            'original_currency' => 'GBP',
+            'fees_amount' => 231,
+            'partner_external_id' => '42682b3e-084d-4674-81ea-8d7450bd0495',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => 'webhook',
+            'idempotency_key' => 'card:42682b3e-084d-4674-81ea-8d7450bd0495:out',
+            'description' => 'ASDAPETROL/UPT',
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => 'out',
+            'type' => FundingPartnerMovementType::Fee,
+            'amount' => 231,
+            'currency' => 'EUR',
+            'fees_amount' => 231,
+            'partner_external_id' => 'fx-fees:42682b3e-084d-4674-81ea-8d7450bd0495',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => 'webhook',
+            'idempotency_key' => 'fx-fees:42682b3e-084d-4674-81ea-8d7450bd0495',
+            'description' => 'Câmbio',
+            'reference_type' => $purchase->getMorphClass(),
+            'reference_id' => $purchase->id,
+        ]);
+
+        $refund = FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => 'in',
+            'type' => FundingPartnerMovementType::CardRefund,
+            'amount' => 4682,
+            'currency' => 'EUR',
+            'original_amount' => 4018,
+            'original_currency' => 'GBP',
+            'partner_external_id' => 'aa9481d9-92e1-4ad9-b1ed-3656d3ee9ba3',
+            'status' => FundingPartnerMovementStatus::Failed,
+            'failure_reason' => 'AcceptedReversal',
+            'source' => 'webhook',
+            'idempotency_key' => 'card:aa9481d9-92e1-4ad9-b1ed-3656d3ee9ba3:in',
+            'description' => 'ASDAPETROL/UPT',
+            'metadata' => [
+                'original_authorization_id' => '42682b3e-084d-4674-81ea-8d7450bd0495',
+                'is_reversal' => true,
+                'response_code' => 'AcceptedReversal',
+                'is_declined' => false,
+            ],
+        ]);
+
+        $this->artisan('wallester:repair-accepted-reversals', ['--movement' => $refund->id])
+            ->assertSuccessful();
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'id' => $refund->id,
+            'status' => FundingPartnerMovementStatus::Completed->value,
+            'failure_reason' => null,
+        ]);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'entry_type' => LedgerEntryType::CARD_UNLOAD->value,
+            'amount' => 4682,
+        ]);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $customer->id,
+            'entry_type' => LedgerEntryType::PAYMENT_REFUND->value,
+            'description' => 'Câmbio',
+            'amount' => 94,
+        ]);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'available' => 11630,
+        ]);
+    }
+
     private function setFxPercentage(string $value): void
     {
         Setting::query()->updateOrCreate(
@@ -804,6 +1010,68 @@ class WallesterCardMovementWebhookTest extends TestCase
                 'approval_code' => '9M768E',
                 'approved_amount' => -4.54,
                 'created_at' => '2026-08-26T16:21:07Z',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function asdaPetrolAuthorizationPayload(string $authId): array
+    {
+        return [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => $authId,
+                'card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+                'account_id' => self::LIDL_ACCOUNT_ID,
+                'date' => '2026-09-08T09:21:00Z',
+                'type' => 'AutomatedFuelDispenser',
+                'account_amount' => -115.36,
+                'account_currency_code' => 'EUR',
+                'group' => 'Purchase',
+                'merchant_category_code' => '5542',
+                'merchant_name' => 'ASDAPETROL/UPT',
+                'response_code' => 'Approved',
+                'transaction_amount' => -99.00,
+                'transaction_currency_code' => 'GBP',
+                'fees_amount' => 2.31,
+                'is_reversal' => false,
+                'is_declined' => false,
+                'approved_amount' => -115.36,
+                'created_at' => '2026-09-08T09:21:00Z',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function asdaPetrolReversalPayload(string $authId, string $reversalId): array
+    {
+        return [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => $reversalId,
+                'card_id' => '3b77a4ec-338e-40e2-a7e9-efd8cb5cf6a7',
+                'account_id' => self::LIDL_ACCOUNT_ID,
+                'date' => '2026-09-08T09:24:00Z',
+                'type' => 'AutomatedFuelDispenser',
+                'account_amount' => 46.82,
+                'account_currency_code' => 'EUR',
+                'group' => 'Reversal',
+                'merchant_category_code' => '5542',
+                'merchant_name' => 'ASDAPETROL/UPT',
+                'response_code' => 'AcceptedReversal',
+                'transaction_amount' => 40.18,
+                'transaction_currency_code' => 'GBP',
+                'original_authorization_id' => $authId,
+                'authorization_id' => $authId,
+                'is_reversal' => true,
+                'is_declined' => false,
+                'created_at' => '2026-09-08T09:24:00Z',
             ],
         ];
     }

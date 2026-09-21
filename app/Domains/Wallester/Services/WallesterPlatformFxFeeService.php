@@ -153,4 +153,111 @@ class WallesterPlatformFxFeeService
             && $originalCurrency !== $accountCurrency
             && (int) $movement->amount > 0;
     }
+
+    public function reverseForReversal(FundingPartnerMovement $refund, CustomerWallesterAccount $account): void
+    {
+        if ($refund->type !== FundingPartnerMovementType::CardRefund
+            || $refund->status !== FundingPartnerMovementStatus::Completed) {
+            return;
+        }
+
+        $purchase = $this->findOriginalPurchase($refund, $account);
+
+        if (! $purchase instanceof FundingPartnerMovement) {
+            return;
+        }
+
+        $ratio = $this->reversalRatio($purchase, $refund);
+
+        if ($ratio <= 0) {
+            return;
+        }
+
+        $feeMovement = FundingPartnerMovement::query()
+            ->where('idempotency_key', 'fx-fees:'.$purchase->partner_external_id)
+            ->first();
+
+        $wallesterFeeCents = (int) $purchase->fees_amount;
+        $yoopFeeCents = (int) $purchase->platform_fees_amount;
+        $reversalWallesterCents = (int) round($wallesterFeeCents * $ratio);
+        $reversalYoopCents = (int) round($yoopFeeCents * $ratio);
+
+        // A Wallester anula a taxa dela e a % Yoop em lançamentos separados.
+        // Arredondar cada parte (e somar) alinha o ledger ao saldo Wallester;
+        // arredondar a soma visível pode ficar 1 cêntimo abaixo (ex. 1,40 vs 0,94+0,47).
+        $reversalFeeCents = ($wallesterFeeCents > 0 || $yoopFeeCents > 0)
+            ? $reversalWallesterCents + $reversalYoopCents
+            : (int) round((int) ($feeMovement?->amount ?? 0) * $ratio);
+
+        if ($reversalFeeCents > 0 && $feeMovement instanceof FundingPartnerMovement) {
+            $this->movements->creditFxFeeReversal(
+                feeMovement: $feeMovement,
+                refund: $refund,
+                account: $account,
+                amountCents: $reversalFeeCents,
+            );
+        }
+
+        if ($reversalYoopCents <= 0) {
+            return;
+        }
+
+        $customer = $account->customer;
+
+        if (! $customer instanceof Customer) {
+            return;
+        }
+
+        try {
+            $this->movements->transferFromPlatformFeesToCustomer(
+                to: $customer,
+                amountCents: $reversalYoopCents,
+                currency: strtoupper((string) $purchase->currency),
+                description: 'Câmbio Yoop (reversão)',
+                idempotencyKey: 'fx-platform-reversal:'.$refund->partner_external_id,
+                reference: $refund,
+            );
+        } catch (Throwable $exception) {
+            Log::channel('wallester')->warning('wallester_platform_fx_fee_reversal_failed', [
+                'refund_id' => $refund->id,
+                'purchase_id' => $purchase->id,
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function findOriginalPurchase(
+        FundingPartnerMovement $refund,
+        CustomerWallesterAccount $account,
+    ): ?FundingPartnerMovement {
+        $metadata = is_array($refund->metadata) ? $refund->metadata : [];
+        $authorizationId = $metadata['original_authorization_id']
+            ?? $metadata['authorization_id']
+            ?? data_get($metadata, 'data.original_authorization_id')
+            ?? data_get($metadata, 'data.authorization_id');
+
+        if (! is_string($authorizationId) || $authorizationId === '') {
+            return null;
+        }
+
+        return FundingPartnerMovement::query()
+            ->where('funding_account_type', $account::class)
+            ->where('funding_account_id', $account->id)
+            ->where('type', FundingPartnerMovementType::CardPurchase)
+            ->where('partner_external_id', $authorizationId)
+            ->first();
+    }
+
+    private function reversalRatio(FundingPartnerMovement $purchase, FundingPartnerMovement $refund): float
+    {
+        $purchaseBase = (int) ($purchase->original_amount ?: $purchase->amount);
+        $refundBase = (int) ($refund->original_amount ?: $refund->amount);
+
+        if ($purchaseBase <= 0 || $refundBase <= 0) {
+            return 0.0;
+        }
+
+        return min(1.0, $refundBase / $purchaseBase);
+    }
 }

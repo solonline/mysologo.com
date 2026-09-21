@@ -5,6 +5,7 @@ namespace App\Domains\Wallester;
 use App\Domains\Wallester\Clients\WallesterHttpClient;
 use App\Domains\Wallester\Commands\ApplyPlatformFxFeesToExistingPurchasesCommand;
 use App\Domains\Wallester\Commands\NormalizeSwallowedWallesterFxPurchasesCommand;
+use App\Domains\Wallester\Commands\RepairAcceptedReversalsCommand;
 use App\Domains\Wallester\Commands\SyncWallesterCardMovementsCommand;
 use App\Domains\Wallester\Contracts\WallesterAccountRepositoryInterface;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
@@ -47,6 +48,7 @@ class WallesterServiceProvider extends ServiceProvider
                 SyncWallesterCardMovementsCommand::class,
                 NormalizeSwallowedWallesterFxPurchasesCommand::class,
                 ApplyPlatformFxFeesToExistingPurchasesCommand::class,
+                RepairAcceptedReversalsCommand::class,
             ]);
         }
 

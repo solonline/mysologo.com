@@ -16,6 +16,7 @@ use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
+use App\Models\CustomerBalance;
 use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
 use App\Models\FundingPartnerMovement;
@@ -285,6 +286,173 @@ class FundingPartnerMovementService
         );
     }
 
+    public function transferFromPlatformFeesToCustomer(
+        Customer $to,
+        int $amountCents,
+        string $currency,
+        string $description,
+        string $idempotencyKey,
+        ?object $reference = null,
+    ): ?FundingPartnerMovement {
+        if ($amountCents <= 0 || $this->hasCompletedMovement($idempotencyKey)) {
+            return null;
+        }
+
+        $routingCurrency = $this->currencyResolver->resolve($currency);
+        $fromAccount = $this->wallesterDriver->getPlatformFeeAccount($routingCurrency);
+        $toAccount = $this->wallesterDriver->requireActiveAccount($to, $routingCurrency);
+        $fromCustomer = $fromAccount->customer;
+
+        if (! $fromCustomer instanceof Customer) {
+            return null;
+        }
+
+        $available = $this->wallesterDriver->getAvailableBalance($fromCustomer, $routingCurrency);
+        if ($available < $amountCents) {
+            throw new ApiException(
+                ErrorCode::INSUFFICIENT_BALANCE,
+                422,
+                "Saldo insuficiente na conta de taxas Wallester. Disponível: {$available} {$routingCurrency}.",
+            );
+        }
+
+        $provider = IntegrationProvider::WALLESTER;
+
+        $pair = DB::transaction(function () use (
+            $fromAccount,
+            $toAccount,
+            $amountCents,
+            $routingCurrency,
+            $description,
+            $idempotencyKey,
+            $provider,
+            $reference,
+        ) {
+            return $this->resolveTransferMovementPair(
+                idempotencyKey: $idempotencyKey,
+                provider: $provider,
+                fromAccount: $fromAccount,
+                toAccount: $toAccount,
+                amountCents: $amountCents,
+                routingCurrency: $routingCurrency,
+                description: $description,
+                reference: $reference,
+            );
+        });
+
+        if ($pair === null) {
+            return null;
+        }
+
+        [$outMovement, $inMovement] = $pair;
+
+        try {
+            $response = $this->wallesterDriver->executeTransfer(
+                fromAccount: $fromAccount,
+                toAccount: $toAccount,
+                amountCents: $amountCents,
+                description: $description,
+                auditUserId: 'platform',
+            );
+
+            $this->completeTransferPair($outMovement, $inMovement, $response);
+
+            $this->refreshBalancesAfterMasterTransfer(
+                masterAccount: $fromAccount,
+                to: $to,
+                currency: $routingCurrency,
+            );
+        } catch (Throwable $exception) {
+            $reason = $exception->getMessage();
+            $this->markMovementFailed($outMovement, $reason);
+            $this->markMovementFailed($inMovement, $reason);
+
+            throw $exception;
+        }
+
+        return $outMovement->fresh();
+    }
+
+    public function creditFxFeeReversal(
+        FundingPartnerMovement $feeMovement,
+        FundingPartnerMovement $refund,
+        CustomerWallesterAccount $account,
+        int $amountCents,
+    ): void {
+        if ($amountCents <= 0) {
+            return;
+        }
+
+        $query = LedgerEntry::query()
+            ->where('reference_type', $refund->getMorphClass())
+            ->where('reference_id', $refund->id)
+            ->where('entry_type', LedgerEntryType::PAYMENT_REFUND);
+
+        $recorded = (int) (clone $query)->sum('amount');
+        $delta = $amountCents - $recorded;
+
+        if ($delta <= 0) {
+            return;
+        }
+
+        $existing = (clone $query)->first();
+
+        if ($existing instanceof LedgerEntry) {
+            DB::transaction(function () use ($existing, $delta, $amountCents, $account, $feeMovement): void {
+                $balance = CustomerBalance::query()
+                    ->lockForUpdate()
+                    ->where('customer_id', $account->customer_id)
+                    ->where('currency', strtoupper((string) $feeMovement->currency))
+                    ->first();
+
+                $existing->update([
+                    'amount' => $amountCents,
+                    'available_after' => (int) $existing->available_after + $delta,
+                    'balance_after' => (int) $existing->balance_after + $delta,
+                ]);
+
+                $balance?->increment('available', $delta);
+            });
+
+            return;
+        }
+
+        $this->ledger->record(
+            customerId: (int) $account->customer_id,
+            currency: (string) $feeMovement->currency,
+            entryType: LedgerEntryType::PAYMENT_REFUND,
+            amount: $amountCents,
+            reference: $refund,
+            description: 'Câmbio',
+            metadata: [
+                'fx_reversal' => true,
+                'fee_movement_id' => $feeMovement->id,
+                'partner_external_id' => $refund->partner_external_id,
+            ],
+        );
+    }
+
+    public function completeAcceptedReversal(
+        FundingPartnerMovement $movement,
+        CustomerWallesterAccount $account,
+    ): FundingPartnerMovement {
+        if ($movement->type !== FundingPartnerMovementType::CardRefund) {
+            return $movement;
+        }
+
+        if ($movement->status === FundingPartnerMovementStatus::Failed) {
+            $movement->update([
+                'status' => FundingPartnerMovementStatus::Completed,
+                'failure_reason' => null,
+            ]);
+            $movement = $movement->fresh();
+        }
+
+        $this->applyCardMovementLedger($movement, $account);
+
+        return $movement;
+    }
+
     /**
      * @param  array<string, mixed>|null  $metadata
      */
@@ -549,6 +717,15 @@ class FundingPartnerMovementService
             );
 
             if ($existing instanceof FundingPartnerMovement) {
+                if ($existing->status === FundingPartnerMovementStatus::Failed
+                    && $status === FundingPartnerMovementStatus::Completed) {
+                    $existing->update([
+                        'status' => FundingPartnerMovementStatus::Completed,
+                        'failure_reason' => null,
+                    ]);
+                    $existing = $existing->fresh();
+                }
+
                 $this->attachSettlementReference($existing, $partnerExternalId, $metadata);
                 $this->applyCardMovementLedger($existing, $account);
 

@@ -15,6 +15,20 @@ use Throwable;
 
 class WallesterCardMovementIngestService
 {
+    private const DECLINED_RESPONSE_CODES = [
+        'notsufficientfunds',
+        'donothonor',
+        'declined',
+        'expiredcard',
+        'restrictedcard',
+        'invalidcard',
+        'stolencard',
+        'lostcard',
+        'exceedsamountlimit',
+        'withdrawalamountlimitexceeded',
+        'pickupcard',
+    ];
+
     public function __construct(
         protected IntegrationAccountService $integrationAccounts,
         protected FundingPartnerMovementService $movements,
@@ -87,7 +101,12 @@ class WallesterCardMovementIngestService
         );
 
         try {
-            $this->platformFxFees->collect($movement, $account);
+            if ($movement->type === FundingPartnerMovementType::CardRefund
+                && $movement->status === FundingPartnerMovementStatus::Completed) {
+                $this->platformFxFees->reverseForReversal($movement, $account);
+            } else {
+                $this->platformFxFees->collect($movement, $account);
+            }
         } catch (Throwable $exception) {
             Log::channel('wallester')->warning('wallester_platform_fx_fee_unhandled', [
                 'movement_id' => $movement->id,
@@ -165,24 +184,29 @@ class WallesterCardMovementIngestService
             || isset($payload['merchant_name']);
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     */
     private function isDeclined(array $payload): bool
     {
-        if (($payload['is_declined'] ?? false) === true) {
+        if (array_key_exists('is_declined', $payload)) {
+            return (bool) $payload['is_declined'];
+        }
+
+        if (($payload['is_reversal'] ?? false) === true) {
+            return false;
+        }
+
+        $status = strtolower((string) ($payload['status'] ?? ''));
+
+        if (in_array($status, ['declined', 'failed', 'rejected'], true)) {
             return true;
         }
 
         $responseCode = strtolower((string) ($payload['response_code'] ?? ''));
 
-        if ($responseCode !== '' && $responseCode !== 'approved') {
-            return true;
+        if ($responseCode === '') {
+            return false;
         }
 
-        $status = strtolower((string) ($payload['status'] ?? ''));
-
-        return in_array($status, ['declined', 'failed', 'rejected'], true);
+        return in_array($responseCode, self::DECLINED_RESPONSE_CODES, true);
     }
 
     /**
