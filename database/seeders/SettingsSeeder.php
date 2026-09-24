@@ -67,6 +67,10 @@ class SettingsSeeder extends Seeder
             ['key' => 'sms.auth_token',  'label' => 'Auth Token', 'type' => 'secret', 'value' => ''],
             ['key' => 'sms.key',    'label' => 'key',   'type' => 'text',   'value' => ''],
             ['key' => 'sms.secret',    'label' => 'Secret',   'type' => 'secret', 'value' => ''],
+            // WhatsApp (Evolution API)
+            ['key' => 'whatsapp.base_url',  'label' => 'URL Base (Evolution API)', 'type' => 'url',    'value' => env('WHATSAPP_BASE_URL', env('EVOLUTION_BASE_URL', ''))],
+            ['key' => 'whatsapp.api_key',   'label' => 'API Key',                  'type' => 'secret', 'value' => env('WHATSAPP_API_KEY', env('EVOLUTION_API_KEY', ''))],
+            ['key' => 'whatsapp.instance',  'label' => 'Instância',                'type' => 'text',   'value' => env('WHATSAPP_INSTANCE', env('EVOLUTION_INSTANCE', ''))],
             // Didit (KYC/KYB)
             ['key' => 'didit.api_key',         'label' => 'API Key',              'type' => 'secret', 'value' => env('DIDIT_API_KEY', '')],
             ['key' => 'didit.api_secret',      'label' => 'API Secret',           'type' => 'secret', 'value' => env('DIDIT_API_SECRET', '')],

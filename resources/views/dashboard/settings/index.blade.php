@@ -22,6 +22,7 @@ $tabs = [
     'wallester'=> ['label' => 'Wallester',      'title' => 'Wallester'],
     'mail'     => ['label' => 'Email',          'title' => 'SMTP (email de clientes)'],
     'sms'      => ['label' => 'SMS',            'title' => 'SMS'],
+    'whatsapp' => ['label' => 'WhatsApp',       'title' => 'WhatsApp (Evolution API)'],
     'social'   => ['label' => 'Redes Sociais',  'title' => 'Redes Sociais'],
     'currency' => ['label' => 'Moedas',         'title' => 'Configurações de Moedas'],
     'fx'       => ['label' => 'Câmbio',         'title' => 'Cotação de moedas (AwesomeAPI)'],

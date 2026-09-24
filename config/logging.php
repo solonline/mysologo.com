@@ -47,6 +47,7 @@ return [
         'stripe',
         'wallester',
         'fx',
+        'whatsapp',
     ],
 
     'channels' => [
@@ -125,6 +126,7 @@ return [
         'wallester' => $daily('wallester', 'wallester.log'),
         'fx' => $daily('fx', 'fx.log'),
         'sms' => $daily('sms', 'sms.log'),
+        'whatsapp' => $daily('whatsapp', 'whatsapp.log'),
         'ebury' => $daily('ebury', 'ebury.log'),
         'merchant' => $daily('merchant', 'merchant.log'),
 

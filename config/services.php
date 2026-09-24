@@ -65,4 +65,11 @@ return [
         'percentage' => env('FX_PERCENTAGE', ''),
     ],
 
+    'whatsapp' => [
+        'base_url' => env('WHATSAPP_BASE_URL', env('EVOLUTION_BASE_URL', '')),
+        'api_key' => env('WHATSAPP_API_KEY', env('EVOLUTION_API_KEY', '')),
+        'instance' => env('WHATSAPP_INSTANCE', env('EVOLUTION_INSTANCE', '')),
+        'timeout_seconds' => env('WHATSAPP_TIMEOUT', 15),
+    ],
+
 ];

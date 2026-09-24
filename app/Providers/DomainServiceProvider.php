@@ -16,6 +16,7 @@ use App\Domains\Stripe\StripeServiceProvider;
 use App\Domains\Tpa\TpaServiceProvider;
 use App\Domains\Wallester\WallesterServiceProvider;
 use App\Domains\Wallet\WalletServiceProvider;
+use App\Domains\Whatsapp\WhatsappServiceProvider;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -45,6 +46,7 @@ class DomainServiceProvider extends ServiceProvider
         CustomerServiceProvider::class,
         SettingsServiceProvider::class,
         TpaServiceProvider::class,
+        WhatsappServiceProvider::class,
     ];
 
     public function register(): void
