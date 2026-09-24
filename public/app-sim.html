@@ -1313,6 +1313,94 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
+.otp-phone-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.otp-phone-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--slate-500);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.otp-phone-field .form-input {
+  width: 100%;
+}
+.otp-phone-hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--slate-400);
+  line-height: 1.35;
+}
+
+.otp-channel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--slate-200);
+  border-radius: 14px;
+  background: var(--slate-50);
+  cursor: pointer;
+  user-select: none;
+  font-family: inherit;
+  text-align: left;
+}
+.otp-channel:has(input:checked) {
+  border-color: #86efac;
+  background: #ecfdf5;
+}
+.otp-channel input {
+  accent-color: #16a34a;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.otp-channel-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: none;
+}
+.otp-channel-icon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+.otp-channel .otp-icon-sms { display: block; color: var(--slate-500); }
+.otp-channel .otp-icon-wa { color: #16a34a; }
+.otp-channel:has(input:checked) .otp-icon-sms { display: none; }
+.otp-channel:has(input:checked) .otp-icon-wa { display: block; }
+.otp-channel-copy { min-width: 0; }
+.otp-channel-title {
+  display: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-700);
+}
+.otp-channel .otp-title-sms { display: block; }
+.otp-channel:has(input:checked) .otp-title-sms { display: none; }
+.otp-channel:has(input:checked) .otp-title-wa {
+  display: block;
+  color: #166534;
+}
+.otp-channel-hint {
+  display: none;
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--slate-400);
+  line-height: 1.35;
+}
+.otp-channel .otp-hint-sms { display: block; }
+.otp-channel:has(input:checked) .otp-hint-sms { display: none; }
+.otp-channel:has(input:checked) .otp-hint-wa {
+  display: block;
+  color: #15803d;
+}
+
 /* ── PIN keypad ───────────────────────────────────── */
 .pin-screen { background: #fff; align-items: center; padding: 40px 32px 32px; }
 
@@ -2969,14 +3057,9 @@ body {
         <div id="card-reveal-section" hidden>
           <div class="divider"></div>
 
-          <div class="form-field">
-            <label class="form-label">Senha da conta (para revelar dados)</label>
-            <input class="form-input" id="card-reveal-password" type="password" placeholder="Sua senha de login" />
-          </div>
-
           <div id="card-sensitive-result" class="result-card"></div>
 
-          <button class="btn-action" id="card-reveal-btn" onclick="doRevealCard()" style="margin-top:0">
+          <button class="btn-action" id="card-reveal-btn" onclick="startRevealCard()" style="margin-top:0">
             Revelar número e CVV
           </button>
           <button class="btn-action" id="card-reveal-pin-btn" onclick="startRevealCardPin()" style="margin-top:10px">
@@ -3478,6 +3561,9 @@ let stripeClient  = null;
 let stripeElements = null;
 let depositStripeElements = null;
 let authSession   = null;
+let phoneCodeViaWhatsapp = false;
+let onboardingPhoneDraft = '';
+let onboardingPhoneCodeDraft = '';
 let wallesterReady = false;
 let currentCard   = null;
 let customerCards = [];
@@ -4912,11 +4998,45 @@ function onboardingStepState(session, step) {
   }
 }
 
+function captureOnboardingPhoneFields() {
+  const phoneInput = document.getElementById('onboarding-phone-input');
+  const codeInput = document.getElementById('phone-code-input');
+  const whatsappInput = document.getElementById('phone-via-whatsapp');
+
+  if (phoneInput) {
+    onboardingPhoneDraft = String(phoneInput.value || '').replace(/\D/g, '');
+  }
+  if (codeInput) {
+    onboardingPhoneCodeDraft = String(codeInput.value || '').trim();
+  }
+  if (whatsappInput) {
+    phoneCodeViaWhatsapp = !!whatsappInput.checked;
+  }
+}
+
+function restoreOnboardingPhoneFields() {
+  const codeInput = document.getElementById('phone-code-input');
+  if (codeInput && onboardingPhoneCodeDraft) {
+    codeInput.value = onboardingPhoneCodeDraft;
+  }
+}
+
+function resolveOnboardingPhone(session) {
+  captureOnboardingPhoneFields();
+  return onboardingPhoneDraft || String(session?.user?.phone || '').replace(/\D/g, '');
+}
+
+function onOnboardingPhoneInput(el) {
+  onboardingPhoneDraft = String(el.value || '').replace(/\D/g, '');
+}
+
 function renderOnboardingHub(session) {
   const title = document.getElementById('onboarding-title');
   const statusEl = document.getElementById('onboarding-status');
   const container = document.getElementById('onboarding-steps');
   if (!container) return;
+
+  captureOnboardingPhoneFields();
 
   const lifecycle = session?.lifecycle || {};
   const status = lifecycleStatus(session);
@@ -4935,6 +5055,7 @@ function renderOnboardingHub(session) {
   const kycStatus = identityStatus(session) || authSession?.identity_verification?.status || '';
   const kycLabel = kycStatusLabel(kycStatus);
   const isUnderReview = isIdentityUnderReview(session);
+  const currentOnboardingPhone = resolveOnboardingPhone(session);
 
   const steps = [
     {
@@ -4947,12 +5068,32 @@ function renderOnboardingHub(session) {
     },
     {
       id: 'phone', num: 2, title: 'Verificar telefone',
-      desc: 'Receba e introduza o código SMS',
+      desc: 'Confirme o número e receba o código por SMS ou WhatsApp',
       state: onboardingStepState(session, 'phone'),
       actions: `
-        <button class="btn-step" onclick="sendPhoneCode()">Enviar SMS</button>
+        <label class="otp-phone-field">
+          <span class="otp-phone-label">Número de telemóvel</span>
+          <input id="onboarding-phone-input" class="form-input" type="tel" inputmode="numeric" autocomplete="tel" placeholder="351912345678" value="${escapeHtml(currentOnboardingPhone)}" oninput="onOnboardingPhoneInput(this)" />
+          <span class="otp-phone-hint">Se o código não chegar, corrija o número e reenvie.</span>
+        </label>
+        <label class="otp-channel">
+          <input type="checkbox" id="phone-via-whatsapp"${phoneCodeViaWhatsapp ? ' checked' : ''} onchange="onPhoneChannelChange(this)" />
+          <span class="otp-channel-icon otp-icon-sms" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <span class="otp-channel-icon otp-icon-wa" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          </span>
+          <span class="otp-channel-copy">
+            <span class="otp-channel-title otp-title-sms">Enviar por SMS</span>
+            <span class="otp-channel-title otp-title-wa">Enviar por WhatsApp</span>
+            <span class="otp-channel-hint otp-hint-sms">Toque para usar WhatsApp</span>
+            <span class="otp-channel-hint otp-hint-wa">Toque para voltar ao SMS</span>
+          </span>
+        </label>
+        <button class="btn-step" id="send-phone-code-btn" onclick="sendPhoneCode()">${phoneCodeViaWhatsapp ? 'Enviar WhatsApp' : 'Enviar SMS'}</button>
         <div class="sms-input">
-          <input id="phone-code-input" type="text" maxlength="6" placeholder="000000" inputmode="numeric" />
+          <input id="phone-code-input" type="text" maxlength="6" placeholder="000000" inputmode="numeric" oninput="onboardingPhoneCodeDraft = this.value.trim()" />
         </div>
         <button class="btn-step primary" onclick="validatePhoneCode()">Validar código</button>`,
     },
@@ -4992,6 +5133,8 @@ function renderOnboardingHub(session) {
       ${s.state === 'active' ? `<div class="step-actions">${s.actions}</div>` : ''}
     </div>`;
   }).join('');
+
+  restoreOnboardingPhoneFields();
 }
 
 async function refreshOnboarding() {
@@ -5018,14 +5161,37 @@ async function resendValidationEmail() {
   showToast(ok ? 'E-mail reenviado' : (data?.message || 'Erro ao reenviar'), ok ? 'success' : 'error');
 }
 
+function onPhoneChannelChange(el) {
+  phoneCodeViaWhatsapp = !!el.checked;
+  const btn = document.getElementById('send-phone-code-btn');
+  if (btn) btn.textContent = phoneCodeViaWhatsapp ? 'Enviar WhatsApp' : 'Enviar SMS';
+}
+
 async function sendPhoneCode() {
   if (!isEmailVerified(authSession)) {
     showToast('Verifique o e-mail primeiro', 'error');
     return;
   }
-  const phone = authSession?.user?.phone || '';
-  const { ok, data } = await api('POST', '/onboarding/phone/send', { phone });
-  showToast(ok ? 'SMS enviado' : (data?.message || 'Erro ao enviar SMS'), ok ? 'success' : 'error');
+  const phone = String(document.getElementById('onboarding-phone-input')?.value || onboardingPhoneDraft || authSession?.user?.phone || '').replace(/\D/g, '');
+  if (!/^\d{8,20}$/.test(phone)) {
+    showToast('Indica um telefone válido', 'error');
+    return;
+  }
+  onboardingPhoneDraft = phone;
+  const viaWhatsapp = document.getElementById('phone-via-whatsapp')?.checked ?? phoneCodeViaWhatsapp;
+  phoneCodeViaWhatsapp = !!viaWhatsapp;
+  const { ok, data } = await api('POST', '/onboarding/phone/send', { phone, whatsapp: viaWhatsapp });
+  const channel = viaWhatsapp ? 'WhatsApp' : 'SMS';
+  if (ok) {
+    const sentPhone = data?.phone || phone;
+    onboardingPhoneDraft = String(sentPhone).replace(/\D/g, '');
+    if (authSession?.user) authSession.user.phone = sentPhone;
+    const phoneInput = document.getElementById('onboarding-phone-input');
+    if (phoneInput) phoneInput.value = onboardingPhoneDraft;
+    showToast(`${channel} enviado para ${sentPhone}`, 'success');
+    return;
+  }
+  showToast(data?.message || `Erro ao enviar ${channel}`, 'error');
 }
 
 async function validatePhoneCode() {
@@ -5331,6 +5497,7 @@ function createPinKeypad(dotsId, keypadId, options) {
   if (!dotsEl || !keypadEl) return null;
 
   let pin = '';
+  let busy = false;
   const maxLen = options.length || 4;
 
   function renderDots() {
@@ -5341,15 +5508,17 @@ function createPinKeypad(dotsId, keypadId, options) {
 
   function reset() {
     pin = '';
+    busy = false;
     renderDots();
     if (options.onReset) options.onReset();
   }
 
   function handleDigit(d) {
-    if (pin.length >= maxLen) return;
+    if (busy || pin.length >= maxLen) return;
     pin += d;
     renderDots();
     if (pin.length === maxLen) {
+      busy = true;
       setTimeout(() => options.onComplete(pin, reset), 150);
     }
   }
@@ -5364,6 +5533,7 @@ function createPinKeypad(dotsId, keypadId, options) {
 
   keypadEl.querySelectorAll('.pin-key').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (busy) return;
       if (btn.dataset.digit) handleDigit(btn.dataset.digit);
       if (btn.dataset.action === 'back') {
         pin = pin.slice(0, -1);
@@ -7325,8 +7495,6 @@ function renderCardDetail(card) {
   if (blockResult) blockResult.className = 'result-card';
   const activateResult = document.getElementById('card-activate-result');
   if (activateResult) activateResult.className = 'result-card';
-  const revealPassword = document.getElementById('card-reveal-password');
-  if (revealPassword) revealPassword.value = '';
   const activateCvv = document.getElementById('card-activate-cvv');
   if (activateCvv) activateCvv.value = '';
 }
@@ -7340,9 +7508,9 @@ async function doCreateCard(pin) {
   const btn = document.getElementById('card-create-btn');
   const result = document.getElementById('card-create-result');
 
-  if (!name) { showToast('Informe o nome do cartão', 'error'); return; }
-  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
-  if (type === 'Physical' && !validateCardDeliveryAddress(deliveryAddress || {})) return;
+  if (!name) { showToast('Informe o nome do cartão', 'error'); return false; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return false; }
+  if (type === 'Physical' && !validateCardDeliveryAddress(deliveryAddress || {})) return false;
 
   btn.disabled = true;
   btn.innerHTML = '<div class="spin"></div> Criando...';
@@ -7364,7 +7532,7 @@ async function doCreateCard(pin) {
       result.classList.add('show', 'error');
       result.textContent = JSON.stringify(data, null, 2);
       showToast(data?.message || `Erro ${status}`, 'error');
-      return;
+      return false;
     }
 
     currentCard = { local: card, api: card };
@@ -7379,8 +7547,10 @@ async function doCreateCard(pin) {
 
     renderCardDetail(currentCard);
     navigate('card-detail');
+    return true;
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
+    return false;
   } finally {
     btn.disabled = false;
     btn.textContent = 'Criar cartão';
@@ -7487,7 +7657,7 @@ function openCardPin(action, title, summary) {
   document.getElementById('card-pin-overlay').classList.add('show');
   if (cardPinController) cardPinController.reset();
   cardPinController = createPinKeypad('card-pin-dots', 'card-pin-keypad', {
-    onComplete: (pin) => submitCardPin(pin),
+    onComplete: (pin, reset) => submitCardPin(pin, reset),
   });
 }
 
@@ -7498,33 +7668,45 @@ function closeCardPin() {
   pendingActivateCvv = null;
 }
 
-async function submitCardPin(pin) {
+async function submitCardPin(pin, reset) {
   const action = cardPinAction;
   const cvv = pendingActivateCvv;
-  closeCardPin();
-  pendingActivateCvv = null;
-  if (action === 'create') await doCreateCard(pin);
-  if (action === 'block') await doBlockCard(pin);
-  if (action === 'unblock') await doUnblockCard(pin);
-  if (action === 'close') await doCloseCard(pin);
-  if (action === 'reveal-pin') await doRevealCardPin({ pin, device_token: deviceToken });
-  if (action === 'activate-cvv') await doActivateCardByCvv(pin, cvv);
+  let succeeded = false;
+  try {
+    if (action === 'create') succeeded = await doCreateCard(pin);
+    else if (action === 'block') succeeded = await doBlockCard(pin);
+    else if (action === 'unblock') succeeded = await doUnblockCard(pin);
+    else if (action === 'close') succeeded = await doCloseCard(pin);
+    else if (action === 'reveal') succeeded = await doRevealCard(pin);
+    else if (action === 'reveal-pin') succeeded = await doRevealCardPin({ pin, device_token: deviceToken });
+    else if (action === 'activate-cvv') succeeded = await doActivateCardByCvv(pin, cvv);
+  } catch (e) {
+    showToast(e.message || 'Erro de conexão', 'error');
+  } finally {
+    if (succeeded) {
+      closeCardPin();
+    } else {
+      reset?.();
+    }
+  }
 }
 
 async function doBlockCard(pin) {
-  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
-  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return false; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return false; }
   if (currentCardStatus() !== 'Active') {
     renderCardDetail(currentCard);
-    return;
+    return false;
   }
 
   const btn = document.getElementById('card-block-btn');
   const result = document.getElementById('card-block-result');
 
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spin"></div> Bloqueando...';
-  result.className = 'result-card';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spin"></div> Bloqueando...';
+  }
+  if (result) result.className = 'result-card';
 
   try {
     const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/block`, {
@@ -7534,37 +7716,45 @@ async function doBlockCard(pin) {
     const card = unwrap(data);
 
     if (!ok) {
-      result.classList.add('show', 'error');
-      result.textContent = JSON.stringify(data, null, 2);
+      if (result) {
+        result.classList.add('show', 'error');
+        result.textContent = JSON.stringify(data, null, 2);
+      }
       showToast(data?.message || `Erro ${status}`, 'error');
-      return;
+      return false;
     }
 
     currentCard = { local: { ...currentCard.local, ...card }, api: { ...currentCard.api, ...card } };
     renderCardDetail(currentCard);
     showToast('Cartão bloqueado', 'success');
+    return true;
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
+    return false;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Bloquear / congelar';
+    }
   }
-
-  btn.disabled = false;
-  btn.textContent = 'Bloquear / congelar';
 }
 
 async function doUnblockCard(pin) {
-  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
-  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return false; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return false; }
   if (currentCardStatus() !== 'Blocked') {
     renderCardDetail(currentCard);
-    return;
+    return false;
   }
 
   const btn = document.getElementById('card-unblock-btn');
   const result = document.getElementById('card-block-result');
 
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spin"></div> Desbloqueando...';
-  result.className = 'result-card';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spin"></div> Desbloqueando...';
+  }
+  if (result) result.className = 'result-card';
 
   try {
     const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/unblock`, {
@@ -7574,33 +7764,41 @@ async function doUnblockCard(pin) {
     const card = unwrap(data);
 
     if (!ok) {
-      result.classList.add('show', 'error');
-      result.textContent = JSON.stringify(data, null, 2);
+      if (result) {
+        result.classList.add('show', 'error');
+        result.textContent = JSON.stringify(data, null, 2);
+      }
       showToast(data?.message || `Erro ${status}`, 'error');
-      return;
+      return false;
     }
 
     currentCard = { local: { ...currentCard.local, ...card }, api: { ...currentCard.api, ...card } };
     renderCardDetail(currentCard);
     showToast('Cartão desbloqueado', 'success');
+    return true;
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
+    return false;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Desbloquear cartão';
+    }
   }
-
-  btn.disabled = false;
-  btn.textContent = 'Desbloquear cartão';
 }
 
 async function doCloseCard(pin) {
-  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
-  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return false; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return false; }
 
   const btn = document.getElementById('card-close-btn');
   const result = document.getElementById('card-block-result');
 
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spin"></div> Fechando...';
-  result.className = 'result-card';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spin"></div> Fechando...';
+  }
+  if (result) result.className = 'result-card';
 
   try {
     const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/close`, {
@@ -7610,21 +7808,27 @@ async function doCloseCard(pin) {
     const card = unwrap(data);
 
     if (!ok) {
-      result.classList.add('show', 'error');
-      result.textContent = JSON.stringify(data, null, 2);
+      if (result) {
+        result.classList.add('show', 'error');
+        result.textContent = JSON.stringify(data, null, 2);
+      }
       showToast(data?.message || `Erro ${status}`, 'error');
-      return;
+      return false;
     }
 
     currentCard = { local: { ...currentCard.local, ...card }, api: { ...currentCard.api, ...card } };
     showToast('Cartão fechado', 'success');
     navigate('card-list');
+    return true;
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
+    return false;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Fechar cartão';
+    }
   }
-
-  btn.disabled = false;
-  btn.textContent = 'Fechar cartão';
 }
 
 function currentCardStatus() {
@@ -7653,19 +7857,21 @@ function startActivateCardByCvv() {
 }
 
 async function doActivateCardByCvv(pin, cvv) {
-  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
-  if (!pin) { showToast('PIN obrigatório', 'error'); return; }
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return false; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return false; }
   if (!/^\d{3}$/.test(String(cvv || ''))) {
     showToast('Informe o CVV de 3 dígitos impresso no cartão', 'error');
-    return;
+    return false;
   }
 
   const btn = document.getElementById('card-activate-cvv-btn');
   const result = document.getElementById('card-activate-result');
 
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spin"></div> A activar...';
-  result.className = 'result-card';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spin"></div> A activar...';
+  }
+  if (result) result.className = 'result-card';
 
   try {
     const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/activate-by-cvv`, {
@@ -7676,45 +7882,60 @@ async function doActivateCardByCvv(pin, cvv) {
     const card = unwrap(data);
 
     if (!ok) {
-      result.classList.add('show', 'error');
-      result.textContent = JSON.stringify(data, null, 2);
+      if (result) {
+        result.classList.add('show', 'error');
+        result.textContent = JSON.stringify(data, null, 2);
+      }
       showToast(data?.message || `Erro ${status}`, 'error');
-      return;
+      return false;
     }
 
     currentCard = { local: { ...currentCard.local, ...card }, api: { ...currentCard.api, ...card } };
     renderCardDetail(currentCard);
     showToast('Cartão activado', 'success');
+    return true;
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
+    return false;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Activar com CVV';
+    }
   }
-
-  btn.disabled = false;
-  btn.textContent = 'Activar com CVV';
 }
 
-async function doRevealCard() {
+function startRevealCard() {
   if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  const name = currentCard?.api?.name || currentCard?.local?.name || 'este cartão';
+  openCardPin('reveal', 'Revelar dados', `Introduza o PIN do dispositivo para ver os dados de “${name}”`);
+}
 
-  const password = document.getElementById('card-reveal-password').value;
+async function doRevealCard(pin) {
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return false; }
+  if (!pin) { showToast('PIN obrigatório', 'error'); return false; }
+
+  const credentials = { pin, device_token: deviceToken };
   const btn = document.getElementById('card-reveal-btn');
   const result = document.getElementById('card-sensitive-result');
 
-  if (!password) { showToast('Informe a senha da conta', 'error'); return; }
-
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spin"></div> Revelando...';
-  result.className = 'result-card';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spin"></div> Revelando...';
+  }
+  if (result) result.className = 'result-card';
 
   try {
-    const { ok, data } = await api('POST', `/wallester/cards/${currentCard.local.id}/sensitive`, { password });
+    const { ok, data } = await api('POST', `/wallester/cards/${currentCard.local.id}/sensitive`, credentials);
     const sensitive = unwrap(data);
 
     if (!ok) {
-      result.classList.add('show', 'error');
-      result.textContent = JSON.stringify(data, null, 2);
+      if (result) {
+        result.classList.add('show', 'error');
+        result.textContent = JSON.stringify(data, null, 2);
+      }
       showToast(data?.message || 'Não foi possível revelar', 'error');
-      return;
+      return false;
     }
 
     document.getElementById('card-preview-number').textContent =
@@ -7725,67 +7946,78 @@ async function doRevealCard() {
     document.getElementById('card-preview-cvv').textContent = sensitive.cvv || '•••';
 
     let pinLine = '';
-    const pinResponse = await api('POST', `/wallester/cards/${currentCard.local.id}/encrypted-pin`, { password });
+    const pinResponse = await api('POST', `/wallester/cards/${currentCard.local.id}/encrypted-pin`, credentials);
     const pinPayload = unwrap(pinResponse.data);
     if (pinResponse.ok && pinPayload?.pin) {
       applyRevealedCardPin(pinPayload.pin);
       pinLine = `\nPIN: ${pinPayload.pin}`;
     }
 
-    result.classList.add('show', 'success');
-    result.textContent =
-      `Número: ${sensitive.card_number}\nCVV: ${sensitive.cvv}\nValidade: ${formatExpiry(sensitive.expiry_date)}${pinLine}`;
+    if (result) {
+      result.classList.add('show', 'success');
+      result.textContent =
+        `Número: ${sensitive.card_number}\nCVV: ${sensitive.cvv}\nValidade: ${formatExpiry(sensitive.expiry_date)}${pinLine}`;
+    }
     showToast(pinLine ? 'Dados e PIN revelados' : 'Dados revelados', 'success');
+    return true;
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
+    return false;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Revelar número e CVV';
+    }
   }
-
-  btn.disabled = false;
-  btn.textContent = 'Revelar número e CVV';
 }
 
 function startRevealCardPin() {
   if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
-  const password = document.getElementById('card-reveal-password').value;
-  if (password) {
-    doRevealCardPin({ password });
-    return;
-  }
   const name = currentCard?.api?.name || currentCard?.local?.name || 'este cartão';
-  openCardPin('reveal-pin', 'Revelar PIN do cartão', `Introduza o PIN da app para ver o PIN de “${name}”`);
+  openCardPin('reveal-pin', 'Revelar PIN do cartão', `Introduza o PIN do dispositivo para ver o PIN de “${name}”`);
 }
 
 async function doRevealCardPin(credentials) {
-  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return; }
+  if (!currentCard?.local?.id) { showToast('Nenhum cartão seleccionado', 'error'); return false; }
 
   const btn = document.getElementById('card-reveal-pin-btn');
   const result = document.getElementById('card-sensitive-result');
 
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spin"></div> A revelar PIN...';
-  result.className = 'result-card';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spin"></div> A revelar PIN...';
+  }
+  if (result) result.className = 'result-card';
 
   try {
     const { ok, data, status } = await api('POST', `/wallester/cards/${currentCard.local.id}/encrypted-pin`, credentials);
     const payload = unwrap(data);
 
     if (!ok || !payload?.pin) {
-      result.classList.add('show', 'error');
-      result.textContent = JSON.stringify(data, null, 2);
+      if (result) {
+        result.classList.add('show', 'error');
+        result.textContent = JSON.stringify(data, null, 2);
+      }
       showToast(data?.message || `Erro ${status || ''}`.trim() || 'Não foi possível revelar o PIN', 'error');
-      return;
+      return false;
     }
 
     applyRevealedCardPin(payload.pin);
-    result.classList.add('show', 'success');
-    result.textContent = `PIN do cartão: ${payload.pin}`;
+    if (result) {
+      result.classList.add('show', 'success');
+      result.textContent = `PIN do cartão: ${payload.pin}`;
+    }
     showToast('PIN do cartão revelado', 'success');
+    return true;
   } catch (e) {
     showToast(e.message || 'Erro de conexão', 'error');
+    return false;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Revelar PIN do cartão';
+    }
   }
-
-  btn.disabled = false;
-  btn.textContent = 'Revelar PIN do cartão';
 }
 
 function applyRevealedCardPin(pin) {
