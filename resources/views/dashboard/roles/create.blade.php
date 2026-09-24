@@ -11,7 +11,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
     </a>
-    <h1 class="text-2xl font-bold text-slate-900">Nova Role</h1>
+    <h1 class="text-2xl font-bold text-slate-900">Novo Cargo</h1>
 </div>
 @endsection
 
@@ -27,7 +27,7 @@
             </div>
             <div class="px-6 py-5">
                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Nome da Role <span class="text-red-400">*</span>
+                    Nome do Cargo <span class="text-red-400">*</span>
                 </label>
                 <input type="text" name="name" value="{{ old('name') }}"
                        class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('name') border-red-400 @enderror"
@@ -53,7 +53,7 @@
                                     <input type="checkbox" name="permissions[]" value="{{ $perm->name }}"
                                            {{ in_array($perm->name, old('permissions', [])) ? 'checked' : '' }}
                                            class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                                    <span class="text-sm text-slate-700">{{ $perm->name }}</span>
+                                    <span class="text-sm text-slate-700">{{ $perm->label ?: $perm->name }}</span>
                                 </label>
                             @endforeach
                         </div>
@@ -65,7 +65,7 @@
         <div class="flex items-center gap-3">
             <button type="submit"
                     class="px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition shadow-sm shadow-indigo-500/25">
-                Criar Role
+                Criar Cargo
             </button>
             <a href="{{ route('dashboard.roles') }}"
                class="px-5 py-2.5 text-sm text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition">

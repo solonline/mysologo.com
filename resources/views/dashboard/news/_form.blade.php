@@ -84,6 +84,7 @@
                     class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('status') border-red-400 @enderror">
                 <option value="draft" @selected(old('status', $news?->status ?? 'draft') === 'draft')>Rascunho</option>
                 <option value="published" @selected(old('status', $news?->status) === 'published')>Publicada</option>
+                <option value="expired  " @selected(old('status', $news?->status) === 'expired')>Expirada</option>
             </select>
             @error('status')
                 <p class="mt-1.5 text-xs text-red-500">{{ $message }}</p>

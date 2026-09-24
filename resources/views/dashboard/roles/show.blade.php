@@ -47,7 +47,7 @@
                     <div class="flex flex-wrap gap-2">
                         @foreach ($perms as $perm)
                             <span class="px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg border border-slate-200">
-                                {{ $perm->name }}
+                                {{ $perm->label ?: $perm->name }}
                             </span>
                         @endforeach
                     </div>

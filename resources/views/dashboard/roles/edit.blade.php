@@ -28,7 +28,7 @@
             </div>
             <div class="px-6 py-5">
                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Nome da Role <span class="text-red-400">*</span>
+                    Nome do Cargo <span class="text-red-400">*</span>
                 </label>
                 <input type="text" name="name" value="{{ old('name', $role->name) }}"
                        class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 @error('name') border-red-400 @enderror">
@@ -61,7 +61,7 @@
                                     <input type="checkbox" name="permissions[]" value="{{ $perm->name }}"
                                            {{ in_array($perm->name, old('permissions', $rolePermissions)) ? 'checked' : '' }}
                                            class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                                    <span class="text-sm text-slate-700">{{ $perm->name }}</span>
+                                    <span class="text-sm text-slate-700">{{ $perm->label ?: $perm->name }}</span>
                                 </label>
                             @endforeach
                         </div>

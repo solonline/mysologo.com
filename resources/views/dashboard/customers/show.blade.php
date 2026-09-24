@@ -82,7 +82,6 @@
         : strtoupper((string) $wallesterStatus) === 'ACTIVE';
     $canRetryProvisioning = ($customer->status === \App\Domains\Onboarding\Enums\CustomerLifecycleStatus::PROVISIONING)
         && ($wallesterFailed || $customer->wallesterAccount === null);
-    $canAdjustBalance = $wallesterActive && auth('web')->user()?->hasRole('super-admin', 'web');
     $pendingBalanceAdjustment = $pendingBalanceAdjustment ?? null;
     $pendingBalanceAdjustmentPayload = $pendingBalanceAdjustment
         ? [
@@ -1313,125 +1312,9 @@
 
     {{-- ==================== RIGHT COLUMN ==================== --}}
     <div class="flex flex-col gap-6">
-        {{-- Saldo --}}
-        @php
-            $isPlatformCustomer = $customer->type === 'platform';
-            $platformMasterAccounts = $isPlatformCustomer
-                ? $customer->platformWallesterMainAccounts
-                : collect();
-            $platformFeeAccounts = $isPlatformCustomer
-                ? $customer->platformWallesterFeeAccounts
-                : collect();
-        @endphp
-        @if ($isPlatformCustomer && ($platformMasterAccounts->isNotEmpty() || $platformFeeAccounts->isNotEmpty()))
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-                </svg>
-                <h2 class="text-sm font-semibold text-slate-900">Saldo</h2>
-            </div>
-            <div class="divide-y divide-slate-50">
-                @foreach ($platformMasterAccounts as $masterAccount)
-                @php $masterCurrency = strtoupper($masterAccount->funding_currency ?: $masterAccount->currency_code ?: 'EUR'); @endphp
-                <div class="px-5 py-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ $masterCurrency }} · Caixa</span>
-                    </div>
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                                <span class="text-xs text-slate-500">Disponível</span>
-                            </div>
-                            <span class="text-sm font-bold text-emerald-600">
-                                {{ number_format(((int) $masterAccount->available_amount) / 100, 2, ',', '.') }}
-                                <span class="text-xs font-normal text-slate-400">{{ $masterCurrency }}</span>
-                            </span>
-                        </div>
-                    </div>
-                    <p class="text-[11px] text-slate-400 mt-3">Caixa Wallester · master. Lucro (taxas Stripe e câmbio) vai para a Sub Conta Master.@can('transactions.view') Ver também <a href="{{ route('dashboard.platform-revenue') }}" class="text-emerald-700 hover:underline">Receita Platform</a>.@endcan</p>
-                </div>
-                @endforeach
-                @foreach ($platformFeeAccounts as $feeAccount)
-                @php $feeCurrency = strtoupper($feeAccount->funding_currency ?: $feeAccount->currency_code ?: 'EUR'); @endphp
-                <div class="px-5 py-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold text-violet-500 uppercase tracking-widest">{{ $feeAccount->receiver_name ?: 'Sub Conta Master' }}</span>
-                    </div>
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-violet-400"></span>
-                                <span class="text-xs text-slate-500">Ganhos da plataforma</span>
-                            </div>
-                            <span class="text-sm font-bold text-violet-600">
-                                {{ number_format(((int) $feeAccount->available_amount) / 100, 2, ',', '.') }}
-                                <span class="text-xs font-normal text-slate-400">{{ $feeCurrency }}</span>
-                            </span>
-                        </div>
-                    </div>
-                    <p class="text-[11px] text-slate-400 mt-3 font-mono">{{ $feeAccount->wallester_account_id }}</p>
-                </div>
-                @endforeach
-            </div>
-        </div>
-        @elseif ($customer->balances->isNotEmpty())
-        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
-                </svg>
-                <h2 class="text-sm font-semibold text-slate-900">Saldo</h2>
-            </div>
-            <div class="divide-y divide-slate-50">
-                @foreach ($customer->balances as $balance)
-                <div class="px-5 py-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ $balance->currency }}</span>
-                    </div>
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                                <span class="text-xs text-slate-500">Disponível</span>
-                            </div>
-                            <span class="text-sm font-bold text-emerald-600">
-                                {{ number_format($balance->available / 100, 2, ',', '.') }}
-                                <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
-                            </span>
-                        </div>
-                        {{-- @if ($balance->pending > 0) --}}
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                                <span class="text-xs text-slate-500">Pendente</span>
-                            </div>
-                            <span class="text-sm font-semibold text-amber-600">
-                                {{ number_format($balance->pending / 100, 2, ',', '.') }}
-                                <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
-                            </span>
-                        </div>
-                        {{-- @endif --}}
-                        <div class="pt-1 border-t border-slate-100 flex items-center justify-between">
-                            <span class="text-xs text-slate-400">Total</span>
-                            <span class="text-sm font-bold text-slate-800">
-                                {{ number_format(($balance->available + $balance->pending) / 100, 2, ',', '.') }}
-                                <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                @endforeach
-            </div>
-        </div>
-        @endif
-
-        {{-- Conta Wallester --}}
-        @if ($customer->wallesterAccount)
-        <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm overflow-hidden"
+        <div class="flex flex-col gap-6"
              x-data="{
-                 sectionOpen: {{ $pendingBalanceAdjustmentPayload ? 'true' : 'false' }},
+                 sectionOpen: false,
                  showBalanceModal: false,
                  showSmsModal: {{ $pendingBalanceAdjustmentPayload ? 'true' : 'false' }},
                  balanceDirection: 'credit',
@@ -1545,6 +1428,158 @@
                      }
                  }
              }">
+        {{-- Saldo --}}
+        @php
+            $isPlatformCustomer = $customer->type === 'platform';
+            $platformMasterAccounts = $isPlatformCustomer
+                ? $customer->platformWallesterMainAccounts
+                : collect();
+            $platformFeeAccounts = $isPlatformCustomer
+                ? $customer->platformWallesterFeeAccounts
+                : collect();
+            $showPlatformSaldo = $isPlatformCustomer && ($platformMasterAccounts->isNotEmpty() || $platformFeeAccounts->isNotEmpty());
+            $showCustomerSaldo = $customer->balances->isNotEmpty();
+        @endphp
+        @if ($showPlatformSaldo || $showCustomerSaldo)
+        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                <h2 class="text-sm font-semibold text-slate-900">Saldo</h2>
+            </div>
+            @if ($showPlatformSaldo)
+            <div class="divide-y divide-slate-50">
+                @foreach ($platformMasterAccounts as $masterAccount)
+                @php $masterCurrency = strtoupper($masterAccount->funding_currency ?: $masterAccount->currency_code ?: 'EUR'); @endphp
+                <div class="px-5 py-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ $masterCurrency }} · Caixa</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                <span class="text-xs text-slate-500">Disponível</span>
+                            </div>
+                            <span class="text-sm font-bold text-emerald-600">
+                                {{ number_format(((int) $masterAccount->available_amount) / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ $masterCurrency }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-3">Caixa Wallester · master. Lucro (taxas Stripe e câmbio) vai para a Sub Conta Master.@can('transactions.view') Ver também <a href="{{ route('dashboard.platform-revenue') }}" class="text-emerald-700 hover:underline">Receita Platform</a>.@endcan</p>
+                </div>
+                @endforeach
+                @foreach ($platformFeeAccounts as $feeAccount)
+                @php $feeCurrency = strtoupper($feeAccount->funding_currency ?: $feeAccount->currency_code ?: 'EUR'); @endphp
+                <div class="px-5 py-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-violet-500 uppercase tracking-widest">{{ $feeAccount->receiver_name ?: 'Sub Conta Master' }}</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-violet-400"></span>
+                                <span class="text-xs text-slate-500">Ganhos da plataforma</span>
+                            </div>
+                            <span class="text-sm font-bold text-violet-600">
+                                {{ number_format(((int) $feeAccount->available_amount) / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ $feeCurrency }}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-3 font-mono">{{ $feeAccount->wallester_account_id }}</p>
+                </div>
+                @endforeach
+            </div>
+            @elseif ($showCustomerSaldo)
+            <div class="divide-y divide-slate-50">
+                @foreach ($customer->balances as $balance)
+                <div class="px-5 py-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ $balance->currency }}</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                <span class="text-xs text-slate-500">Disponível</span>
+                            </div>
+                            <span class="text-sm font-bold text-emerald-600">
+                                {{ number_format($balance->available / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
+                            </span>
+                        </div>
+                        {{-- @if ($balance->pending > 0) --}}
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                <span class="text-xs text-slate-500">Pendente</span>
+                            </div>
+                            <span class="text-sm font-semibold text-amber-600">
+                                {{ number_format($balance->pending / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
+                            </span>
+                        </div>
+                        {{-- @endif --}}
+                        <div class="pt-1 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-xs text-slate-400">Total</span>
+                            <span class="text-sm font-bold text-slate-800">
+                                {{ number_format(($balance->available + $balance->pending) / 100, 2, ',', '.') }}
+                                <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+
+            @can('customers.adjustments_balance')
+                <div class="px-5 py-4 space-y-3 {{ ($showPlatformSaldo || $showCustomerSaldo) ? 'border-t border-slate-100' : '' }}">
+                    <div x-show="pendingAdjustment" x-cloak
+                        class="rounded-xl border border-amber-200 bg-amber-50/70 p-3 space-y-3">
+                        <div>
+                            <p class="text-xs font-semibold text-amber-800 uppercase tracking-wider">Confirmação SMS pendente</p>
+                            <p class="text-sm text-amber-900 mt-1">
+                                <span x-text="pendingAdjustment?.direction_label"></span>
+                                de <span x-text="pendingAdjustment?.amount_formatted"></span>
+                                <span x-text="pendingAdjustment?.currency"></span>
+                            </p>
+                            <p class="text-xs text-amber-700 mt-1" x-text="pendingAdjustment?.description"></p>
+                        </div>
+                        <button type="button" @click="showSmsModal = true" class="btn-secondary btn-sm w-full">
+                            Inserir código SMS
+                        </button>
+                    </div>
+
+                    <div class="flex gap-2" x-show="!pendingAdjustment">
+                        <button type="button"
+                                @click="balanceDirection = 'credit'; showBalanceModal = true"
+                                class="btn-secondary btn-sm flex-1 inline-flex items-center justify-center gap-1.5">
+                            Creditar
+                            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                            </svg>
+                        </button>
+                        <button type="button"
+                                @click="balanceDirection = 'debit'; showBalanceModal = true"
+                                class="btn-secondary btn-sm flex-1 inline-flex items-center justify-center gap-1.5">
+                            Debitar
+                            <svg class="w-3.5 h-3.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            @endcan
+        </div>
+        @endif
+
+        {{-- Conta Wallester --}}
+        @if ($customer->wallesterAccount)
+        <div class="bg-white rounded-2xl border {{ $wallesterFailed ? 'border-red-200' : 'border-slate-200/60' }} shadow-sm overflow-hidden">
             @php $wallesterCardCount = $customer->wallesterAccount->cards->count(); @endphp
             <button type="button"
                     @click="sectionOpen = !sectionOpen"
@@ -1585,39 +1620,6 @@
                 </div>
                 @endif
 
-                @if ($canAdjustBalance)
-                <div class="pt-3 mt-1 border-t border-slate-100 space-y-3">
-                    <div x-show="pendingAdjustment" x-cloak
-                         class="rounded-xl border border-amber-200 bg-amber-50/70 p-3 space-y-3">
-                        <div>
-                            <p class="text-xs font-semibold text-amber-800 uppercase tracking-wider">Confirmação SMS pendente</p>
-                            <p class="text-sm text-amber-900 mt-1">
-                                <span x-text="pendingAdjustment?.direction_label"></span>
-                                de <span x-text="pendingAdjustment?.amount_formatted"></span>
-                                <span x-text="pendingAdjustment?.currency"></span>
-                            </p>
-                            <p class="text-xs text-amber-700 mt-1" x-text="pendingAdjustment?.description"></p>
-                        </div>
-                        <button type="button" @click="showSmsModal = true" class="btn-secondary btn-sm w-full">
-                            Inserir código SMS
-                        </button>
-                    </div>
-
-                    <div class="flex gap-2" x-show="!pendingAdjustment">
-                        <button type="button"
-                                @click="balanceDirection = 'credit'; showBalanceModal = true"
-                                class="btn-secondary btn-sm flex-1">
-                            Creditar
-                        </button>
-                        <button type="button"
-                                @click="balanceDirection = 'debit'; showBalanceModal = true"
-                                class="btn-secondary btn-sm flex-1">
-                            Debitar
-                        </button>
-                    </div>
-                </div>
-                @endif
-
                 <div class="pt-3 mt-1 border-t border-slate-100 space-y-3">
                     @php
                         $linkableWallesterCards = $customer->wallesterAccount->cards
@@ -1642,112 +1644,7 @@
                         @endif
                         @endcan
                     </div>
-                    @can('customers.edit')
-                    @if ($linkableWallesterCards->isNotEmpty())
-                    <form method="POST"
-                          action="{{ route('dashboard.customers.wallester-cards.link', $customer) }}"
-                          class="rounded-xl border border-slate-200 bg-white p-2.5 space-y-2"
-                          data-search-url="{{ route('dashboard.customers.username-search', ['exclude' => $customer->id]) }}"
-                          data-initial-query="{{ old('target_customer', '') }}"
-                          x-data="{
-                              query: $el.dataset.initialQuery || '',
-                              results: [],
-                              open: false,
-                              loading: false,
-                              searchUrl: $el.dataset.searchUrl,
-                              async search() {
-                                  const term = this.query.trim().replace(/^@/, '');
-                                  if (term.length < 2) {
-                                      this.results = [];
-                                      this.open = false;
-                                      return;
-                                  }
-                                  this.loading = true;
-                                  try {
-                                      const url = new URL(this.searchUrl, window.location.origin);
-                                      url.searchParams.set('q', term);
-                                      const response = await fetch(url.toString(), {
-                                          headers: {
-                                              'Accept': 'application/json',
-                                              'X-Requested-With': 'XMLHttpRequest',
-                                          },
-                                      });
-                                      const json = await response.json().catch(() => ({ data: [] }));
-                                      this.results = Array.isArray(json.data) ? json.data : [];
-                                      this.open = true;
-                                  } finally {
-                                      this.loading = false;
-                                  }
-                              },
-                              select(user) {
-                                  this.query = user.username;
-                                  this.results = [];
-                                  this.open = false;
-                              }
-                          }"
-                          @click.outside="open = false"
-                          onsubmit="return confirm('Transferir o cartão selecionado para este username? O cartão passa a debitar a conta Wallester do destinatário.')">
-                        @csrf
-                        <select name="card_id"
-                                required
-                                class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
-                            <option value="">Selecionar cartão</option>
-                            @foreach ($linkableWallesterCards as $linkableCard)
-                            @php
-                                $linkableLabel = trim(
-                                    ($linkableCard->masked_card_number ?: 'Cartão #'.$linkableCard->id)
-                                    .' · '
-                                    .($linkableCard->name ?: ($linkableCard->type ?: 'Virtual'))
-                                );
-                            @endphp
-                            <option value="{{ $linkableCard->id }}" @selected((string) old('card_id') === (string) $linkableCard->id)>
-                                {{ $linkableLabel }}
-                            </option>
-                            @endforeach
-                        </select>
-                        <div class="relative">
-                            <input type="text"
-                                   name="target_customer"
-                                   x-model="query"
-                                   @input.debounce.300ms="search()"
-                                   @focus="if (results.length) open = true"
-                                   autocomplete="off"
-                                   required
-                                   maxlength="255"
-                                   placeholder="Username do destinatário"
-                                   class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
-                            <div x-show="open"
-                                 x-cloak
-                                 class="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                                <p x-show="loading" class="px-2.5 py-2 text-xs text-slate-400">A procurar…</p>
-                                <p x-show="!loading && results.length === 0" class="px-2.5 py-2 text-xs text-slate-400">Nenhum username encontrado.</p>
-                                <ul x-show="!loading && results.length" class="max-h-40 overflow-auto py-1">
-                                    <template x-for="user in results" :key="user.id">
-                                        <li>
-                                            <button type="button"
-                                                    class="w-full px-2.5 py-1.5 text-left hover:bg-indigo-50"
-                                                    @click="select(user)">
-                                                <span class="block text-xs font-semibold text-slate-800" x-text="'@' + user.username"></span>
-                                                <span class="block text-[11px] text-slate-500 truncate" x-text="user.name"></span>
-                                            </button>
-                                        </li>
-                                    </template>
-                                </ul>
-                            </div>
-                        </div>
-                        @error('card_id')
-                        <p class="text-xs text-red-600">{{ $message }}</p>
-                        @enderror
-                        @error('target_customer')
-                        <p class="text-xs text-red-600">{{ $message }}</p>
-                        @enderror
-                        <button type="submit"
-                                class="w-full px-2.5 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
-                            Transferir cartão
-                        </button>
-                    </form>
-                    @endif
-                    @endcan
+
                     @forelse ($customer->wallesterAccount->cards as $card)
                     @php
                         $cardStatus = (string) ($card->status ?? '');
@@ -1790,68 +1687,68 @@
             </div>
             </div>{{-- fim sectionOpen --}}
 
-            @if ($canAdjustBalance && ! $pendingBalanceAdjustment)
-            <template x-teleport="body">
-            <div x-show="showBalanceModal" x-cloak
-                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
-                 x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0"
-                 x-transition:enter-end="opacity-100"
-                 x-transition:leave="transition ease-in duration-150"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0">
-                <div class="absolute inset-0 bg-black/50 backdrop-blur-md" @click="showBalanceModal = false"></div>
-                <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
-                     x-transition:enter="transition ease-out duration-200"
-                     x-transition:enter-start="opacity-0 scale-95"
-                     x-transition:enter-end="opacity-100 scale-100">
-                    <div class="flex items-center justify-between mb-5">
-                        <h3 class="text-base font-semibold text-slate-900"
-                            x-text="balanceDirection === 'credit' ? 'Creditar cliente' : 'Debitar cliente'"></h3>
-                        <button type="button" @click="showBalanceModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
+            @can('customers.adjustments_balance')
+            @if (! $pendingBalanceAdjustment)
+                <template x-teleport="body">
+                <div x-show="showBalanceModal" x-cloak
+                    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0">
+                    <div class="absolute inset-0 bg-black/50 backdrop-blur-md" @click="showBalanceModal = false"></div>
+                    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 scale-95"
+                        x-transition:enter-end="opacity-100 scale-100">
+                        <div class="flex items-center justify-between mb-5">
+                            <h3 class="text-base font-semibold text-slate-900"
+                                x-text="balanceDirection === 'credit' ? 'Creditar cliente' : 'Debitar cliente'"></h3>
+                            <button type="button" @click="showBalanceModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <form @submit.prevent="submitAdjustment()">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Valor</label>
+                                    <input type="number" x-model="amount" step="0.01" min="0.01" required
+                                        class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                        placeholder="0.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moeda</label>
+                                    <input type="text" readonly
+                                        value="{{ strtoupper($customer->wallesterAccount->funding_currency ?? $customer->wallesterAccount->currency_code ?? 'EUR') }}"
+                                        class="w-full px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded-xl text-slate-600">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Motivo</label>
+                                    <textarea x-model="description" required rows="3" maxlength="500"
+                                            class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                                            placeholder="Descreva o motivo do ajuste"></textarea>
+                                </div>
+                                <p class="text-xs text-slate-500">
+                                    Será enviado um SMS com código de autenticação para o seu telefone de super-admin.
+                                </p>
+                                <p x-show="errorMessage" x-text="errorMessage" class="text-xs text-red-600"></p>
+                            </div>
+                            <div class="flex gap-3 mt-6">
+                                <button type="button" @click="showBalanceModal = false" class="btn-secondary flex-1">Cancelar</button>
+                                <button type="submit" class="btn-primary flex-1 disabled:opacity-60"
+                                        :disabled="isSubmitting"
+                                        x-text="balanceDirection === 'credit' ? 'Solicitar crédito' : 'Solicitar débito'"></button>
+                            </div>
+                        </form>
                     </div>
-                    <form @submit.prevent="submitAdjustment()">
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Valor</label>
-                                <input type="number" x-model="amount" step="0.01" min="0.01" required
-                                       class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-                                       placeholder="0.00">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moeda</label>
-                                <input type="text" readonly
-                                       value="{{ strtoupper($customer->wallesterAccount->funding_currency ?? $customer->wallesterAccount->currency_code ?? 'EUR') }}"
-                                       class="w-full px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded-xl text-slate-600">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Motivo</label>
-                                <textarea x-model="description" required rows="3" maxlength="500"
-                                          class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-                                          placeholder="Descreva o motivo do ajuste"></textarea>
-                            </div>
-                            <p class="text-xs text-slate-500">
-                                Será enviado um SMS com código de autenticação para o seu telefone de super-admin.
-                            </p>
-                            <p x-show="errorMessage" x-text="errorMessage" class="text-xs text-red-600"></p>
-                        </div>
-                        <div class="flex gap-3 mt-6">
-                            <button type="button" @click="showBalanceModal = false" class="btn-secondary flex-1">Cancelar</button>
-                            <button type="submit" class="btn-primary flex-1 disabled:opacity-60"
-                                    :disabled="isSubmitting"
-                                    x-text="balanceDirection === 'credit' ? 'Solicitar crédito' : 'Solicitar débito'"></button>
-                        </div>
-                    </form>
                 </div>
-            </div>
-            </template>
+                </template>
             @endif
 
-            @if ($canAdjustBalance)
             <template x-teleport="body">
             <div x-show="showSmsModal" x-cloak
                  class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -1912,9 +1809,10 @@
                 </div>
             </div>
             </template>
-            @endif
+            @endcan
         </div>
         @endif
+        </div>
 
         {{-- Conta Stripe --}}
         @if ($customer->stripeAccount)

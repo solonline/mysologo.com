@@ -11,6 +11,7 @@ class RolesSeeder extends Seeder
 {
     public function run(): void
     {
+        // comando para executar o seeder: php artisan db:seed --class=RolesSeeder
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Permissões por módulo
@@ -20,6 +21,7 @@ class RolesSeeder extends Seeder
             'customers.create',
             'customers.edit',
             'customers.delete',
+            'customers.adjustments_balance',
             // Utilizadores
             'users.view',
             'users.create',

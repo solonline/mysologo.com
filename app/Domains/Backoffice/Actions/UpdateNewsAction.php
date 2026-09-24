@@ -30,4 +30,11 @@ class UpdateNewsAction
 
         return $news->fresh(['author']) ?? $news;
     }
+
+    public function checkNewsExpiration(News $news): void
+    {
+        if ($news->expiration_date && $news->expiration_date < now()) {
+            $news->update(['status' => 'expired']);
+        }
+    }
 }

@@ -1,13 +1,13 @@
 @extends('layouts.dashboard')
 
-@section('title', 'Roles')
-@section('breadcrumb', 'Roles')
+@section('title', 'Cargos')
+@section('breadcrumb', 'Cargos')
 
 @section('page-header')
 <div class="flex items-center justify-between">
     <div>
-        <h1 class="text-2xl font-bold text-slate-900">Roles</h1>
-        <p class="mt-1 text-sm text-slate-500">Gerir roles e permissões do sistema.</p>
+        <h1 class="text-2xl font-bold text-slate-900">Cargos</h1>
+        <p class="mt-1 text-sm text-slate-500">Gerir cargos e permissões do sistema.</p>
     </div>
     @can('roles.create')
     <a href="{{ route('dashboard.roles.create') }}"
@@ -15,7 +15,7 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
-        Nova Role
+        Novo Cargo
     </a>
     @endcan
 </div>
@@ -32,7 +32,7 @@
 {{-- Filtro --}}
 <form method="GET" class="mb-4 flex gap-3">
     <input type="text" name="search" value="{{ request('search') }}"
-           placeholder="Pesquisar role..."
+           placeholder="Pesquisar cargo..."
            class="flex-1 max-w-xs px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
     <button type="submit"
             class="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-xl hover:bg-slate-700 transition">
@@ -50,7 +50,7 @@
     <table class="w-full text-sm">
         <thead>
             <tr class="border-b border-slate-100 bg-slate-50/60">
-                <th class="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Role</th>
+                <th class="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Cargo</th>
                 <th class="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Permissões</th>
                 <th class="px-5 py-3.5 text-left font-semibold text-slate-500 text-xs uppercase tracking-wider">Utilizadores</th>
                 <th class="px-5 py-3.5"></th>
