@@ -65,6 +65,10 @@ return [
         'percentage' => env('FX_PERCENTAGE', ''),
     ],
 
+    'fcm' => [
+        'credentials' => env('FCM_CREDENTIALS'),
+    ],
+
     'whatsapp' => [
         'base_url' => env('WHATSAPP_BASE_URL', env('EVOLUTION_BASE_URL', '')),
         'api_key' => env('WHATSAPP_API_KEY', env('EVOLUTION_API_KEY', '')),

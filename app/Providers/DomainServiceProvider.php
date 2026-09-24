@@ -10,6 +10,7 @@ use App\Domains\Fx\FxServiceProvider;
 use App\Domains\Kyc\KycServiceProvider;
 use App\Domains\Merchant\MerchantServiceProvider;
 use App\Domains\Onboarding\OnboardingServiceProvider;
+use App\Domains\Push\PushServiceProvider;
 use App\Domains\Settings\SettingsServiceProvider;
 use App\Domains\Sms\SmsServiceProvider;
 use App\Domains\Stripe\StripeServiceProvider;
@@ -44,6 +45,7 @@ class DomainServiceProvider extends ServiceProvider
         WalletServiceProvider::class,
         MerchantServiceProvider::class,
         CustomerServiceProvider::class,
+        PushServiceProvider::class,
         SettingsServiceProvider::class,
         TpaServiceProvider::class,
         WhatsappServiceProvider::class,

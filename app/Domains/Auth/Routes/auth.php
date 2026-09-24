@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\Auth\Controllers\AuthController;
+use App\Domains\Auth\Controllers\DeviceController;
 use App\Domains\Auth\Controllers\PinController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,7 @@ Route::post('/login-tpa', [AuthController::class, 'loginWithTpa'])->name('auth.l
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('auth.forgot-password');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('auth.reset-password');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum')->name('auth.logout');
+Route::delete('/devices', [DeviceController::class, 'destroy'])->middleware('auth:sanctum')->name('auth.devices.destroy');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::middleware([

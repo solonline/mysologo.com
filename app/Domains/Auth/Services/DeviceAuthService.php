@@ -89,6 +89,21 @@ class DeviceAuthService
         return ! is_null($device->blocked_at);
     }
 
+    public function forgetDevice(Customer $customer, string $deviceToken): void
+    {
+        $device = $this->deviceRepository->findByCustomerAndToken($customer, $deviceToken);
+
+        if ($device === null) {
+            throw new ApiException(
+                ErrorCode::DEVICE_NOT_FOUND,
+                404,
+                'Dispositivo não encontrado.',
+            );
+        }
+
+        $device->delete();
+    }
+
     public function hasPin(Customer $customer): bool
     {
         return $customer->devices()->whereNotNull('pin')->exists();

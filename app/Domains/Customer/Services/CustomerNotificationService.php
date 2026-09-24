@@ -2,6 +2,7 @@
 
 namespace App\Domains\Customer\Services;
 
+use App\Domains\Customer\Events\CustomerNotificationCreated;
 use App\Models\Customer;
 use App\Models\CustomerNotification;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -41,12 +42,14 @@ class CustomerNotificationService
         ?string $body = null,
         array $data = [],
     ): void {
-        CustomerNotification::create([
+        $notification = CustomerNotification::create([
             'customer_id' => $customer->id,
             'type' => $type,
             'title' => $title,
             'body' => $body,
             'data' => $data,
         ]);
+
+        CustomerNotificationCreated::dispatch($notification);
     }
 }
