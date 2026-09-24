@@ -1287,6 +1287,64 @@ class WallesterServiceTest extends TestCase
         $service->closeCardForCustomer($customer, $localCard);
     }
 
+    public function test_change_pin_encrypts_payload_before_calling_gateway(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_change_pin');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_change_pin_1',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Travel Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_change_pin_1', 'Active');
+        $gateway->shouldReceive('changePin')
+            ->once()
+            ->with('card_change_pin_1', 'encrypted-pin', (string) $customer->id)
+            ->andReturn(['id' => 'card_change_pin_1']);
+
+        $encryptor = Mockery::mock(WallesterSensitiveDataEncryptor::class);
+        $encryptor->shouldReceive('encryptPin')->once()->with('5678')->andReturn('encrypted-pin');
+
+        $service = $this->makeService($gateway, $encryptor);
+
+        $card = $service->changePinForCustomer($customer, $localCard, '5678');
+
+        $this->assertSame('Active', $card->status);
+    }
+
+    public function test_change_pin_rejects_closed_card(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_change_pin_closed');
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_change_pin_closed',
+            'type' => 'Virtual',
+            'status' => 'Closed',
+            'name' => 'Travel Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_change_pin_closed', 'Closed');
+        $gateway->shouldNotReceive('changePin');
+
+        $encryptor = Mockery::mock(WallesterSensitiveDataEncryptor::class);
+        $encryptor->shouldNotReceive('encryptPin');
+
+        $service = $this->makeService($gateway, $encryptor);
+
+        $this->expectException(ApiException::class);
+        $this->expectExceptionMessage('This card cannot be changed the pin in its current status.');
+
+        $service->changePinForCustomer($customer, $localCard, '5678');
+    }
+
     public function test_get_encrypted_pin_for_customer_decrypts_wallester_payload(): void
     {
         $customer = $this->createRetailCustomer();

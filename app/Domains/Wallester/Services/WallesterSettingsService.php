@@ -72,11 +72,42 @@ class WallesterSettingsService
     {
         $value = $this->settings->getByKey('wallester.rsa_public_key');
 
-        if ($value !== null && trim($value) !== '') {
-            return str_replace('\\n', "\n", trim($value));
+        if ($value === null || trim($value) === '') {
+            throw new RuntimeException('Wallester RSA public key is not configured.');
         }
 
-        throw new RuntimeException('Wallester RSA public key is not configured.');
+        return $this->normalizeRsaPublicKey(str_replace('\\n', "\n", trim($value)));
+    }
+
+    private function normalizeRsaPublicKey(string $value): string
+    {
+        if (
+            str_contains($value, 'BEGIN PUBLIC KEY')
+            || str_contains($value, 'BEGIN RSA PUBLIC KEY')
+            || str_contains($value, 'BEGIN CERTIFICATE')
+        ) {
+            return $value;
+        }
+
+        $compact = preg_replace('/\s+/', '', $value) ?? $value;
+        $decoded = base64_decode($compact, true);
+
+        if (! is_string($decoded) || $decoded === '') {
+            return $value;
+        }
+
+        if (
+            str_contains($decoded, 'BEGIN PUBLIC KEY')
+            || str_contains($decoded, 'BEGIN RSA PUBLIC KEY')
+        ) {
+            return $decoded;
+        }
+
+        $pem = "-----BEGIN PUBLIC KEY-----\n"
+            .chunk_split(base64_encode($decoded), 64, "\n")
+            ."-----END PUBLIC KEY-----\n";
+
+        return openssl_pkey_get_public($pem) === false ? $value : $pem;
     }
 
     public function threeDsChallengeTtlSeconds(): int

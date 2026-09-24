@@ -49,6 +49,7 @@ trait InteractsWithWallesterSettings
     {
         $gateway = Mockery::mock(WallesterGatewayInterface::class);
         $gateway->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $gateway->shouldReceive('withProductCode')->andReturnSelf()->byDefault();
         $gateway->shouldReceive('getAccount')->andReturn([
             'available_amount' => 0,
             'balance' => 0,

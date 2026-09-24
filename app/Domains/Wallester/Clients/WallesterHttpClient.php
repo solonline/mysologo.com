@@ -48,6 +48,14 @@ class WallesterHttpClient
         return $this;
     }
 
+    public function withProductCode(?string $productCode): self
+    {
+        $this->ensureCurrencyResolved();
+        $this->productCode = $productCode;
+
+        return $this;
+    }
+
     public function authenticate(): string
     {
         $this->ensureCurrencyResolved();
@@ -171,6 +179,18 @@ class WallesterHttpClient
         $response = $this->httpClient->post('cards', [
             'headers' => $this->getRequestHeaders($auditUserId),
             'json' => $data,
+        ]);
+
+        return $this->decodeJson($response->getBody()->getContents());
+    }
+
+    public function changePin(string $cardId, string $encryptedPin, ?string $auditUserId = null): array
+    {
+        $response = $this->httpClient->patch("cards/{$cardId}/pin", [
+            'headers' => $this->getRequestHeaders($auditUserId),
+            'json' => [
+                'encrypted_pin' => $encryptedPin,
+            ],
         ]);
 
         return $this->decodeJson($response->getBody()->getContents());

@@ -71,11 +71,11 @@ class PlatformAccountSeeder extends Seeder
         $accountService = app(WallesterAccountService::class);
         $gateway = app(WallesterGatewayInterface::class);
 
-        foreach (self::SUPPORTED_MAIN_CURRENCIES as $currency) {
-            if (! $settings->hasCurrencyCredentials($currency)) {
-                continue;
-            }
+        if (! $settings->hasCredentials()) {
+            return [];
+        }
 
+        foreach (self::SUPPORTED_MAIN_CURRENCIES as $currency) {
             try {
                 $response = $accountService->listForCustomer($customer, ['is_main' => true], $currency);
 

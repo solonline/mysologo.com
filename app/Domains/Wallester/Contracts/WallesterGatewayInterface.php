@@ -6,6 +6,8 @@ interface WallesterGatewayInterface
 {
     public function forCurrency(string $currency): self;
 
+    public function withProductCode(?string $productCode): self;
+
     public function authenticate(): string;
 
     public function createAccount(array $data): array;
@@ -39,6 +41,8 @@ interface WallesterGatewayInterface
     public function getEncryptedCvv2(string $cardId, string $publicKeyBase64, ?string $auditUserId = null): string;
 
     public function createCard(array $data, ?string $auditUserId = null): array;
+
+    public function changePin(string $cardId, string $encryptedPin, ?string $auditUserId = null): array;
 
     /**
      * @return list<array{dispatch_method: string, price: float|null, description: string}>

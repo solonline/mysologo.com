@@ -21,6 +21,13 @@ class WallesterGateway implements WallesterGatewayInterface
         return $this;
     }
 
+    public function withProductCode(?string $productCode): static
+    {
+        $this->client->withProductCode($productCode);
+
+        return $this;
+    }
+
     public function authenticate(): string
     {
         return $this->client->authenticate();
@@ -151,6 +158,16 @@ class WallesterGateway implements WallesterGatewayInterface
     {
         $response = $this->run('createCard', fn () => $this->client->createCard($data, $auditUserId), [
             'request' => $data,
+            'audit_user_id' => $auditUserId,
+        ]);
+
+        return $this->normalizeCardResponse(is_array($response) ? $response : []);
+    }
+
+    public function changePin(string $cardId, string $encryptedPin, ?string $auditUserId = null): array
+    {
+        $response = $this->run('changePin', fn () => $this->client->changePin($cardId, $encryptedPin, $auditUserId), [
+            'card_id' => $cardId,
             'audit_user_id' => $auditUserId,
         ]);
 

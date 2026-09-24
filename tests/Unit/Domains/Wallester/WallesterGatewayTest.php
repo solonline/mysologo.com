@@ -378,6 +378,45 @@ class WallesterGatewayTest extends TestCase
         );
     }
 
+    public function test_change_pin_does_not_log_encrypted_pin(): void
+    {
+        $logged = [];
+        Log::listen(function (MessageLogged $event) use (&$logged): void {
+            $logged[] = [
+                'level' => $event->level,
+                'message' => $event->message,
+                'context' => $event->context,
+            ];
+        });
+
+        $client = Mockery::mock(WallesterHttpClient::class);
+        $client->shouldReceive('forCurrency')->andReturnSelf()->byDefault();
+        $client->shouldReceive('changePin')
+            ->once()
+            ->with('card_123', 'encrypted-pin', '42')
+            ->andReturn([
+                'card' => [
+                    'id' => 'card_123',
+                    'status' => 'Active',
+                ],
+            ]);
+
+        $gateway = new WallesterGateway($client);
+
+        $result = $gateway->changePin('card_123', 'encrypted-pin', '42');
+
+        $this->assertSame('card_123', $result['id']);
+        $this->assertTrue(
+            collect($logged)->contains(
+                fn (array $entry) => $entry['level'] === 'info'
+                    && $entry['message'] === 'wallester_api: changePin'
+                    && ($entry['context']['card_id'] ?? null) === 'card_123'
+                    && ! array_key_exists('pin', $entry['context'])
+                    && ! array_key_exists('encrypted_pin', $entry['context']),
+            ),
+        );
+    }
+
     public function test_block_card_unwraps_nested_card_payload(): void
     {
         $client = Mockery::mock(WallesterHttpClient::class);

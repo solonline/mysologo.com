@@ -35,4 +35,28 @@ class WallesterSensitiveDataEncryptor
 
         return base64_encode($pem);
     }
+
+    public function encryptPin(string $pin): string
+    {
+        try {
+            $ciphertext = WallesterRsaOaep::encrypt(
+                $pin,
+                $this->settings->rsaPublicKey(),
+                'PIN',
+            );
+        } catch (RuntimeException $exception) {
+            throw new ApiException(
+                ErrorCode::INTERNAL_ERROR,
+                500,
+                'Unable to encrypt Wallester card PIN.',
+                previous: $exception,
+            );
+        }
+
+        $pem = "-----BEGIN PIN MESSAGE-----\n"
+            .base64_encode($ciphertext)
+            ."\n-----END PIN MESSAGE-----";
+
+        return base64_encode($pem);
+    }
 }

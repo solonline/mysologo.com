@@ -44,6 +44,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->name('wallester.cards.unblock');
         Route::post('/cards/{card}/close', [WallesterCardController::class, 'close'])
             ->name('wallester.cards.close');
+        // Route::post('/cards/{card}/change-pin', [WallesterCardController::class, 'changePin'])
+        //     ->name('wallester.cards.change-pin');
     });
 
     Route::middleware([

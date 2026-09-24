@@ -502,6 +502,50 @@ class WallesterCardTest extends TestCase
             ->assertJsonPath('reason', 'invalid_pin');
     }
 
+    public function test_customer_can_change_card_pin(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_card_change_pin');
+        $pin = $this->attachDevicePin($customer);
+
+        $localCard = CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => 'card_change_pin',
+            'type' => 'Virtual',
+            'status' => 'Active',
+            'name' => 'Travel Card',
+        ]);
+
+        $gateway = $this->mockWallesterGateway();
+        $this->expectWallesterGetCard($gateway, 'card_change_pin', 'Active');
+        $gateway->shouldReceive('changePin')
+            ->once()
+            ->with('card_change_pin', 'encrypted-pin', (string) $customer->id)
+            ->andReturn([
+                'id' => 'card_change_pin',
+                'type' => 'Virtual',
+                'status' => 'Active',
+                'name' => 'Travel Card',
+            ]);
+
+        $encryptor = Mockery::mock(WallesterSensitiveDataEncryptor::class);
+        $encryptor->shouldReceive('encryptPin')->once()->with('5678')->andReturn('encrypted-pin');
+
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+        $this->app->instance(WallesterSensitiveDataEncryptor::class, $encryptor);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson("/api/wallester/cards/{$localCard->id}/change-pin", [
+                ...$pin,
+                'pin_card' => '5678',
+                'confirm_pin_card' => '5678',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Active');
+    }
+
     public function test_activate_by_cvv_requires_pin_and_cvv(): void
     {
         $customer = $this->createActiveCustomer();

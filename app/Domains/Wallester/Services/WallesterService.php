@@ -17,7 +17,9 @@ use App\Models\Customer;
 use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
 use App\Models\LedgerEntry;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class WallesterService
@@ -407,6 +409,102 @@ class WallesterService
         $card->update(CustomerWallesterCard::updatableAttributesFromWallesterResponse($wallesterCard));
 
         return $card->fresh();
+    }
+
+    public function changePinForCustomer(Customer $customer, CustomerWallesterCard $card, string $pin): CustomerWallesterCard
+    {
+        $this->ensureCustomerOwnsCard($customer, $card);
+        $card = $this->syncCardStatusFromWallester($customer, $card);
+
+        if (in_array($card->status, ['Closed', 'Dispatched'], true)) {
+            throw new ApiException(
+                ErrorCode::CARD_NOT_CHANGEABLE_PIN,
+                422,
+                'This card cannot be changed the pin in its current status.',
+            );
+        }
+
+        $currency = (string) ($card->wallesterAccount?->funding_currency ?? 'EUR');
+        $encryptedPin = $this->encryptor->encryptPin($pin);
+        $lastException = null;
+
+        foreach ($this->changePinProductCodes($card) as $productCode) {
+            try {
+                $this->gateway
+                    ->forCurrency($currency)
+                    ->withProductCode($productCode)
+                    ->changePin(
+                        $card->wallester_card_id,
+                        $encryptedPin,
+                        (string) $customer->id,
+                    );
+
+                Log::channel('wallester')->info('wallester_pin_product_code_accepted', [
+                    'card_id' => $card->wallester_card_id,
+                    'product_code' => $productCode,
+                ]);
+
+                return $card->fresh();
+            } catch (RequestException $exception) {
+                $lastException = $exception;
+
+                if (! $this->shouldRetryChangePin($exception)) {
+                    throw $exception;
+                }
+
+                Log::channel('wallester')->warning('wallester_pin_product_code_rejected', [
+                    'card_id' => $card->wallester_card_id,
+                    'product_code' => $productCode,
+                    'http_status' => $exception->getResponse()?->getStatusCode(),
+                ]);
+            }
+        }
+
+        throw $lastException ?? new RuntimeException('Unable to change Wallester card PIN.');
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    private function changePinProductCodes(CustomerWallesterCard $card): array
+    {
+        $codes = [];
+        $fromCard = trim((string) $card->personalization_product_code);
+        $fromSettings = $this->wallesterSettings->productCode();
+
+        if ($fromCard !== '') {
+            $codes[] = $fromCard;
+        }
+
+        if ($fromSettings !== '' && ! in_array($fromSettings, $codes, true)) {
+            $codes[] = $fromSettings;
+        }
+
+        $codes[] = null;
+
+        return $codes;
+    }
+
+    private function shouldRetryChangePin(RequestException $exception): bool
+    {
+        $status = $exception->getResponse()?->getStatusCode();
+
+        return $status === 401
+            || $this->isWallesterPinDecryptFailure($exception);
+    }
+
+    private function isWallesterPinDecryptFailure(RequestException $exception): bool
+    {
+        $haystack = $exception->getMessage();
+        $response = $exception->getResponse();
+
+        if ($response !== null) {
+            $haystack .= (string) $response->getBody();
+        }
+
+        return str_contains($haystack, '90965')
+            || str_contains($haystack, 'cannot be decrypted due to RSA')
+            || str_contains($haystack, 'valid Base64');
     }
 
     /**

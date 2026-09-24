@@ -104,6 +104,42 @@ class WallesterSettingsServiceTest extends TestCase
         $service->rsaPublicKey();
     }
 
+    public function test_rsa_public_key_accepts_base64_der(): void
+    {
+        $resource = openssl_pkey_new([
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+
+        if ($resource === false) {
+            $this->markTestSkipped('OpenSSL key generation is unavailable in this environment.');
+        }
+
+        $details = openssl_pkey_get_details($resource);
+        $this->assertIsArray($details);
+        $this->assertIsString($details['key'] ?? null);
+
+        $der = base64_decode((string) preg_replace(
+            '/-----[^-]+-----|\s+/',
+            '',
+            $details['key'],
+        ), true);
+        $this->assertNotFalse($der);
+
+        Setting::query()->where('key', 'wallester.rsa_public_key')->update([
+            'value' => base64_encode($der),
+        ]);
+
+        $pem = app(WallesterSettingsService::class)->rsaPublicKey();
+        $parsed = openssl_pkey_get_public($pem);
+
+        $this->assertNotFalse($parsed);
+        $this->assertSame(
+            openssl_pkey_get_details($parsed)['bits'] ?? null,
+            $details['bits'] ?? null,
+        );
+    }
+
     public function test_throws_when_api_key_is_missing(): void
     {
         Setting::query()->where('key', 'wallester.api_key')->delete();

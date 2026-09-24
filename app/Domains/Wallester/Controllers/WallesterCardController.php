@@ -5,6 +5,7 @@ namespace App\Domains\Wallester\Controllers;
 use App\Domains\Auth\Services\DeviceAuthService;
 use App\Domains\Wallester\Http\Requests\ActivateCardByCVVRequest;
 use App\Domains\Wallester\Http\Requests\BlockWallesterCardRequest;
+use App\Domains\Wallester\Http\Requests\ChangeWallesterCardPinRequest;
 use App\Domains\Wallester\Http\Requests\CreateWallesterCardRequest;
 use App\Domains\Wallester\Http\Requests\RevealWallesterCardSensitiveRequest;
 use App\Domains\Wallester\Services\WallesterCardSensitiveService;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CustomerWallesterCard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class WallesterCardController extends Controller
 {
@@ -197,7 +199,29 @@ class WallesterCardController extends Controller
         ]);
     }
 
-    private function verifyCustomerPin(CreateWallesterCardRequest|BlockWallesterCardRequest|ActivateCardByCVVRequest $request): void
+    /**
+     * @hideFromApiDocs
+     */
+    public function changePin(ChangeWallesterCardPinRequest $request, CustomerWallesterCard $card): JsonResponse
+    {
+        $this->verifyCustomerPin($request);
+        $data = $this->wallesterService->changePinForCustomer(
+            $request->user(),
+            $card,
+            (string) $request->validated('pin_card'),
+        );
+
+        Log::channel('wallester')->info('wallester_card_change_pin', [
+            'card_id' => $card->id,
+            'data' => $data->toArray(),
+        ]);
+
+        return response()->json([
+            'data' => $data,
+        ]);
+    }
+
+    private function verifyCustomerPin(CreateWallesterCardRequest|BlockWallesterCardRequest|ActivateCardByCVVRequest|ChangeWallesterCardPinRequest $request): void
     {
         $this->deviceAuthService->verifyPin(
             $request->user(),
