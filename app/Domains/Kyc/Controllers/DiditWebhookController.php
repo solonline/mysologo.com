@@ -20,8 +20,26 @@ class DiditWebhookController extends Controller
      */
     public function handle(Request $request): JsonResponse
     {
-        $signature = $request->header('X-Signature-V2');
-        if (! $this->identityVerification->verifyWebhookSignature($request->getContent(), $signature)) {
+        $rawBody = $request->getContent();
+        $verified = $this->identityVerification->verifyWebhookSignature(
+            $rawBody,
+            $request->header('X-Signature-V2'),
+            [
+                'signature' => $request->header('X-Signature'),
+                'signature_simple' => $request->header('X-Signature-Simple'),
+                'timestamp' => $request->header('X-Timestamp'),
+            ],
+        );
+
+        if (! $verified) {
+            Log::channel('diditDocumentJob')->warning('Didit webhook recusado: assinatura inválida', [
+                'has_signature_v2' => $request->header('X-Signature-V2') !== null,
+                'has_signature' => $request->header('X-Signature') !== null,
+                'has_signature_simple' => $request->header('X-Signature-Simple') !== null,
+                'has_timestamp' => $request->header('X-Timestamp') !== null,
+                'user_agent' => $request->userAgent(),
+            ]);
+
             return response()->json(['error' => 'Invalid signature'], 401);
         }
 

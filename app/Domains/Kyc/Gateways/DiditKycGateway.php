@@ -4,6 +4,7 @@ namespace App\Domains\Kyc\Gateways;
 
 use App\Domains\Kyc\Clients\DiditHttpClient;
 use App\Domains\Kyc\Contracts\KycGatewayInterface;
+use App\Domains\Kyc\DiditWebhookSignature;
 use App\Domains\Settings\Services\DiditSettingsService;
 use Illuminate\Support\Facades\Log;
 
@@ -62,15 +63,14 @@ class DiditKycGateway implements KycGatewayInterface
         return $this->client->getSessionStatus($sessionId);
     }
 
-    public function verifyWebhookSignature(string $payload, ?string $signature): bool
+    public function verifyWebhookSignature(string $payload, ?string $signature, array $headers = []): bool
     {
-        if (! $signature) {
-            return false;
-        }
-
-        $expectedSignature = hash_hmac('sha256', $payload, $this->diditSettings->webhookSecret());
-
-        return hash_equals($expectedSignature, $signature);
+        return DiditWebhookSignature::verify($payload, $this->diditSettings->webhookSecret(), [
+            'signature_v2' => $signature ?? ($headers['signature_v2'] ?? null),
+            'signature' => $headers['signature'] ?? null,
+            'signature_simple' => $headers['signature_simple'] ?? null,
+            'timestamp' => $headers['timestamp'] ?? null,
+        ]);
     }
 
     protected function mapDiditError(int $status, ?array $body): string

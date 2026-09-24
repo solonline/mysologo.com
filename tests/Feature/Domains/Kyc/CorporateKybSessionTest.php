@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Domains\Kyc;
 
+use App\Domains\Kyc\DiditVendorData;
 use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Kyc\Services\IdentityVerificationService;
 use App\Domains\Kyc\Services\IdentityVerificationWebhookService;
@@ -62,10 +63,17 @@ class CorporateKybSessionTest extends TestCase
         ]);
 
         Http::assertSent(function ($request) use ($corporate) {
+            $payload = $request->data();
+
             return $request->url() === 'https://didit.test/session'
                 && $request['workflow_id'] === 'wf_kyb_test'
-                && $request['customer_id'] === $corporate->id;
+                && ($payload['vendor_data'] ?? null) === DiditVendorData::forCustomer($corporate->id)
+                && ! array_key_exists('customer_id', $payload);
         });
+
+        $session = CustomerDiditSession::query()->where('session_id', 'sess_kyb_1')->first();
+        $this->assertNotNull($session);
+        $this->assertSame(DiditVendorData::forCustomer($corporate->id), $session->metadata['vendor_data'] ?? null);
 
         $this->assertTrue($responsible->is($corporate->fresh()->responsibles()->first()));
     }

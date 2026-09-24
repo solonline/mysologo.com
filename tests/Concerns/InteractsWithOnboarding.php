@@ -2,6 +2,7 @@
 
 namespace Tests\Concerns;
 
+use App\Domains\Kyc\DiditWebhookSignature;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Onboarding\Jobs\ProvisionFundingPartnersJob;
@@ -292,13 +293,17 @@ trait InteractsWithOnboarding
     }
 
     /** @param array<string, mixed> $payload */
-    protected function postDiditWebhook(array $payload): TestResponse
+    protected function postDiditWebhook(array $payload, array $headerOverrides = []): TestResponse
     {
-        $json = json_encode($payload, JSON_THROW_ON_ERROR);
-        $signature = hash_hmac('sha256', $json, 'didit-webhook-secret');
+        $raw = json_encode($payload, JSON_THROW_ON_ERROR);
+        $canonical = DiditWebhookSignature::canonicalizeJson($raw);
+        $this->assertNotNull($canonical);
 
-        return $this->postJson('/api/webhooks/didit', $payload, [
-            'X-Signature-V2' => $signature,
-        ]);
+        $headers = array_merge([
+            'X-Signature-V2' => hash_hmac('sha256', $canonical, 'didit-webhook-secret'),
+            'X-Timestamp' => (string) now()->timestamp,
+        ], $headerOverrides);
+
+        return $this->withHeaders($headers)->postJson('/api/webhooks/didit', $payload);
     }
 }

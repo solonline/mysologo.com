@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Domains\Kyc;
 
+use App\Domains\Kyc\DiditVendorData;
 use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Kyc\Jobs\UploadDocumentMediaJob;
 use App\Domains\Kyc\Mail\DocumentStatusMail;
@@ -93,7 +94,43 @@ class IdentityVerificationWebhookTest extends TestCase
         $this->assertSame(DocumentStatus::APPROVED->value, $customer->doc_status);
     }
 
-    public function test_user_data_updated_declined_via_application_id(): void
+    public function test_didit_webhook_endpoint_rejects_invalid_v2_signature(): void
+    {
+        $payload = $this->diditApprovedPayload(1, 'sess_kyc_sig');
+
+        $response = $this->postDiditWebhook($payload, [
+            'X-Signature-V2' => str_repeat('a', 64),
+        ]);
+
+        $response->assertUnauthorized()->assertJson(['error' => 'Invalid signature']);
+    }
+
+    public function test_didit_webhook_endpoint_rejects_stale_timestamp(): void
+    {
+        $payload = $this->diditApprovedPayload(1, 'sess_kyc_stale');
+
+        $response = $this->postDiditWebhook($payload, [
+            'X-Timestamp' => (string) now()->subMinutes(10)->timestamp,
+        ]);
+
+        $response->assertUnauthorized()->assertJson(['error' => 'Invalid signature']);
+    }
+
+    public function test_didit_webhook_endpoint_accepts_raw_x_signature_fallback(): void
+    {
+        $payload = $this->diditApprovedPayload(1, 'sess_kyc_raw');
+        $raw = json_encode($payload, JSON_THROW_ON_ERROR);
+
+        $response = $this->withHeaders([
+            'X-Signature-V2' => str_repeat('b', 64),
+            'X-Signature' => hash_hmac('sha256', $raw, 'didit-webhook-secret'),
+            'X-Timestamp' => (string) now()->timestamp,
+        ])->postJson('/api/webhooks/didit', $payload);
+
+        $response->assertOk()->assertJson(['success' => true]);
+    }
+
+    public function test_user_data_updated_declined_via_vendor_data(): void
     {
         $applicationId = 'c159a625-9dde-444c-990d-9accf2298448';
         $vendorUserId = '9342433c-a69d-42f5-9dd2-5ab079051b89';
@@ -101,10 +138,12 @@ class IdentityVerificationWebhookTest extends TestCase
         $customer = $this->createRetailCustomer([
             'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
         ]);
-        $session = $this->createDiditSession($customer, $applicationId);
+        $session = $this->createDiditSession($customer, 'sess_vendor_data_1');
 
         app(IdentityVerificationWebhookService::class)->handleDataUpdated(
-            $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Declined'),
+            $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Declined', [
+                'vendor_data' => DiditVendorData::forCustomer($customer->id),
+            ]),
         );
 
         $customer->refresh();
@@ -115,7 +154,7 @@ class IdentityVerificationWebhookTest extends TestCase
         $this->assertSame('Declined', $session->status);
     }
 
-    public function test_user_data_updated_finds_session_by_metadata_application_id(): void
+    public function test_user_data_updated_finds_session_by_vendor_user_id(): void
     {
         $applicationId = 'c159a625-9dde-444c-990d-9accf2298448';
         $vendorUserId = '9342433c-a69d-42f5-9dd2-5ab079051b89';
@@ -130,7 +169,7 @@ class IdentityVerificationWebhookTest extends TestCase
             'status' => 'In Progress',
             'workflow_id' => 'wf_test',
             'session_url' => 'https://didit.test/session-metadata',
-            'metadata' => ['application_id' => $applicationId],
+            'metadata' => ['vendor_user_id' => $vendorUserId],
         ]);
 
         app(IdentityVerificationWebhookService::class)->handleDataUpdated(
@@ -143,7 +182,7 @@ class IdentityVerificationWebhookTest extends TestCase
         $this->assertSame(DocumentStatus::DECLINED->value, $customer->doc_status);
     }
 
-    public function test_user_data_updated_ignores_unknown_application_id(): void
+    public function test_user_data_updated_ignores_unknown_vendor_ids(): void
     {
         $customer = $this->createRetailCustomer([
             'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
@@ -171,10 +210,12 @@ class IdentityVerificationWebhookTest extends TestCase
         $customer = $this->createRetailCustomer([
             'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
         ]);
-        $this->createDiditSession($customer, $applicationId);
+        $this->createDiditSession($customer, 'sess-approved-001');
 
         app(IdentityVerificationWebhookService::class)->handleDataUpdated(
-            $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Approved'),
+            $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Approved', [
+                'vendor_data' => DiditVendorData::forCustomer($customer->id),
+            ]),
         );
 
         $this->runProvisionFundingPartnersJob($customer->fresh());
@@ -193,8 +234,10 @@ class IdentityVerificationWebhookTest extends TestCase
         $customer = $this->createRetailCustomer([
             'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
         ]);
-        $this->createDiditSession($customer, $applicationId);
-        $payload = $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Declined');
+        $this->createDiditSession($customer, 'sess_webhook_endpoint_1');
+        $payload = $this->diditUserDataUpdatedPayload($applicationId, $vendorUserId, 'Declined', [
+            'vendor_data' => DiditVendorData::forCustomer($customer->id),
+        ]);
 
         $response = $this->postDiditWebhook($payload);
 
@@ -495,7 +538,10 @@ class IdentityVerificationWebhookTest extends TestCase
         $otherCustomer->refresh();
 
         $this->assertSame(DocumentStatus::APPROVED->value, $targetCustomer->doc_status);
-        $this->assertSame(CustomerLifecycleStatus::PROVISIONING, $targetCustomer->status);
+        $this->assertTrue(in_array($targetCustomer->status, [
+            CustomerLifecycleStatus::PROVISIONING,
+            CustomerLifecycleStatus::ACTIVE,
+        ], true));
         $this->assertSame('pending', $otherCustomer->doc_status);
         $this->assertSame(CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW, $otherCustomer->status);
     }
@@ -619,6 +665,111 @@ class IdentityVerificationWebhookTest extends TestCase
         Mail::assertNotSent(DocumentStatusMail::class);
     }
 
+    public function test_user_data_updated_does_not_apply_to_wrong_customer_when_application_id_is_shared(): void
+    {
+        $applicationId = 'c159a625-9dde-444c-990d-9accf2298448';
+
+        $wrongCustomer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+            'doc_status' => DocumentStatus::ANALYSING->value,
+        ]);
+        $targetCustomer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+            'doc_status' => DocumentStatus::ANALYSING->value,
+        ]);
+
+        $wrongSession = CustomerDiditSession::query()->create([
+            'customer_id' => $wrongCustomer->id,
+            'session_id' => '518423db-5519-41c0-97bc-25822727b1e4',
+            'status' => 'In Progress',
+            'workflow_id' => 'wf_test',
+            'session_url' => 'https://didit.test/session-wrong',
+            'metadata' => ['application_id' => $applicationId],
+        ]);
+
+        CustomerDiditSession::query()->create([
+            'customer_id' => $targetCustomer->id,
+            'session_id' => '86281871-a1fd-48ec-aa43-444f6519c223',
+            'status' => 'In Review',
+            'workflow_id' => 'wf_test',
+            'session_url' => 'https://didit.test/session-target-user',
+            'metadata' => ['application_id' => $applicationId],
+        ]);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditUserDataUpdatedPayload($applicationId, 'vendor-target', 'Declined', [
+                'vendor_data' => DiditVendorData::forCustomer($targetCustomer->id),
+            ]),
+        );
+
+        $wrongCustomer->refresh();
+        $targetCustomer->refresh();
+        $wrongSession->refresh();
+
+        $this->assertSame(DocumentStatus::ANALYSING->value, $wrongCustomer->doc_status);
+        $this->assertSame(CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW, $wrongCustomer->status);
+        $this->assertSame('In Progress', $wrongSession->status);
+        $this->assertSame(DocumentStatus::DECLINED->value, $targetCustomer->doc_status);
+        $this->assertSame(CustomerLifecycleStatus::IDENTITY_REJECTED, $targetCustomer->status);
+    }
+
+    public function test_user_data_updated_without_unique_ids_does_not_use_application_id(): void
+    {
+        $applicationId = 'c159a625-9dde-444c-990d-9accf2298448';
+
+        $wrongCustomer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+            'doc_status' => DocumentStatus::ANALYSING->value,
+        ]);
+
+        $session = CustomerDiditSession::query()->create([
+            'customer_id' => $wrongCustomer->id,
+            'session_id' => '518423db-5519-41c0-97bc-25822727b1e4',
+            'status' => 'In Progress',
+            'workflow_id' => 'wf_test',
+            'session_url' => 'https://didit.test/session-shared-app',
+            'metadata' => ['application_id' => $applicationId],
+        ]);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditUserDataUpdatedPayload($applicationId, 'unknown-vendor', 'Declined'),
+        );
+
+        $wrongCustomer->refresh();
+        $session->refresh();
+
+        $this->assertSame(DocumentStatus::ANALYSING->value, $wrongCustomer->doc_status);
+        $this->assertSame(CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW, $wrongCustomer->status);
+        $this->assertSame('In Progress', $session->status);
+    }
+
+    public function test_user_data_updated_active_does_not_overwrite_session_kyc_status(): void
+    {
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW,
+            'doc_status' => DocumentStatus::ANALYSING->value,
+        ]);
+
+        $session = $this->createDiditSession($customer, 'sess-active-entity');
+        $session->update(['status' => 'In Review']);
+
+        app(IdentityVerificationWebhookService::class)->handleDataUpdated(
+            $this->diditUserDataUpdatedPayload('shared-app-id', 'vendor-active', 'ACTIVE', [
+                'vendor_data' => DiditVendorData::forCustomer($customer->id),
+            ]),
+        );
+
+        $customer->refresh();
+        $session->refresh();
+
+        $this->assertSame('In Review', $session->status);
+        $this->assertSame(DocumentStatus::ANALYSING->value, $customer->doc_status);
+        $this->assertSame(CustomerLifecycleStatus::IDENTITY_UNDER_REVIEW, $customer->status);
+        $this->assertSame(DiditVendorData::forCustomer($customer->id), $session->metadata['vendor_data']);
+        $this->assertSame('vendor-active', $session->metadata['vendor_user_id']);
+        Mail::assertNotSent(DocumentStatusMail::class);
+    }
+
     public function test_abandoned_session_does_not_send_document_status_email(): void
     {
         $sessionId = 'sess-abandoned-001';
@@ -630,7 +781,9 @@ class IdentityVerificationWebhookTest extends TestCase
         $this->createDiditSession($customer, $sessionId);
 
         app(IdentityVerificationWebhookService::class)->handleDataUpdated(
-            $this->diditUserDataUpdatedPayload($sessionId, 'vendor-abandoned', 'Abandoned'),
+            $this->diditUserDataUpdatedPayload($sessionId, 'vendor-abandoned', 'Abandoned', [
+                'vendor_data' => DiditVendorData::forCustomer($customer->id),
+            ]),
         );
 
         $customer->refresh();

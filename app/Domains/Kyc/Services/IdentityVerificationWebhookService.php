@@ -6,6 +6,7 @@ use App\Domains\Customer\Contracts\CorporateDocumentRepositoryInterface;
 use App\Domains\Customer\Contracts\CustomerRepositoryInterface;
 use App\Domains\Customer\Contracts\RetailDocumentRepositoryInterface;
 use App\Domains\Kyc\Contracts\IdentityVerificationSessionRepositoryInterface;
+use App\Domains\Kyc\DiditVendorData;
 use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Kyc\Jobs\SendDocumentStatusEmail;
 use App\Domains\Kyc\Jobs\UploadDocumentMediaJob;
@@ -85,6 +86,18 @@ class IdentityVerificationWebhookService
                 Log::warning('Didit user.data.updated: customer não encontrado', [
                     'customer_id' => $diditSession->customer_id,
                     'event_id' => $payload['event_id'] ?? null,
+                ]);
+
+                return;
+            }
+
+            $this->enrichSessionMetadata($diditSession, $payload);
+
+            if ($this->isDiditEntityStatus((string) $rawStatus)) {
+                Log::channel('diditDocumentJob')->info('Didit user.data.updated ignorado (status de entidade)', [
+                    'customer_id' => $customer->id,
+                    'session_id' => $diditSession->session_id,
+                    'status' => $rawStatus,
                 ]);
 
                 return;
@@ -252,13 +265,56 @@ class IdentityVerificationWebhookService
             }
         }
 
-        $applicationId = $payload['application_id'] ?? null;
+        $vendorData = $this->stringPayloadValue($payload['vendor_data'] ?? $decision['vendor_data'] ?? null);
 
-        if (is_string($applicationId) && $applicationId !== '') {
-            return $this->sessionRepository->findByApplicationId($applicationId);
+        if ($vendorData !== null) {
+            $session = $this->resolveSessionByVendorData($vendorData);
+
+            if ($session) {
+                return $session;
+            }
+        }
+
+        $vendorUserId = $this->stringPayloadValue($payload['vendor_user_id'] ?? $decision['vendor_user_id'] ?? null);
+
+        if ($vendorUserId !== null) {
+            return $this->sessionRepository->findByVendorUserId($vendorUserId);
         }
 
         return null;
+    }
+
+    private function resolveSessionByVendorData(string $vendorData): ?CustomerDiditSession
+    {
+        $customerId = DiditVendorData::parseCustomerId($vendorData);
+
+        if ($customerId !== null) {
+            $customer = $this->customerRepository->findById($customerId);
+
+            if ($customer) {
+                $session = $this->sessionRepository->latestByCustomer($customer);
+
+                if ($session) {
+                    return $session;
+                }
+            }
+        }
+
+        return $this->sessionRepository->findByVendorData($vendorData);
+    }
+
+    private function stringPayloadValue(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        return $value;
+    }
+
+    private function isDiditEntityStatus(string $status): bool
+    {
+        return in_array(strtoupper($status), ['ACTIVE', 'FLAGGED', 'BLOCKED'], true);
     }
 
     /**
@@ -281,7 +337,8 @@ class IdentityVerificationWebhookService
 
         return array_values(array_unique(array_filter([
             ...$this->collectDiditSessionIds($payload, $decision),
-            $payload['application_id'] ?? null,
+            $payload['vendor_data'] ?? null,
+            $payload['vendor_user_id'] ?? null,
         ])));
     }
 
@@ -329,6 +386,8 @@ class IdentityVerificationWebhookService
         foreach ([
             'application_id' => $payload['application_id'] ?? null,
             'session_id' => $payload['session_id'] ?? $decision['session_id'] ?? null,
+            'vendor_data' => $payload['vendor_data'] ?? $decision['vendor_data'] ?? null,
+            'vendor_user_id' => $payload['vendor_user_id'] ?? $decision['vendor_user_id'] ?? null,
         ] as $key => $value) {
             if (! is_string($value) || $value === '' || ($metadata[$key] ?? null) === $value) {
                 continue;

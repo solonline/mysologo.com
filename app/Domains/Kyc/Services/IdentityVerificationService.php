@@ -7,6 +7,7 @@ use App\Domains\Customer\Contracts\CustomerRepositoryInterface;
 use App\Domains\Customer\Services\CorporateDocumentService;
 use App\Domains\Kyc\Contracts\IdentityVerificationSessionRepositoryInterface;
 use App\Domains\Kyc\Contracts\KycGatewayInterface;
+use App\Domains\Kyc\DiditVendorData;
 use App\Domains\Kyc\Enums\DocumentStatus;
 use App\Domains\Settings\Services\DiditSettingsService;
 use App\Exceptions\ApiException;
@@ -35,9 +36,11 @@ class IdentityVerificationService
             $this->corporateDocumentService->initiateKyBReview($customer);
         }
 
+        $vendorData = DiditVendorData::forCustomer($customer->id);
+
         $sessionData = [
             'workflow_id' => $workflowId,
-            'customer_id' => $customer->id,
+            'vendor_data' => $vendorData,
             'callback' => config('app.url_frontend').'/verification-pending',
             'callback_method' => 'initiator',
             'language' => $customer->language ?? 'en',
@@ -55,7 +58,7 @@ class IdentityVerificationService
                     'session_url' => $body['url'] ?? null,
                     'status' => $body['status'] ?? 'pending',
                     'callback' => $sessionData['callback'],
-                    'metadata' => $this->buildSessionMetadata($body),
+                    'metadata' => $this->buildSessionMetadata($body, $vendorData),
                 ]
             );
 
@@ -64,6 +67,7 @@ class IdentityVerificationService
                 'session_id' => $diditSession->session_id,
                 'workflow_id' => $diditSession->workflow_id,
             ]);
+
             return [
                 'status' => 'success',
                 'message' => null,
@@ -83,9 +87,9 @@ class IdentityVerificationService
         return $this->gateway->getSessionStatus($sessionId);
     }
 
-    public function verifyWebhookSignature(string $payload, ?string $signature): bool
+    public function verifyWebhookSignature(string $payload, ?string $signature, array $headers = []): bool
     {
-        return $this->gateway->verifyWebhookSignature($payload, $signature);
+        return $this->gateway->verifyWebhookSignature($payload, $signature, $headers);
     }
 
     public function ensureValidIndividualDocument(Customer $customer): array
@@ -167,25 +171,22 @@ class IdentityVerificationService
     {
         $session = $this->sessionRepository->latestByCustomer($customer);
 
-        if (! isset($session) || in_array($session->status, ['Approved', 'Not Started'])) {
-            if (! isset($session) || $session->updated_at->addDays(7)->isPast()) {
-                return $this->createSession($customer, $workflowId);
-            }
+        if ($session === null) {
+            return $this->createSession($customer, $workflowId);
+        }
 
-            $action = match ($session->status) {
-                'Declined', 'Abandoned', 'Expired' => fn () => $this->createSession($customer, $workflowId),
-                default => null,
-            };
+        if (in_array($session->status, ['Expired', 'Abandoned', 'Declined'], true)) {
+            return $this->createSession($customer, $workflowId);
+        }
 
-            if ($action) {
-                return $action();
-            }
+        if ($session->status === 'Not Started' && $session->updated_at->addDays(7)->isPast()) {
+            return $this->createSession($customer, $workflowId);
         }
 
         return [
             'status' => 'success',
             'message' => null,
-            'session' => $session?->toArray(),
+            'session' => $session->toArray(),
         ];
     }
 
@@ -205,15 +206,23 @@ class IdentityVerificationService
     }
 
     /** @param array<string, mixed> $body */
-    private function buildSessionMetadata(array $body): ?array
+    private function buildSessionMetadata(array $body, string $vendorData): ?array
     {
         $metadata = is_array($body['metadata'] ?? null) ? $body['metadata'] : [];
 
-        if (isset($body['application_id'])) {
+        $metadata['vendor_data'] = is_string($body['vendor_data'] ?? null) && $body['vendor_data'] !== ''
+            ? $body['vendor_data']
+            : $vendorData;
+
+        if (isset($body['vendor_user_id']) && is_string($body['vendor_user_id']) && $body['vendor_user_id'] !== '') {
+            $metadata['vendor_user_id'] = $body['vendor_user_id'];
+        }
+
+        if (isset($body['application_id']) && is_string($body['application_id']) && $body['application_id'] !== '') {
             $metadata['application_id'] = $body['application_id'];
         }
 
-        if (isset($body['session_id'])) {
+        if (isset($body['session_id']) && is_string($body['session_id']) && $body['session_id'] !== '') {
             $metadata['session_id'] = $body['session_id'];
         }
 

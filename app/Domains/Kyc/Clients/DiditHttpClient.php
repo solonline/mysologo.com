@@ -14,22 +14,27 @@ class DiditHttpClient
 
     public function createSession(array $data): Response
     {
-        return Http::withHeaders([
-            'Authorization' => 'Bearer '.$this->diditSettings->apiKey(),
+        return Http::withHeaders($this->headers([
             'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-            'x-api-key' => $this->diditSettings->apiSecret(),
-        ])->post($this->diditSettings->baseUrl().'/session', $data);
+        ]))->post($this->diditSettings->baseUrl().'/session', $data);
     }
 
     /** @return array<string, mixed> */
     public function getSessionStatus(string $sessionId): array
     {
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer '.$this->diditSettings->apiKey(),
-            'Accept' => 'application/json',
-        ])->get($this->diditSettings->baseUrl().'/session/'.$sessionId.'/decision');
+        $response = Http::withHeaders($this->headers())
+            ->get($this->diditSettings->baseUrl().'/session/'.$sessionId.'/decision');
 
         return $response->json() ?? [];
+    }
+
+    /** @param array<string, string> $extra */
+    private function headers(array $extra = []): array
+    {
+        return array_merge([
+            'Authorization' => 'Bearer '.$this->diditSettings->apiKey(),
+            'Accept' => 'application/json',
+            'x-api-key' => $this->diditSettings->apiSecret(),
+        ], $extra);
     }
 }

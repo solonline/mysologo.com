@@ -14,5 +14,5 @@ interface KycGatewayInterface
 
     public function getSessionStatus(string $sessionId): array;
 
-    public function verifyWebhookSignature(string $payload, ?string $signature): bool;
+    public function verifyWebhookSignature(string $payload, ?string $signature, array $headers = []): bool;
 }

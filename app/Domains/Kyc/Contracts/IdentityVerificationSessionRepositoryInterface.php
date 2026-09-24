@@ -11,7 +11,9 @@ interface IdentityVerificationSessionRepositoryInterface
 
     public function findBySessionId(string $sessionId): ?CustomerDiditSession;
 
-    public function findByApplicationId(string $applicationId): ?CustomerDiditSession;
+    public function findByVendorData(string $vendorData): ?CustomerDiditSession;
+
+    public function findByVendorUserId(string $vendorUserId): ?CustomerDiditSession;
 
     public function latestByCustomer(Customer $customer): ?CustomerDiditSession;
 }
