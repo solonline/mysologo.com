@@ -18,8 +18,9 @@ class PhoneVerificationController extends Controller
     /**
      * Send Phone Verification Code
      *
-     * Sends a one-time SMS code to the customer's phone. Optional `phone` corrects
-     * an unverified number from registration before sending.
+     * Sends a one-time code to the customer's phone. Optional `phone` corrects
+     * an unverified number from registration before sending. Optional `whatsapp`
+     * sends the code via WhatsApp instead of SMS.
      *
      * @tags Onboarding
      */
@@ -27,7 +28,12 @@ class PhoneVerificationController extends Controller
     {
         /** @var Customer $customer */
         $customer = Auth::user();
-        $sent = $this->service->sendForOnboarding($customer, $request->validated('phone'));
+        $viaWhatsapp = $request->boolean('whatsapp');
+        $sent = $this->service->sendForOnboarding(
+            $customer,
+            $request->validated('phone'),
+            $viaWhatsapp,
+        );
         $customer->refresh();
 
         if ($sent) {
@@ -41,6 +47,7 @@ class PhoneVerificationController extends Controller
         SmsLogger::info('onboarding_phone_send_endpoint', [
             'customer_id' => $customer->id,
             'phone' => $customer->phone,
+            'channel' => $viaWhatsapp ? 'whatsapp' : 'sms',
             'sent' => $sent,
             'message' => $msg,
         ]);

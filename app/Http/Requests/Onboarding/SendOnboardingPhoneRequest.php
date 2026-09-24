@@ -13,13 +13,17 @@ class SendOnboardingPhoneRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if (! $this->exists('phone')) {
-            return;
+        if ($this->exists('phone')) {
+            $digits = preg_replace('/\D+/', '', (string) $this->input('phone')) ?: null;
+
+            $this->merge(['phone' => $digits]);
         }
 
-        $digits = preg_replace('/\D+/', '', (string) $this->input('phone')) ?: null;
-
-        $this->merge(['phone' => $digits]);
+        if ($this->exists('whatsapp')) {
+            $this->merge([
+                'whatsapp' => filter_var($this->input('whatsapp'), FILTER_VALIDATE_BOOLEAN),
+            ]);
+        }
     }
 
     /** @return array<string, mixed> */
@@ -27,6 +31,7 @@ class SendOnboardingPhoneRequest extends FormRequest
     {
         return [
             'phone' => ['sometimes', 'nullable', 'string', 'max:20', 'regex:/^[0-9]+$/'],
+            'whatsapp' => ['sometimes', 'boolean'],
         ];
     }
 }

@@ -4,6 +4,8 @@ namespace Tests\Feature\Domains\Onboarding;
 
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Sms\Contracts\SmsGatewayInterface;
+use App\Domains\Whatsapp\Contracts\WhatsappGatewayInterface;
+use App\Domains\Whatsapp\DTOs\WhatsappSendResult;
 use App\Models\Customer;
 use App\Models\PhoneVerification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -62,6 +64,31 @@ class PhoneVerificationControllerTest extends TestCase
             ->assertJsonPath('reason', 'phone_already_verified');
 
         $this->assertSame('351911111111', $customer->fresh()->phone);
+    }
+
+    public function test_send_with_whatsapp_true_uses_whatsapp_channel(): void
+    {
+        $this->mock(SmsGatewayInterface::class, function ($mock) {
+            $mock->shouldNotReceive('send');
+        });
+
+        $this->mock(WhatsappGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('sendText')
+                ->once()
+                ->with('351911111111', \Mockery::type('string'))
+                ->andReturn(WhatsappSendResult::fromProvider(201, [
+                    'key' => ['id' => 'WA1'],
+                    'status' => 'PENDING',
+                ]));
+        });
+
+        $customer = $this->pendingPhoneCustomer('351911111111');
+
+        $this->withToken($customer->createToken('test')->plainTextToken)
+            ->postJson('/api/onboarding/phone/send', ['whatsapp' => true])
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('phone', '351911111111');
     }
 
     private function pendingPhoneCustomer(string $phone): Customer

@@ -5,6 +5,8 @@ namespace Tests\Unit\Domains\Onboarding;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Services\PhoneVerificationService;
 use App\Domains\Sms\Contracts\SmsGatewayInterface;
+use App\Domains\Whatsapp\Contracts\WhatsappGatewayInterface;
+use App\Domains\Whatsapp\DTOs\WhatsappSendResult;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
@@ -106,5 +108,62 @@ class PhoneVerificationServiceTest extends TestCase
             CustomerLifecycleStatus::PENDING_IDENTITY_VERIFICATION,
             $customer->fresh()->status,
         );
+    }
+
+    public function test_send_via_whatsapp_does_not_call_sms(): void
+    {
+        $this->mock(SmsGatewayInterface::class, function ($mock) {
+            $mock->shouldNotReceive('send');
+        });
+
+        $this->mock(WhatsappGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('sendText')
+                ->once()
+                ->with('351911111111', \Mockery::on(fn (string $message) => str_contains($message, 'código')))
+                ->andReturn(WhatsappSendResult::fromProvider(201, [
+                    'key' => ['id' => 'WA1'],
+                    'status' => 'PENDING',
+                ]));
+        });
+
+        $customer = Customer::factory()->create([
+            'phone' => '351911111111',
+            'status' => CustomerLifecycleStatus::PENDING_PHONE_VERIFICATION,
+        ]);
+
+        $sent = app(PhoneVerificationService::class)->sendForOnboarding($customer, null, true);
+
+        $this->assertTrue($sent);
+        $this->assertDatabaseHas('phone_verifications', [
+            'customer_id' => $customer->id,
+            'phone' => '351911111111',
+            'verified_at' => null,
+        ]);
+    }
+
+    public function test_send_via_whatsapp_deletes_code_when_provider_fails(): void
+    {
+        $this->mock(SmsGatewayInterface::class, function ($mock) {
+            $mock->shouldNotReceive('send');
+        });
+
+        $this->mock(WhatsappGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('sendText')
+                ->once()
+                ->andReturn(WhatsappSendResult::failed('Erro de comunicação com o serviço de WhatsApp.'));
+        });
+
+        $customer = Customer::factory()->create([
+            'phone' => '351911111111',
+            'status' => CustomerLifecycleStatus::PENDING_PHONE_VERIFICATION,
+        ]);
+
+        $sent = app(PhoneVerificationService::class)->sendForOnboarding($customer, null, true);
+
+        $this->assertFalse($sent);
+        $this->assertDatabaseMissing('phone_verifications', [
+            'customer_id' => $customer->id,
+            'phone' => '351911111111',
+        ]);
     }
 }
