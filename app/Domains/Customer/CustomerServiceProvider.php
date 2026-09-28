@@ -5,6 +5,10 @@ namespace App\Domains\Customer;
 use App\Domains\Customer\Contracts\CorporateDocumentRepositoryInterface;
 use App\Domains\Customer\Contracts\CustomerRepositoryInterface;
 use App\Domains\Customer\Contracts\RetailDocumentRepositoryInterface;
+use App\Domains\Customer\Notifications\Channels\EmailNotificationChannel;
+use App\Domains\Customer\Notifications\Channels\FcmNotificationChannel;
+use App\Domains\Customer\Notifications\Channels\InAppNotificationChannel;
+use App\Domains\Customer\Notifications\NotificationDispatcher;
 use App\Domains\Customer\Repositories\CorporateDocumentRepository;
 use App\Domains\Customer\Repositories\CustomerRepository;
 use App\Domains\Customer\Repositories\RetailDocumentRepository;
@@ -29,6 +33,10 @@ class CustomerServiceProvider extends ServiceProvider
         CorporateDocumentService::class,
         CustomerNotificationService::class,
         CustomerFavoriteService::class,
+        NotificationDispatcher::class,
+        InAppNotificationChannel::class,
+        FcmNotificationChannel::class,
+        EmailNotificationChannel::class,
     ];
 
     public function register(): void

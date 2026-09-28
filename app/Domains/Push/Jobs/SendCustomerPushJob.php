@@ -34,25 +34,17 @@ class SendCustomerPushJob implements ShouldQueue
 
         $payload = is_array($notification->data) ? $notification->data : [];
 
+        // Front espera sempre estes campos no data do FCM.
         $data = [
-            'type' => (string) $notification->type,
-            'notification_id' => (string) $notification->id,
+            'type' => (string) ($payload['type'] ?? $notification->type),
+            'resource_id' => (string) ($payload['resource_id'] ?? ''),
+            'notification_id' => (string) ($payload['notification_id'] ?? $notification->id),
+            'path' => (string) ($payload['path'] ?? ''),
         ];
-
-        $resourceId = $payload['resource_id'] ?? null;
-        $path = $payload['path'] ?? null;
-
-        if ($resourceId !== null && $resourceId !== '') {
-            $data['resource_id'] = (string) $resourceId;
-        }
-
-        if ($path !== null && $path !== '') {
-            $data['path'] = (string) $path;
-        }
 
         $challengeId = $payload['challenge_id'] ?? null;
 
-        if (! isset($data['resource_id']) && $challengeId !== null && $challengeId !== '') {
+        if ($data['resource_id'] === '' && $challengeId !== null && $challengeId !== '') {
             $data['challenge_id'] = (string) $challengeId;
         }
 

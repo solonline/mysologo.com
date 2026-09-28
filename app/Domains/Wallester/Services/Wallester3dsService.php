@@ -2,7 +2,8 @@
 
 namespace App\Domains\Wallester\Services;
 
-use App\Domains\Customer\Services\CustomerNotificationService;
+use App\Domains\Customer\Notifications\NotificationDispatcher;
+use App\Domains\Customer\Notifications\SimpleCustomerNotification;
 use App\Domains\Wallester\Enums\Wallester3dsChallengeStatus;
 use App\Domains\Wallester\Enums\Wallester3dsValidationStatus;
 use App\Models\Customer;
@@ -16,7 +17,7 @@ use RuntimeException;
 class Wallester3dsService
 {
     public function __construct(
-        protected CustomerNotificationService $notifications,
+        protected NotificationDispatcher $notifications,
         protected WallesterSettingsService $wallesterSettings,
     ) {}
 
@@ -187,19 +188,22 @@ class Wallester3dsService
         $currency = (string) ($challenge->transaction['currency'] ?? '');
         $amountLabel = trim($amount.' '.$currency);
 
-        $this->notifications->notify(
+        $this->notifications->send(
             $customer,
-            'wallester.3ds_challenge',
-            'Confirm online payment',
-            $amountLabel !== '' ? "{$merchantName} — {$amountLabel}" : $merchantName,
-            [
-                'challenge_id' => $challenge->id,
-                'wallester_request_id' => $challenge->wallester_request_id,
-                'merchant' => $challenge->merchant,
-                'transaction' => $challenge->transaction,
-                'card' => $challenge->card,
-                'expires_at' => $challenge->expires_at?->toIso8601String(),
-            ],
+            new SimpleCustomerNotification(
+                notificationType: 'wallester.3ds_challenge',
+                notificationTitle: 'Confirm online payment',
+                notificationBody: $amountLabel !== '' ? "{$merchantName} — {$amountLabel}" : $merchantName,
+                notificationResourceId: null,
+                extra: [
+                    'challenge_id' => $challenge->id,
+                    'wallester_request_id' => $challenge->wallester_request_id,
+                    'merchant' => $challenge->merchant,
+                    'transaction' => $challenge->transaction,
+                    'card' => $challenge->card,
+                    'expires_at' => $challenge->expires_at?->toIso8601String(),
+                ],
+            ),
         );
     }
 }

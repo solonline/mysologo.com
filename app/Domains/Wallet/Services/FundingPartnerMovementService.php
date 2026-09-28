@@ -13,6 +13,7 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
+use App\Domains\Wallet\Events\CustomerTransferReceived;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
@@ -139,6 +140,15 @@ class FundingPartnerMovementService
                     to: $to,
                     currency: $routingCurrency,
                 );
+
+                CustomerTransferReceived::dispatch(
+                    toCustomerId: (int) $to->id,
+                    fromCustomerId: (int) $from->id,
+                    amountCents: $amountCents,
+                    currency: $routingCurrency,
+                    movementId: (int) $inMovement->id,
+                    description: $description,
+                );
             } catch (Throwable $exception) {
                 $reason = $exception->getMessage();
                 $this->markMovementFailed($outMovement, $reason);
@@ -236,6 +246,15 @@ class FundingPartnerMovementService
             if ($reference instanceof StripeTransaction) {
                 $this->partnerTopupFundingCompleter->complete($reference);
             }
+
+            CustomerTransferReceived::dispatch(
+                toCustomerId: (int) $to->id,
+                fromCustomerId: (int) $masterAccount->username,
+                amountCents: $amountCents,
+                currency: $routingCurrency,
+                movementId: (int) $inMovement->id,
+                description: $description,
+            );
         } catch (Throwable $exception) {
             $reason = $exception->getMessage();
             $this->markMovementFailed($outMovement, $reason);

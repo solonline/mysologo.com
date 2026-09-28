@@ -9,6 +9,7 @@ use App\Domains\Wallester\Services\WallesterFundingTransferDriver;
 use App\Domains\Wallester\Services\WallesterSettingsService;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
+use App\Domains\Customer\Enums\CustomerNotificationType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\Concerns\InteractsWithOnboarding;
@@ -78,6 +79,14 @@ class FundingPartnerMovementServiceTest extends TestCase
         $this->assertDatabaseHas('funding_partner_movements', [
             'idempotency_key' => 'transfer:test:1:in',
             'partner_external_id' => 'pay_once',
+        ]);
+        $this->assertDatabaseHas('customer_notifications', [
+            'customer_id' => $to->id,
+            'type' => CustomerNotificationType::TransferReceived->value,
+            'title' => __('notifications.transfer_received', [
+                'sender' => 'from_user',
+                'amount' => '10,00 EUR',
+            ]),
         ]);
     }
 

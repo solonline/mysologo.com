@@ -2,19 +2,22 @@
 
 namespace Tests\Feature\Domains\Wallet;
 
+use App\Domains\Customer\Enums\CustomerNotificationType;
+use App\Domains\Customer\Jobs\SendCustomerNotificationEmailJob;
+use App\Domains\Customer\Mail\CustomerAppNotificationMail;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
+use App\Domains\Push\Jobs\SendCustomerPushJob;
 use App\Domains\Wallester\Contracts\WallesterGatewayInterface;
 use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
-use App\Domains\Wallet\Jobs\SendBankTransferTopupReceivedEmail;
-use App\Domains\Wallet\Mail\BankTransferTopupReceivedMail;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
 use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
 use App\Models\Customer;
+use App\Models\CustomerNotification;
 use App\Models\StripeTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -46,7 +49,7 @@ class BankTransferTopupEmailTest extends TestCase
 
     public function test_bank_transfer_topup_job_sends_email_after_wallester_funding_completes(): void
     {
-        Bus::fake([SendBankTransferTopupReceivedEmail::class]);
+        Bus::fake([SendCustomerPushJob::class, SendCustomerNotificationEmailJob::class]);
         Mail::fake();
 
         $customer = $this->createRetailCustomer(['email' => 'bank-topup@example.com']);
@@ -105,16 +108,23 @@ class BankTransferTopupEmailTest extends TestCase
         (new FundWallesterTopupFromStripeJob($transaction->id))
             ->handle(app(FundingPartnerMovementService::class), app(TopupWallesterFundingPolicy::class));
 
-        Bus::assertDispatched(SendBankTransferTopupReceivedEmail::class, function (SendBankTransferTopupReceivedEmail $job) use ($transaction): bool {
-            return $job->stripeTransactionId === $transaction->id;
+        $notification = CustomerNotification::query()
+            ->where('customer_id', $customer->id)
+            ->where('type', CustomerNotificationType::TopupImmediate->value)
+            ->first();
+
+        $this->assertNotNull($notification);
+
+        Bus::assertDispatched(SendCustomerNotificationEmailJob::class, function (SendCustomerNotificationEmailJob $job) use ($notification): bool {
+            return $job->notificationId === $notification->id;
         });
 
-        (new SendBankTransferTopupReceivedEmail($transaction->id))->handle();
+        (new SendCustomerNotificationEmailJob($notification->id))->handle();
 
-        Mail::assertSent(BankTransferTopupReceivedMail::class, function (BankTransferTopupReceivedMail $mail) use ($customer): bool {
+        Mail::assertSent(CustomerAppNotificationMail::class, function (CustomerAppNotificationMail $mail) use ($customer): bool {
             return $mail->hasTo($customer->email)
-                && $mail->formattedAmount === '99,00'
-                && $mail->currency === 'EUR';
+                && $mail->notification->type === CustomerNotificationType::TopupImmediate->value
+                && ($mail->notification->data['amount_cents'] ?? null) === 9_900;
         });
     }
 

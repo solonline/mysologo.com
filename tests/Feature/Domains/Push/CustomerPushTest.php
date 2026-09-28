@@ -2,8 +2,9 @@
 
 namespace Tests\Feature\Domains\Push;
 
-use App\Domains\Customer\Enums\CustomerNotificationType;
-use App\Domains\Customer\Services\CustomerNotificationService;
+use App\Domains\Customer\Notifications\NotificationDispatcher;
+use App\Domains\Customer\Notifications\SimpleCustomerNotification;
+use App\Domains\Customer\Notifications\TransferReceivedNotification;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
@@ -167,12 +168,14 @@ class CustomerPushTest extends TestCase
             'push_enabled' => false,
         ]);
 
-        app(CustomerNotificationService::class)->notify(
+        app(NotificationDispatcher::class)->send(
             $customer,
-            'wallester.3ds_challenge',
-            'Confirm online payment',
-            'Shop — 10 EUR',
-            ['challenge_id' => 15],
+            new SimpleCustomerNotification(
+                notificationType: 'wallester.3ds_challenge',
+                notificationTitle: 'Confirm online payment',
+                notificationBody: 'Shop — 10 EUR',
+                extra: ['challenge_id' => 15],
+            ),
         );
 
         Http::assertSent(function ($request) {
@@ -208,12 +211,14 @@ class CustomerPushTest extends TestCase
             'push_enabled' => true,
         ]);
 
-        app(CustomerNotificationService::class)->notify(
+        app(NotificationDispatcher::class)->send(
             $customer,
-            CustomerNotificationType::TransferReceived,
-            'Recebeste uma transferência',
-            '10,00 EUR de João',
-            resourceId: 155,
+            new TransferReceivedNotification(
+                sender: 'João',
+                amountLabel: '10,00 EUR',
+                description: '10,00 EUR de João',
+                movementId: 155,
+            ),
         );
 
         Http::assertSent(function ($request) {
@@ -226,7 +231,7 @@ class CustomerPushTest extends TestCase
             return $message['token'] === 'fcm-transfer'
                 && $message['data']['type'] === 'transfer_received'
                 && $message['data']['resource_id'] === '155'
-                && $message['data']['path'] === '/api/wallet/transactions/155'
+                && $message['data']['path'] === 'api/wallet/transactions/155'
                 && $message['data']['notification_id'] !== '';
         });
     }
@@ -253,12 +258,12 @@ class CustomerPushTest extends TestCase
             'push_enabled' => true,
         ]);
 
-        app(CustomerNotificationService::class)->notify(
+        app(NotificationDispatcher::class)->send(
             $customer,
-            'wallet.received',
-            'Pagamento recebido',
-            null,
-            [],
+            new SimpleCustomerNotification(
+                notificationType: 'wallet.received',
+                notificationTitle: 'Pagamento recebido',
+            ),
         );
 
         $device->refresh();

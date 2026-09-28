@@ -95,6 +95,6 @@ class SendPushNotificationCommandTest extends TestCase
         $this->assertNotNull($notification);
         $this->assertSame(CustomerNotificationType::TransferReceived->value, $notification->type);
         $this->assertSame('155', $notification->data['resource_id']);
-        $this->assertSame('/api/wallet/transactions/155', $notification->data['path']);
+        $this->assertSame('api/wallet/transactions/155', $notification->data['path']);
     }
 }

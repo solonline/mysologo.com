@@ -12,7 +12,7 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
-use App\Domains\Wallet\Jobs\SendBankTransferTopupReceivedEmail;
+use App\Domains\Customer\Jobs\SendCustomerNotificationEmailJob;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
 use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
@@ -201,7 +201,7 @@ class StripeTopupWallesterFundingTest extends TestCase
 
     public function test_topup_job_transfers_net_amount_and_is_idempotent(): void
     {
-        Bus::fake([SendBankTransferTopupReceivedEmail::class]);
+        Bus::fake([SendCustomerNotificationEmailJob::class]);
 
         $customer = $this->createActiveCustomer();
         $platform = $this->createPlatformCustomer();
@@ -283,12 +283,12 @@ class StripeTopupWallesterFundingTest extends TestCase
         $this->assertSame(50_000, (int) $master->available_amount);
         $this->assertSame(2_875, (int) $toAccount->available_amount);
 
-        Bus::assertNotDispatched(SendBankTransferTopupReceivedEmail::class);
+        Bus::assertNotDispatched(SendCustomerNotificationEmailJob::class);
     }
 
     public function test_topup_job_sends_platform_fee_to_sub_master_account(): void
     {
-        Bus::fake([SendBankTransferTopupReceivedEmail::class]);
+        Bus::fake([SendCustomerNotificationEmailJob::class]);
 
         $this->seedWallesterSettings([
             'wallester.eur.platform_fee_account_id' => '626c80a3-f8e7-4627-8bcf-ca73f9944abf',

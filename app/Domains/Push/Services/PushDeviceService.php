@@ -72,4 +72,5 @@ class PushDeviceService
 
         return $device;
     }
+
 }

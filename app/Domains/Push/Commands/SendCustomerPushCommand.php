@@ -3,7 +3,8 @@
 namespace App\Domains\Push\Commands;
 
 use App\Domains\Customer\Enums\CustomerNotificationType;
-use App\Domains\Customer\Services\CustomerNotificationService;
+use App\Domains\Customer\Notifications\NotificationDispatcher;
+use App\Domains\Customer\Notifications\SimpleCustomerNotification;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
 use Illuminate\Console\Command;
@@ -20,7 +21,7 @@ class SendCustomerPushCommand extends Command
 
     protected $description = 'Grava uma notificação e envia push FCM só para os customer IDs indicados';
 
-    public function handle(CustomerNotificationService $notifications): int
+    public function handle(NotificationDispatcher $dispatcher): int
     {
         $ids = collect($this->argument('ids'))
             ->flatMap(fn (string $value) => preg_split('/[,\s]+/', $value, -1, PREG_SPLIT_NO_EMPTY))
@@ -78,12 +79,14 @@ class SendCustomerPushCommand extends Command
                 $skipped++;
             }
 
-            $notifications->notify(
+            $dispatcher->send(
                 $customer,
-                $type,
-                $title,
-                $body,
-                resourceId: $resourceId,
+                new SimpleCustomerNotification(
+                    notificationType: $type,
+                    notificationTitle: $title,
+                    notificationBody: $body,
+                    notificationResourceId: $resourceId,
+                ),
             );
             $sent++;
             $this->info("Customer #{$customer->id}: notificação criada.");
