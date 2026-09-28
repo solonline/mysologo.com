@@ -7,6 +7,7 @@ enum LedgerEntryType: string
     case PAYMENT_RECEIVED = 'payment_received';
     case PAYMENT_FEE = 'payment_fee';
     case PLATFORM_FEE = 'platform_fee';
+    case PLATFORM_FEE_INCOME = 'platform_fee_income';
     case PAYMENT_REFUND = 'payment_refund';
     case P2P_SEND = 'p2p_send';
     case P2P_RECEIVE = 'p2p_receive';
@@ -26,6 +27,7 @@ enum LedgerEntryType: string
             self::PAYMENT_RECEIVED => 'Pagamento Recebido',
             self::PAYMENT_FEE => 'Taxa de Pagamento',
             self::PLATFORM_FEE => 'Taxa da Plataforma',
+            self::PLATFORM_FEE_INCOME => 'Câmbio Yoop (receita)',
             self::PAYMENT_REFUND => 'Reembolso',
             self::P2P_SEND => 'Transferência Enviada',
             self::P2P_RECEIVE => 'Transferência Recebida',
@@ -49,6 +51,7 @@ enum LedgerEntryType: string
             self::P2P_RECEIVE,
             self::CARD_UNLOAD,
             self::PARTNER_FUNDING_RELEASED,
+            self::PLATFORM_FEE_INCOME,
             self::MANUAL_CREDIT => TransactionDirection::Credit,
             self::PAYMENT_FEE,
             self::PLATFORM_FEE,

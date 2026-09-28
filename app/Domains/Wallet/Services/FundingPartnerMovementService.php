@@ -687,6 +687,7 @@ class FundingPartnerMovementService
         ?int $feesAmountCents = null,
         FundingPartnerMovementStatus $status = FundingPartnerMovementStatus::Completed,
         ?string $failureReason = null,
+        bool $applyLedger = true,
     ): FundingPartnerMovement {
         $idempotencyKey = 'card:'.$partnerExternalId.':'.$direction->value;
 
@@ -707,6 +708,7 @@ class FundingPartnerMovementService
             $feesAmountCents,
             $status,
             $failureReason,
+            $applyLedger,
         ): FundingPartnerMovement {
             $existing = $this->findExistingCardMovement(
                 account: $account,
@@ -727,7 +729,10 @@ class FundingPartnerMovementService
                 }
 
                 $this->attachSettlementReference($existing, $partnerExternalId, $metadata);
-                $this->applyCardMovementLedger($existing, $account);
+
+                if ($applyLedger) {
+                    $this->applyCardMovementLedger($existing, $account);
+                }
 
                 return $existing;
             }
@@ -754,7 +759,9 @@ class FundingPartnerMovementService
                 'metadata' => $metadata,
             ]);
 
-            $this->applyCardMovementLedger($movement, $account);
+            if ($applyLedger) {
+                $this->applyCardMovementLedger($movement, $account);
+            }
 
             return $movement;
         });
@@ -764,6 +771,7 @@ class FundingPartnerMovementService
         FundingPartnerMovement $purchase,
         CustomerWallesterAccount $account,
         int $amountCents,
+        bool $applyLedger = true,
     ): FundingPartnerMovement {
         $partnerExternalId = (string) $purchase->partner_external_id;
         $idempotencyKey = 'fx-fees:'.$partnerExternalId;
@@ -773,6 +781,7 @@ class FundingPartnerMovementService
             $account,
             $amountCents,
             $idempotencyKey,
+            $applyLedger,
         ): FundingPartnerMovement {
             $existing = FundingPartnerMovement::query()
                 ->where('idempotency_key', $idempotencyKey)
@@ -786,7 +795,9 @@ class FundingPartnerMovementService
                     'status' => FundingPartnerMovementStatus::Completed,
                 ]);
 
-                $this->applyFxFeeLedger($existing->fresh(), $account);
+                if ($applyLedger) {
+                    $this->applyFxFeeLedger($existing->fresh(), $account);
+                }
 
                 return $existing->fresh();
             }
@@ -812,9 +823,104 @@ class FundingPartnerMovementService
                 'reference_id' => $purchase->id,
             ]);
 
-            $this->applyFxFeeLedger($movement, $account);
+            if ($applyLedger) {
+                $this->applyFxFeeLedger($movement, $account);
+            }
 
             return $movement;
+        });
+    }
+
+    /**
+     * Recovery: grava o par out/in de taxa Yoop→subconta já liquidado na Wallester,
+     * sem nova transferência e sem ledger.
+     *
+     * @param  array<string, mixed>|null  $metadata
+     */
+    public function recordHistoricalPlatformFeeTransfer(
+        CustomerWallesterAccount $fromAccount,
+        CustomerWallesterAccount $toAccount,
+        int $amountCents,
+        string $currency,
+        string $description,
+        string $idempotencyBase,
+        ?string $outPartnerExternalId = null,
+        ?string $inPartnerExternalId = null,
+        ?array $metadata = null,
+        ?object $reference = null,
+    ): ?FundingPartnerMovement {
+        if ($amountCents <= 0) {
+            return null;
+        }
+
+        if ($this->hasCompletedMovement($idempotencyBase)) {
+            return FundingPartnerMovement::query()
+                ->where('idempotency_key', $idempotencyBase.':out')
+                ->first();
+        }
+
+        $currency = strtoupper($currency);
+        $transferGroupId = (string) Str::uuid();
+        $meta = is_array($metadata) ? $metadata : [];
+        $meta['recovery'] = true;
+        $meta['recovery_skip_platform_fee_transfer'] = true;
+
+        return DB::transaction(function () use (
+            $fromAccount,
+            $toAccount,
+            $amountCents,
+            $currency,
+            $description,
+            $idempotencyBase,
+            $outPartnerExternalId,
+            $inPartnerExternalId,
+            $meta,
+            $reference,
+            $transferGroupId,
+        ): FundingPartnerMovement {
+            $outMovement = FundingPartnerMovement::query()->create([
+                'provider' => IntegrationProvider::WALLESTER,
+                'funding_account_type' => $fromAccount::class,
+                'funding_account_id' => $fromAccount->id,
+                'external_account_id' => $fromAccount->wallester_account_id,
+                'direction' => FundingPartnerMovementDirection::Out,
+                'type' => FundingPartnerMovementType::AccountTransfer,
+                'amount' => $amountCents,
+                'currency' => $currency,
+                'transfer_group_id' => $transferGroupId,
+                'counterparty_external_account_id' => $toAccount->wallester_account_id,
+                'partner_external_id' => $outPartnerExternalId,
+                'status' => FundingPartnerMovementStatus::Completed,
+                'source' => FundingPartnerMovementSource::Sync,
+                'idempotency_key' => $idempotencyBase.':out',
+                'description' => $description,
+                'reference_type' => $reference !== null ? $reference::class : null,
+                'reference_id' => $reference?->id ?? null,
+                'metadata' => $meta,
+            ]);
+
+            FundingPartnerMovement::query()->create([
+                'provider' => IntegrationProvider::WALLESTER,
+                'funding_account_type' => $toAccount::class,
+                'funding_account_id' => $toAccount->id,
+                'external_account_id' => $toAccount->wallester_account_id,
+                'direction' => FundingPartnerMovementDirection::In,
+                'type' => FundingPartnerMovementType::AccountTransfer,
+                'amount' => $amountCents,
+                'currency' => $currency,
+                'transfer_group_id' => $transferGroupId,
+                'counterparty_external_account_id' => $fromAccount->wallester_account_id,
+                'partner_external_id' => $inPartnerExternalId ?? $outPartnerExternalId,
+                'status' => FundingPartnerMovementStatus::Completed,
+                'source' => FundingPartnerMovementSource::Sync,
+                'idempotency_key' => $idempotencyBase.':in',
+                'description' => $description,
+                'reference_type' => $reference !== null ? $reference::class : null,
+                'reference_id' => $reference?->id ?? null,
+                'metadata' => $meta,
+            ]);
+
+            return $outMovement;
         });
     }
 
@@ -1063,7 +1169,8 @@ class FundingPartnerMovementService
             ->where('funding_account_type', $fundingAccount::class)
             ->where('funding_account_id', $fundingAccount->id)
             ->with(['reference', 'counterpartyWallesterAccount.customer'])
-            ->latest('id')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate($perPage);
     }
 
@@ -1187,6 +1294,96 @@ class FundingPartnerMovementService
 
         $this->markMovementCompleted($outMovement, $partnerExternalId, $payload);
         $this->markMovementCompleted($inMovement, $partnerExternalId, $payload);
+
+        $this->applyFxPlatformFeeAccountLedger($outMovement->fresh());
+        $this->applyFxPlatformFeeAccountLedger($inMovement->fresh());
+    }
+
+    /**
+     * Credita/debita o ledger do dono da subconta (fee account) nas transferências Câmbio Yoop.
+     * Idempotente por reference + entry_type.
+     */
+    public function applyFxPlatformFeeAccountLedger(?FundingPartnerMovement $movement): ?LedgerEntry
+    {
+        if (! $movement instanceof FundingPartnerMovement) {
+            return null;
+        }
+
+        if ($movement->status !== FundingPartnerMovementStatus::Completed) {
+            return null;
+        }
+
+        if (! $this->isFxPlatformFeeAccountMovement($movement)) {
+            return null;
+        }
+
+        $account = $movement->fundingAccount;
+
+        if (! $account instanceof CustomerWallesterAccount || $account->customer_id === null) {
+            return null;
+        }
+
+        $direction = $movement->direction;
+        $entryType = $direction === FundingPartnerMovementDirection::In
+            ? LedgerEntryType::PLATFORM_FEE_INCOME
+            : LedgerEntryType::PLATFORM_FEE;
+
+        $already = (int) LedgerEntry::query()
+            ->where('reference_type', $movement->getMorphClass())
+            ->where('reference_id', $movement->id)
+            ->where('entry_type', $entryType)
+            ->sum('amount');
+
+        $amount = (int) $movement->amount;
+
+        if ($amount <= 0 || $already >= $amount) {
+            return null;
+        }
+
+        return $this->ledger->record(
+            customerId: (int) $account->customer_id,
+            currency: strtoupper((string) ($movement->currency ?: 'EUR')),
+            entryType: $entryType,
+            amount: $amount - $already,
+            reference: $movement,
+            description: $movement->description ?: ($direction === FundingPartnerMovementDirection::In
+                ? 'Câmbio Yoop'
+                : 'Câmbio Yoop (reversão)'),
+            metadata: [
+                'source' => 'fx_platform_fee_account_ledger',
+                'idempotency_key' => $movement->idempotency_key,
+                'partner_external_id' => $movement->partner_external_id,
+            ],
+        );
+    }
+
+    private function isFxPlatformFeeAccountMovement(FundingPartnerMovement $movement): bool
+    {
+        $key = (string) $movement->idempotency_key;
+
+        if ($key === '' || (
+            ! str_starts_with($key, 'fx-platform:')
+            && ! str_starts_with($key, 'fx-platform-reversal:')
+            && ! str_starts_with($key, 'fx-platform-recovery:')
+        )) {
+            return false;
+        }
+
+        $account = $movement->fundingAccount;
+
+        if (! $account instanceof CustomerWallesterAccount) {
+            return false;
+        }
+
+        $currency = strtoupper((string) ($movement->currency ?: $account->funding_currency ?: 'EUR'));
+
+        try {
+            $feeAccount = $this->wallesterDriver->getPlatformFeeAccount($currency);
+        } catch (Throwable) {
+            return false;
+        }
+
+        return $account->is($feeAccount);
     }
 
     /**

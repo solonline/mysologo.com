@@ -3,6 +3,7 @@
 namespace App\Domains\Wallet;
 
 use App\Domains\Wallet\Commands\AlignPlatformWalletToWallesterCommand;
+use App\Domains\Wallet\Commands\BackfillFxPlatformFeeAccountLedgerCommand;
 use App\Domains\Wallet\Commands\BackfillStripePlatformFeesToSubMasterCommand;
 use App\Domains\Wallet\Commands\ReassignPlatformFeesToSubMasterCommand;
 use App\Domains\Wallet\Commands\RunPlatformRevenueReportCommand;
@@ -70,6 +71,7 @@ class WalletServiceProvider extends ServiceProvider
                 AlignPlatformWalletToWallesterCommand::class,
                 ReassignPlatformFeesToSubMasterCommand::class,
                 BackfillStripePlatformFeesToSubMasterCommand::class,
+                BackfillFxPlatformFeeAccountLedgerCommand::class,
             ]);
         }
 

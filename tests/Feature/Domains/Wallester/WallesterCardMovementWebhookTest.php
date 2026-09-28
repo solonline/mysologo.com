@@ -568,6 +568,14 @@ class WallesterCardMovementWebhookTest extends TestCase
             'entry_type' => LedgerEntryType::PLATFORM_FEE->value,
             'description' => 'Câmbio',
         ]);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $platform->id,
+            'currency' => 'EUR',
+            'direction' => TransactionDirection::Credit->value,
+            'amount' => 5,
+            'entry_type' => LedgerEntryType::PLATFORM_FEE_INCOME->value,
+            'description' => 'Câmbio Yoop',
+        ]);
         $this->assertDatabaseMissing('ledger_entries', [
             'customer_id' => $platform->id,
             'entry_type' => LedgerEntryType::MANUAL_CREDIT->value,
@@ -642,6 +650,19 @@ class WallesterCardMovementWebhookTest extends TestCase
             'funding_account_id' => $feeAccount->id,
             'amount' => 5,
             'status' => FundingPartnerMovementStatus::Completed->value,
+        ]);
+        $this->assertDatabaseHas('ledger_entries', [
+            'customer_id' => $platform->id,
+            'currency' => 'EUR',
+            'direction' => TransactionDirection::Credit->value,
+            'amount' => 5,
+            'entry_type' => LedgerEntryType::PLATFORM_FEE_INCOME->value,
+            'description' => 'Câmbio Yoop',
+        ]);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $platform->id,
+            'currency' => 'EUR',
+            'available' => 5,
         ]);
     }
 
