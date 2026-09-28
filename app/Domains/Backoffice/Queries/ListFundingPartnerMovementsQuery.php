@@ -25,7 +25,8 @@ class ListFundingPartnerMovementsQuery
                 'wallesterCard',
                 'counterpartyWallesterAccount.customer',
             ])
-            ->latest('id');
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
 
         if ($customerId = $filters['customer_id'] ?? null) {
             $query->whereHasMorph(
