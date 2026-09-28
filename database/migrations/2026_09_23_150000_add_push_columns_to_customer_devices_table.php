@@ -25,21 +25,6 @@ return new class extends Migration
             $table->boolean('push_enabled')
                 ->default(false)
                 ->comment('Indica se este aparelho pode receber push.');
-
-            $table->string('pin')
-                ->nullable()
-                ->comment('PIN de 4 dígitos do login rápido. Guardado como hash bcrypt, nunca em claro.')
-                ->change();
-
-            $table->timestamp('blocked_at')
-                ->nullable()
-                ->comment('Momento em que o PIN ficou bloqueado após várias tentativas falhadas.')
-                ->change();
-
-            $table->timestamp('last_used_at')
-                ->nullable()
-                ->comment('Última utilização bem-sucedida do PIN neste aparelho.')
-                ->change();
         });
     }
 

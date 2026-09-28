@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Domains\Push;
 
+use App\Domains\Customer\Enums\CustomerNotificationType;
 use App\Domains\Customer\Services\CustomerNotificationService;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Models\Customer;
@@ -190,6 +191,44 @@ class CustomerPushTest extends TestCase
 
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'fcm.googleapis.com')
             && ($request->data()['message']['token'] ?? null) === 'fcm-off');
+    }
+
+    public function test_notification_push_includes_resource_id_and_path(): void
+    {
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response(['access_token' => 'ya29.test', 'expires_in' => 3600]),
+            'https://fcm.googleapis.com/*' => Http::response(['name' => 'projects/yoop-test/messages/1']),
+        ]);
+
+        $customer = $this->createActiveCustomer();
+        $device = $this->createDevice($customer, 'device-transfer');
+        $device->update([
+            'platform' => 'android',
+            'push_token' => 'fcm-transfer',
+            'push_enabled' => true,
+        ]);
+
+        app(CustomerNotificationService::class)->notify(
+            $customer,
+            CustomerNotificationType::TransferReceived,
+            'Recebeste uma transferência',
+            '10,00 EUR de João',
+            resourceId: 155,
+        );
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), 'fcm.googleapis.com')) {
+                return false;
+            }
+
+            $message = $request->data()['message'];
+
+            return $message['token'] === 'fcm-transfer'
+                && $message['data']['type'] === 'transfer_received'
+                && $message['data']['resource_id'] === '155'
+                && $message['data']['path'] === '/api/wallet/transactions/155'
+                && $message['data']['notification_id'] !== '';
+        });
     }
 
     public function test_invalid_fcm_token_is_cleared_and_the_pin_remains(): void

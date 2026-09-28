@@ -32,14 +32,27 @@ class SendCustomerPushJob implements ShouldQueue
             ->whereNotNull('push_token')
             ->get();
 
+        $payload = is_array($notification->data) ? $notification->data : [];
+
         $data = [
             'type' => (string) $notification->type,
             'notification_id' => (string) $notification->id,
         ];
 
-        $challengeId = $notification->data['challenge_id'] ?? null;
+        $resourceId = $payload['resource_id'] ?? null;
+        $path = $payload['path'] ?? null;
 
-        if ($challengeId !== null && $challengeId !== '') {
+        if ($resourceId !== null && $resourceId !== '') {
+            $data['resource_id'] = (string) $resourceId;
+        }
+
+        if ($path !== null && $path !== '') {
+            $data['path'] = (string) $path;
+        }
+
+        $challengeId = $payload['challenge_id'] ?? null;
+
+        if (! isset($data['resource_id']) && $challengeId !== null && $challengeId !== '') {
             $data['challenge_id'] = (string) $challengeId;
         }
 
