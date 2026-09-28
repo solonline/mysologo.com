@@ -21,9 +21,6 @@ Route::get('/debug/stripe/charge-updated', function (StripeService $service) {
             ->where('is_active', true)
             ->first();
 
-    $platformFee = $feeConfig ? $feeConfig->calculatePlatformFee(100) : 0;
-dd($platformFee);
-
     $service->handleStripeEvent([
         'type' => 'charge.updated',
         'data' => [
@@ -40,7 +37,7 @@ dd($platformFee);
             ],
         ],
     ]);
-        
+
 });
 
 Route::middleware('web')->group(base_path('app/Domains/Backoffice/Routes/web.php'));
