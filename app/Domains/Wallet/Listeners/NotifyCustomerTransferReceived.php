@@ -4,6 +4,7 @@ namespace App\Domains\Wallet\Listeners;
 
 use App\Domains\Customer\Notifications\NotificationDispatcher;
 use App\Domains\Customer\Notifications\TransferReceivedNotification;
+use App\Domains\Customer\Notifications\TransferSentNotification;
 use App\Domains\Wallet\Events\CustomerTransferReceived;
 use App\Models\Customer;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -42,5 +43,26 @@ class NotifyCustomerTransferReceived implements ShouldQueue
                 ],
             ),
         );
+
+        if ($event->sendBothSides) {
+            $recipient = (string) ($to->username ?: $to->name);
+
+            $this->dispatcher->send(
+                $from,
+                new TransferSentNotification(
+                    recipient: $recipient,
+                    amountLabel: $amountLabel,
+                    description: filled($event->description) ? (string) $event->description : null,
+                    movementId: $event->movementId,
+                    extra: [
+                        'amount_cents' => $event->amountCents,
+                        'currency' => $event->currency,
+                        'to_customer_id' => $event->toCustomerId,
+                        'amount_label' => $amountLabel,
+                        'recipient' => $recipient,
+                    ],
+                ),
+            );
+        }
     }
 }

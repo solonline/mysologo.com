@@ -148,6 +148,7 @@ class FundingPartnerMovementService
                     currency: $routingCurrency,
                     movementId: (int) $inMovement->id,
                     description: $description,
+                    sendBothSides: true,
                 );
             } catch (Throwable $exception) {
                 $reason = $exception->getMessage();

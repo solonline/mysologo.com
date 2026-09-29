@@ -37,6 +37,16 @@ class CustomerAppNotificationMail extends Mailable
             );
         }
 
+        if ($this->notification->type === CustomerNotificationType::TransferSent->value) {
+            $amount = (string) ($data['amount_label'] ?? '');
+
+            return new Envelope(
+                subject: filled($amount)
+                    ? 'Transferência de '.$amount.' enviada'
+                    : (string) $this->notification->title,
+            );
+        }
+
         return new Envelope(
             subject: (string) $this->notification->title,
         );
@@ -52,6 +62,10 @@ class CustomerAppNotificationMail extends Mailable
 
         if ($this->notification->type === CustomerNotificationType::TransferReceived->value) {
             return $this->transferReceivedContent($data);
+        }
+
+        if ($this->notification->type === CustomerNotificationType::TransferSent->value) {
+            return $this->transferSentContent($data);
         }
 
         return new Content(
@@ -122,6 +136,30 @@ class CustomerAppNotificationMail extends Mailable
                 'currency' => $currency,
                 'description' => $this->notification->body,
                 'creditedAt' => $this->notification->created_at,
+            ],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function transferSentContent(array $data): Content
+    {
+        $currency = strtoupper((string) ($data['currency'] ?? ''));
+        $amountCents = (int) ($data['amount_cents'] ?? 0);
+        $formattedAmount = $amountCents > 0
+            ? number_format($amountCents / 100, 2, ',', '.')
+            : (string) ($data['amount_label'] ?? '');
+
+        return new Content(
+            view: 'emails.transfer_sent',
+            with: [
+                'customer' => $this->notification->customer,
+                'recipient' => (string) ($data['recipient'] ?? ''),
+                'formattedAmount' => $formattedAmount,
+                'currency' => $currency,
+                'description' => $this->notification->body,
+                'sentAt' => $this->notification->created_at,
             ],
         );
     }

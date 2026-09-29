@@ -88,6 +88,14 @@ class FundingPartnerMovementServiceTest extends TestCase
                 'amount' => '10,00 EUR',
             ]),
         ]);
+        $this->assertDatabaseHas('customer_notifications', [
+            'customer_id' => $from->id,
+            'type' => CustomerNotificationType::TransferSent->value,
+            'title' => __('notifications.transfer_sent', [
+                'recipient' => 'to_user',
+                'amount' => '10,00 EUR',
+            ]),
+        ]);
     }
 
     public function test_transfer_persists_nested_payment_id_on_both_movements(): void

@@ -83,29 +83,37 @@ class CustomerPushTest extends TestCase
         $this->assertFalse($device->push_enabled);
     }
 
-    public function test_register_moves_the_same_push_token_off_the_previous_device(): void
+    public function test_register_allows_the_same_push_token_on_multiple_accounts(): void
     {
-        $customer = $this->createActiveCustomer();
-        $first = $this->createDevice($customer, 'device-a');
-        $second = $this->createDevice($customer, 'device-b');
-        $token = $customer->createToken('test')->plainTextToken;
+        $firstCustomer = $this->createActiveCustomer();
+        $secondCustomer = $this->createActiveCustomer();
+        $first = $this->createDevice($firstCustomer, 'device-account-a');
+        $second = $this->createDevice($secondCustomer, 'device-account-b');
+        $firstToken = $firstCustomer->createToken('test')->plainTextToken;
+        $secondToken = $secondCustomer->createToken('test')->plainTextToken;
 
-        $this->withToken($token)->putJson('/api/push/devices', [
-            'device_token' => 'device-a',
-            'platform' => 'android',
-            'push_token' => 'shared-fcm',
-        ])->assertOk();
+        $this->withToken($firstToken)
+            ->putJson('/api/push/devices', [
+                'device_token' => 'device-account-a',
+                'platform' => 'android',
+                'push_token' => 'shared-fcm',
+            ])
+            ->assertOk();
 
-        $this->withToken($token)->putJson('/api/push/devices', [
-            'device_token' => 'device-b',
-            'platform' => 'android',
-            'push_token' => 'shared-fcm',
-        ])->assertOk();
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($secondToken)
+            ->putJson('/api/push/devices', [
+                'device_token' => 'device-account-b',
+                'platform' => 'android',
+                'push_token' => 'shared-fcm',
+            ])
+            ->assertOk();
 
         $first->refresh();
         $second->refresh();
-        $this->assertNull($first->push_token);
-        $this->assertFalse($first->push_enabled);
+        $this->assertSame('shared-fcm', $first->push_token);
+        $this->assertTrue($first->push_enabled);
         $this->assertSame('shared-fcm', $second->push_token);
         $this->assertTrue($second->push_enabled);
     }

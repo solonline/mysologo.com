@@ -16,5 +16,6 @@ class CustomerTransferReceived implements ShouldDispatchAfterCommit
         public readonly string $currency,
         public readonly int $movementId,
         public readonly ?string $description = null,
+        public readonly bool $sendBothSides = false,
     ) {}
 }

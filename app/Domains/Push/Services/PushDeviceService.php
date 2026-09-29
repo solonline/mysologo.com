@@ -7,7 +7,6 @@ use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
-use Illuminate\Support\Facades\DB;
 
 class PushDeviceService
 {
@@ -29,27 +28,15 @@ class PushDeviceService
 
         $pushToken = $pushToken !== null && $pushToken !== '' ? $pushToken : null;
 
-        return DB::transaction(function () use ($device, $platform, $pushToken): CustomerDevice {
-            if ($pushToken !== null) {
-                CustomerDevice::query()
-                    ->where('push_token', $pushToken)
-                    ->where('id', '!=', $device->id)
-                    ->update([
-                        'push_token' => null,
-                        'push_enabled' => false,
-                    ]);
-            }
+        $device->fill([
+            'platform' => $platform,
+            'push_token' => $pushToken,
+            'push_enabled' => $pushToken !== null,
+            'push_token_seen_at' => now(),
+        ]);
+        $device->save();
 
-            $device->fill([
-                'platform' => $platform,
-                'push_token' => $pushToken,
-                'push_enabled' => $pushToken !== null,
-                'push_token_seen_at' => now(),
-            ]);
-            $device->save();
-
-            return $device;
-        });
+        return $device;
     }
 
     public function disable(Customer $customer, string $deviceToken): CustomerDevice

@@ -30,6 +30,14 @@ class DeviceAuthService
         return $this->deviceRepository->upsertPin($customer, $hashedDto);
     }
 
+    /*
+    * Reset PIN
+    *
+    * Changes the device PIN after verifying the current PIN or account password.
+    *
+    * @tags Authentication
+    */
+
     public function resetPin(Customer $customer, ResetPinDTO $dto): CustomerDevice
     {
         $device = $this->deviceRepository->findByCustomerAndToken($customer, $dto->deviceToken);

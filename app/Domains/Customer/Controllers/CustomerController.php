@@ -24,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
 
 class CustomerController extends Controller
 {
@@ -154,7 +155,7 @@ class CustomerController extends Controller
                 'status' => CustomerLifecycleStatus::ACTIVE,
                 'doc_status' => DocumentStatus::APPROVED,
             ],
-            excludeId: $request->user()->id,
+            excludeId: Auth::check() ? $request->user()->id : null,
         );
 
         return response()->json(new PublicCustomerResource($customer));

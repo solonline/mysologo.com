@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::table('customer_devices', function (Blueprint $table) {
             $table->string('push_token', 512)
                 ->nullable()
-                ->unique()
                 ->comment('Token FCM deste aparelho. Guardado em claro porque o envio precisa do valor exato.');
 
             $table->string('platform', 16)
@@ -31,7 +30,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('customer_devices', function (Blueprint $table) {
-            $table->dropUnique(['push_token']);
             $table->dropColumn([
                 'push_token',
                 'platform',
