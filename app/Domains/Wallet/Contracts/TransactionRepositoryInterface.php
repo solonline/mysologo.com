@@ -3,6 +3,7 @@
 namespace App\Domains\Wallet\Contracts;
 
 use App\Models\Customer;
+use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -22,4 +23,10 @@ interface TransactionRepositoryInterface
     public function getAvailableBalance(int $customerId, string $currency): int;
 
     public function adjustBalance(int $customerId, string $currency, int $delta): void;
+    /*
+    * Get couple of transactions for a P2P transfer
+    * @param int $movementId
+    * @return FundingPartnerMovement|null
+    */
+    public function getTransfersP2pById(int $id): ?FundingPartnerMovement;
 }

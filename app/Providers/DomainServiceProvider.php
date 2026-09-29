@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Domains\Auth\AuthServiceProvider;
 use App\Domains\Backoffice\BackofficeServiceProvider;
 use App\Domains\Customer\CustomerServiceProvider;
+use App\Domains\Documents\DocumentsServiceProvider;
 use App\Domains\Ebury\EburyServiceProvider;
 use App\Domains\Fx\FxServiceProvider;
 use App\Domains\Kyc\KycServiceProvider;
@@ -49,6 +50,7 @@ class DomainServiceProvider extends ServiceProvider
         SettingsServiceProvider::class,
         TpaServiceProvider::class,
         WhatsappServiceProvider::class,
+        DocumentsServiceProvider::class,
     ];
 
     public function register(): void

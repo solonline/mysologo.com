@@ -2,6 +2,8 @@
 
 namespace App\Domains\Customer\Jobs;
 
+use App\Application\Documents\TransferReceipt\GenerateTransferReceiptCommand;
+use App\Application\Documents\TransferReceipt\GenerateTransferReceiptHandler;
 use App\Domains\Customer\Mail\CustomerAppNotificationMail;
 use App\Models\CustomerNotification;
 use Illuminate\Bus\Queueable;
@@ -26,7 +28,7 @@ class SendCustomerNotificationEmailJob implements ShouldQueue
         $this->onQueue('emails');
     }
 
-    public function handle(): void
+    public function handle(?GenerateTransferReceiptHandler $generateTransferReceiptHandler = null): void
     {
         $notification = CustomerNotification::query()
             ->with('customer')
@@ -42,6 +44,20 @@ class SendCustomerNotificationEmailJob implements ShouldQueue
             return;
         }
 
-        Mail::to($email)->send(new CustomerAppNotificationMail($notification));
+        $pdf = '';
+        if (in_array($notification->type, ['transfer_received', 'transfer_sent'], true)) {
+            $movementId = (int) ($notification->data['resource_id'] ?? 0);
+
+            if ($movementId > 0) {
+                $pdf = ($generateTransferReceiptHandler ?? app(GenerateTransferReceiptHandler::class))->handle(
+                    new GenerateTransferReceiptCommand(
+                        customerId: (int) $notification->customer_id,
+                        movementId: $movementId,
+                    )
+                );
+            }
+        }
+
+        Mail::to($email)->send(new CustomerAppNotificationMail($notification, $pdf));
     }
 }

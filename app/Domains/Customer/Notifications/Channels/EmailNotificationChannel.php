@@ -10,7 +10,7 @@ use RuntimeException;
 
 class EmailNotificationChannel implements NotificationChannel
 {
-    public function send(Customer $customer, CustomerAppNotification $notification): void
+    public function send(Customer $customer, CustomerAppNotification $notification, int $movementId = 0): void
     {
         $notificationId = $notification->persistedId();
 

@@ -6,6 +6,7 @@ use App\Domains\Wallet\Contracts\TransactionRepositoryInterface;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
+use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -76,5 +77,10 @@ class TransactionRepository implements TransactionRepositoryInterface
         CustomerBalance::where('id', $balance->id)->update([
             'available' => DB::raw("available + {$delta}"),
         ]);
+    }
+
+    public function getTransfersP2pById(int $movementId): ?FundingPartnerMovement
+    {
+        return FundingPartnerMovement::where('id', $movementId)->with('fundingAccount.customer', 'groupedTransactions.fundingAccount.customer')->first();
     }
 }

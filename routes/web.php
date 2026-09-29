@@ -63,6 +63,42 @@ Route::post('email/verification-notification', function () {
 
 Route::middleware('web')->group(base_path('routes/docs.php'));
 
+// Preview HTML do comprovativo de transferência (navegador)
+Route::get('/debug/transfer-receipt/{movementId}', function (
+    int $movementId,
+    \App\Domains\Wallet\Contracts\TransactionRepositoryInterface $transactions,
+) {
+    $movement = $transactions->getTransfersP2pById($movementId);
+
+    if ($movement === null) {
+        abort(404, 'Transferência não encontrada.');
+    }
+
+    try {
+        $data = \App\Application\Documents\TransferReceipt\TransferReceiptData::fromMovement($movement);
+    } catch (\UnexpectedValueException $e) {
+        abort(422, $e->getMessage());
+    }
+
+    if (request()->boolean('pdf')) {
+        $html = view('pdf.transfer-receipt', ['data' => $data])->render();
+
+        return response(
+            app(\App\Domains\Documents\Contracts\PdfRenderer::class)->render($html),
+            200,
+            [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="comprovativo-transferencia-'.$movementId.'.pdf"',
+            ],
+        );
+    }
+
+    return view('pdf.transfer-receipt', [
+        'data' => $data,
+        'preview' => true,
+    ]);
+})->whereNumber('movementId')->name('debug.transfer-receipt');
+
 // Rotas de desenvolvimento / testes manuais
 Route::get('/test-wallester-account', function (WallesterService $wallesterService) {
     $data = ['name' => 'Daniel Silva'];

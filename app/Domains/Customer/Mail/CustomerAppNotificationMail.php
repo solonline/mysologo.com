@@ -18,6 +18,7 @@ class CustomerAppNotificationMail extends Mailable
 
     public function __construct(
         public CustomerNotification $notification,
+        public string $pdf = '',
     ) {}
 
     public function envelope(): Envelope
@@ -76,8 +77,22 @@ class CustomerAppNotificationMail extends Mailable
                 'body' => $this->notification->body,
                 'path' => (string) ($data['path'] ?? ''),
                 'resourceId' => (string) ($data['resource_id'] ?? ''),
+                'pdf' => $this->pdf ?? '',
             ],
         );
+    }
+
+    /** @return array<int, \Illuminate\Mail\Mailables\Attachment> */
+    public function attachments(): array
+    {
+        if ($this->pdf === '') {
+            return [];
+        }
+
+        return [\Illuminate\Mail\Mailables\Attachment::fromData(
+            fn (): string => $this->pdf,
+            'comprovativo-transferencia.pdf',
+        )->withMime('application/pdf')];
     }
 
     /**

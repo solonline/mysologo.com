@@ -10,6 +10,7 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class FundingPartnerMovement extends Model
@@ -226,5 +227,10 @@ class FundingPartnerMovement extends Model
         $merchant = $purchase instanceof self ? trim((string) $purchase->description) : '';
 
         return $merchant !== '' ? 'Câmbio Yoop · '.$merchant : 'Câmbio Yoop';
+    }
+
+    public function groupedTransactions(): HasMany
+    {
+        return $this->hasMany(FundingPartnerMovement::class, 'transfer_group_id', 'transfer_group_id');
     }
 }
