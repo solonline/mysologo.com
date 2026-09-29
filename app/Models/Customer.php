@@ -50,6 +50,7 @@ class Customer extends Model
         'username',
         'type',
         'corporate_id',
+        'referred_by_customer_id',
         'avatar',
         'show_profile_pic',
         'language',
@@ -90,6 +91,16 @@ class Customer extends Model
     public function responsibles()
     {
         return $this->hasMany(Customer::class, 'corporate_id');
+    }
+
+    public function referredBy()
+    {
+        return $this->belongsTo(Customer::class, 'referred_by_customer_id');
+    }
+
+    public function referrals()
+    {
+        return $this->hasMany(Customer::class, 'referred_by_customer_id');
     }
 
     public function documents()

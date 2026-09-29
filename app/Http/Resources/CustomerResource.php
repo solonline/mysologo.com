@@ -26,6 +26,12 @@ class CustomerResource extends JsonResource
             'show_profile_pic' => (bool) $this->show_profile_pic,
             'email_verified_at' => $this->email_verified_at ?? null,
             'phone' => $this->phone ?? null,
+            'referred_by_customer_id' => $this->referred_by_customer_id,
+            'referred_by' => $this->whenLoaded('referredBy', fn () => $this->referredBy ? [
+                'id' => $this->referredBy->id,
+                'username' => $this->referredBy->username,
+                'name' => $this->referredBy->name,
+            ] : null),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

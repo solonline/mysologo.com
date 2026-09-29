@@ -15,6 +15,15 @@ class RegisterCustomerRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('referral_code')) {
+            $this->merge([
+                'referral_code' => strtolower(str_replace(' ', '_', (string) $this->input('referral_code'))),
+            ]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -31,6 +40,7 @@ class RegisterCustomerRequest extends FormRequest
             'type' => ['sometimes', 'string', 'in:retail,corporate,responsible'],
             'language' => ['sometimes', 'string', 'max:5'],
             'currency' => ['required', 'string', 'size:3'],
+            'referral_code' => ['nullable', 'string', 'max:40', 'exists:customers,username'],
         ];
     }
 }

@@ -15,6 +15,15 @@ class RegisterCustomerCorporateRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('referral_code')) {
+            $this->merge([
+                'referral_code' => strtolower(str_replace(' ', '_', (string) $this->input('referral_code'))),
+            ]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -29,6 +38,7 @@ class RegisterCustomerCorporateRequest extends FormRequest
             'tax_id' => ['required', 'string', 'max:50', 'unique:customer_corporate_documents,tax_id'],
             'password' => ['required', 'string', 'min:6'],
             'country_code' => ['required', 'string', 'size:2'],
+            'referral_code' => ['nullable', 'string', 'max:40', 'exists:customers,username'],
         ];
     }
 }

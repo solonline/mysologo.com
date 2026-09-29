@@ -13,6 +13,7 @@ class RegisterCustomerDTO
         public readonly ?string $name = null,
         public readonly ?string $language = null,
         public readonly ?string $currency = null,
+        public readonly ?string $referralCode = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -26,6 +27,7 @@ class RegisterCustomerDTO
             name: $data['name'] ?? null,
             language: $data['language'] ?? null,
             currency: $data['currency'] ?? null,
+            referralCode: $data['referral_code'] ?? null,
         );
     }
 }

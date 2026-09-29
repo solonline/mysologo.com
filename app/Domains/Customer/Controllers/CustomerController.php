@@ -75,6 +75,8 @@ class CustomerController extends Controller
             $message = $kyc['message'] ?? null;
         }
 
+        $user->loadMissing('referredBy');
+
         return CustomerProfileResource::make([
             'customer' => $user,
             'requires_responsible' => $requiresResponsible,

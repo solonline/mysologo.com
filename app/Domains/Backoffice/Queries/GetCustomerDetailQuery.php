@@ -12,6 +12,7 @@ class GetCustomerDetailQuery
             'documents',
             'diditSessions' => fn ($q) => $q->latest(),
             'responsibles',
+            'referredBy',
             'balances',
             'stripeAccount',
             'wallesterAccount.cards' => fn ($q) => $q->orderByDesc('id'),

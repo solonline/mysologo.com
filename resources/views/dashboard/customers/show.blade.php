@@ -224,6 +224,14 @@
                         ['label' => 'Cadastro',            'value' => $formatDateTime($customer->created_at)],
                     ];
 
+                    if ($customer->referredBy) {
+                        $fields[] = [
+                            'label' => 'Indicado por',
+                            'value' => $customer->referredBy->username.' (#'.$customer->referredBy->id.')',
+                            'link' => route('dashboard.customers.show', $customer->referredBy),
+                        ];
+                    }
+
                     if (filled($customer->status_reason)) {
                         $fields[] = ['label' => 'Motivo do estado', 'value' => $customer->status_reason];
                     }
@@ -231,7 +239,13 @@
                 @foreach ($fields as $f)
                 <div>
                     <p class="text-xs text-slate-400 font-medium mb-0.5">{{ $f['label'] }}</p>
+                    @if (!empty($f['link']))
+                    <p class="text-sm text-slate-800 font-medium">
+                        <a href="{{ $f['link'] }}" class="text-indigo-600 hover:text-indigo-700 hover:underline">{{ $f['value'] ?? '—' }}</a>
+                    </p>
+                    @else
                     <p class="text-sm text-slate-800 font-medium">{{ $f['value'] ?? '—' }}</p>
+                    @endif
                 </div>
                 @endforeach
             </div>

@@ -11,6 +11,10 @@ Route::get('/health', fn () => response()->json([
     'status' => 'ok',
 ]))->name('customer.health');
 
+Route::get('/find/{username}', [CustomerController::class, 'findByUsername'])
+        ->where('username', '[a-zA-Z0-9_]+')
+        ->name('customer.find-by-username');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [CustomerController::class, 'me'])->name('customer.me');
     Route::post('/update', [CustomerController::class, 'update'])->name('customer.update');
@@ -26,9 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/favorites/{username}', [CustomerController::class, 'removeFavorite'])
         ->where('username', '[a-zA-Z0-9_]+')
         ->name('customer.favorites.remove');
-    Route::get('/find/{username}', [CustomerController::class, 'findByUsername'])
-        ->where('username', '[a-zA-Z0-9_]+')
-        ->name('customer.find-by-username');
+
 
     Route::middleware([
         'customer.active',

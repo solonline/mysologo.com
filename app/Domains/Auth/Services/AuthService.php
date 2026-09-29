@@ -40,7 +40,10 @@ class AuthService implements AuthServiceInterface
                 username: $dto->username ? strtolower(str_replace(' ', '_', $dto->username)) : null,
                 name: ucwords(strtolower(trim($dto->name))),
                 language: $dto->language,
-                currency: $dto->currency
+                currency: $dto->currency,
+                referralCode: $dto->referralCode
+                    ? strtolower(str_replace(' ', '_', $dto->referralCode))
+                    : null,
             );
 
             $customer = DB::transaction(function () use ($preparedDto) {
@@ -83,6 +86,8 @@ class AuthService implements AuthServiceInterface
         }
 
         $token = $customer->createToken('password_login', [], now()->addMinutes(10))->plainTextToken;
+
+        $customer->loadMissing('referredBy');
 
         return [
             'user' => $customer,

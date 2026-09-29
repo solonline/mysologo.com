@@ -24,6 +24,15 @@ class CustomerProfileResource extends JsonResource
             'show_profile_pic' => (bool) $customer->show_profile_pic,
             'phone'    => $customer->phone,
 
+            'referred_by_customer_id' => $customer->referred_by_customer_id,
+            'referred_by' => $customer->relationLoaded('referredBy') && $customer->referredBy
+                ? [
+                    'id' => $customer->referredBy->id,
+                    'username' => $customer->referredBy->username,
+                    'name' => $customer->referredBy->name,
+                ]
+                : null,
+
             'status'            => $customer->status,
             'email_verified_at' => $customer->email_verified_at,
             'created_at'        => $customer->created_at,

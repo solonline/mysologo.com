@@ -15,6 +15,13 @@ class CustomerRepository implements CustomerRepositoryInterface
 {
     public function createCustomer(RegisterCustomerDTO $dto): Customer
     {
+        $referredByCustomerId = null;
+        if ($dto->referralCode) {
+            $referredByCustomerId = Customer::query()
+                ->where('username', $dto->referralCode)
+                ->value('id');
+        }
+
         return Customer::create(array_filter([
             'email' => $dto->email,
             'password' => $dto->password,
@@ -24,6 +31,7 @@ class CustomerRepository implements CustomerRepositoryInterface
             'phone' => $dto->phone,
             'language' => $dto->language,
             'currency' => $dto->currency,
+            'referred_by_customer_id' => $referredByCustomerId,
             'status' => CustomerLifecycleStatus::PENDING_EMAIL_VERIFICATION,
         ], fn ($v) => ! is_null($v)));
     }
@@ -36,6 +44,7 @@ class CustomerRepository implements CustomerRepositoryInterface
     public function findByUsername(string $username, array $filters = [], ?int $excludeId = null): ?Customer
     {
         return Customer::where('username', $username)
+            ->select('id', 'username', 'name', 'email', 'avatar', 'status', 'doc_status', 'type', 'created_at', 'updated_at')
             ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
             ->when(isset($filters['type']), fn ($q) => $q->where('type', $filters['type']))
             ->when(isset($filters['status']), fn ($q) => $q->where('status', $filters['status']))
