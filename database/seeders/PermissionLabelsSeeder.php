@@ -41,6 +41,10 @@ class PermissionLabelsSeeder extends Seeder
         'news.create' => 'Criar notícias',
         'news.edit' => 'Editar notícias',
         'news.delete' => 'Eliminar notícias',
+        'rewards.view' => 'Ver recompensas',
+        'rewards.create' => 'Criar programas de recompensa',
+        'rewards.edit' => 'Editar programas de recompensa',
+        'rewards.delete' => 'Eliminar programas de recompensa',
     ];
 
     public function run(): void

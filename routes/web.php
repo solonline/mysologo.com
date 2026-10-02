@@ -11,35 +11,6 @@ use Illuminate\Support\Facades\Route;
 | Staff login + dashboard: app/Domains/Backoffice/Routes/web.php
 */
 
-use App\Domains\Stripe\Services\StripeService;
-use App\Models\StripePaymentMethodFee;
-
-Route::get('/debug/stripe/charge-updated', function (StripeService $service) {
-
-    $feeConfig = StripePaymentMethodFee::where('payment_method', 'card_non_eea')
-            ->where('currency', 'EUR')
-            ->where('is_active', true)
-            ->first();
-
-    $service->handleStripeEvent([
-        'type' => 'charge.updated',
-        'data' => [
-            'object' => [
-                'id' => 'ch_3N0g1e2eZvKYlo2C0X9Y6Z5K',
-                'amount' => 100,
-                'currency' => 'eur',
-                'payment_method_details' => [
-                    'card' => [
-                        'brand' => 'visa',
-                        'country' => 'US',
-                    ],
-                ],
-            ],
-        ],
-    ]);
-
-});
-
 Route::middleware('web')->group(base_path('app/Domains/Backoffice/Routes/web.php'));
 
 // Rotas de verificação de e-mail (clientes)

@@ -369,6 +369,9 @@ customers
      ├──▶ customer_didit_sessions     (sessões KYC Didit)
      ├──▶ customer_devices            (dispositivos autorizados)
      ├──▶ customer_notifications      (notificações push)
+     ├──▶ rewards                     (ganho do customer; program_id → reward_programs)
+     │      └── referred_id nullable (único; só programa referral)
+     ├──▶ reward_programs             (catálogo: slug, description, valid_from/until)
      └──▶ tpas                        (third party access tokens)
            └── customer_fee_configs (taxas do TPA)
 
@@ -447,6 +450,7 @@ idempotency_keys                      (previne duplicação de requests)
 | `DeviceAuthService` | Verificação de PIN por dispositivo |
 | `MerchantService` | Payment requests de merchants |
 | `NotificationService` | Push notifications para customers |
+| `ReferralRewardService` | Grava reward de indicação no `CustomerApproved` e lista os ganhos do customer |
 | `SettingsService` | Leitura/escrita de configurações da plataforma |
 
 ---

@@ -1258,3 +1258,72 @@ WallesterTransactionList:
           type: integer
         records_count:
           type: integer
+
+Reward:
+  type: object
+  description: |
+    Recompensa do customer autenticado. `program` identifica o meio
+    (hoje `referral`). `referred` só existe nesse programa.
+    `amount_cents` e `paid_at` ficam nulos até o pagamento ser implementado.
+  properties:
+    id:
+      type: integer
+    status:
+      type: string
+      enum: [pending, eligible, cancelled, paid]
+    qualified_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: Preenchido quando o indicado fica `ACTIVE` e o reward passa a `eligible`.
+    amount_cents:
+      type: integer
+      nullable: true
+    currency:
+      type: string
+      nullable: true
+      example: EUR
+    paid_at:
+      type: string
+      format: date-time
+      nullable: true
+    program:
+      type: object
+      nullable: true
+      properties:
+        slug:
+          type: string
+          example: referral
+        name:
+          type: string
+          example: Indicação
+        description:
+          type: string
+          nullable: true
+          description: Detalhes, termos e condições do programa.
+        valid_from:
+          type: string
+          format: date-time
+          nullable: true
+          description: Início da validade do programa. `null` = sem data de início.
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: Fim da validade do programa. `null` = sem prazo.
+    referred:
+      type: object
+      nullable: true
+      description: Customer indicado (só no programa `referral`).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        username:
+          type: string
+          nullable: true
+    created_at:
+      type: string
+      format: date-time
+      nullable: true

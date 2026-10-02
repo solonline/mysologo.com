@@ -89,8 +89,8 @@
             <p class="text-sm text-gray-500">{{ $config['message'] }}</p>
         </div>
 
-        @if ($status === 'success')
-            <a href="{{ config('app.url_frontend') }}"
+        @if ($status === 'success' || $status === 'already_verified')
+            <a href="com.yooppayments.app://"
                class="mt-2 inline-flex items-center justify-center rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors">
                 Abrir a app
             </a>

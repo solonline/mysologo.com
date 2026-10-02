@@ -12,6 +12,7 @@ use App\Domains\Kyc\KycServiceProvider;
 use App\Domains\Merchant\MerchantServiceProvider;
 use App\Domains\Onboarding\OnboardingServiceProvider;
 use App\Domains\Push\PushServiceProvider;
+use App\Domains\Reward\RewardServiceProvider;
 use App\Domains\Settings\SettingsServiceProvider;
 use App\Domains\Sms\SmsServiceProvider;
 use App\Domains\Stripe\StripeServiceProvider;
@@ -51,6 +52,7 @@ class DomainServiceProvider extends ServiceProvider
         TpaServiceProvider::class,
         WhatsappServiceProvider::class,
         DocumentsServiceProvider::class,
+        RewardServiceProvider::class,
     ];
 
     public function register(): void

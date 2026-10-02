@@ -74,30 +74,21 @@ class CustomerProfileService
 
     public function generateEmailValidationUrl(Customer $customer): string
     {
-        $signedUrl = URL::temporarySignedRoute(
-            'verification.verify',
-            now()->addMinutes(60),
-            [
-                'id' => $customer->id,
-                'hash' => sha1($customer->email),
-            ]
-        );
+        $frontendBase = rtrim((string) (config('app.url_frontend') ?: config('app.url')), '/');
 
-        $frontendBase = config('app.url_frontend') ?? env('URL_FRONTEND');
-        $parsed = parse_url($signedUrl);
-        $query = $parsed['query'] ?? '';
-        $path = $parsed['path'] ?? '';
+        URL::forceRootUrl($frontendBase);
 
-        preg_match('#/email/verify/(\d+)/(\w+)#', $path, $matches);
-        $id = $matches[1] ?? null;
-        $hash = $matches[2] ?? null;
-
-        $frontendUrl = rtrim((string) $frontendBase, '/') . "/email/verify/$id/$hash";
-
-        if ($query) {
-            $frontendUrl .= '?' . $query;
+        try {
+            return URL::temporarySignedRoute(
+                'verification.verify',
+                now()->addMinutes(60),
+                [
+                    'id' => $customer->id,
+                    'hash' => sha1($customer->email),
+                ]
+            );
+        } finally {
+            URL::forceRootUrl(null);
         }
-
-        return $frontendUrl;
     }
 }

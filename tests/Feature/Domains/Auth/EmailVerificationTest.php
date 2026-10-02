@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Domains\Auth;
 
+use App\Domains\Customer\Services\CustomerProfileService;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Models\Customer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,6 +38,8 @@ class EmailVerificationTest extends TestCase
         $response->assertViewHas('name', $customer->name);
         $response->assertSee('Email confirmado');
         $response->assertSee($customer->name);
+        $response->assertSee('Abrir a app');
+        $response->assertSee('com.yooppayments.app://', false);
 
         $customer->refresh();
         $this->assertNotNull($customer->email_verified_at);
@@ -78,6 +81,31 @@ class EmailVerificationTest extends TestCase
         $response->assertViewIs('auth.email-verification-result');
         $response->assertViewHas('status', 'not_found');
         $response->assertSee('Conta não encontrada');
+    }
+
+    public function test_email_validation_url_is_signed_for_the_frontend_host(): void
+    {
+        config(['app.url_frontend' => 'https://frontend.test']);
+
+        $customer = Customer::factory()->create([
+            'status' => CustomerLifecycleStatus::PENDING_EMAIL_VERIFICATION,
+            'email_verified_at' => null,
+        ]);
+
+        URL::forceRootUrl('https://api.yooppayments.eu');
+
+        $url = app(CustomerProfileService::class)->generateEmailValidationUrl($customer);
+
+        URL::forceRootUrl(null);
+
+        $this->assertStringStartsWith(
+            'https://frontend.test/email/verify/'.$customer->id.'/'.sha1($customer->email).'?',
+            $url
+        );
+
+        $this->get($url)
+            ->assertOk()
+            ->assertViewHas('status', 'success');
     }
 
     public function test_email_verification_returns_json_when_requested(): void

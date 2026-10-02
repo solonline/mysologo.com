@@ -1,0 +1,47 @@
+reward-my-rewards:
+  get:
+    tags: [Reward]
+    summary: Listar as minhas recompensas
+    operationId: rewardMyRewards
+    description: |
+      Lista paginada das rewards do customer autenticado (`customer_id`),
+      de **qualquer** programa. Hoje só existe `referral`.
+
+      Cada item inclui `program` (`slug`, `name`, `description`, `valid_from`,
+      `valid_until`). `referred` só vem preenchido no programa de indicação.
+
+      O registo **não** é criado por este endpoint. Indicações são gravadas
+      quando um customer com `referred_by_customer_id` passa a aprovado
+      (`CustomerApproved`) — um reward por indicado (`referred_id` único).
+
+      **Estados:** `pending`, `eligible`, `cancelled`, `paid`.
+
+      **Ainda não implementado:** valor (`amount_cents`) e pagamento
+      (`paid_at`, ledger). Esses campos vêm `null`.
+
+      **Pré-requisitos:** só `auth:sanctum` (sem tríade de elegibilidade).
+
+      Paginação Laravel padrão (`data`, `links`, `meta`). 20 por página.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+    responses:
+      '200':
+        description: Lista paginada de rewards do customer
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas.yaml#/Reward'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'

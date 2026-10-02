@@ -68,6 +68,12 @@ return [
             'description' => 'Um movimento por compra: total na conta, valor original e taxa FX.',
             'file' => 'wallester-card-movements.md',
         ],
+        [
+            'slug' => 'referral-rewards',
+            'title' => 'Recompensas',
+            'description' => 'Programas, ganhos em rewards e GET /reward/my-rewards.',
+            'file' => 'referral-rewards.md',
+        ],
     ],
 
     'partners' => [

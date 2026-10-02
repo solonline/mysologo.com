@@ -11,6 +11,7 @@ use App\Domains\Backoffice\Controllers\NewsController;
 use App\Domains\Backoffice\Controllers\NotificationController;
 use App\Domains\Backoffice\Controllers\OperationsController;
 use App\Domains\Backoffice\Controllers\PlatformRevenueController;
+use App\Domains\Backoffice\Controllers\RewardProgramController;
 use App\Domains\Backoffice\Controllers\RoleController;
 use App\Domains\Backoffice\Controllers\SettingsController;
 use App\Domains\Backoffice\Controllers\StripeFeeController;
@@ -140,6 +141,20 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
         Route::put('/news/{news}', [NewsController::class, 'update'])->name('.news.update');
     });
     Route::delete('/news/{news}', [NewsController::class, 'destroy'])->name('.news.destroy')->middleware('can:news.delete');
+
+    Route::get('/reward-programs', [RewardProgramController::class, 'index'])->name('.reward-programs')->middleware('can:rewards.view');
+    Route::middleware('can:rewards.create')->group(function () {
+        Route::get('/reward-programs/create', [RewardProgramController::class, 'create'])->name('.reward-programs.create');
+        Route::post('/reward-programs', [RewardProgramController::class, 'store'])->name('.reward-programs.store');
+    });
+    Route::middleware('can:rewards.view')->group(function () {
+        Route::get('/reward-programs/{reward_program}', [RewardProgramController::class, 'show'])->name('.reward-programs.show');
+    });
+    Route::middleware('can:rewards.edit')->group(function () {
+        Route::get('/reward-programs/{reward_program}/edit', [RewardProgramController::class, 'edit'])->name('.reward-programs.edit');
+        Route::put('/reward-programs/{reward_program}', [RewardProgramController::class, 'update'])->name('.reward-programs.update');
+    });
+    Route::delete('/reward-programs/{reward_program}', [RewardProgramController::class, 'destroy'])->name('.reward-programs.destroy')->middleware('can:rewards.delete');
 
     Route::middleware('can:stripe_fees.view')->group(function () {
         Route::get('/stripe-fees', [StripeFeeController::class, 'index'])->name('.stripe-fees');

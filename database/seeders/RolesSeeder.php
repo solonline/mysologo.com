@@ -57,6 +57,11 @@ class RolesSeeder extends Seeder
             'news.create',
             'news.edit',
             'news.delete',
+            // Recompensas
+            'rewards.view',
+            'rewards.create',
+            'rewards.edit',
+            'rewards.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -86,6 +91,7 @@ class RolesSeeder extends Seeder
             'reports.view',
             'accounts_payable.view', 'accounts_payable.create', 'accounts_payable.edit', 'accounts_payable.pay',
             'news.view', 'news.create', 'news.edit', 'news.delete',
+            'rewards.view', 'rewards.create', 'rewards.edit',
         ]);
 
         // support — só leitura
@@ -93,6 +99,7 @@ class RolesSeeder extends Seeder
             'customers.view',
             'transactions.view',
             'news.view',
+            'rewards.view',
         ]);
     }
 }

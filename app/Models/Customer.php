@@ -103,6 +103,16 @@ class Customer extends Model
         return $this->hasMany(Customer::class, 'referred_by_customer_id');
     }
 
+    public function rewards()
+    {
+        return $this->hasMany(Reward::class);
+    }
+
+    public function referralAsReferred()
+    {
+        return $this->hasOne(Reward::class, 'referred_id');
+    }
+
     public function documents()
     {
         return $this->hasMany(CustomerRetailDocument::class);

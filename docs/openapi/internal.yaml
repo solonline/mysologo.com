@@ -78,7 +78,7 @@ x-tagGroups:
   - name: Autenticação & Onboarding
     tags: [Auth, Onboarding, Kyc, Tpa]
   - name: Perfil & Notificações
-    tags: [Customer]
+    tags: [Customer, Reward]
   - name: Carteira & Pagamentos
     tags: [Wallet, Stripe, Wallester]
   - name: Merchants
@@ -97,6 +97,8 @@ tags:
     description: Terminais físicos — associação e login.
   - name: Customer
     description: Perfil, telefone, documentos corporate, notificações.
+  - name: Reward
+    description: Recompensas do customer autenticado (indicação hoje; outros programas depois).
   - name: Wallet
     description: Dashboard, conta, transacções, P2P e movimentos de funding (Wallester).
   - name: Stripe
@@ -184,6 +186,10 @@ paths:
     $ref: './paths/customer.yaml#/customer-notifications-read-all'
   /customer/notifications/{notification}/read:
     $ref: './paths/customer.yaml#/customer-notifications-read'
+
+  # Reward
+  /reward/my-rewards:
+    $ref: './paths/reward.yaml#/reward-my-rewards'
 
   # Wallet
   /wallet/health:
@@ -345,6 +351,8 @@ components:
       $ref: './components/schemas.yaml#/PaymentIntentResult'
     Notification:
       $ref: './components/schemas.yaml#/Notification'
+    Reward:
+      $ref: './components/schemas.yaml#/Reward'
     MerchantPaymentRequest:
       $ref: './components/schemas.yaml#/MerchantPaymentRequest'
     MerchantPaymentWebhook:

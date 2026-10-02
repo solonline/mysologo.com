@@ -14,6 +14,7 @@ Este guia é a leitura contínua. Contratos JSON e fluxos isolados:
 - [Webhooks](/docs/guides/webhooks)
 - [Cartões Wallester](/docs/guides/wallester-cards)
 - [Compras Wallester](/docs/guides/wallester-card-movements)
+- [Recompensas](/docs/guides/referral-rewards)
 
 Não hardcode a sequência no front: a fonte de verdade é `lifecycle`, `capabilities`, `verification` e `identity_verification` devolvidos no login e em `GET /customer/me`.
 
@@ -458,7 +459,7 @@ sequenceDiagram
 
 **Pré-requisitos:** Bearer + tríade; o intent é do customer. Quando o webhook ligar, inclui `stripe_transaction_id` / `transaction`.
 
-Webhook que fecha o ciclo: `POST /api/webhooks/stripe` (secção 18).
+Webhook que fecha o ciclo: `POST /api/webhooks/stripe` (secção 19).
 
 ---
 
@@ -928,7 +929,27 @@ Escreve `value`. Se a chave for `mail.*`, reaplica SMTP. Qualquer customer auten
 
 ---
 
-## 18. Webhooks inbound
+## 18. Recompensas
+
+O catálogo vive em `reward_programs`. O ganho vive em `rewards` (`customer_id` = quem recebe). O grafo de indicação continua em `customers.referred_by_customer_id`.
+
+Indicação: quando o indicado é aprovado (`CustomerApproved`), grava-se um `rewards` com `program = referral` (único por `referred_id`).
+
+Guia: [Recompensas](/docs/guides/referral-rewards).
+
+### `GET /api/reward/my-rewards`
+
+**Quando:** ecrã de recompensas do customer autenticado.
+
+**Pré-requisitos:** `auth:sanctum` (sem tríade).
+
+**O que o sistema faz:** lista paginada (20/página) das rewards em que `customer_id` é o do token. Inclui `program` (`slug`, `name`, `description`, `valid_from`, `valid_until`). No programa `referral`, inclui o indicado (`referred`). Estados: `pending`, `eligible`, `cancelled`, `paid`.
+
+**Passo seguinte:** valor e pagamento ainda não existem (`amount_cents` / `paid_at` nulos). Outros programas ainda não existem.
+
+---
+
+## 19. Webhooks inbound
 
 A app **não** chama estes URLs. São os parceiros a notificar a Yoop. Sem eles o onboarding e o saldo não fecham.
 
@@ -958,7 +979,7 @@ Detalhe: [Webhooks](/docs/guides/webhooks).
 
 ---
 
-## 19. Health
+## 20. Health
 
 Públicos, sem lógica de negócio. Úteis para load balancer e smoke tests:
 
@@ -984,6 +1005,7 @@ Públicos, sem lógica de negócio. Úteis para load balancer e smoke tests:
 | Cartões | quote → `POST /wallester/cards` → (físico `Dispatched`: `activate-by-cvv`) / (virtual: `activate`) → `sensitive` / `block` / `unblock` / `close` |
 | 3DS | pending → approve/reject (webhooks Wallester 3DS) |
 | Extrato | `GET /wallet/funding-accounts/{id}/movements` |
+| Recompensas | `GET /reward/my-rewards` |
 | Terminal POS | `tpa/link` → `login-tpa` → `connection-token` → `create-intent` → `capture` |
 
 O backend continua a ser a fonte de verdade: se `capabilities.can_transact` for `false`, não forçar wallet, PIN ou pagamentos.
