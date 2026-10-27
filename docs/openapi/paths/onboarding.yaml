@@ -29,7 +29,7 @@ onboarding-phone-send:
       (`phone_already_verified`) — nesse caso usar `POST /customer/phone`.
 
       Reenvio para um número já verificado devolve `status: failed` com mensagem informativa.
-      Falha do gateway SMS → `502`.
+      Falha do gateway SMS ou WhatsApp → `424` com `SmsValidationResult` (`status: failed`).
     security:
       - bearerAuth: []
     requestBody:
@@ -53,8 +53,12 @@ onboarding-phone-send:
         $ref: '../components/responses.yaml#/Unauthorized'
       '422':
         $ref: '../components/responses.yaml#/ValidationError'
-      '502':
-        description: Falha ao enviar o SMS
+      '424':
+        description: Falha ao enviar o código por SMS ou WhatsApp
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/SmsValidationResult'
 
 onboarding-phone-validate:
   post:

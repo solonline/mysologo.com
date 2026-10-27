@@ -91,6 +91,24 @@ class PhoneVerificationControllerTest extends TestCase
             ->assertJsonPath('phone', '351911111111');
     }
 
+    public function test_send_with_whatsapp_failure_returns_application_json(): void
+    {
+        $this->mock(WhatsappGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('sendText')
+                ->once()
+                ->andReturn(WhatsappSendResult::failed('Connection Closed', 500));
+        });
+
+        $customer = $this->pendingPhoneCustomer('351911111111');
+
+        $this->withToken($customer->createToken('test')->plainTextToken)
+            ->postJson('/api/onboarding/phone/send', ['whatsapp' => true])
+            ->assertStatus(424)
+            ->assertJsonPath('status', 'failed')
+            ->assertJsonPath('message', 'Unable to send verification code.')
+            ->assertJsonPath('phone', '351911111111');
+    }
+
     private function pendingPhoneCustomer(string $phone): Customer
     {
         return Customer::factory()->create([

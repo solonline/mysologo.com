@@ -62,7 +62,7 @@ class PhoneVerificationController extends Controller
             return $resource;
         }
 
-        return $resource->response()->setStatusCode(502);
+        return $resource->response()->setStatusCode(424);
     }
 
     /**
