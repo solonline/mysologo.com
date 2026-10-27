@@ -32,7 +32,11 @@
 <body>
     <div class="container">
         <div class="logo">
-            <img src="{{ url('/yoop.jpeg') }}" alt="Yoop Logo">
+            @hasSection('logo')
+                @yield('logo')
+            @else
+                <img src="{{ url('/yoop.jpeg') }}" alt="Yoop Logo">
+            @endif
         </div>
         @yield('content')
         <hr>

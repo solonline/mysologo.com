@@ -52,6 +52,14 @@ class MerchantRepository implements MerchantRepositoryInterface
             ->first();
     }
 
+    public function customerHasTestMerchant(int $customerId): bool
+    {
+        return Merchant::query()
+            ->where('customer_id', $customerId)
+            ->where('mode', 'test')
+            ->exists();
+    }
+
     public function update(Merchant $merchant, array $data): Merchant
     {
         $merchant->update($data);
@@ -71,5 +79,10 @@ class MerchantRepository implements MerchantRepositoryInterface
         $merchant->update(['webhook_secret' => $webhookSecret]);
 
         return $merchant->fresh();
+    }
+
+    public function delete(Merchant $merchant): void
+    {
+        $merchant->delete();
     }
 }

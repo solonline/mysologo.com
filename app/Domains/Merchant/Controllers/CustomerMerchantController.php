@@ -59,6 +59,14 @@ class CustomerMerchantController extends Controller
         return (new MerchantResource($updated))->response();
     }
 
+    public function destroy(Request $request, int $merchant): JsonResponse
+    {
+        $owned = $this->resolveOwnedMerchant($request, $merchant);
+        $this->merchantService->delete($owned);
+
+        return response()->json(['ok' => true]);
+    }
+
     public function credentials(Request $request, int $merchant): JsonResponse
     {
         $owned = $this->resolveOwnedMerchant($request, $merchant);

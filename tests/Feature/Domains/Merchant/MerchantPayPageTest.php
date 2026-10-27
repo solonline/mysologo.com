@@ -8,6 +8,7 @@ use App\Domains\Stripe\Contracts\StripeGatewayInterface;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Merchant;
 use App\Models\MerchantPaymentRequest;
+use App\Models\Setting;
 use App\Models\StripePaymentIntent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithOnboarding;
@@ -296,6 +297,71 @@ class MerchantPayPageTest extends TestCase
             'id' => $paymentRequest->id,
             'status' => 'completed',
         ]);
+    }
+
+    public function test_pay_page_uses_test_publishable_key_when_merchant_is_in_test_mode(): void
+    {
+        $paymentRequest = $this->makePaymentRequest();
+        $this->putStripeKey('stripe.eur.test_public_key', 'pk_test_merchant_page');
+        $this->putStripeKey('stripe.eur.public_key', 'pk_live_should_not_appear');
+
+        $this->mock(StripeGatewayInterface::class, function ($mock): void {
+            $mock->shouldReceive('createPaymentIntentWithMode')
+                ->once()
+                ->withArgs(fn (array $payload, string $mode): bool => $mode === 'test')
+                ->andReturn([
+                    'status' => 'success',
+                    'data' => [
+                        'id' => 'pi_mode_test',
+                        'client_secret' => 'pi_mode_test_secret',
+                        'status' => 'requires_payment_method',
+                        'amount' => 1500,
+                        'currency' => 'eur',
+                    ],
+                ]);
+        });
+
+        $this->get(route('pay.show', $paymentRequest->uuid))
+            ->assertOk()
+            ->assertSee('pk_test_merchant_page', false)
+            ->assertDontSee('pk_live_should_not_appear', false);
+    }
+
+    public function test_pay_page_uses_live_publishable_key_when_merchant_is_in_live_mode(): void
+    {
+        $paymentRequest = $this->makePaymentRequest();
+        $paymentRequest->merchant->update(['mode' => 'live']);
+        $this->putStripeKey('stripe.eur.public_key', 'pk_live_merchant_page');
+        $this->putStripeKey('stripe.eur.test_public_key', 'pk_test_should_not_appear');
+
+        $this->mock(StripeGatewayInterface::class, function ($mock): void {
+            $mock->shouldReceive('createPaymentIntentWithMode')
+                ->once()
+                ->withArgs(fn (array $payload, string $mode): bool => $mode === 'live')
+                ->andReturn([
+                    'status' => 'success',
+                    'data' => [
+                        'id' => 'pi_mode_live',
+                        'client_secret' => 'pi_mode_live_secret',
+                        'status' => 'requires_payment_method',
+                        'amount' => 1500,
+                        'currency' => 'eur',
+                    ],
+                ]);
+        });
+
+        $this->get(route('pay.show', $paymentRequest->uuid))
+            ->assertOk()
+            ->assertSee('pk_live_merchant_page', false)
+            ->assertDontSee('pk_test_should_not_appear', false);
+    }
+
+    private function putStripeKey(string $key, string $value): void
+    {
+        Setting::query()->updateOrCreate(
+            ['key' => $key],
+            ['label' => $key, 'type' => 'text', 'value' => $value],
+        );
     }
 
     /** @param array<string, mixed> $attributes */

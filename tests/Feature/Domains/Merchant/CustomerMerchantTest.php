@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Domains\Merchant;
 
+use App\Domains\Merchant\Mail\SecurePayWelcomeMail;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Models\Merchant;
+use App\Models\MerchantPaymentRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
 
@@ -12,6 +15,35 @@ class CustomerMerchantTest extends TestCase
 {
     use InteractsWithOnboarding;
     use RefreshDatabase;
+
+    public function test_register_sends_securepay_welcome_email(): void
+    {
+        Mail::fake();
+
+        $customer = $this->createActiveCustomer([
+            'name' => 'Ana Silva',
+            'email' => 'ana@loja.test',
+        ]);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson('/api/merchant/register', [
+                'name' => 'Loja da Ana',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Loja da Ana');
+
+        Mail::assertSent(SecurePayWelcomeMail::class, function (SecurePayWelcomeMail $mail) use ($customer): bool {
+            $html = $mail->render();
+
+            return $mail->hasTo($customer->email)
+                && $mail->envelope()->subject === 'Bem-vindo à SecurePay'
+                && $mail->merchant->name === 'Loja da Ana'
+                && str_contains($html, 'Loja da Ana')
+                && str_contains($html, 'data:image/png;base64,');
+        });
+    }
 
     public function test_customer_can_list_own_merchants(): void
     {
@@ -69,7 +101,7 @@ class CustomerMerchantTest extends TestCase
             'is_active' => true,
         ]);
 
-        \App\Models\MerchantPaymentRequest::query()->create([
+        MerchantPaymentRequest::query()->create([
             'merchant_id' => $merchant->id,
             'amount' => 1200,
             'currency' => 'EUR',
@@ -78,7 +110,7 @@ class CustomerMerchantTest extends TestCase
             'expires_at' => now()->addDay(),
         ]);
 
-        \App\Models\MerchantPaymentRequest::query()->create([
+        MerchantPaymentRequest::query()->create([
             'merchant_id' => $otherMerchant->id,
             'amount' => 9900,
             'currency' => 'EUR',
@@ -123,7 +155,7 @@ class CustomerMerchantTest extends TestCase
             ->assertJsonPath('data.status', 'pending')
             ->assertJsonStructure(['data' => ['uuid', 'url', 'expires_at']]);
 
-        $paymentRequest = \App\Models\MerchantPaymentRequest::query()
+        $paymentRequest = MerchantPaymentRequest::query()
             ->where('merchant_id', $merchant->id)
             ->latest('id')
             ->first();
@@ -252,6 +284,152 @@ class CustomerMerchantTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_customer_can_have_one_test_merchant_and_many_live(): void
+    {
+        Mail::fake();
+
+        $customer = $this->createActiveCustomer();
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->postJson('/api/merchant/register', [
+                'name' => 'Loja Teste',
+                'mode' => 'test',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.mode', 'test');
+
+        $this->withToken($token)
+            ->postJson('/api/merchant/register', [
+                'name' => 'Loja Teste 2',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('mode');
+
+        $this->withToken($token)
+            ->postJson('/api/merchant/register', [
+                'name' => 'Loja Live 1',
+                'mode' => 'live',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.mode', 'live');
+
+        $this->withToken($token)
+            ->postJson('/api/merchant/register', [
+                'name' => 'Loja Live 2',
+                'mode' => 'live',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.mode', 'live');
+
+        $this->assertSame(1, Merchant::query()->where('customer_id', $customer->id)->where('mode', 'test')->count());
+        $this->assertSame(2, Merchant::query()->where('customer_id', $customer->id)->where('mode', 'live')->count());
+    }
+
+    public function test_customer_cannot_change_merchant_mode(): void
+    {
+        $customer = $this->createActiveCustomer();
+
+        $test = Merchant::query()->create([
+            'customer_id' => $customer->id,
+            'name' => 'Loja Teste',
+            'slug' => 'loja-teste-limite',
+            'api_key' => hash('sha256', 'yoop_test_limit'),
+            'mode' => 'test',
+            'is_active' => true,
+        ]);
+
+        $live = Merchant::query()->create([
+            'customer_id' => $customer->id,
+            'name' => 'Loja Live',
+            'slug' => 'loja-live-limite',
+            'api_key' => hash('sha256', 'yoop_live_limit'),
+            'mode' => 'live',
+            'is_active' => true,
+        ]);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->patchJson('/api/merchant/'.$live->id, [
+                'name' => 'Loja Live Nova',
+                'mode' => 'test',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('mode');
+
+        $this->withToken($token)
+            ->patchJson('/api/merchant/'.$test->id, [
+                'mode' => 'live',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('mode');
+
+        $live->refresh();
+        $test->refresh();
+        $this->assertSame('live', $live->mode);
+        $this->assertSame('Loja Live', $live->name);
+        $this->assertSame('test', $test->mode);
+    }
+
+    public function test_customer_can_delete_own_merchant_and_register_test_again(): void
+    {
+        Mail::fake();
+
+        $customer = $this->createActiveCustomer();
+        $other = $this->createActiveCustomer();
+
+        $merchant = Merchant::query()->create([
+            'customer_id' => $customer->id,
+            'name' => 'Loja a excluir',
+            'slug' => 'loja-a-excluir',
+            'api_key' => hash('sha256', 'yoop_test_delete'),
+            'mode' => 'test',
+            'is_active' => true,
+        ]);
+
+        $foreign = Merchant::query()->create([
+            'customer_id' => $other->id,
+            'name' => 'Loja alheia',
+            'slug' => 'loja-alheia-delete',
+            'api_key' => hash('sha256', 'yoop_test_delete_other'),
+            'mode' => 'test',
+            'is_active' => true,
+        ]);
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($token)
+            ->deleteJson('/api/merchant/'.$foreign->id)
+            ->assertNotFound();
+
+        $this->withToken($token)
+            ->deleteJson('/api/merchant/'.$merchant->id)
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->assertSoftDeleted('merchants', ['id' => $merchant->id]);
+
+        $this->withToken($token)
+            ->getJson('/api/merchant')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $this->withToken($token)
+            ->patchJson('/api/merchant/'.$merchant->id, [
+                'name' => 'Já excluída',
+            ])
+            ->assertNotFound();
+
+        $this->withToken($token)
+            ->postJson('/api/merchant/register', [
+                'name' => 'Nova loja teste',
+                'mode' => 'test',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.mode', 'test');
+    }
+
     public function test_customer_can_update_own_merchant(): void
     {
         $customer = $this->createActiveCustomer();
@@ -283,19 +461,18 @@ class CustomerMerchantTest extends TestCase
                 'name' => 'Loja Nova',
                 'slug' => 'loja-nova',
                 'webhook_url' => 'https://nova.test/webhook',
-                'mode' => 'live',
             ])
             ->assertOk()
             ->assertJsonPath('data.name', 'Loja Nova')
             ->assertJsonPath('data.slug', 'loja-nova')
             ->assertJsonPath('data.webhook_url', 'https://nova.test/webhook')
-            ->assertJsonPath('data.mode', 'live');
+            ->assertJsonPath('data.mode', 'test');
 
         $merchant->refresh();
         $this->assertSame('Loja Nova', $merchant->name);
         $this->assertSame('loja-nova', $merchant->slug);
         $this->assertSame('https://nova.test/webhook', $merchant->webhook_url);
-        $this->assertSame('live', $merchant->mode);
+        $this->assertSame('test', $merchant->mode);
 
         $this->withToken($token)
             ->patchJson('/api/merchant/'.$merchant->id, [

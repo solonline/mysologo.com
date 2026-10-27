@@ -37,19 +37,19 @@ class UpdateMerchantRequest extends FormRequest
                     ->whereNull('deleted_at'),
             ],
             'webhook_url' => ['sometimes', 'nullable', 'url', 'max:500'],
-            'mode' => ['sometimes', 'string', 'in:test,live'],
+            'mode' => ['prohibited'],
         ];
     }
 
     public function withValidator($validator): void
     {
         $validator->after(function ($validator): void {
-            $payload = $this->only(['name', 'slug', 'webhook_url', 'mode']);
+            $payload = $this->only(['name', 'slug', 'webhook_url']);
 
             if ($payload === []) {
                 $validator->errors()->add(
                     'name',
-                    'Indique pelo menos um campo para actualizar: name, slug, webhook_url ou mode.',
+                    'Indique pelo menos um campo para actualizar: name, slug ou webhook_url.',
                 );
             }
         });

@@ -20,6 +20,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/{merchant}', [CustomerMerchantController::class, 'update'])
         ->where('merchant', '[0-9]+')
         ->name('merchant.customer.update');
+    Route::delete('/{merchant}', [CustomerMerchantController::class, 'destroy'])
+        ->where('merchant', '[0-9]+')
+        ->name('merchant.customer.destroy');
     Route::get('/{merchant}/credentials', [CustomerMerchantController::class, 'credentials'])
         ->where('merchant', '[0-9]+')
         ->name('merchant.customer.credentials.show');

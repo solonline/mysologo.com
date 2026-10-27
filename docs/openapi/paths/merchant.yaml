@@ -64,6 +64,8 @@ merchant-register:
     operationId: merchantRegister
     description: |
       Converte o customer autenticado em merchant (uso interno / app).
+      Cada conta pode ter **um** merchant `test` e vários `live`.
+      O `mode` é escolhido na criação e não pode ser alterado.
       Devolve `api_key` e `webhook_secret` **uma vez** no corpo da resposta
       (`additional` / root) — guardar com segurança; o secret assina webhooks HMAC.
     security:
@@ -113,7 +115,8 @@ merchant-customer-update:
     operationId: merchantCustomerUpdate
     description: |
       Actualiza campos do merchant do customer autenticado.
-      Envie pelo menos um de: `name`, `slug`, `webhook_url`, `mode`.
+      Envie pelo menos um de: `name`, `slug`, `webhook_url`.
+      O `mode` não pode ser alterado.
     security:
       - bearerAuth: []
     parameters:
@@ -140,14 +143,10 @@ merchant-customer-update:
                 type: string
                 format: uri
                 nullable: true
-              mode:
-                type: string
-                enum: [test, live]
           example:
             name: Loja Nova
             slug: loja-nova
             webhook_url: https://loja.com/webhook/yoop
-            mode: live
     responses:
       '200':
         description: Merchant actualizado
@@ -164,6 +163,36 @@ merchant-customer-update:
         $ref: '../components/responses.yaml#/NotFound'
       '422':
         $ref: '../components/responses.yaml#/ValidationError'
+  delete:
+    tags: [Merchant]
+    summary: Excluir merchant
+    operationId: merchantCustomerDestroy
+    description: |
+      Exclui (soft delete) o merchant do customer autenticado.
+      A API key deixa de autenticar. O lugar de merchant `test` fica livre.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: merchant
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Merchant excluído
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ok:
+                  type: boolean
+                  enum: [true]
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses.yaml#/NotFound'
 
 merchant-customer-credentials:
   get:

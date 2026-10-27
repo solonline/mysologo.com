@@ -129,7 +129,7 @@ class MerchantPaymentSettlementTest extends TestCase
             ->first();
 
         $this->assertNotNull($balance);
-        $this->assertSame(0, (int) $balance->available);
+        $this->assertSame(0, (int) $balance->wallester_allocated);
         $this->assertSame((int) $transaction->net_amount, (int) $balance->pending);
 
         $this->assertTrue(

@@ -7,6 +7,7 @@ use App\Domains\Merchant\Contracts\MerchantRepositoryInterface;
 use App\Domains\Merchant\DTOs\CreateMerchantPaymentRequestDTO;
 use App\Domains\Merchant\DTOs\RegisterMerchantDTO;
 use App\Domains\Merchant\Jobs\DispatchMerchantWebhook;
+use App\Domains\Merchant\Jobs\SendSecurePayWelcomeEmail;
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
 use App\Domains\Stripe\Enums\StripePaymentIntentPurpose;
 use App\Domains\Stripe\Services\StripePaymentIntentService;
@@ -19,6 +20,7 @@ use App\Models\MerchantPaymentRequest;
 use App\Models\Payer;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class MerchantService
 {
@@ -33,6 +35,8 @@ class MerchantService
     public function register(Customer $customer, array $data): array
     {
         $mode = $data['mode'] ?? 'test';
+        $this->assertTestMerchantAvailable($customer->id, $mode);
+
         $rawKey = $this->generateRawApiKey($mode);
         $webhookSecret = app(MerchantWebhookSigner::class)->generateRawSecret();
 
@@ -49,15 +53,23 @@ class MerchantService
                 : null,
         );
 
+        $merchant = $this->merchantRepository->create($dto);
+
+        SendSecurePayWelcomeEmail::dispatch($merchant);
+
+        /**
+         * @todo: create a job to send the documentation email to the merchant
+         */
+
         return [
-            'merchant' => $this->merchantRepository->create($dto),
+            'merchant' => $merchant,
             'api_key' => $rawKey,
             'webhook_secret' => $webhookSecret,
         ];
     }
 
     /**
-     * @param  array{name?: string, slug?: string, webhook_url?: string|null, mode?: string}  $data
+     * @param  array{name?: string, slug?: string, webhook_url?: string|null}  $data
      */
     public function update(Merchant $merchant, array $data): Merchant
     {
@@ -75,11 +87,12 @@ class MerchantService
             $payload['webhook_url'] = $data['webhook_url'];
         }
 
-        if (array_key_exists('mode', $data)) {
-            $payload['mode'] = $data['mode'];
-        }
-
         return $this->merchantRepository->update($merchant, $payload);
+    }
+
+    public function delete(Merchant $merchant): void
+    {
+        $this->merchantRepository->delete($merchant);
     }
 
     /**
@@ -125,9 +138,23 @@ class MerchantService
         ];
     }
 
+    private function assertTestMerchantAvailable(int $customerId, string $mode): void
+    {
+        if ($mode !== 'test') {
+            return;
+        }
+
+        if ($this->merchantRepository->customerHasTestMerchant($customerId)) {
+            throw ValidationException::withMessages([
+                'mode' => 'Cada conta pode ter apenas um merchant em modo teste.',
+            ]);
+        }
+    }
+
     private function generateRawApiKey(string $mode): string
     {
-        $prefix = $mode === 'live' ? 'yoop_live_' : 'yoop_test_';
+        // $prefix = $mode === 'live' ? 'yoop_live_' : 'yoop_test_';
+        $prefix = 'yoop_';
 
         return $prefix.bin2hex(random_bytes(32));
     }

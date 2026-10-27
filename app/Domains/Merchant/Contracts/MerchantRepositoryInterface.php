@@ -18,10 +18,14 @@ interface MerchantRepositoryInterface
 
     public function findOwnedByCustomer(Customer $customer, int $merchantId): ?Merchant;
 
+    public function customerHasTestMerchant(int $customerId): bool;
+
     /**
-     * @param  array{name?: string, slug?: string, webhook_url?: string|null, mode?: string}  $data
+     * @param  array{name?: string, slug?: string, webhook_url?: string|null}  $data
      */
     public function update(Merchant $merchant, array $data): Merchant;
+
+    public function delete(Merchant $merchant): void;
 
     public function updateApiKey(Merchant $merchant, string $hashedApiKey): Merchant;
 

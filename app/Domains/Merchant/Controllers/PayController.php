@@ -3,7 +3,7 @@
 namespace App\Domains\Merchant\Controllers;
 
 use App\Domains\Merchant\Services\MerchantService;
-use App\Domains\Settings\Services\SettingsService;
+use App\Domains\Stripe\Clients\StripeHttpClient;
 use App\Domains\Stripe\Enums\StripePaymentIntentStatus;
 use App\Models\MerchantPaymentRequest;
 use Illuminate\Http\Request;
@@ -14,7 +14,7 @@ class PayController extends Controller
 {
     public function __construct(
         protected MerchantService $merchantService,
-        protected SettingsService $settingsService,
+        protected StripeHttpClient $stripeClient,
     ) {}
 
     public function show(Request $request, string $uuid)
@@ -34,7 +34,10 @@ class PayController extends Controller
 
         $clientSecret = null;
         $awaitingConfirmation = false;
-        $publishableKey = $this->settingsService->getByKey("stripe.{$customerCurrency}.public_key");
+        $publishableKey = $this->stripeClient->publishableKey(
+            (string) $paymentRequest->merchant->mode,
+            $customerCurrency,
+        );
 
         $redirectStatus = $request->query('redirect_status');
         $piStatus = $paymentRequest->stripePaymentIntent?->status;
