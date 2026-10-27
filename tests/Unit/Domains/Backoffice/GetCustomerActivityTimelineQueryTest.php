@@ -94,6 +94,52 @@ class GetCustomerActivityTimelineQueryTest extends TestCase
         $this->assertTrue($wallester->contains(fn ($item) => $item->isIncoming && $item->amountCents === 5_000));
     }
 
+    public function test_timeline_hides_stripe_topup_funding_and_keeps_gross_available_and_fee(): void
+    {
+        $customer = $this->createRetailCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_timeline_topup');
+
+        $transaction = StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'bank_transfer',
+            'direction' => 'credit',
+            'amount' => 300,
+            'stripe_fee' => 2,
+            'platform_fee' => 0,
+            'net_amount' => 298,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'Bank transfer top-up via VIBAN',
+            'stripe_created_at' => now(),
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::In,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 298,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'stripe_topup:'.$transaction->id.':in',
+            'description' => 'Stripe top-up #'.$transaction->id,
+            'reference_type' => $transaction->getMorphClass(),
+            'reference_id' => $transaction->id,
+        ]);
+
+        $timeline = app(GetCustomerActivityTimelineQuery::class)->execute($customer);
+
+        $this->assertCount(1, $timeline);
+        $this->assertSame('stripe', $timeline->first()->source);
+        $this->assertSame(300, $timeline->first()->amountCents);
+        $this->assertSame(298, $timeline->first()->netAmountCents);
+        $this->assertSame(2, $timeline->first()->feeCents);
+    }
+
     public function test_timeline_includes_same_customer_visible_wallester_types_as_api(): void
     {
         $customer = $this->createRetailCustomer();

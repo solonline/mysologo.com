@@ -1510,6 +1510,13 @@
             @elseif ($showCustomerSaldo)
             <div class="divide-y divide-slate-50">
                 @foreach ($customer->balances as $balance)
+                @php
+                    $captiveTransfers = $customer->wiseTransfers
+                        ->filter(fn ($transfer) => strtoupper((string) $transfer->currency) === strtoupper((string) $balance->currency)
+                            && $transfer->settled_at === null
+                            && $transfer->refunded_at === null);
+                    $captiveCents = (int) $captiveTransfers->sum('amount_cents');
+                @endphp
                 <div class="px-5 py-4">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ $balance->currency }}</span>
@@ -1521,10 +1528,29 @@
                                 <span class="text-xs text-slate-500">Disponível</span>
                             </div>
                             <span class="text-sm font-bold text-emerald-600">
-                                {{ number_format($balance->available / 100, 2, ',', '.') }}
+                                {{ number_format($balance->wise_allocated / 100, 2, ',', '.') }}
                                 <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
                             </span>
                         </div>
+                        @if ($captiveCents > 0)
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                                    <span class="text-xs text-slate-500">Cativo</span>
+                                </div>
+                                <span class="text-sm font-semibold text-sky-700">
+                                    {{ number_format($captiveCents / 100, 2, ',', '.') }}
+                                    <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
+                                </span>
+                            </div>
+                            @foreach ($captiveTransfers as $transfer)
+                            <p class="text-[11px] text-slate-400 mt-1 pl-3.5">
+                                {{ $transfer->beneficiary_name }} · {{ $transfer->reference }}
+                            </p>
+                            @endforeach
+                        </div>
+                        @endif
                         {{-- @if ($balance->pending > 0) --}}
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-1.5">
@@ -1540,7 +1566,7 @@
                         <div class="pt-1 border-t border-slate-100 flex items-center justify-between">
                             <span class="text-xs text-slate-400">Total</span>
                             <span class="text-sm font-bold text-slate-800">
-                                {{ number_format(($balance->available + $balance->pending) / 100, 2, ',', '.') }}
+                                {{ number_format(($balance->wallester_allocated + $balance->pending + $captiveCents) / 100, 2, ',', '.') }}
                                 <span class="text-xs font-normal text-slate-400">{{ strtoupper($balance->currency) }}</span>
                             </span>
                         </div>

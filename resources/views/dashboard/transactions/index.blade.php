@@ -49,6 +49,8 @@
     $movementTypeLabels = [
         'account_transfer' => 'Transferência',
         'card_purchase' => 'Compra cartão',
+        'card_withdrawal' => 'Saque',
+        'card_withdrawal_fee' => 'Taxa de saque',
         'card_refund' => 'Reembolso cartão',
         'inbound_payment' => 'Entrada',
         'fee' => 'Câmbio',
@@ -262,18 +264,29 @@
                         <span class="font-semibold {{ $isCredit ? 'text-emerald-600' : 'text-red-500' }}">
                             {{ $isCredit ? '+' : '−' }}{{ number_format(abs($tx->amount) / 100, 2, ',', '.') }} {{ strtoupper($tx->currency) }}
                         </span>
-                        @if ($tx->net_amount && $tx->net_amount !== $tx->amount)
-                        <span class="text-xs text-slate-400 block">Líq. {{ number_format($tx->net_amount / 100, 2, ',', '.') }}</span>
+                        @if (! $tx->feesPending() && $tx->resolvedFeeTotal() > 0 && $tx->resolvedNetAmount() !== null)
+                        <span class="text-xs text-slate-400 block">
+                            @if (! $tx->customerFundsAvailable() && $tx->available_on)
+                            disponível em {{ $tx->available_on->timezone(config('app.timezone'))->format('d/m/Y') }}
+                            @else
+                            disponível {{ number_format($tx->resolvedNetAmount() / 100, 2, ',', '.') }}
+                            @endif
+                            · taxas {{ number_format($tx->resolvedFeeTotal() / 100, 2, ',', '.') }}
+                        </span>
                         @endif
                     </td>
                     <td>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border {{ match (strtolower($tx->status ?? '')) {
+                        @php
+                            $visibleStatus = $tx->customerFacingStatus();
+                            $visibleStatusLabel = $visibleStatus === 'pending' ? 'Pendente' : $visibleStatus;
+                        @endphp
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border {{ match (strtolower($visibleStatus)) {
                             'succeeded', 'paid', 'complete', 'completed', 'settled' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
                             'pending', 'processing', 'requires_capture' => 'bg-amber-50 text-amber-700 border-amber-200',
                             'failed', 'canceled', 'cancelled', 'refunded', 'disputed' => 'bg-red-50 text-red-700 border-red-200',
                             default => 'bg-slate-100 text-slate-600 border-slate-200',
                         } }}">
-                            {{ $tx->status ?? '—' }}
+                            {{ $visibleStatusLabel }}
                         </span>
                     </td>
                     <td>

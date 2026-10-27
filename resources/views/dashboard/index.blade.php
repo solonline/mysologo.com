@@ -115,41 +115,55 @@
         <span class="text-xs font-semibold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity mt-3 inline-block">Ver movimentos →</span>
     </a>
 
-    {{-- Clientes --}}
-    <a href="{{ route('dashboard.customers') }}"
-       class="card p-5 block transition-all hover:shadow-md hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-300/40 group">
+    {{-- Saldo Wise --}}
+    <div class="card p-5">
         <div class="flex items-start justify-between mb-4">
             <div class="p-2.5 rounded-xl stat-icon-2">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
             </div>
-            <span class="text-xs font-semibold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">Ver todos →</span>
+            @include('dashboard.partials.value-help', ['items' => [
+                ['Wise', 'Saldo da conta na API Wise, por moeda.'],
+                ['Clientes', 'Soma de todos os saldos: clientes, subcontas e master.'],
+                ['Suficiente', 'O saldo Wise cobre essa soma. Insuficiente quando fica abaixo.'],
+            ]])
         </div>
-        <p class="text-3xl font-bold text-slate-900 tracking-tight">{{ number_format($stats['total_customers'] ?? 0) }}</p>
-        <p class="text-sm text-slate-500 mt-1 font-medium">Clientes</p>
-        <div class="mt-4 space-y-2">
-            @php
-                $customerBreakdown = [
-                    ['label' => 'Ativos', 'value' => $stats['active_customers'] ?? 0, 'color' => '#10b981'],
-                    ['label' => 'Pendentes', 'value' => $stats['pending_customers'] ?? 0, 'color' => '#f59e0b'],
-                    ['label' => 'Em análise', 'value' => $stats['analysis_customers'] ?? 0, 'color' => '#0ea5e9'],
-                    ['label' => 'Bloqueados', 'value' => $stats['blocked_customers'] ?? 0, 'color' => '#ef4444'],
-                    ['label' => 'Docs pendentes', 'value' => $stats['pending_documents'] ?? 0, 'color' => '#64748b'],
-                    ['label' => 'Com SecurePay', 'value' => $stats['merchant_customers'] ?? 0, 'color' => '#0891b2'],
-                ];
-            @endphp
-            @foreach ($customerBreakdown as $row)
-            <div class="flex items-center justify-between text-xs">
-                <span class="flex items-center gap-1.5 text-slate-600">
-                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:{{ $row['color'] }}"></span>
-                    {{ $row['label'] }}
-                </span>
-                <span class="font-bold text-slate-800">{{ number_format($row['value']) }}</span>
+        <p class="text-sm text-slate-500 font-medium">Saldo Wise</p>
+        @if ($wiseBalancesError)
+        <p class="text-sm font-semibold text-slate-400 mt-3">{{ $wiseBalancesError }}</p>
+        @endif
+        @if (count($wiseBalances) === 0 && ! $wiseBalancesError)
+        <p class="text-3xl font-bold text-slate-400 tracking-tight mt-2">—</p>
+        @elseif (count($wiseBalances) > 0)
+        <div class="mt-4 space-y-3">
+            @foreach ($wiseBalances as $balance)
+            <div class="rounded-lg border border-slate-100 px-3 py-2">
+                <div class="flex items-center justify-between text-sm">
+                    <span class="font-semibold text-slate-600">{{ $balance['currency'] }}</span>
+                    @if ($balance['sufficient'] === true)
+                    <span class="text-[10px] font-semibold uppercase text-emerald-700">Suficiente</span>
+                    @elseif ($balance['sufficient'] === false)
+                    <span class="text-[10px] font-semibold uppercase text-red-700">Insuficiente</span>
+                    @endif
+                </div>
+                <div class="mt-1 flex items-center justify-between text-xs">
+                    <span class="text-slate-500">Wise</span>
+                    <span class="font-bold text-slate-900">
+                        {{ $balance['amount'] === null ? '—' : number_format((float) $balance['amount'], 2, ',', '.') }}
+                    </span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-500">Clientes</span>
+                    <span class="font-bold text-slate-900">
+                        {{ number_format(((int) $balance['customers_cents']) / 100, 2, ',', '.') }}
+                    </span>
+                </div>
             </div>
             @endforeach
         </div>
-    </a>
+        @endif
+    </div>
 
     {{-- Wallester --}}
     @php
@@ -178,14 +192,22 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
                 </svg>
             </div>
-            @if ($blockedTopups > 0)
-            <span class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style="background:#fffbeb;color:#d97706;">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                {{ $blockedTopups }} bloqueado{{ $blockedTopups !== 1 ? 's' : '' }}
-            </span>
-            @else
-            <span class="text-xs font-semibold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">Gerir →</span>
-            @endif
+            <div class="flex items-center gap-2">
+                @include('dashboard.partials.value-help', ['items' => [
+                    ['Main', 'Disponível da conta master na Wallester. Não entra na linha Contas.'],
+                    ['Contas', 'Soma de wallester_allocated de todas as subcontas. A master fica de fora.'],
+                    ['Sub-conta', 'Disponível da subconta de lucro na Wallester. Já está incluído em Contas.'],
+                    ['Lucro à espera', 'Taxas ainda por transferir para a subconta.'],
+                ]])
+                @if ($blockedTopups > 0)
+                <span class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full" style="background:#fffbeb;color:#d97706;">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    {{ $blockedTopups }} bloqueado{{ $blockedTopups !== 1 ? 's' : '' }}
+                </span>
+                @else
+                <span class="text-xs font-semibold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">Gerir →</span>
+                @endif
+            </div>
         </div>
 
         @if ($wallesterPrimaryAccount === null)

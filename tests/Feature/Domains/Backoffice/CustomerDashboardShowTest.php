@@ -21,6 +21,7 @@ use App\Models\Merchant;
 use App\Models\MerchantPaymentRequest;
 use App\Models\StripeTransaction;
 use App\Models\User;
+use App\Models\WiseTransfer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -424,6 +425,61 @@ class CustomerDashboardShowTest extends TestCase
         $response->assertSee('4,54 EUR');
     }
 
+    public function test_customer_show_lists_topup_once_with_available_amount_and_fee(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+        $customer = $this->createRetailCustomer(['name' => 'Cliente Topup']);
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_show_topup');
+
+        $transaction = StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'bank_transfer',
+            'direction' => 'credit',
+            'amount' => 300,
+            'stripe_fee' => 2,
+            'platform_fee' => 0,
+            'net_amount' => 298,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'description' => 'Bank transfer top-up via VIBAN',
+            'wallester_funding_net_amount' => 298,
+            'partner_funding_status' => 'completed',
+            'partner_funded_at' => now(),
+            'balance_settled_at' => now(),
+            'available_on' => '2026-10-21',
+            'stripe_created_at' => now(),
+        ]);
+
+        FundingPartnerMovement::query()->create([
+            'provider' => 'wallester',
+            'funding_account_type' => $account::class,
+            'funding_account_id' => $account->id,
+            'external_account_id' => $account->wallester_account_id,
+            'direction' => FundingPartnerMovementDirection::In,
+            'type' => FundingPartnerMovementType::AccountTransfer,
+            'amount' => 298,
+            'currency' => 'EUR',
+            'status' => FundingPartnerMovementStatus::Completed,
+            'source' => FundingPartnerMovementSource::Api,
+            'idempotency_key' => 'stripe_topup:'.$transaction->id.':in',
+            'description' => 'Stripe top-up #'.$transaction->id,
+        ]);
+
+        $response = $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $customer));
+
+        $response->assertOk();
+        $this->assertSame(1, substr_count($response->getContent(), 'data-customer-movement'));
+        $response->assertSee('3,00');
+        $response->assertSee('disponível em 21/10/2026');
+        $response->assertSee('taxas 0,02');
+        $response->assertSee('Pendente');
+        $response->assertDontSee('disponível 2,98');
+        $response->assertDontSee('Stripe top-up #'.$transaction->id);
+        $response->assertDontSee('Wallester imediato');
+    }
+
     public function test_customer_show_limits_recent_movements_to_ten_and_links_to_full_list(): void
     {
         $user = $this->userWithPermission('customers.view');
@@ -546,7 +602,7 @@ class CustomerDashboardShowTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $platform->id,
             'currency' => 'EUR',
-            'available' => 1598,
+            'wallester_allocated' => 1598,
             'pending' => 0,
         ]);
 
@@ -574,6 +630,63 @@ class CustomerDashboardShowTest extends TestCase
             ->assertSee('Câmbio Yoop')
             ->assertSee('0,05')
             ->assertDontSee('15,98');
+    }
+
+    public function test_customer_show_displays_captive_wise_transfer(): void
+    {
+        $user = $this->userWithPermission('customers.view');
+
+        $customer = Customer::factory()->create([
+            'name' => 'Cliente Cativo',
+            'status' => CustomerLifecycleStatus::ACTIVE,
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'wallester_allocated' => 125,
+            'pending' => 767,
+            'wise_allocated' => 125,
+        ]);
+
+        WiseTransfer::query()->create([
+            'customer_id' => $customer->id,
+            'wise_transfer_id' => 2440842090,
+            'wise_batch_group_id' => '64a6d684-3be0-4b40-b3e9-4e22f6f8e9f7',
+            'wise_recipient_id' => 1612703775,
+            'beneficiary_name' => 'TAMIETTO JUNIOR, UNIPESSOAL, LDA',
+            'reference' => 'Tamietto 1 EUR',
+            'currency' => 'EUR',
+            'amount_cents' => 100,
+            'fee_cents' => 0,
+            'fee_currency' => 'EUR',
+            'idempotency_key' => 'wise_transfer:dashboard-captive',
+            'status' => 'incoming_payment_waiting',
+        ]);
+
+        WiseTransfer::query()->create([
+            'customer_id' => $customer->id,
+            'wise_transfer_id' => 2440842091,
+            'wise_batch_group_id' => '64a6d684-3be0-4b40-b3e9-4e22f6f8e9f8',
+            'wise_recipient_id' => 1612703776,
+            'beneficiary_name' => 'Ja enviado',
+            'reference' => 'Enviado',
+            'currency' => 'EUR',
+            'amount_cents' => 500,
+            'idempotency_key' => 'wise_transfer:dashboard-settled',
+            'status' => 'outgoing_payment_sent',
+            'settled_at' => now(),
+        ]);
+
+        $this->actingAs($user, 'web')
+            ->get(route('dashboard.customers.show', $customer))
+            ->assertOk()
+            ->assertSee('Cativo')
+            ->assertSee('1,00')
+            ->assertSee('TAMIETTO JUNIOR, UNIPESSOAL, LDA')
+            ->assertSee('Tamietto 1 EUR')
+            ->assertSee('9,92')
+            ->assertDontSee('Ja enviado');
     }
 
     private function userWithPermission(string $permission): User

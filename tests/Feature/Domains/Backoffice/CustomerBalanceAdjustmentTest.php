@@ -236,10 +236,13 @@ class CustomerBalanceAdjustmentTest extends TestCase
             'currency' => 'EUR',
         ]);
 
-        $this->assertSame(1000, (int) CustomerBalance::query()
+        $balance = CustomerBalance::query()
             ->where('customer_id', $customer->id)
             ->where('currency', 'EUR')
-            ->value('available'));
+            ->first();
+
+        $this->assertSame(1000, (int) $balance?->wallester_allocated);
+        $this->assertSame(1000, (int) $balance?->wise_allocated);
     }
 
     public function test_confirm_debit_with_insufficient_ledger_fails(): void
@@ -251,7 +254,7 @@ class CustomerBalanceAdjustmentTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 500,
+            'wallester_allocated' => 500,
             'pending' => 0,
         ]);
 
@@ -364,7 +367,8 @@ class CustomerBalanceAdjustmentTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 5000,
+            'wallester_allocated' => 5000,
+            'wise_allocated' => 5000,
             'pending' => 0,
         ]);
 
@@ -423,10 +427,13 @@ class CustomerBalanceAdjustmentTest extends TestCase
             'amount' => 1000,
         ]);
 
-        $this->assertSame(4000, (int) CustomerBalance::query()
+        $balance = CustomerBalance::query()
             ->where('customer_id', $customer->id)
             ->where('currency', 'EUR')
-            ->value('available'));
+            ->first();
+
+        $this->assertSame(4000, (int) $balance?->wallester_allocated);
+        $this->assertSame(4000, (int) $balance?->wise_allocated);
     }
 
     public function test_show_page_includes_credit_debit_for_super_admin_with_active_wallester(): void

@@ -14,6 +14,10 @@ class GetCustomerDetailQuery
             'responsibles',
             'referredBy',
             'balances',
+            'wiseTransfers' => fn ($q) => $q
+                ->whereNull('settled_at')
+                ->whereNull('refunded_at')
+                ->orderByDesc('id'),
             'stripeAccount',
             'wallesterAccount.cards' => fn ($q) => $q->orderByDesc('id'),
             'wallesterAccounts',

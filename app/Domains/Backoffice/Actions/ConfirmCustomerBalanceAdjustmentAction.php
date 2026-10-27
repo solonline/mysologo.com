@@ -7,6 +7,7 @@ use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentStatus;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
+use App\Domains\Wallet\Services\RailMirrorService;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
 use App\Models\Customer;
@@ -24,6 +25,7 @@ class ConfirmCustomerBalanceAdjustmentAction
     public function __construct(
         protected FundingPartnerMovementService $fundingPartnerMovements,
         protected LedgerService $ledger,
+        protected RailMirrorService $railMirror,
     ) {}
 
     public function execute(
@@ -101,7 +103,7 @@ class ConfirmCustomerBalanceAdjustmentAction
             $available = (int) (CustomerBalance::query()
                 ->where('customer_id', $customer->id)
                 ->where('currency', $adjustment->currency)
-                ->value('available') ?? 0);
+                ->value('wallester_allocated') ?? 0);
 
             if ($available < $adjustment->amount_cents) {
                 $adjustment->update([
@@ -169,6 +171,8 @@ class ConfirmCustomerBalanceAdjustmentAction
                 ],
             );
 
+            $this->mirrorWiseAllocation($customer, $adjustment);
+
             $adjustment->update([
                 'status' => CustomerBalanceAdjustmentStatus::Executed,
                 'partner_external_id' => is_string($partnerExternalId) ? $partnerExternalId : null,
@@ -177,5 +181,39 @@ class ConfirmCustomerBalanceAdjustmentAction
         });
 
         return $adjustment->fresh(['approvals']);
+    }
+
+    private function mirrorWiseAllocation(Customer $customer, CustomerBalanceAdjustment $adjustment): void
+    {
+        $amountCents = (int) $adjustment->amount_cents;
+
+        if ($amountCents <= 0) {
+            return;
+        }
+
+        $idempotencyKey = $adjustment->idempotency_key.':wise';
+
+        if ($adjustment->direction === CustomerBalanceAdjustmentDirection::Credit) {
+            $this->railMirror->creditAllocation(
+                customerId: (int) $customer->id,
+                currency: $adjustment->currency,
+                amountCents: $amountCents,
+                idempotencyKey: $idempotencyKey,
+                reason: 'manual_credit',
+                reference: $adjustment,
+            );
+
+            return;
+        }
+
+        $this->railMirror->debitAllocation(
+            customerId: (int) $customer->id,
+            currency: $adjustment->currency,
+            amountCents: $amountCents,
+            idempotencyKey: $idempotencyKey,
+            reason: 'manual_debit',
+            reference: $adjustment,
+            allowNegative: true,
+        );
     }
 }

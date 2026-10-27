@@ -4,6 +4,7 @@ namespace App\Domains\Backoffice\Queries;
 
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
+use App\Models\CustomerBalance;
 use App\Models\CustomerWallesterAccount;
 use App\Models\StripeTransaction;
 use Illuminate\Support\Collection;
@@ -46,24 +47,24 @@ class GetWallesterFundingOverviewQuery
     }
 
     /**
-     * Soma o disponível das contas Wallester, excluindo as contas main.
+     * Soma o wallester_allocated de todas as subcontas. A master fica de fora.
      *
      * @return Collection<string, int>
      */
     private function accountsAvailableByCurrency(): Collection
     {
-        return CustomerWallesterAccount::query()
-            ->where('is_main', false)
-            ->get(['funding_currency', 'currency_code', 'available_amount'])
-            ->groupBy(fn (CustomerWallesterAccount $account): string => $this->accountCurrency($account))
-            ->map(fn (Collection $accounts): int => (int) $accounts->sum(
-                fn (CustomerWallesterAccount $account): int => (int) ($account->available_amount ?? 0)
-            ))
-            ->sortKeys();
-    }
+        $masterCustomerIds = CustomerWallesterAccount::query()
+            ->where('is_main', true)
+            ->pluck('customer_id');
 
-    private function accountCurrency(CustomerWallesterAccount $account): string
-    {
-        return strtoupper((string) ($account->funding_currency ?: $account->currency_code ?: 'EUR'));
+        return CustomerBalance::query()
+            ->when($masterCustomerIds->isNotEmpty(), fn ($query) => $query->whereNotIn('customer_id', $masterCustomerIds))
+            ->selectRaw('currency, SUM(wallester_allocated) as allocated')
+            ->groupBy('currency')
+            ->get()
+            ->mapWithKeys(fn (CustomerBalance $balance): array => [
+                strtoupper((string) $balance->currency) => (int) $balance->allocated,
+            ])
+            ->sortKeys();
     }
 }

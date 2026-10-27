@@ -59,10 +59,14 @@
                 @php
                     $amount = number_format(abs($item->amountCents) / 100, 2, ',', '.');
                     $status = strtolower($item->status);
+                    $statusLabel = $item->wallesterMovement?->customerFacingStatusLabel()
+                        ?? ($status === 'pending' ? 'Pendente' : $item->status);
+                    $awaitingRelease = $item->source === 'stripe' && $status === 'pending';
                     $statusBadge = match(true) {
                         in_array($status, ['succeeded', 'paid', 'complete', 'completed', 'settled', 'concluído', 'concluido']) => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                        $status === 'sent' => 'bg-sky-50 text-sky-700 border-sky-200',
                         in_array($status, ['pending', 'processing', 'requires_capture', 'pendente']) => 'bg-amber-50 text-amber-700 border-amber-200',
-                        in_array($status, ['failed', 'canceled', 'cancelled', 'refunded', 'disputed', 'falhou']) => 'bg-red-50 text-red-700 border-red-200',
+                        in_array($status, ['failed', 'canceled', 'cancelled', 'refunded', 'charged_back', 'bounced_back', 'disputed', 'falhou']) => 'bg-red-50 text-red-700 border-red-200',
                         default => 'bg-slate-100 text-slate-500 border-slate-200',
                     };
                     $sourceBadge = match ($item->source) {
@@ -74,20 +78,27 @@
                 <div data-customer-movement class="relative flex gap-3 {{ $loop->last ? 'pb-0' : 'pb-3' }}">
                     <div class="relative flex-shrink-0 mt-1">
                         <div class="w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm z-10 relative
-                                    {{ $item->isIncoming ? 'bg-emerald-500' : 'bg-red-400' }}"></div>
+                                    {{ $awaitingRelease ? 'bg-amber-400' : ($item->isIncoming ? 'bg-emerald-500' : 'bg-red-400') }}"></div>
                     </div>
                     <div class="flex-1 min-w-0 pb-3 {{ ! $loop->last ? 'border-b border-slate-50' : '' }}">
                         <div class="flex items-start justify-between gap-2">
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
-                                    <span class="text-sm font-bold {{ $item->isIncoming ? 'text-emerald-600' : 'text-red-500' }}">
+                                    <span class="text-sm font-bold {{ $awaitingRelease ? 'text-amber-600' : ($item->isIncoming ? 'text-emerald-600' : 'text-red-500') }}">
                                         {{ $item->isIncoming ? '+' : '−' }} {{ $amount }} {{ $item->currency }}
                                     </span>
                                     <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border {{ $sourceBadge }}">
                                         {{ $item->sourceLabel }}
                                     </span>
-                                    @if ($item->netAmountCents && $item->netAmountCents !== $item->amountCents)
-                                    <span class="text-xs text-slate-400">(líq. {{ number_format($item->netAmountCents / 100, 2, ',', '.') }})</span>
+                                    @if ($item->feeCents !== null && $item->feeCents > 0 && $item->netAmountCents !== null)
+                                    <span class="text-xs text-slate-400">
+                                        @if (! $item->fundsAvailable && $item->availableOn)
+                                        disponível em {{ $item->availableOn->timezone(config('app.timezone'))->format('d/m/Y') }}
+                                        @else
+                                        disponível {{ number_format($item->netAmountCents / 100, 2, ',', '.') }}
+                                        @endif
+                                        · taxas {{ number_format($item->feeCents / 100, 2, ',', '.') }}
+                                    </span>
                                     @endif
                                 </div>
                                 @if ($item->fxDetailLabel)
@@ -112,12 +123,6 @@
                                     <span class="ml-2">MCC {{ $item->merchantCategoryCode }}</span>
                                     @endif
                                 </p>
-                                @endif
-
-                                @if ($item->stripeTransaction)
-                                <div class="mt-1">
-                                    @include('dashboard.partials.topup-settlement-route', ['transaction' => $item->stripeTransaction])
-                                </div>
                                 @endif
 
                                 <p class="text-xs text-slate-400 mt-0.5 flex items-baseline gap-1.5 min-w-0">
@@ -154,7 +159,7 @@
                             </div>
                             <div class="flex-shrink-0 text-right">
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border {{ $statusBadge }}">
-                                    {{ $item->status }}
+                                    {{ $statusLabel }}
                                 </span>
                             </div>
                         </div>

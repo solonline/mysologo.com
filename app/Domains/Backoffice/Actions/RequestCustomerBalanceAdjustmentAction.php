@@ -128,7 +128,7 @@ class RequestCustomerBalanceAdjustmentAction
         $available = (int) (CustomerBalance::query()
             ->where('customer_id', $customer->id)
             ->where('currency', $currency)
-            ->value('available') ?? 0);
+            ->value('wallester_allocated') ?? 0);
 
         if ($available < $amountCents) {
             throw new ApiException(

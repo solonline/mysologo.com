@@ -30,5 +30,8 @@ readonly class CustomerActivityItem
         public ?string $merchantCategoryCode = null,
         public ?string $sourceLabel = null,
         public ?string $fxDetailLabel = null,
+        public ?int $feeCents = null,
+        public ?CarbonInterface $availableOn = null,
+        public bool $fundsAvailable = false,
     ) {}
 }

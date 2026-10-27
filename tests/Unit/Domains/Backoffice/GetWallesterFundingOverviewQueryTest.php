@@ -5,6 +5,7 @@ namespace Tests\Unit\Domains\Backoffice;
 use App\Domains\Backoffice\Queries\GetWallesterFundingOverviewQuery;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Models\Customer;
+use App\Models\CustomerBalance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
@@ -17,6 +18,7 @@ class GetWallesterFundingOverviewQueryTest extends TestCase
     public function test_sums_non_main_available_amount_by_currency(): void
     {
         $platform = Customer::factory()->create(['type' => 'platform', 'email' => 'wallester-total@yoop.test']);
+        $fee = Customer::factory()->create(['type' => 'platform', 'email' => 'wallester-fee-total@yoop.test']);
         $retailA = $this->createRetailCustomer(['email' => 'retail-a-total@yoop.test']);
         $retailB = $this->createRetailCustomer(['email' => 'retail-b-total@yoop.test']);
 
@@ -26,19 +28,41 @@ class GetWallesterFundingOverviewQueryTest extends TestCase
             'funding_currency' => 'EUR',
             'currency_code' => 'EUR',
         ]);
-        $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, 'wal-fee-eur', [
+        $this->createWallesterAccount($fee, IntegrationAccountStatus::ACTIVE, 'wal-fee-eur', [
             'is_main' => false,
             'available_amount' => 518,
             'funding_currency' => 'EUR',
             'currency_code' => 'EUR',
-            'product_id' => 'prod_fee_'.$platform->id,
-            'company_id' => 'comp_fee_'.$platform->id,
+            'product_id' => 'prod_fee_'.$fee->id,
+            'company_id' => 'comp_fee_'.$fee->id,
         ]);
         $this->createWallesterAccount($retailA, IntegrationAccountStatus::ACTIVE, 'wal-retail-a', [
             'available_amount' => 27093,
         ]);
         $this->createWallesterAccount($retailB, IntegrationAccountStatus::ACTIVE, 'wal-retail-b', [
             'available_amount' => null,
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $platform->id,
+            'currency' => 'EUR',
+            'wallester_allocated' => 423,
+            'wise_allocated' => 0,
+            'pending' => 0,
+        ]);
+        CustomerBalance::query()->create([
+            'customer_id' => $fee->id,
+            'currency' => 'EUR',
+            'wallester_allocated' => 518,
+            'wise_allocated' => 0,
+            'pending' => 0,
+        ]);
+        CustomerBalance::query()->create([
+            'customer_id' => $retailA->id,
+            'currency' => 'EUR',
+            'wallester_allocated' => 27093,
+            'wise_allocated' => 0,
+            'pending' => 0,
         ]);
 
         $overview = app(GetWallesterFundingOverviewQuery::class)->execute();

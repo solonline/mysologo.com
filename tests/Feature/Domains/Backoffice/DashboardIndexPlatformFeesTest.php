@@ -11,6 +11,7 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Models\Customer;
+use App\Models\CustomerBalance;
 use App\Models\FundingPartnerMovement;
 use App\Models\StripeTransaction;
 use App\Models\User;
@@ -117,20 +118,43 @@ class DashboardIndexPlatformFeesTest extends TestCase
         $this->seedWallesterSettings();
 
         $platform = Customer::factory()->create(['type' => 'platform', 'email' => 'dash-total@yoop.test']);
+        $fee = Customer::factory()->create(['type' => 'platform', 'email' => 'dash-fee-total@yoop.test']);
         $retail = $this->createRetailCustomer(['email' => 'dash-retail-total@yoop.test']);
 
         $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, self::MASTER_ID, [
             'is_main' => true,
             'available_amount' => 423,
         ]);
-        $this->createWallesterAccount($platform, IntegrationAccountStatus::ACTIVE, self::FEE_ID, [
+        $this->createWallesterAccount($fee, IntegrationAccountStatus::ACTIVE, self::FEE_ID, [
             'is_main' => false,
             'available_amount' => 518,
-            'product_id' => 'prod_fee_'.$platform->id,
-            'company_id' => 'comp_fee_'.$platform->id,
+            'product_id' => 'prod_fee_'.$fee->id,
+            'company_id' => 'comp_fee_'.$fee->id,
         ]);
         $this->createWallesterAccount($retail, IntegrationAccountStatus::ACTIVE, 'wal-dash-retail', [
             'available_amount' => 27093,
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $platform->id,
+            'currency' => 'EUR',
+            'wallester_allocated' => 423,
+            'wise_allocated' => 0,
+            'pending' => 0,
+        ]);
+        CustomerBalance::query()->create([
+            'customer_id' => $fee->id,
+            'currency' => 'EUR',
+            'wallester_allocated' => 518,
+            'wise_allocated' => 0,
+            'pending' => 0,
+        ]);
+        CustomerBalance::query()->create([
+            'customer_id' => $retail->id,
+            'currency' => 'EUR',
+            'wallester_allocated' => 27093,
+            'wise_allocated' => 0,
+            'pending' => 0,
         ]);
 
         $user = User::factory()->create();
@@ -141,6 +165,7 @@ class DashboardIndexPlatformFeesTest extends TestCase
             ->assertSee('Wallester · Main')
             ->assertSee('4,23')
             ->assertSee('Contas')
+            ->assertSee('Soma de todas as subcontas. A master fica de fora.')
             ->assertSee('276,11')
             ->assertDontSee('280,34');
     }

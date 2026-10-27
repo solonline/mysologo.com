@@ -7,6 +7,7 @@ use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentDirection;
 use App\Domains\Backoffice\Enums\CustomerBalanceAdjustmentStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\TransactionType;
+use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Models\Customer;
 use App\Models\CustomerBalanceAdjustment;
 use App\Models\CustomerWallesterAccount;
@@ -16,6 +17,10 @@ use Illuminate\Support\Collection;
 
 class GetCustomerActivityTimelineQuery
 {
+    public function __construct(
+        private readonly FundingPartnerMovementService $movements,
+    ) {}
+
     /**
      * @return Collection<int, CustomerActivityItem>
      */
@@ -34,9 +39,15 @@ class GetCustomerActivityTimelineQuery
             ->get()
             ->map(fn (StripeTransaction $transaction): CustomerActivityItem => $this->fromStripeTransaction($transaction));
 
-        $wallesterAccountIds = CustomerWallesterAccount::query()
+        $wallesterAccounts = CustomerWallesterAccount::query()
             ->where('customer_id', $customer->id)
-            ->pluck('id');
+            ->get();
+
+        foreach ($wallesterAccounts as $account) {
+            $this->movements->syncPendingWiseMirrors($account);
+        }
+
+        $wallesterAccountIds = $wallesterAccounts->pluck('id');
 
         $adjustmentMorph = (new CustomerBalanceAdjustment)->getMorphClass();
 
@@ -61,7 +72,11 @@ class GetCustomerActivityTimelineQuery
                 ->latest('created_at')
                 ->latest('id')
                 ->limit($limit)
-                ->get()
+                ->get();
+
+            FundingPartnerMovement::hydrateWiseTransfers($wallesterItems);
+
+            $wallesterItems = $wallesterItems
                 ->map(fn (FundingPartnerMovement $movement): CustomerActivityItem => $this->fromWallesterMovement($movement));
         }
 
@@ -91,10 +106,13 @@ class GetCustomerActivityTimelineQuery
             occurredAt: $transaction->stripe_created_at ?? $transaction->created_at,
             isIncoming: $direction === 'credit',
             amountCents: (int) $transaction->amount,
-            netAmountCents: $transaction->net_amount !== null ? (int) $transaction->net_amount : null,
+            netAmountCents: $transaction->resolvedNetAmount(),
+            feeCents: $transaction->resolvedFeeTotal(),
+            availableOn: $transaction->available_on,
+            fundsAvailable: $transaction->customerFundsAvailable(),
             currency: strtoupper((string) $transaction->currency),
             typeLabel: $transaction->type?->label() ?? ($transaction->payment_method_type ?? 'Stripe'),
-            status: (string) ($transaction->status ?? '—'),
+            status: $transaction->customerFacingStatus(),
             description: $transaction->description,
             bankTransferSenderName: $transaction->bank_transfer_sender_name,
             bankTransferIbanLast4: $transaction->bank_transfer_iban_last4,
@@ -129,7 +147,7 @@ class GetCustomerActivityTimelineQuery
             netAmountCents: null,
             currency: strtoupper((string) $movement->currency),
             typeLabel: $typeLabel,
-            status: $movement->status?->value ?? (string) $movement->status,
+            status: $movement->customerFacingStatus() ?? (string) $movement->status,
             description: $movement->displayDescription(),
             p2pCounterpartyName: $counterparty?->name,
             p2pCounterpartyUsername: $counterparty?->username,
