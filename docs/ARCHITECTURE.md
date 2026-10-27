@@ -198,10 +198,10 @@ customers.type
      │               │  1. stripe_transactions (debit, sender)  │
      │               │  2. stripe_transactions (credit, recip.) │
      │               │  3. LedgerService::record(P2P_SEND)      │
-     │               │     → customer_balances.available -=     │
+     │               │     → customer_balances.wallester_allocated -=     │
      │               │     → ledger_entries (debit)             │
      │               │  4. LedgerService::record(P2P_RECEIVE)   │
-     │               │     → customer_balances.available +=     │
+     │               │     → customer_balances.wallester_allocated +=     │
      │               │     → ledger_entries (credit)            │
      │               └──────┬──────────────────────────────────┘
      │                      │
@@ -333,7 +333,7 @@ customers.type
   └────────────────────────────────────────┘
                 │
                 ▼
-  customer_balances.available = 0  ✓ (consistente)
+  customer_balances.wallester_allocated = 0  ✓ (consistente)
 
   Reconciliação:
   LedgerService::recalculateBalance()  → SUM(credits) - SUM(debits)

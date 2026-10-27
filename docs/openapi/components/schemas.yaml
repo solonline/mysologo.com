@@ -756,6 +756,10 @@ FundingPartnerMovement:
       type: integer
     provider:
       type: string
+      enum: [wallester, wise]
+      description: |
+        `wise` quando o movimento é o espelho de um envio Wise.
+        Nos restantes casos, `wallester`.
       example: wallester
     external_account_id:
       type: string
@@ -767,10 +771,11 @@ FundingPartnerMovement:
       enum: [card_purchase, card_refund, account_transfer, inbound_payment, fee]
     type_label:
       type: string
-      description: Nome de apresentação (ex. Transferência entre contas, Crédito Yoop, Compra cartão)
+      description: Nome de apresentação (ex. Transferência Wise, Transferência entre contas, Crédito Yoop, Compra cartão)
     source_label:
       type: string
-      description: Origem visível (Wallester, Crédito Yoop, Débito Yoop)
+      description: Origem visível (Wallester, Wise, Crédito Yoop, Débito Yoop)
+      example: Wise
     is_p2p:
       type: boolean
     amount:
@@ -823,6 +828,55 @@ FundingPartnerMovement:
       nullable: true
     status:
       type: string
+      description: |
+        Estado normalizado para a app (`CustomerMovementStatus`).
+        Não devolver o estado cru da Wise.
+
+        Transferência Wise (`provider: wise`):
+
+        | Estado Wise | status | status_label |
+        |---|---|---|
+        | incoming_payment_waiting, incoming_payment_initiated | pending | A caminho da Wise |
+        | processing, funds_converted | processing | Em processamento |
+        | outgoing_payment_sent | sent | Pagamento enviado |
+        | cancelled | canceled | Pagamento cancelado |
+        | funds_refunded | refunded | Pagamento reembolsado |
+        | charged_back | charged_back | Valor devolvido ao remetente |
+        | bounced_back | bounced_back | Devolvido |
+        | unknown | unknown | Estado desconhecido |
+
+        Wallester e restantes: `pending` (Pendente), `completed` (Concluído),
+        `failed` (Falhou), `canceled` (Cancelado).
+        `sent` não é `completed`.
+      enum:
+        - pending
+        - processing
+        - sent
+        - completed
+        - failed
+        - canceled
+        - refunded
+        - charged_back
+        - bounced_back
+        - unknown
+      example: sent
+    status_label:
+      type: string
+      description: Texto pronto a mostrar. Espelha `status`.
+      enum:
+        - A caminho da Wise
+        - Em processamento
+        - Pagamento enviado
+        - Pagamento cancelado
+        - Pagamento reembolsado
+        - Valor devolvido ao remetente
+        - Devolvido
+        - Estado desconhecido
+        - Pendente
+        - Concluído
+        - Falhou
+        - Cancelado
+      example: Pagamento enviado
     source:
       type: string
       enum: [webhook, sync, api]

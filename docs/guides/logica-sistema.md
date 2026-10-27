@@ -175,7 +175,7 @@ No **onboarding** o número começa no registo, mas o utilizador pode **corrigir
 2. Com um `phone` **diferente** e o número actual **ainda não verificado** → actualiza `customer.phone` (correcção) e envia o SMS para o novo número.
 3. Com um `phone` diferente mas o actual **já verificado** → **422** (`phone_already_verified`): usar `POST /api/customer/phone`.
 4. Se o telefone da conta já está verificado e se pede reenvio → `status: failed`, «Phone already verified.»
-5. Gera código de 6 dígitos (TTL ~10 min) e grava `PhoneVerification`. Se o gateway SMS falhar, apaga o registo e responde **502**.
+5. Gera código de 6 dígitos (TTL ~10 min) e grava `PhoneVerification`. Se o gateway SMS ou WhatsApp falhar, apaga o registo e responde **424** com `status: failed`.
 
 A resposta de sucesso inclui `phone` com o número para o qual o SMS foi enviado.
 
@@ -576,7 +576,100 @@ Três listas diferentes — não misturar:
 
 **Pré-requisitos:** Bearer + tríade; `{id}` é uma `CustomerWallesterAccount` do customer, operacional. Query `per_page`.
 
-**O que o sistema faz:** lista `funding_partner_movements` visíveis (compras, reembolsos, P2P, transfers). O `amount` já inclui FX quando aplicável; há `original_amount` / `original_currency`, `fees_amount`, `platform_fees_amount`, `type`, `direction`, `is_p2p`, `counterparty`, `status`, `description`.
+**O que o sistema faz:** lista `funding_partner_movements` visíveis (compras, reembolsos, P2P, transfers, envios Wise). O `amount` já inclui FX quando aplicável; há `original_amount` / `original_currency`, `fees_amount`, `platform_fees_amount`, `type`, `direction`, `is_p2p`, `counterparty`, `status`, `status_label`, `description`.
+
+Um envio Wise aparece aqui pelo espelho interno (`idempotency_key` `wise_mirror:…`), mas a resposta já vem normalizada: `provider` `wise`, `source_label` `Wise`, `type_label` `Transferência Wise`. O `status` **não** é o estado cru da Wise (`outgoing_payment_sent`, etc.).
+
+A linha entra na lista assim que a transferência Wise é criada, inclusive em `incoming_payment_waiting`. Nesse caso `status` é `pending` e `status_label` é `A caminho da Wise`. Não fica de fora à espera do débito na Wallester.
+
+Enum `CustomerMovementStatus`. A app mostra `status_label` e usa `status` para a cor.
+
+| Estado Wise | `status` | `status_label` |
+|---|---|---|
+| `incoming_payment_waiting`, `incoming_payment_initiated` | `pending` | A caminho da Wise |
+| `processing`, `funds_converted` | `processing` | Em processamento |
+| `outgoing_payment_sent` | `sent` | Pagamento enviado |
+| `cancelled` | `canceled` | Pagamento cancelado |
+| `funds_refunded` | `refunded` | Pagamento reembolsado |
+| `charged_back` | `charged_back` | Valor devolvido ao remetente |
+| `bounced_back` | `bounced_back` | Devolvido |
+| `unknown` | `unknown` | Estado desconhecido |
+
+Movimentos Wallester (e o resto) usam só `pending`, `completed`, `failed` e `canceled`, com `status_label` `Pendente`, `Concluído`, `Falhou` e `Cancelado`. `sent` é pagamento Wise já enviado, não é `completed`.
+
+A app mostra `status_label`. O formato do item é o mesmo; muda `status` / `status_label` (e, na Wise, `provider` e `source_label`).
+
+Wise pendente:
+
+```json
+{
+  "id": 387,
+  "provider": "wise",
+  "direction": "out",
+  "type": "account_transfer",
+  "type_label": "Transferência Wise",
+  "source_label": "Wise",
+  "is_p2p": false,
+  "amount": 50,
+  "currency": "EUR",
+  "status": "pending",
+  "status_label": "A caminho da Wise",
+  "description": "Maria Silva · REF123",
+  "failure_reason": null,
+  "created_at": "2026-10-20T15:08:20+01:00"
+}
+```
+
+Wise pagamento enviado:
+
+```json
+{
+  "id": 385,
+  "provider": "wise",
+  "direction": "out",
+  "type": "account_transfer",
+  "type_label": "Transferência Wise",
+  "source_label": "Wise",
+  "is_p2p": false,
+  "amount": 35,
+  "currency": "EUR",
+  "status": "sent",
+  "status_label": "Pagamento enviado",
+  "description": "Maria Silva · REF123",
+  "failure_reason": null,
+  "created_at": "2026-10-19T15:52:51+01:00"
+}
+```
+
+Os outros estados Wise usam o mesmo corpo. Só mudam `status` e `status_label`: `processing` / `Em processamento`, `canceled` / `Pagamento cancelado`, `refunded` / `Pagamento reembolsado`, `charged_back` / `Valor devolvido ao remetente`, `bounced_back` / `Devolvido`, `unknown` / `Estado desconhecido`.
+
+Wallester concluído:
+
+```json
+{
+  "id": 210,
+  "provider": "wallester",
+  "direction": "out",
+  "type": "card_purchase",
+  "type_label": "Compra cartão",
+  "source_label": "Wallester",
+  "is_p2p": false,
+  "amount": 463,
+  "currency": "EUR",
+  "original_amount": 388,
+  "original_currency": "GBP",
+  "fees_amount": 9,
+  "status": "completed",
+  "status_label": "Concluído",
+  "description": "LidlGB",
+  "failure_reason": null,
+  "created_at": "2026-10-18T12:04:25+01:00"
+}
+```
+
+Wallester pendente, falhado e cancelado usam o mesmo corpo de transferência, com `status` / `status_label`: `pending` / `Pendente`, `failed` / `Falhou` (`failure_reason` preenchido), `canceled` / `Cancelado`.
+
+Os exemplos completos, um por estado, estão na referência da API em `GET /wallet/funding-accounts/{id}/movements`.
 
 Guia: [Compras Wallester e câmbio](/docs/guides/wallester-card-movements).
 
