@@ -36,23 +36,39 @@ class SettingsSeeder extends Seeder
             ['key' => 'system.timezone',            'label' => 'Timezone',                'type' => 'timezone', 'value' => 'Europe/Lisbon'],
             ['key' => 'system.time_expires_token',  'label' => 'Expiração token (horas)', 'type' => 'number',   'value' => '1'],
             ['key' => 'system.maintenance_mode',    'label' => 'Modo de manutenção',      'type' => 'toggle',   'value' => 'false'],
-            // Stripe — por moeda (cada moeda tem a sua conta Stripe separada)
-            // EUR
-            ['key' => 'stripe.eur.public_key',     'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
-            ['key' => 'stripe.eur.secret_key',     'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
-            ['key' => 'stripe.eur.webhook_secret', 'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => 'whsec_1234567890abcdef'],
-            // USD
-            ['key' => 'stripe.usd.public_key',     'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
-            ['key' => 'stripe.usd.secret_key',     'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
-            ['key' => 'stripe.usd.webhook_secret', 'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => ''],
-            // GBP
-            ['key' => 'stripe.gbp.public_key',     'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
-            ['key' => 'stripe.gbp.secret_key',     'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
-            ['key' => 'stripe.gbp.webhook_secret', 'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => ''],
-            // CHF
-            ['key' => 'stripe.chf.public_key',     'label' => 'Chave Pública (pk_)',     'type' => 'text',   'value' => ''],
-            ['key' => 'stripe.chf.secret_key',     'label' => 'Chave Secreta (sk_)',     'type' => 'secret', 'value' => ''],
-            ['key' => 'stripe.chf.webhook_secret', 'label' => 'Webhook Secret (whsec_)', 'type' => 'secret', 'value' => ''],
+            // Stripe — por moeda e por modo (produção vs teste)
+            // EUR produção
+            ['key' => 'stripe.eur.public_key',          'label' => 'Produção — Chave pública (pk_)',     'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.eur.secret_key',          'label' => 'Produção — Chave secreta (sk_)',     'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.eur.webhook_secret',      'label' => 'Produção — Webhook secret (whsec_)', 'type' => 'secret', 'value' => 'whsec_1234567890abcdef'],
+            // EUR teste
+            ['key' => 'stripe.eur.test_public_key',     'label' => 'Teste — Chave pública (pk_)',        'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.eur.test_secret_key',     'label' => 'Teste — Chave secreta (sk_)',        'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.eur.test_webhook_secret', 'label' => 'Teste — Webhook secret (whsec_)',    'type' => 'secret', 'value' => ''],
+            // USD produção
+            ['key' => 'stripe.usd.public_key',          'label' => 'Produção — Chave pública (pk_)',     'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.usd.secret_key',          'label' => 'Produção — Chave secreta (sk_)',     'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.usd.webhook_secret',      'label' => 'Produção — Webhook secret (whsec_)', 'type' => 'secret', 'value' => ''],
+            // USD teste
+            ['key' => 'stripe.usd.test_public_key',     'label' => 'Teste — Chave pública (pk_)',        'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.usd.test_secret_key',     'label' => 'Teste — Chave secreta (sk_)',        'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.usd.test_webhook_secret', 'label' => 'Teste — Webhook secret (whsec_)',    'type' => 'secret', 'value' => ''],
+            // GBP produção
+            ['key' => 'stripe.gbp.public_key',          'label' => 'Produção — Chave pública (pk_)',     'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.gbp.secret_key',          'label' => 'Produção — Chave secreta (sk_)',     'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.gbp.webhook_secret',      'label' => 'Produção — Webhook secret (whsec_)', 'type' => 'secret', 'value' => ''],
+            // GBP teste
+            ['key' => 'stripe.gbp.test_public_key',     'label' => 'Teste — Chave pública (pk_)',        'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.gbp.test_secret_key',     'label' => 'Teste — Chave secreta (sk_)',        'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.gbp.test_webhook_secret', 'label' => 'Teste — Webhook secret (whsec_)',    'type' => 'secret', 'value' => ''],
+            // CHF produção
+            ['key' => 'stripe.chf.public_key',          'label' => 'Produção — Chave pública (pk_)',     'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.chf.secret_key',          'label' => 'Produção — Chave secreta (sk_)',     'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.chf.webhook_secret',      'label' => 'Produção — Webhook secret (whsec_)', 'type' => 'secret', 'value' => ''],
+            // CHF teste
+            ['key' => 'stripe.chf.test_public_key',     'label' => 'Teste — Chave pública (pk_)',        'type' => 'text',   'value' => ''],
+            ['key' => 'stripe.chf.test_secret_key',     'label' => 'Teste — Chave secreta (sk_)',        'type' => 'secret', 'value' => ''],
+            ['key' => 'stripe.chf.test_webhook_secret', 'label' => 'Teste — Webhook secret (whsec_)',    'type' => 'secret', 'value' => ''],
             // Email SMTP (emails enviados aos clientes)
             ['key' => 'mail.host',          'label' => 'Host SMTP',        'type' => 'text',     'value' => env('MAIL_HOST', '')],
             ['key' => 'mail.port',          'label' => 'Porta SMTP',       'type' => 'number',   'value' => (string) env('MAIL_PORT', '587')],
@@ -103,6 +119,11 @@ class SettingsSeeder extends Seeder
             ['key' => 'wallester.eur.platform_fee_account_id',     'label' => 'Sub Conta Master (lucro) (EUR)',    'type' => 'text',     'value' => env('WALLESTER_PLATFORM_FEE_EUR', self::DEFAULT_WALLESTER_FEE_EUR)],
             ['key' => 'wallester.usd.platform_master_account_id',  'label' => 'Platform Master Account ID (USD)',  'type' => 'text',     'value' => env('WALLESTER_PLATFORM_MASTER_USD', '')],
             ['key' => 'wallester.usd.platform_fee_account_id',     'label' => 'Sub Conta Master (taxas) (USD)',    'type' => 'text',     'value' => env('WALLESTER_PLATFORM_FEE_USD', '')],
+            // Wise
+            ['key' => 'wise.base_url',            'label' => 'Base URL',                 'type' => 'url',      'value' => env('WISE_BASE_URL', 'https://api.wise-sandbox.com')],
+            ['key' => 'wise.api_token',           'label' => 'API Token',                'type' => 'secret',   'value' => env('WISE_API_TOKEN', '')],
+            ['key' => 'wise.profile_id',          'label' => 'Profile ID',               'type' => 'text',     'value' => env('WISE_PROFILE_ID', '')],
+            ['key' => 'wise.webhook_public_key',  'label' => 'Webhook Public Key (PEM)', 'type' => 'textarea', 'value' => env('WISE_WEBHOOK_PUBLIC_KEY', '')],
             // Câmbio (AwesomeAPI hoje)
             ['key' => 'fx.base_url',           'label' => 'URL Base',                      'type' => 'url',    'value' => env('FX_BASE_URL', 'https://economia.awesomeapi.com.br')],
             ['key' => 'fx.api_key',            'label' => 'API Key (x-api-key)',           'type' => 'secret', 'value' => env('FX_API_KEY', '')],
@@ -121,6 +142,35 @@ class SettingsSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ]));
+        }
+
+        $this->copyLiveTestStripeKeysIntoTestMode();
+    }
+
+    /**
+     * Se a chave de produção ainda for uma chave de teste da Stripe (pk_test_ / sk_test_),
+     * copia-a para o par de teste quando esse estiver vazio. Não copia chaves live.
+     */
+    private function copyLiveTestStripeKeysIntoTestMode(): void
+    {
+        foreach (['eur', 'usd', 'gbp', 'chf'] as $currency) {
+            foreach ([
+                'public_key' => 'pk_test_',
+                'secret_key' => 'sk_test_',
+            ] as $field => $prefix) {
+                $testKey = "stripe.{$currency}.test_{$field}";
+                $liveValue = DB::table('settings')->where('key', "stripe.{$currency}.{$field}")->value('value');
+                $testValue = DB::table('settings')->where('key', $testKey)->value('value');
+
+                if (($testValue !== null && $testValue !== '') || ! is_string($liveValue) || ! str_starts_with($liveValue, $prefix)) {
+                    continue;
+                }
+
+                DB::table('settings')->where('key', $testKey)->update([
+                    'value' => $liveValue,
+                    'updated_at' => now(),
+                ]);
+            }
         }
     }
 }

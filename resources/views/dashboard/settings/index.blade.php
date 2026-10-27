@@ -20,6 +20,7 @@ $tabs = [
     'stripe'   => ['label' => 'Stripe',         'title' => 'Stripe'],
     'didit'    => ['label' => 'Didit',          'title' => 'Didit (KYC / KYB)'],
     'wallester'=> ['label' => 'Wallester',      'title' => 'Wallester'],
+    'wise'     => ['label' => 'Wise',           'title' => 'Wise'],
     'mail'     => ['label' => 'Email',          'title' => 'SMTP (email de clientes)'],
     'sms'      => ['label' => 'SMS',            'title' => 'SMS'],
     'whatsapp' => ['label' => 'WhatsApp',       'title' => 'WhatsApp (Evolution API)'],
@@ -34,12 +35,36 @@ $grouped = $settings->groupBy(fn($s) => explode('.', $s->key)[0]);
 $panels = [];
 foreach ($tabs as $group => $meta) {
     if ($group === 'stripe') {
-        $byCurrency = $grouped->get('stripe', collect())->groupBy(fn($s) => strtoupper(explode('.', $s->key)[1]));
+        $rank = function ($setting): int {
+            $field = explode('.', $setting->key)[2] ?? '';
+
+            return match (true) {
+                str_contains($field, 'public') => 0,
+                str_contains($field, 'webhook') => 2,
+                default => 1,
+            };
+        };
+        $byCurrency = $grouped->get('stripe', collect())->groupBy(fn ($s) => strtoupper(explode('.', $s->key)[1]));
         foreach ($byCurrency as $currency => $currencySettings) {
-            $panels[$group][] = ['title' => $currency, 'badge' => $currency, 'settings' => $currencySettings];
+            $live = $currencySettings->reject(fn ($s) => str_contains($s->key, '.test_'))->sortBy($rank)->values();
+            $test = $currencySettings->filter(fn ($s) => str_contains($s->key, '.test_'))->sortBy($rank)->values();
+            $panels[$group][] = [
+                'title' => $currency,
+                'badge' => $currency,
+                'sections' => [
+                    ['title' => 'Produção', 'hint' => 'Merchant em mode live e o resto da plataforma.', 'settings' => $live],
+                    ['title' => 'Teste', 'hint' => 'Merchant em mode test. Estas chaves não liquidam dinheiro real.', 'settings' => $test],
+                ],
+            ];
         }
     } else {
-        $panels[$group][] = ['title' => $meta['title'], 'badge' => null, 'settings' => $grouped->get($group, collect())];
+        $panels[$group][] = [
+            'title' => $meta['title'],
+            'badge' => null,
+            'sections' => [
+                ['title' => null, 'hint' => null, 'settings' => $grouped->get($group, collect())],
+            ],
+        ];
     }
 }
 
@@ -111,8 +136,17 @@ $selectOptions = [
             </div>
 
             {{-- Fields --}}
+            @foreach ($panel['sections'] as $section)
+            @if ($section['title'])
+            <div class="px-6 pt-5 {{ $loop->first ? '' : 'border-t border-slate-100' }}">
+                <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wider">{{ $section['title'] }}</h3>
+                @if ($section['hint'])
+                <p class="text-xs text-slate-500 mt-1">{{ $section['hint'] }}</p>
+                @endif
+            </div>
+            @endif
             <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                @foreach ($panel['settings'] as $setting)
+                @foreach ($section['settings'] as $setting)
                 @php $isWide = in_array($setting->type, ['textarea', 'toggle', 'json']); @endphp
                 <div class="{{ $isWide ? 'sm:col-span-2' : '' }}">
 
@@ -237,6 +271,7 @@ $selectOptions = [
                 </div>
                 @endforeach
             </div>
+            @endforeach
 
         </div>
         @endforeach
