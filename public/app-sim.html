@@ -1013,6 +1013,42 @@ body {
 .result-card.show { display: block; }
 .result-card.success { border-color: #a7f3d0; background: #f0fdf4; color: #065f46; }
 .result-card.error   { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+.result-card.tall { max-height: 280px; }
+
+.wise-wallets,
+.wise-recipients {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.wise-recipients { flex-direction: column; overflow: visible; }
+.wise-wallet,
+.wise-recipient {
+  border: 1.5px solid var(--slate-200);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--slate-800);
+}
+.wise-wallet { flex: 0 0 auto; min-width: 132px; }
+.wise-wallet small,
+.wise-recipient small {
+  display: block;
+  color: var(--slate-500);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+.wise-wallet strong,
+.wise-recipient strong { font-size: 15px; font-weight: 700; }
+.wise-wallet.active,
+.wise-recipient.active {
+  border-color: var(--indigo);
+  background: #eef2ff;
+}
 
 /* ── Toast ────────────────────────────────────────── */
 #toast {
@@ -1083,9 +1119,11 @@ body {
 
 .badge.active     { background: #d1fae5; color: #065f46; }
 .badge.succeeded  { background: #d1fae5; color: #065f46; }
-.badge.pending    { background: #fef3c7; color: #92400e; }
-.badge.inactive   { background: var(--slate-100); color: var(--slate-500); }
-.badge.failed     { background: #fee2e2; color: #991b1b; }
+.badge.pending, .badge.processing { background: #fef3c7; color: #92400e; }
+.badge.sent       { background: #e0f2fe; color: #075985; }
+.badge.completed  { background: #d1fae5; color: #065f46; }
+.badge.inactive, .badge.unknown { background: var(--slate-100); color: var(--slate-500); }
+.badge.failed, .badge.canceled, .badge.refunded, .badge.charged_back, .badge.bounced_back { background: #fee2e2; color: #991b1b; }
 
 /* ── Empty state ──────────────────────────────────── */
 .empty-state {
@@ -1687,6 +1725,26 @@ body {
 
 .sp-endpoint .sp-verb.patch { background: #d97706; }
 .sp-endpoint .sp-verb.get { background: #059669; }
+.sp-endpoint .sp-verb.delete { background: #dc2626; }
+.btn-step.danger { color: #b91c1c; border-color: #fecaca; background: #fff; }
+.sp-merchant-list { display: flex; flex-direction: column; gap: 8px; }
+.sp-merchant-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: var(--slate-50);
+  border: 1px solid var(--slate-100);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.sp-merchant-item.active { border-color: #0891b2; background: #ecfeff; }
+.sp-merchant-item strong { font-size: 13px; color: var(--slate-900); }
+.sp-merchant-item span { font-size: 11px; color: var(--slate-500); font-weight: 600; }
 .sp-endpoint-stack {
   display: flex;
   flex-direction: column;
@@ -2653,6 +2711,15 @@ body {
           </div>
           <span>Enviar</span>
         </button>
+        <button class="action-btn" onclick="navigate('wise')">
+          <div class="action-icon sky">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+          </div>
+          <span>Wise</span>
+        </button>
         <button class="action-btn" onclick="navigate('movements')">
           <div class="action-icon sky">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -3198,6 +3265,56 @@ body {
       </div>
     </div>
 
+    <!-- ── Wise transfer ── -->
+    <div id="screen-wise" class="screen tx-screen">
+      <div class="screen-header">
+        <button class="back-btn" onclick="goBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+        </button>
+        <h2>Transferência Wise</h2>
+      </div>
+      <div class="tx-body">
+        <div id="wise-wallets" class="wise-wallets">Carregando saldos...</div>
+
+        <div class="amount-field">
+          <div class="amount-input-wrap">
+            <span class="amount-prefix" id="wise-prefix">€</span>
+            <input class="amount-big" id="wise-amount" type="number" min="0.01" step="0.01" placeholder="0.00" oninput="resetWiseQuote()" />
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">Para quem</div>
+          <div id="wise-recipients" class="wise-recipients">Carregando...</div>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label">Nome</label>
+          <input class="form-input" id="wise-holder" type="text" maxlength="255" placeholder="Nome de quem recebe" oninput="clearWiseRecipient()" />
+        </div>
+        <div class="form-field">
+          <label class="form-label">IBAN ou conta</label>
+          <input class="form-input" id="wise-account" type="text" placeholder="DE89... ou 04000412345678" autocapitalize="characters" oninput="clearWiseRecipient()" />
+        </div>
+
+        <div id="wise-quote" class="pin-subtitle" style="display:none;white-space:pre-line;text-align:left;margin:8px 0 16px"></div>
+        <div id="wise-result" class="result-card tall"></div>
+        <button class="btn-action" id="wise-btn" onclick="onWiseContinue()">Continuar</button>
+      </div>
+
+      <div class="pin-overlay" id="wise-pin-overlay">
+        <div class="pin-sheet">
+          <div class="pin-title" style="font-size:17px">Confirmar envio</div>
+          <div class="pin-subtitle" id="wise-confirm-summary" style="margin-bottom:24px;white-space:pre-line">—</div>
+          <div class="pin-dots" id="wise-pin-dots"></div>
+          <div class="pin-keypad" id="wise-pin-keypad"></div>
+          <button class="btn-link" style="color:var(--slate-500);width:100%;margin-top:16px" onclick="closeWiseConfirm()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── SecurePay ── -->
     <div id="screen-merchant" class="screen tx-screen">
       <div class="screen-header">
@@ -3222,7 +3339,7 @@ body {
           <div class="sp-panel">
             <div class="section-title">1 · Registar SecurePay</div>
             <div class="sp-endpoint"><span class="sp-verb">POST</span> /api/merchant/register</div>
-            <p class="sp-step-note">Cria o merchant e devolve <strong>api_key</strong> + <strong>webhook_secret</strong> (guarda já — a key só aparece uma vez).</p>
+            <p class="sp-step-note">Cria o merchant e devolve <strong>api_key</strong> + <strong>webhook_secret</strong> (guarda já — a key só aparece uma vez). Cada conta pode ter <strong>1 test</strong> e <strong>vários live</strong>. O modo fica fixo.</p>
             <div class="form-field">
               <label class="form-label">Nome</label>
               <input class="form-input" id="merchant-name" type="text" placeholder="Ex: Loja Demo" maxlength="150" />
@@ -3241,6 +3358,9 @@ body {
             <div id="merchant-register-result" class="result-card"></div>
             <button class="btn-action" id="merchant-register-btn" onclick="registerMerchant()">
               Registar SecurePay
+            </button>
+            <button class="btn-link" id="merchant-register-back" style="display:none;margin-top:4px;color:var(--slate-500)" onclick="showMerchantRegisterFromActive()">
+              ← Voltar à conta
             </button>
             <button class="btn-link" style="margin-top:4px;color:var(--slate-500)" onclick="showMerchantKeyImport()">
               Já tenho API key →
@@ -3284,7 +3404,7 @@ body {
 
           <div class="sp-tabs" role="tablist">
             <button type="button" class="sp-tab active" data-sp-tab="conta" onclick="showSecurePayTab('conta')">
-              Conta<small>GET · PATCH</small>
+              Conta<small>GET · PATCH · DELETE</small>
             </button>
             <button type="button" class="sp-tab" data-sp-tab="creds" onclick="showSecurePayTab('creds')">
               Keys<small>credenciais</small>
@@ -3303,9 +3423,13 @@ body {
               <div class="section-title">Conta SecurePay</div>
               <div class="sp-endpoint-stack">
                 <div class="sp-endpoint"><span class="sp-verb get">GET</span> /api/merchant</div>
+                <div class="sp-endpoint"><span class="sp-verb">POST</span> /api/merchant/register</div>
                 <div class="sp-endpoint"><span class="sp-verb patch">PATCH</span> /api/merchant/{id}</div>
+                <div class="sp-endpoint"><span class="sp-verb delete">DELETE</span> /api/merchant/{id}</div>
               </div>
-              <p class="sp-step-note">Lista o teu merchant e actualiza nome, slug, modo ou webhook.</p>
+              <p class="sp-step-note">1 merchant test e vários live. O modo não se altera. Edita nome, slug ou webhook, ou exclui a conta seleccionada.</p>
+              <div id="merchant-list" class="sp-merchant-list"></div>
+              <button class="btn-step" type="button" onclick="showNewMerchantForm()">Novo merchant</button>
               <div class="info-card" style="margin:0">
                 <div class="info-row">
                   <span class="info-row-label">Webhook URL</span>
@@ -3328,17 +3452,14 @@ body {
                 <label class="form-label">Webhook URL</label>
                 <input class="form-input" id="merchant-edit-webhook" type="url" placeholder="https://…" />
               </div>
-              <div class="form-field">
-                <label class="form-label">Modo</label>
-                <select class="form-input form-select" id="merchant-edit-mode">
-                  <option value="test">Test</option>
-                  <option value="live">Live</option>
-                </select>
-              </div>
               <div id="merchant-edit-result" class="result-card"></div>
               <button class="btn-action" id="merchant-edit-btn" onclick="updateMerchant()">
                 Guardar alterações
               </button>
+              <button class="btn-step danger" id="merchant-delete-btn" type="button" onclick="deleteMerchant()">
+                Excluir este merchant
+              </button>
+              <div id="merchant-delete-result" class="result-card"></div>
             </div>
           </div>
 
@@ -3553,11 +3674,11 @@ body {
 <script>
 // ── Config ──────────────────────────────────────────
 const BASE       = window.location.origin + '/api';
-const STRIPE_PK  = 'pk_test_51T2hGe2QaRyGWkxZfszIzoH8ptXpnvyZJKbSsxkooaxf8qLbhk1zbhr01eU7sutPuYVHS8WwS2sFRUvcAlWgZGdH00xWuRIIUp';
 let token         = localStorage.getItem('yoop_sim_token') || null;
 let currentScreen = 'welcome';
 let prevScreen    = null;
-let stripeClient  = null;
+let depositStripeClient = null;
+let paymentStripeClient = null;
 let stripeElements = null;
 let depositStripeElements = null;
 let authSession   = null;
@@ -3593,13 +3714,19 @@ const ONBOARDING_ALLOWED_SCREENS = ['welcome', 'login', 'register', 'pin-login',
 const NO_NAV_SCREENS = [
   'welcome', 'login', 'register', 'pin-login', 'pin-setup', 'pin-reset', 'onboarding', 'kyc',
   'deposit', 'payment', 'notifications', 'card-list', 'card-create', 'card-detail',
-  'movements', 'transaction-detail', 'p2p', 'account', 'merchant',
+  'movements', 'transaction-detail', 'p2p', 'wise', 'account', 'merchant',
   'news',
 ];
 
 const CURRENCY_SYMBOLS = { eur: '€', usd: '$', gbp: '£', brl: 'R$' };
 
-window.addEventListener('DOMContentLoaded', () => { stripeClient = Stripe(STRIPE_PK); });
+function stripeClientFor(publishableKey, currency) {
+  if (!publishableKey) {
+    const code = String(currency || 'eur').toLowerCase();
+    throw new Error(`Chave pública em falta. Nas settings, stripe.${code}.public_key (Produção) tem de ser a pk_ da mesma conta de stripe.${code}.secret_key.`);
+  }
+  return Stripe(publishableKey);
+}
 
 // ── Clock ────────────────────────────────────────────
 function updateClock() {
@@ -3673,6 +3800,7 @@ function navigate(screen) {
     resetP2PScreen();
     loadP2PFavorites();
   }
+  if (screen === 'wise') loadWiseScreen();
   if (screen === 'deposit') {
     resetDepositScreen();
     loadDepositMethods();
@@ -4139,8 +4267,11 @@ async function doLogout() {
 const MERCHANT_KEY_STORAGE = 'yoop_sim_merchant_key';
 const MERCHANT_SECRET_STORAGE = 'yoop_sim_merchant_webhook_secret';
 const MERCHANT_META_STORAGE = 'yoop_sim_merchant_meta';
+const MERCHANT_KEYS_MAP_STORAGE = 'yoop_sim_merchant_keys';
+const MERCHANT_SECRETS_MAP_STORAGE = 'yoop_sim_merchant_secrets';
 let merchantPaymentUrl = null;
 let currentMerchant = null;
+let merchantAccounts = [];
 let currentWebhookSecret = null;
 let merchantHadAccountBeforeImport = false;
 let merchantCredsLoading = false;
@@ -4158,6 +4289,72 @@ function getStoredMerchantMeta() {
     return JSON.parse(localStorage.getItem(MERCHANT_META_STORAGE) || 'null') || {};
   } catch {
     return {};
+  }
+}
+
+function readJsonMap(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '{}');
+    return value && typeof value === 'object' ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberMerchantCredential(merchantId, apiKey, webhookSecret) {
+  const id = String(merchantId || '');
+  if (!id) return;
+
+  if (apiKey) {
+    const keys = readJsonMap(MERCHANT_KEYS_MAP_STORAGE);
+    keys[id] = apiKey;
+    localStorage.setItem(MERCHANT_KEYS_MAP_STORAGE, JSON.stringify(keys));
+    localStorage.setItem(MERCHANT_KEY_STORAGE, apiKey);
+  }
+
+  if (webhookSecret) {
+    const secrets = readJsonMap(MERCHANT_SECRETS_MAP_STORAGE);
+    secrets[id] = webhookSecret;
+    localStorage.setItem(MERCHANT_SECRETS_MAP_STORAGE, JSON.stringify(secrets));
+    localStorage.setItem(MERCHANT_SECRET_STORAGE, webhookSecret);
+    currentWebhookSecret = webhookSecret;
+  }
+}
+
+function applyStoredCredentialsForMerchant(merchantId) {
+  const id = String(merchantId || '');
+  const keys = readJsonMap(MERCHANT_KEYS_MAP_STORAGE);
+  const secrets = readJsonMap(MERCHANT_SECRETS_MAP_STORAGE);
+  const sameStored = String(getStoredMerchantMeta()?.id || '') === id;
+  const key = keys[id] || (sameStored ? getStoredMerchantKey() : '');
+  const secret = secrets[id] || (sameStored ? getStoredMerchantWebhookSecret() : '');
+
+  if (key) localStorage.setItem(MERCHANT_KEY_STORAGE, key);
+  else localStorage.removeItem(MERCHANT_KEY_STORAGE);
+
+  if (secret) {
+    localStorage.setItem(MERCHANT_SECRET_STORAGE, secret);
+    currentWebhookSecret = secret;
+  } else {
+    localStorage.removeItem(MERCHANT_SECRET_STORAGE);
+    currentWebhookSecret = null;
+  }
+}
+
+function forgetMerchantCredentials(merchantId) {
+  const id = String(merchantId || '');
+  const keys = readJsonMap(MERCHANT_KEYS_MAP_STORAGE);
+  const secrets = readJsonMap(MERCHANT_SECRETS_MAP_STORAGE);
+  delete keys[id];
+  delete secrets[id];
+  localStorage.setItem(MERCHANT_KEYS_MAP_STORAGE, JSON.stringify(keys));
+  localStorage.setItem(MERCHANT_SECRETS_MAP_STORAGE, JSON.stringify(secrets));
+
+  if (String(getStoredMerchantMeta()?.id || '') === id) {
+    localStorage.removeItem(MERCHANT_KEY_STORAGE);
+    localStorage.removeItem(MERCHANT_SECRET_STORAGE);
+    localStorage.removeItem(MERCHANT_META_STORAGE);
+    currentWebhookSecret = null;
   }
 }
 
@@ -4220,6 +4417,8 @@ function setMerchantPanel(panel) {
   if (registerEl) registerEl.style.display = panel === 'register' ? '' : 'none';
   if (importEl) importEl.style.display = panel === 'import' ? '' : 'none';
   if (activeEl) activeEl.style.display = panel === 'active' ? '' : 'none';
+  const back = document.getElementById('merchant-register-back');
+  if (back) back.style.display = panel === 'register' && merchantAccounts.length ? '' : 'none';
 }
 
 function showSecurePayTab(tab) {
@@ -4281,14 +4480,56 @@ function fillMerchantEditForm(merchant) {
   const nameInput = document.getElementById('merchant-edit-name');
   const slugInput = document.getElementById('merchant-edit-slug');
   const webhookInput = document.getElementById('merchant-edit-webhook');
-  const modeInput = document.getElementById('merchant-edit-mode');
   const editResult = document.getElementById('merchant-edit-result');
+  const deleteResult = document.getElementById('merchant-delete-result');
 
   if (nameInput) nameInput.value = merchant?.name || '';
   if (slugInput) slugInput.value = merchant?.slug || '';
   if (webhookInput) webhookInput.value = merchant?.webhook_url || '';
-  if (modeInput) modeInput.value = merchant?.mode === 'live' ? 'live' : 'test';
   if (editResult) editResult.className = 'result-card';
+  if (deleteResult) deleteResult.className = 'result-card';
+}
+
+function renderMerchantList() {
+  const listEl = document.getElementById('merchant-list');
+  if (!listEl) return;
+
+  if (!merchantAccounts.length) {
+    listEl.innerHTML = '';
+    return;
+  }
+
+  const currentId = String(currentMerchant?.id || '');
+  listEl.innerHTML = merchantAccounts.map((merchant) => {
+    const active = String(merchant.id) === currentId ? ' active' : '';
+    const mode = String(merchant.mode || 'test').toUpperCase();
+    return `<button type="button" class="sp-merchant-item${active}" onclick="selectMerchantAccount(${Number(merchant.id)})">
+      <strong>${escapeHtml(merchant.name || 'SecurePay')}</strong>
+      <span>${escapeHtml(mode)}</span>
+    </button>`;
+  }).join('');
+}
+
+function selectMerchantAccount(id) {
+  const merchant = merchantAccounts.find((item) => Number(item.id) === Number(id));
+  if (!merchant) return;
+
+  applyStoredCredentialsForMerchant(merchant.id);
+  saveMerchantMeta({
+    id: merchant.id,
+    name: merchant.name,
+    slug: merchant.slug,
+    mode: merchant.mode,
+    webhook_url: merchant.webhook_url || null,
+    is_active: merchant.is_active,
+  });
+  renderMerchantActivePanel(merchant);
+}
+
+function showNewMerchantForm() {
+  const result = document.getElementById('merchant-register-result');
+  if (result) result.className = 'result-card';
+  setMerchantPanel('register');
 }
 
 function renderMerchantActivePanel(merchant) {
@@ -4310,6 +4551,7 @@ function renderMerchantActivePanel(merchant) {
   if (credsResult) credsResult.className = 'result-card';
 
   fillMerchantEditForm(merchant);
+  renderMerchantList();
 
   if (!currentWebhookSecret) {
     currentWebhookSecret = getStoredMerchantWebhookSecret() || null;
@@ -4335,7 +4577,6 @@ async function updateMerchant() {
   const name = document.getElementById('merchant-edit-name')?.value.trim() || '';
   const slug = document.getElementById('merchant-edit-slug')?.value.trim() || '';
   const webhook = document.getElementById('merchant-edit-webhook')?.value.trim() || '';
-  const mode = document.getElementById('merchant-edit-mode')?.value || 'test';
   const btn = document.getElementById('merchant-edit-btn');
   const result = document.getElementById('merchant-edit-result');
 
@@ -4344,7 +4585,6 @@ async function updateMerchant() {
 
   if (name && name !== (current.name || '')) body.name = name;
   if (slug && slug !== (current.slug || '')) body.slug = slug;
-  if (mode && mode !== (current.mode || 'test')) body.mode = mode;
 
   const currentWebhook = current.webhook_url || '';
   if (webhook !== currentWebhook) {
@@ -4381,12 +4621,15 @@ async function updateMerchant() {
       id: payload.id || merchantId,
       name: payload.name || name || current.name,
       slug: payload.slug || slug || current.slug,
-      mode: payload.mode || mode || current.mode,
+      mode: payload.mode || current.mode,
       webhook_url: payload.webhook_url ?? (Object.prototype.hasOwnProperty.call(body, 'webhook_url') ? body.webhook_url : current.webhook_url),
       is_active: payload.is_active !== false,
     };
 
     currentMerchant = { ...currentMerchant, ...updated };
+    merchantAccounts = merchantAccounts.map((item) => (
+      Number(item.id) === Number(updated.id) ? { ...item, ...updated } : item
+    ));
     saveMerchantMeta(updated);
     renderMerchantActivePanel(currentMerchant);
     showToast('SecurePay actualizado', 'success');
@@ -4396,6 +4639,52 @@ async function updateMerchant() {
     if (btn) {
       btn.disabled = false;
       btn.textContent = 'Guardar alterações';
+    }
+  }
+}
+
+async function deleteMerchant() {
+  const merchantId = currentMerchant?.id || getStoredMerchantMeta()?.id;
+  if (!merchantId) {
+    showToast('Sem SecurePay activo', 'error');
+    return;
+  }
+
+  const name = currentMerchant?.name || 'este merchant';
+  if (!confirm(`Excluir ${name}? A API key deixa de funcionar.`)) return;
+
+  const btn = document.getElementById('merchant-delete-btn');
+  const result = document.getElementById('merchant-delete-result');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'A excluir...';
+  }
+  if (result) result.className = 'result-card';
+
+  try {
+    const { ok, data, status } = await api('DELETE', `/merchant/${merchantId}`);
+    if (!ok) {
+      const msg = data?.message
+        || Object.values(data?.errors || {}).flat()?.[0]
+        || `Erro (${status})`;
+      if (result) {
+        result.className = 'result-card show error';
+        result.textContent = msg;
+      }
+      showToast(msg, 'error');
+      return;
+    }
+
+    forgetMerchantCredentials(merchantId);
+    currentMerchant = null;
+    showToast('Merchant excluído', 'success');
+    await loadMerchantScreen();
+  } catch (e) {
+    showToast(e.message || 'Erro ao excluir', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Excluir este merchant';
     }
   }
 }
@@ -4421,6 +4710,7 @@ async function loadMerchantCredentials() {
     if (typeof secret === 'string' && secret !== '') {
       currentWebhookSecret = secret;
       localStorage.setItem(MERCHANT_SECRET_STORAGE, secret);
+      rememberMerchantCredential(merchantId, null, secret);
     }
 
     const payload = unwrap(data);
@@ -4501,7 +4791,7 @@ async function rotateMerchantCredential(kind) {
     }
 
     if (kind === 'api_key' && data?.api_key) {
-      localStorage.setItem(MERCHANT_KEY_STORAGE, data.api_key);
+      rememberMerchantCredential(merchantId, data.api_key, null);
       if (result) {
         result.className = 'result-card show success';
         result.textContent = `Nova API key: ${data.api_key}`;
@@ -4510,8 +4800,7 @@ async function rotateMerchantCredential(kind) {
     }
 
     if (kind === 'webhook_secret' && data?.webhook_secret) {
-      currentWebhookSecret = data.webhook_secret;
-      localStorage.setItem(MERCHANT_SECRET_STORAGE, data.webhook_secret);
+      rememberMerchantCredential(merchantId, null, data.webhook_secret);
       if (result) {
         result.className = 'result-card show success';
         result.textContent = `Novo webhook secret: ${data.webhook_secret}`;
@@ -4614,9 +4903,12 @@ async function loadMerchantScreen() {
     const { ok, data } = await api('GET', '/merchant');
     const list = ok ? (Array.isArray(unwrap(data)) ? unwrap(data) : (data?.data || [])) : [];
     const merchants = Array.isArray(list) ? list : [];
+    merchantAccounts = merchants;
 
     if (merchants.length) {
-      const merchant = merchants[0];
+      const preferredId = currentMerchant?.id || getStoredMerchantMeta()?.id;
+      const merchant = merchants.find((item) => Number(item.id) === Number(preferredId)) || merchants[0];
+      applyStoredCredentialsForMerchant(merchant.id);
       saveMerchantMeta({
         id: merchant.id,
         name: merchant.name,
@@ -4629,6 +4921,7 @@ async function loadMerchantScreen() {
       return;
     }
 
+    currentMerchant = null;
     const localKey = getStoredMerchantKey();
     const localMeta = getStoredMerchantMeta();
     if (localKey && localMeta?.id) {
@@ -4636,7 +4929,6 @@ async function loadMerchantScreen() {
       return;
     }
 
-    currentMerchant = null;
     setMerchantPanel('register');
   } catch (e) {
     showToast(e.message || 'Erro ao carregar SecurePay', 'error');
@@ -4690,14 +4982,17 @@ async function registerMerchant() {
     const apiKey = data?.api_key || payload.api_key;
     const webhookSecret = data?.webhook_secret || payload.webhook_secret;
     if (apiKey || webhookSecret) {
-      saveMerchantSession(apiKey, {
+      const created = {
         id: payload.id,
         name: payload.name || name,
         slug: payload.slug,
         mode: payload.mode || mode,
         webhook_url: payload.webhook_url || webhook || null,
         is_active: payload.is_active !== false,
-      }, webhookSecret || null);
+      };
+      currentMerchant = created;
+      saveMerchantSession(apiKey, created, webhookSecret || null);
+      rememberMerchantCredential(payload.id, apiKey, webhookSecret || null);
     }
 
     if (apiKey || webhookSecret) {
@@ -4738,6 +5033,7 @@ function importMerchantKey() {
     name: name || existing.name || 'SecurePay',
     mode,
   });
+  if (existing?.id) rememberMerchantCredential(existing.id, key, null);
   showToast('API key guardada', 'success');
   loadMerchantScreen();
 }
@@ -5550,6 +5846,7 @@ let pinSetupController = null;
 let pinLoginController = null;
 let pinResetController = null;
 let p2pPinController = null;
+let wisePinController = null;
 let cardPinController = null;
 let cardPinAction = null;
 let pinSetupFirst = null;
@@ -5891,6 +6188,7 @@ function normalizeWallesterMovement(m) {
     feesPending: false,
     currency: sanitizeCurrency(m.currency),
     status: String(m.status || 'pending').toLowerCase(),
+    statusLabel: m.status_label || '',
     type,
     typeLabel: wallesterMovementTypeLabel(m),
     description: p2pLabel || friendlyMovementDescription(m.description),
@@ -5928,7 +6226,7 @@ function renderMovementItem(item, { clickable = false } = {}) {
     <div class="tx-right">
       <span class="tx-amount ${item.isIn ? 'credit' : 'debit'}">${sign}${amt} ${item.currency}</span>
       ${fxLabel ? `<span class="tx-fx">${escapeHtml(fxLabel)}</span>` : ''}
-      <span class="badge ${item.status}">${escapeHtml(item.status)}</span>
+      <span class="badge ${item.status}">${escapeHtml(item.statusLabel || item.status)}</span>
     </div>
   </div>`;
 }
@@ -6913,6 +7211,301 @@ async function loadHomeData() {
   }
 }
 
+// ── Wise transfer ─────────────────────────────────────
+let wiseWalletCurrency = '';
+let wiseSelectedRecipientId = '';
+let wiseQuoteReady = false;
+
+const WISE_IBAN_CURRENCY = {
+  DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', PT: 'EUR', NL: 'EUR', BE: 'EUR', AT: 'EUR', IE: 'EUR',
+  FI: 'EUR', LU: 'EUR', GR: 'EUR', EE: 'EUR', LV: 'EUR', LT: 'EUR', SK: 'EUR', SI: 'EUR', MT: 'EUR',
+  CY: 'EUR', HR: 'EUR', AD: 'EUR', MC: 'EUR', SM: 'EUR', VA: 'EUR',
+  GB: 'GBP', GI: 'GBP', CH: 'CHF', LI: 'CHF', PL: 'PLN', SE: 'SEK', DK: 'DKK', NO: 'NOK',
+  CZ: 'CZK', HU: 'HUF', RO: 'RON', BG: 'BGN', BR: 'BRL',
+};
+
+function selectWiseWallet(currency) {
+  resetWiseQuote();
+  wiseWalletCurrency = sanitizeCurrency(currency);
+  document.querySelectorAll('.wise-wallet').forEach((button) => {
+    button.classList.toggle('active', button.dataset.currency === wiseWalletCurrency);
+  });
+  const prefix = document.getElementById('wise-prefix');
+  if (prefix) prefix.textContent = currencySymbol(wiseWalletCurrency);
+}
+
+function selectWiseRecipient(id) {
+  resetWiseQuote();
+  wiseSelectedRecipientId = String(id);
+  document.getElementById('wise-holder').value = '';
+  document.getElementById('wise-account').value = '';
+  document.querySelectorAll('.wise-recipient').forEach((button) => {
+    button.classList.toggle('active', button.dataset.id === wiseSelectedRecipientId);
+  });
+}
+
+function clearWiseRecipient() {
+  resetWiseQuote();
+  wiseSelectedRecipientId = '';
+  document.querySelectorAll('.wise-recipient').forEach((button) => button.classList.remove('active'));
+}
+
+function inferWiseAccount(raw) {
+  const compact = String(raw || '').replace(/[\s-]/g, '').toUpperCase();
+  if (/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(compact)) {
+    return {
+      type: 'iban',
+      currency: WISE_IBAN_CURRENCY[compact.slice(0, 2)] || 'EUR',
+      details: { legalType: 'PRIVATE', iban: compact },
+    };
+  }
+  if (/^\d{14}$/.test(compact)) {
+    return {
+      type: 'sort_code',
+      currency: 'GBP',
+      details: {
+        legalType: 'PRIVATE',
+        sortCode: compact.slice(0, 6),
+        accountNumber: compact.slice(6),
+      },
+    };
+  }
+  return null;
+}
+
+function renderWiseWallets(balances) {
+  const el = document.getElementById('wise-wallets');
+  const items = (Array.isArray(balances) ? balances : []).filter((balance) => {
+    return /^[A-Z]{3}$/.test(String(balance?.currency || '').toUpperCase());
+  });
+  if (!items.length) {
+    wiseWalletCurrency = '';
+    el.textContent = 'Sem saldo disponível.';
+    return;
+  }
+  if (!items.some((balance) => sanitizeCurrency(balance.currency) === wiseWalletCurrency)) {
+    wiseWalletCurrency = sanitizeCurrency(items[0].currency);
+  }
+  el.innerHTML = items.map((balance) => {
+    const currency = sanitizeCurrency(balance.currency);
+    const active = currency === wiseWalletCurrency ? ' active' : '';
+    const available = Number(balance.available ?? balance.amount ?? 0);
+    return `<button type="button" class="wise-wallet${active}" data-currency="${currency}" onclick="selectWiseWallet('${currency}')"><small>${currency}</small><strong>${formatMoney(available, currency)}</strong></button>`;
+  }).join('');
+  selectWiseWallet(wiseWalletCurrency);
+}
+
+function renderWiseRecipients(list) {
+  const el = document.getElementById('wise-recipients');
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) {
+    el.textContent = 'Nenhuma conta salva. Indique o nome e o IBAN abaixo.';
+    return;
+  }
+  el.innerHTML = items.map((beneficiary) => {
+    const id = String(beneficiary.wise_recipient_id);
+    const name = escapeHtml(beneficiary.account_holder_name || 'Beneficiário');
+    const summary = escapeHtml(beneficiary.account_summary || beneficiary.currency || '');
+    const active = id === wiseSelectedRecipientId ? ' active' : '';
+    return `<button type="button" class="wise-recipient${active}" data-id="${id}" onclick="selectWiseRecipient('${id}')"><strong>${name}</strong><small>${summary}</small></button>`;
+  }).join('');
+}
+
+async function loadWiseScreen() {
+  closeWiseConfirm();
+  const walletsEl = document.getElementById('wise-wallets');
+  const recipientsEl = document.getElementById('wise-recipients');
+  walletsEl.textContent = 'Carregando saldos...';
+  recipientsEl.textContent = 'Carregando...';
+
+  const [walletRes, beneficiariesRes] = await Promise.all([
+    api('GET', '/wallet/dashboard'),
+    api('GET', '/wise/beneficiaries'),
+  ]);
+
+  let balances = walletRes.ok ? extractBalanceList(walletRes.data) : [];
+  if (!balances.length) {
+    const fallback = await api('GET', '/wallet/account/balance');
+    if (fallback.ok) balances = extractBalanceList(fallback.data);
+  }
+  renderWiseWallets(balances);
+
+  if (beneficiariesRes.ok) {
+    renderWiseRecipients(beneficiariesRes.data?.data ?? []);
+  } else {
+    recipientsEl.textContent = 'Não foi possível carregar as contas salvas.';
+  }
+}
+
+function wiseDraft() {
+  const sourceCurrency = sanitizeCurrency(wiseWalletCurrency);
+  const major = Number(String(document.getElementById('wise-amount').value).replace(',', '.'));
+  const holder = document.getElementById('wise-holder').value.trim();
+  const account = document.getElementById('wise-account').value.trim();
+
+  if (!/^[A-Z]{3}$/.test(sourceCurrency) || !document.querySelector('.wise-wallet')) {
+    return { error: 'Escolha a moeda do saldo' };
+  }
+  if (!Number.isFinite(major) || major <= 0) {
+    return { error: 'Informe um valor válido' };
+  }
+
+  const payload = {
+    source_currency: sourceCurrency,
+    source_amount: Math.round(major * 100),
+  };
+
+  if (holder || account) {
+    const inferred = inferWiseAccount(account);
+    if (!holder || !account || !inferred) {
+      return { error: holder && account ? 'Use um IBAN ou uma conta do Reino Unido' : 'Indique o nome e a conta' };
+    }
+    payload.beneficiary = {
+      currency: inferred.currency,
+      type: inferred.type,
+      account_holder_name: holder,
+      owned_by_customer: false,
+      details: inferred.details,
+    };
+  } else if (wiseSelectedRecipientId) {
+    payload.beneficiary_id = parseInt(wiseSelectedRecipientId, 10);
+  } else {
+    return { error: 'Escolha quem recebe ou indique uma conta' };
+  }
+
+  const recipientName = holder
+    || document.querySelector('.wise-recipient.active strong')?.textContent
+    || 'beneficiário';
+
+  return { sourceCurrency, major, payload, recipientName };
+}
+
+function wiseQuoteSummary(quote, fallback) {
+  const sourceCurrency = quote?.source_currency || fallback.sourceCurrency;
+  const lines = [
+    `Enviar ${formatMajorMoney(fallback.major, sourceCurrency)} para ${fallback.recipientName}`,
+  ];
+  if (quote?.fee != null) {
+    lines.push(`Taxa ${formatMajorMoney(quote.fee, quote.fee_currency || sourceCurrency)}`);
+  }
+  if (quote?.source_value != null) {
+    lines.push(`Total ${formatMajorMoney(quote.source_value, sourceCurrency)}`);
+  }
+  if (quote?.target_value != null) {
+    lines.push(`Recebe ${formatMajorMoney(quote.target_value, quote.target_currency || sourceCurrency)}`);
+  }
+  return lines.join('\n');
+}
+
+function resetWiseQuote() {
+  wiseQuoteReady = false;
+  const quote = document.getElementById('wise-quote');
+  if (quote) {
+    quote.style.display = 'none';
+    quote.textContent = '';
+  }
+  const btn = document.getElementById('wise-btn');
+  if (btn && !btn.disabled) btn.textContent = 'Continuar';
+}
+
+async function onWiseContinue() {
+  if (wiseQuoteReady) {
+    openWisePin();
+    return;
+  }
+
+  const draft = wiseDraft();
+  if (draft.error) {
+    showToast(draft.error, 'error');
+    return;
+  }
+
+  const btn = document.getElementById('wise-btn');
+  const result = document.getElementById('wise-result');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> A calcular taxa...';
+  result.className = 'result-card tall';
+
+  try {
+    const { ok, data } = await api('POST', '/wise/quotes', draft.payload);
+    result.classList.add('show', ok ? 'success' : 'error');
+    result.textContent = JSON.stringify(data, null, 2);
+    if (!ok) {
+      showToast(data?.message || 'Não foi possível calcular a taxa', 'error');
+      return;
+    }
+
+    const quote = data?.data ?? {};
+    const summary = wiseQuoteSummary(quote, draft);
+    const quoteEl = document.getElementById('wise-quote');
+    quoteEl.textContent = summary;
+    quoteEl.style.display = 'block';
+    document.getElementById('wise-confirm-summary').textContent = summary;
+    wiseQuoteReady = true;
+    btn.textContent = 'Enviar';
+  } catch (error) {
+    showToast(error.message || 'Erro de conexão', 'error');
+  } finally {
+    btn.disabled = false;
+    if (!wiseQuoteReady) btn.textContent = 'Continuar';
+  }
+}
+
+function openWisePin() {
+  document.getElementById('wise-pin-overlay').classList.add('show');
+  if (wisePinController) wisePinController.reset();
+  wisePinController = createPinKeypad('wise-pin-dots', 'wise-pin-keypad', {
+    onComplete: (pin) => doWiseTransfer(pin),
+  });
+}
+
+function closeWiseConfirm() {
+  document.getElementById('wise-pin-overlay')?.classList.remove('show');
+  if (wisePinController) wisePinController.reset();
+}
+
+async function doWiseTransfer(pin) {
+  const btn = document.getElementById('wise-btn');
+  const result = document.getElementById('wise-result');
+  const draft = wiseDraft();
+
+  closeWiseConfirm();
+
+  if (draft.error) {
+    showToast(draft.error, 'error');
+    return;
+  }
+
+  const payload = {
+    ...draft.payload,
+    device_token: deviceToken,
+    pin,
+  };
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Enviando...';
+  result.className = 'result-card tall';
+
+  try {
+    const { ok, data } = await api('POST', '/wise/transfers', payload);
+    result.classList.add('show', ok ? 'success' : 'error');
+    result.textContent = JSON.stringify(data, null, 2);
+    if (!ok) {
+      showToast(data?.message || 'Erro na transferência Wise', 'error');
+      return;
+    }
+    showToast('Transferência Wise criada', 'success');
+    document.getElementById('wise-holder').value = '';
+    document.getElementById('wise-account').value = '';
+    await loadWiseScreen();
+  } catch (error) {
+    showToast(error.message || 'Erro de conexão', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Continuar';
+  }
+}
+
 // ── Deposit (Stripe top-up) ───────────────────────────
 function onDepositCurrencyChange() {
   const currency = document.getElementById('deposit-currency').value;
@@ -6985,7 +7578,8 @@ async function doDeposit() {
     const clientSecret = data.client_secret;
     if (!clientSecret) throw new Error('client_secret não retornado');
 
-    depositStripeElements = stripeClient.elements({
+    depositStripeClient = stripeClientFor(data.publishable_key, currency);
+    depositStripeElements = depositStripeClient.elements({
       appearance: { theme: 'stripe', variables: { colorPrimary: '#4f46e5', borderRadius: '8px' } },
       clientSecret,
     });
@@ -7015,7 +7609,7 @@ async function doConfirmDeposit() {
   btn.disabled = true;
   btn.innerHTML = '<div class="spin"></div> Confirmando...';
 
-  const { error, paymentIntent } = await stripeClient.confirmPayment({
+  const { error, paymentIntent } = await depositStripeClient.confirmPayment({
     elements: depositStripeElements,
     confirmParams: { return_url: window.location.href },
     redirect: 'if_required',
@@ -7089,7 +7683,8 @@ async function doPayment() {
       const clientSecret = data.client_secret;
       if (!clientSecret) throw new Error('client_secret não retornado');
 
-      stripeElements = stripeClient.elements({
+      paymentStripeClient = stripeClientFor(data.publishable_key, currency);
+      stripeElements = paymentStripeClient.elements({
         appearance: { theme: 'stripe', variables: { colorPrimary: '#4f46e5', borderRadius: '8px' } },
         clientSecret,
       });
@@ -7118,7 +7713,7 @@ async function doConfirmPayment() {
   btn.disabled = true;
   btn.innerHTML = '<div class="spin"></div> Confirmando...';
 
-  const { error, paymentIntent } = await stripeClient.confirmPayment({
+  const { error, paymentIntent } = await paymentStripeClient.confirmPayment({
     elements: stripeElements,
     confirmParams: { return_url: window.location.href },
     redirect: 'if_required',
