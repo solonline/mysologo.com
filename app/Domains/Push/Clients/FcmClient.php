@@ -26,17 +26,56 @@ class FcmClient
         }
 
         $accessToken = $this->accessToken($credentials);
+        $notification = array_filter([
+            'title' => $title,
+            'body' => $body,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        // FCM requires every data value to be a string.
+        $stringData = [];
+        foreach ($data as $key => $value) {
+            if ($value === null) {
+                continue;
+            }
+            $stringData[(string) $key] = is_string($value) ? $value : (string) $value;
+        }
+
         $response = Http::withToken($accessToken)
             ->acceptJson()
             ->timeout(10)
             ->post($this->sendUrl($credentials['project_id']), [
                 'message' => [
                     'token' => $token,
-                    'notification' => array_filter([
-                        'title' => $title,
-                        'body' => $body,
-                    ], fn ($value) => $value !== null && $value !== ''),
-                    'data' => $data,
+                    'notification' => $notification,
+                    'data' => $stringData,
+                    // Android shows notification reliably with high priority.
+                    'android' => [
+                        'priority' => 'HIGH',
+                        'notification' => array_filter([
+                            'title' => $notification['title'] ?? null,
+                            'body' => $notification['body'] ?? null,
+                            'sound' => 'default',
+                            'channel_id' => 'yoop_general',
+                        ], fn ($value) => $value !== null && $value !== ''),
+                    ],
+                    // iOS needs an explicit APNs payload — notification-only messages
+                    // often fail to display without aps.alert / apns-priority.
+                    'apns' => [
+                        'headers' => [
+                            'apns-priority' => '10',
+                            'apns-push-type' => 'alert',
+                        ],
+                        'payload' => [
+                            'aps' => [
+                                'alert' => array_filter([
+                                    'title' => $notification['title'] ?? null,
+                                    'body' => $notification['body'] ?? null,
+                                ], fn ($value) => $value !== null && $value !== ''),
+                                'sound' => 'default',
+                                'content-available' => 1,
+                            ],
+                        ],
+                    ],
                 ],
             ]);
 

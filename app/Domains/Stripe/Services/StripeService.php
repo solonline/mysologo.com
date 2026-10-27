@@ -277,15 +277,24 @@ class StripeService
 
         $currency = strtolower($currency);
 
-        $paymentMethodTypes = StripePaymentMethodFee::where('is_active', true)
-            ->where('currency', strtoupper($currency))
-            ->orderBy('id')
-            ->get()
-            ->map(fn ($f) => $f->stripePaymentMethodType())
-            ->unique()
-            ->values()
-            ->reject(fn ($type) => $type === 'bank_transfer') // card_present é só para pagamentos terminal, não deve aparecer como opção na criação de intents normais
-            ->toArray();
+        // Only expose the method the customer actually selected (e.g. card),
+        // so the Payment Element does not show unrelated tabs (MB WAY, etc.).
+        $selectedType = $feeConfig->stripePaymentMethodType();
+        $paymentMethodTypes = $selectedType === 'bank_transfer'
+            ? []
+            : [$selectedType];
+
+        if ($paymentMethodTypes === []) {
+            $paymentMethodTypes = StripePaymentMethodFee::where('is_active', true)
+                ->where('currency', strtoupper($currency))
+                ->orderBy('id')
+                ->get()
+                ->map(fn ($f) => $f->stripePaymentMethodType())
+                ->unique()
+                ->values()
+                ->reject(fn ($type) => $type === 'bank_transfer')
+                ->toArray();
+        }
 
         $result = $this->stripeGateway->createPaymentIntent([
             'amount' => $amount,

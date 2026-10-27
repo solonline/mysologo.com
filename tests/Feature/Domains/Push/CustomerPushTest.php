@@ -197,7 +197,9 @@ class CustomerPushTest extends TestCase
                 && $message['notification']['title'] === 'Confirm online payment'
                 && $message['data']['type'] === 'wallester.3ds_challenge'
                 && $message['data']['challenge_id'] === '15'
-                && $message['data']['notification_id'] !== '';
+                && $message['data']['notification_id'] !== ''
+                && ($message['apns']['headers']['apns-priority'] ?? null) === '10'
+                && ($message['apns']['payload']['aps']['sound'] ?? null) === 'default';
         });
 
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'fcm.googleapis.com')
