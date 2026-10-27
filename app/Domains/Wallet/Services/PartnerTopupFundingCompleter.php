@@ -3,12 +3,14 @@
 namespace App\Domains\Wallet\Services;
 
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
+use App\Models\RailMirrorEvent;
 use App\Models\StripeTransaction;
 
 class PartnerTopupFundingCompleter
 {
     public function __construct(
         protected LedgerService $ledgerService,
+        protected RailMirrorService $railMirror,
         protected TopupImmediateNotifier $topupImmediateNotifier,
     ) {}
 
@@ -32,6 +34,8 @@ class PartnerTopupFundingCompleter
             );
         }
 
+        $this->mirrorWiseAllocation($transaction, $netAmount);
+
         $updates = [
             'partner_funding_status' => PartnerFundingStatus::Completed,
             'partner_funding_failure_reason' => null,
@@ -45,5 +49,31 @@ class PartnerTopupFundingCompleter
         $transaction->update($updates);
 
         $this->topupImmediateNotifier->notifyIfEligible($transaction->fresh());
+    }
+
+    private function mirrorWiseAllocation(StripeTransaction $transaction, int $netAmount): void
+    {
+        if ($netAmount <= 0) {
+            return;
+        }
+
+        foreach ([
+            'stripe_payout_wise:'.$transaction->id,
+            'stripe_liquidity_wise:'.$transaction->id,
+            'stripe_topup_wise:'.$transaction->id,
+        ] as $key) {
+            if (RailMirrorEvent::query()->where('idempotency_key', $key)->exists()) {
+                return;
+            }
+        }
+
+        $this->railMirror->creditAllocation(
+            customerId: (int) $transaction->customer_id,
+            currency: (string) $transaction->currency,
+            amountCents: $netAmount,
+            idempotencyKey: 'stripe_topup_wise:'.$transaction->id,
+            reason: 'wallester_topup_available',
+            reference: $transaction,
+        );
     }
 }

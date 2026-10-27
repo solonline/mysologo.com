@@ -121,7 +121,7 @@ class StripePaymentIntent extends Model
         return match ($this->purpose) {
             StripePaymentIntentPurpose::MerchantPayment => TransactionType::MERCHANT_PAYMENT,
             StripePaymentIntentPurpose::Terminal => TransactionType::CARD_PRESENT,
-            StripePaymentIntentPurpose::BankTransferTopup => TransactionType::TOPUP,
+            StripePaymentIntentPurpose::BankTransferTopup => TransactionType::BANK_TRANSFER,
             default => TransactionType::TOPUP,
         };
     }

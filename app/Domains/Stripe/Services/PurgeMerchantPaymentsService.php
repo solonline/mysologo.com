@@ -261,7 +261,7 @@ class PurgeMerchantPaymentsService
         return CustomerBalance::query()
             ->whereIn('customer_id', $customerIds->unique()->all())
             ->orderBy('customer_id')
-            ->get(['customer_id', 'currency', 'available', 'pending'])
+            ->get(['customer_id', 'currency', 'wallester_allocated', 'pending'])
             ->map(fn (CustomerBalance $balance) => $balance->toArray())
             ->all();
     }

@@ -6,16 +6,16 @@ use App\Domains\Onboarding\Events\CustomerApproved;
 use App\Domains\Stripe\Clients\StripeHttpClient;
 use App\Domains\Stripe\Commands\MigratePendingToPaymentIntents;
 use App\Domains\Stripe\Commands\PurgeMerchantPaymentsCommand;
+use App\Domains\Stripe\Commands\ReprovisionStripeAccountsCommand;
 use App\Domains\Stripe\Commands\SettleStripeBalances;
 use App\Domains\Stripe\Commands\SettleStripePayoutCommand;
-use App\Domains\Stripe\Jobs\ExpireStaleStripePaymentIntentsJob;
-use App\Domains\Stripe\Services\PurgeMerchantPaymentsService;
-use App\Domains\Stripe\Services\StripePaymentIntentService;
 use App\Domains\Stripe\Contracts\StripeAccountRepositoryInterface;
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
 use App\Domains\Stripe\Gateways\StripeGateway;
 use App\Domains\Stripe\Listeners\CreateStripeCustomer;
 use App\Domains\Stripe\Repositories\StripeAccountRepository;
+use App\Domains\Stripe\Services\PurgeMerchantPaymentsService;
+use App\Domains\Stripe\Services\StripePaymentIntentService;
 use App\Domains\Stripe\Services\StripeService;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +41,7 @@ class StripeServiceProvider extends ServiceProvider
                 SettleStripePayoutCommand::class,
                 MigratePendingToPaymentIntents::class,
                 PurgeMerchantPaymentsCommand::class,
+                ReprovisionStripeAccountsCommand::class,
             ]);
         }
 

@@ -18,6 +18,37 @@ class TopupWallesterFundingPolicyTest extends TestCase
     use InteractsWithOnboarding;
     use RefreshDatabase;
 
+    public function test_bank_transfer_within_daily_quota_waits_for_stripe_payout(): void
+    {
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'email_verified_at' => now(),
+            'doc_status' => 'approved',
+        ]);
+        $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'wal_policy_viban');
+
+        $transaction = StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::TOPUP,
+            'payment_method_type' => 'bank_transfer',
+            'stripe_cash_balance_transaction_id' => 'ccsbtxn_policy',
+            'direction' => TransactionDirection::Credit,
+            'amount' => 300,
+            'stripe_fee' => 2,
+            'platform_fee' => 0,
+            'net_amount' => 298,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'available_on' => '2026-10-21',
+        ]);
+
+        $allocation = app(TopupWallesterFundingPolicy::class)->allocate($transaction);
+
+        $this->assertSame(0, $allocation->immediateGrossCents);
+        $this->assertSame(0, $allocation->wallesterFundingNetCents);
+        $this->assertSame(298, $allocation->stripeDeferredNetCents);
+    }
+
     public function test_first_topup_within_daily_quota_funds_wallester_immediately(): void
     {
         $customer = $this->createRetailCustomer([

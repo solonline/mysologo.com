@@ -114,11 +114,11 @@ class PurgeMerchantPaymentsCommand extends Command
             $this->newLine();
             $this->info('Customer balances after purge:');
             $this->table(
-                ['Customer', 'Currency', 'Available', 'Pending'],
+                ['Customer', 'Currency', 'Wallester allocated', 'Pending'],
                 collect($result['balances'])->map(fn (array $row) => [
                     $row['customer_id'],
                     $row['currency'],
-                    $row['available'],
+                    $row['wallester_allocated'],
                     $row['pending'],
                 ])->all(),
             );

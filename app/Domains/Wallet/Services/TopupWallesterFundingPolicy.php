@@ -26,6 +26,10 @@ class TopupWallesterFundingPolicy
             return new TopupSettlementAllocation(0, 0, $netAmount);
         }
 
+        if ($this->awaitsStripePayout($transaction)) {
+            return new TopupSettlementAllocation(0, 0, $netAmount);
+        }
+
         $remainingQuota = max(
             0,
             self::DAILY_IMMEDIATE_TOPUP_GROSS_LIMIT_CENTS - $this->dailyImmediateGrossUsedCents($transaction),
@@ -151,6 +155,16 @@ class TopupWallesterFundingPolicy
                         ->where('created_at', '>=', $cutoff);
                 });
         });
+    }
+
+    /**
+     * Transferências VIBAN ficam no saldo Stripe até ao payout.
+     * A data available_on (ex. dia 21) não autoriza adiantar a main Wallester.
+     */
+    public function awaitsStripePayout(StripeTransaction $transaction): bool
+    {
+        return $transaction->payment_method_type === 'bank_transfer'
+            || filled($transaction->stripe_cash_balance_transaction_id);
     }
 
     public function hasOperationalWallesterAccount(StripeTransaction $transaction): bool

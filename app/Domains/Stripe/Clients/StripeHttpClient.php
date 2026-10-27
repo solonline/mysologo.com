@@ -4,14 +4,18 @@ namespace App\Domains\Stripe\Clients;
 
 use App\Domains\Settings\Services\SettingsService;
 use Stripe\Event;
+use Stripe\Exception\SignatureVerificationException;
 use Stripe\StripeClient as Stripe;
 use Stripe\Webhook;
 
 class StripeHttpClient
 {
+    /** @var list<string> */
+    private const CURRENCIES = ['eur', 'usd', 'gbp', 'chf'];
+
     protected ?string $secretKey = null;
 
-    protected ?string $webhookSecret = null;
+    protected ?string $activeSettingKey = null;
 
     protected ?Stripe $stripe = null;
 
@@ -22,24 +26,34 @@ class StripeHttpClient
 
     public function forCurrency(string $currency): static
     {
-        $key = $this->settings->getByKey('stripe.'.strtolower($currency).'.secret_key');
-        if (! empty($key) && $key !== $this->secretKey) {
-            $this->secretKey = $key;
-            $this->stripe = null;
-        }
-
-        return $this;
+        return $this->useSecret('stripe.'.strtolower($currency).'.secret_key');
     }
 
     public function forMode(string $mode, string $currency): static
     {
-        $settingKey = $mode === 'test'
-            ? 'stripe.'.strtolower($currency).'.test_secret_key'
-            : 'stripe.'.strtolower($currency).'.secret_key';
+        $currency = strtolower($currency);
+        $field = $mode === 'test' ? 'test_secret_key' : 'secret_key';
 
+        return $this->useSecret("stripe.{$currency}.{$field}");
+    }
+
+    public function publishableKey(string $mode, string $currency): ?string
+    {
+        $currency = strtolower($currency);
+        $field = $mode === 'test' ? 'test_public_key' : 'public_key';
+        $key = $this->settings->getByKey("stripe.{$currency}.{$field}");
+
+        return is_string($key) && $key !== '' ? $key : null;
+    }
+
+    private function useSecret(string $settingKey): static
+    {
         $key = $this->settings->getByKey($settingKey);
-        if (! empty($key) && $key !== $this->secretKey) {
-            $this->secretKey = $key;
+        $resolved = is_string($key) && $key !== '' ? $key : null;
+
+        if ($settingKey !== $this->activeSettingKey || $resolved !== $this->secretKey) {
+            $this->activeSettingKey = $settingKey;
+            $this->secretKey = $resolved;
             $this->stripe = null;
         }
 
@@ -49,11 +63,12 @@ class StripeHttpClient
     private function client(): Stripe
     {
         if ($this->stripe === null) {
-            if ($this->secretKey === null) {
-                $this->secretKey = $this->settings->getByKey('stripe.eur.secret_key');
+            if ($this->activeSettingKey === null) {
+                $this->useSecret('stripe.eur.secret_key');
             }
             if (empty($this->secretKey)) {
-                throw new \RuntimeException('Stripe is not configured: stripe_secret_key is missing.');
+                $which = $this->activeSettingKey ?? 'stripe.eur.secret_key';
+                throw new \RuntimeException("Stripe is not configured: {$which} is missing.");
             }
             $this->stripe = new Stripe($this->secretKey);
         }
@@ -125,6 +140,11 @@ class StripeHttpClient
         return $this->client()->balanceTransactions->retrieve($balanceTransactionId)->toArray();
     }
 
+    public function getCharge(string $chargeId): array
+    {
+        return $this->client()->charges->retrieve($chargeId)->toArray();
+    }
+
     public function createTerminalConnectionToken(): array
     {
         return $this->client()->terminal->connectionTokens->create([])->toArray();
@@ -160,14 +180,38 @@ class StripeHttpClient
 
     public function constructWebhookEvent(string $payload, string $sigHeader): Event
     {
-        if ($this->webhookSecret === null) {
-            $this->webhookSecret = $this->settings->getByKey('stripe.eur.webhook_secret');
-        }
-        if (empty($this->webhookSecret)) {
-            throw new \RuntimeException('Stripe is not configured: stripe_webhook_secret is missing.');
+        $secrets = $this->webhookSecrets();
+        if ($secrets === []) {
+            throw new \RuntimeException('Stripe is not configured: stripe webhook secret is missing.');
         }
 
-        return Webhook::constructEvent($payload, $sigHeader, $this->webhookSecret);
+        $last = null;
+        foreach ($secrets as $secret) {
+            try {
+                return Webhook::constructEvent($payload, $sigHeader, $secret);
+            } catch (SignatureVerificationException $e) {
+                $last = $e;
+            }
+        }
+
+        throw $last ?? new \RuntimeException('Stripe webhook signature verification failed.');
+    }
+
+    /** @return list<string> */
+    private function webhookSecrets(): array
+    {
+        $secrets = [];
+
+        foreach (self::CURRENCIES as $currency) {
+            foreach (['webhook_secret', 'test_webhook_secret'] as $field) {
+                $value = $this->settings->getByKey("stripe.{$currency}.{$field}");
+                if (is_string($value) && $value !== '') {
+                    $secrets[$value] = $value;
+                }
+            }
+        }
+
+        return array_values($secrets);
     }
 
     public function getTransactionsByIdPayout(string $payoutId): array

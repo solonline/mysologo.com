@@ -44,6 +44,60 @@ class StripeTransactionFeesPendingTest extends TestCase
         $this->assertSame(125, $transaction->resolvedFeeTotal());
     }
 
+    public function test_transaction_resource_exposes_gross_available_and_fee(): void
+    {
+        $transaction = $this->makeTransaction([
+            'amount' => 300,
+            'stripe_fee' => 2,
+            'platform_fee' => 0,
+            'net_amount' => 298,
+            'status' => 'succeeded',
+            'partner_funding_status' => 'completed',
+        ]);
+
+        $payload = (new TransactionResource($transaction))->resolve();
+
+        $this->assertSame(300, $payload['amount']);
+        $this->assertSame(298, $payload['net_amount']);
+        $this->assertSame(2, $payload['fee']);
+        $this->assertFalse($payload['fees_pending']);
+        $this->assertSame('pending', $payload['status']);
+        $this->assertArrayNotHasKey('partner_funding_status', $payload);
+    }
+
+    public function test_settled_topup_stays_succeeded_for_the_customer(): void
+    {
+        $transaction = $this->makeTransaction([
+            'amount' => 300,
+            'stripe_fee' => 2,
+            'platform_fee' => 0,
+            'net_amount' => 298,
+            'status' => 'succeeded',
+            'balance_settled_at' => now(),
+        ]);
+
+        $this->assertSame('succeeded', $transaction->customerFacingStatus());
+        $this->assertTrue($transaction->customerFundsAvailable());
+    }
+
+    public function test_bank_transfer_stays_pending_until_stripe_liquidity_date(): void
+    {
+        $transaction = $this->makeTransaction([
+            'payment_method_type' => 'bank_transfer',
+            'amount' => 300,
+            'stripe_fee' => 2,
+            'platform_fee' => 0,
+            'net_amount' => 298,
+            'status' => 'succeeded',
+            'balance_settled_at' => now(),
+            'available_on' => '2026-10-21',
+        ]);
+
+        $this->assertTrue($transaction->awaitsStripeLiquidityDate());
+        $this->assertSame('pending', $transaction->customerFacingStatus());
+        $this->assertFalse($transaction->customerFundsAvailable());
+    }
+
     public function test_transaction_resource_exposes_null_net_while_fees_pending(): void
     {
         $transaction = $this->makeTransaction([

@@ -77,6 +77,11 @@ class StripeGateway implements StripeGatewayInterface
         );
     }
 
+    public function getCharge(string $chargeId, string $currency = 'eur'): array
+    {
+        return $this->run('getCharge', fn () => $this->client->forCurrency($currency)->getCharge($chargeId));
+    }
+
     public function getBalanceTransaction(string $balanceTransactionId): array
     {
         return $this->run('getBalanceTransaction', fn () => $this->client->getBalanceTransaction($balanceTransactionId)

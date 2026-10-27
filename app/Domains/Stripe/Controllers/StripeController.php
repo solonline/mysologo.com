@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Stripe\Controllers;
 
+use App\Domains\Stripe\Clients\StripeHttpClient;
 use App\Domains\Stripe\Services\StripeService;
 use App\Exceptions\ApiException;
 use App\Http\Requests\Stripe\CreatePaymentIntentRequest;
@@ -21,7 +22,10 @@ use Illuminate\Support\Facades\Cache;
 
 class StripeController extends Controller
 {
-    public function __construct(protected StripeService $stripeService) {}
+    public function __construct(
+        protected StripeService $stripeService,
+        protected StripeHttpClient $stripeClient,
+    ) {}
 
     /**
      * List Payment Methods
@@ -48,7 +52,7 @@ class StripeController extends Controller
     /**
      * Create Payment Intent
      *
-     * Creates a Stripe PaymentIntent to top up the customer's balance. Returns a `client_secret` to confirm the payment on the client side using Stripe.js or a mobile SDK. Amounts are in the smallest currency unit (e.g. cents for EUR).
+     * Creates a Stripe PaymentIntent to top up the customer's balance. Returns a `client_secret` and the matching `publishable_key` (`stripe.{currency}.public_key`) so Stripe.js confirms the intent on the same account that created it. Amounts are in the smallest currency unit (e.g. cents for EUR).
      *
      * @tags Stripe
      */
@@ -56,13 +60,14 @@ class StripeController extends Controller
     {
         $customer = $request->user();
         $data = $request->validated();
+        $currency = $data['currency'] ?? 'eur';
 
         try {
             $result = $this->stripeService->createPaymentIntent(
                 customer: $customer,
                 amount: $data['amount'],
                 paymentMethodFeeId: $data['payment_method_id'],
-                currency: $data['currency'] ?? 'eur',
+                currency: $currency,
                 isTopup: true,
             );
         } catch (ApiException $e) {
@@ -72,6 +77,7 @@ class StripeController extends Controller
         return response()->json([
             'payment_intent' => new StripePaymentIntentResource($result['payment_intent']),
             'client_secret' => $result['client_secret'],
+            'publishable_key' => $this->stripeClient->publishableKey('live', $currency),
         ], 201);
     }
 

@@ -14,6 +14,7 @@ class StripePaymentWalletService
     public function __construct(
         protected LedgerService $ledgerService,
         protected TopupWallesterFundingPolicy $topupFundingPolicy,
+        protected RailMirrorService $railMirror,
     ) {}
 
     public function creditFromStripePayment(StripeTransaction $transaction): bool
@@ -26,13 +27,19 @@ class StripePaymentWalletService
             return $this->creditMerchantPaymentAsPending($transaction);
         }
 
+        if ($this->isBankTransfer($transaction)) {
+            return $this->creditBankTransferAsPending($transaction);
+        }
+
         $netAmount = (int) $transaction->net_amount;
         $platformFee = (int) $transaction->platform_fee;
         $wallesterFundingNet = $this->topupFundingPolicy->wallesterFundingNetAmount($transaction);
         $stripeDeferredNet = $this->topupFundingPolicy->stripeDeferredNetAmount($transaction);
-        $walletCreditNet = $transaction->type === TransactionType::TOPUP
-            ? $wallesterFundingNet
-            : $netAmount;
+        $walletCreditNet = match ($transaction->type) {
+            TransactionType::TOPUP => $wallesterFundingNet,
+            TransactionType::BANK_TRANSFER => 0,
+            default => $netAmount,
+        };
 
         if ($netAmount <= 0 && $platformFee <= 0) {
             $transaction->update(['balance_settled_at' => now()]);
@@ -141,6 +148,39 @@ class StripePaymentWalletService
         return true;
     }
 
+    private function creditBankTransferAsPending(StripeTransaction $transaction): bool
+    {
+        $netAmount = (int) $transaction->net_amount;
+
+        if ($netAmount <= 0) {
+            return false;
+        }
+
+        $missing = $netAmount - $this->ledgerService->pendingHeldFor($transaction);
+
+        if ($missing <= 0) {
+            return false;
+        }
+
+        $this->ledgerService->recordPendingCredit(
+            customerId: $transaction->customer_id,
+            currency: $transaction->currency,
+            entryType: LedgerEntryType::PAYMENT_RECEIVED,
+            amount: $missing,
+            reference: $transaction,
+            description: 'Stripe payment #'.$transaction->id,
+        );
+
+        return true;
+    }
+
+    private function isBankTransfer(StripeTransaction $transaction): bool
+    {
+        return $transaction->type === TransactionType::BANK_TRANSFER
+            || $transaction->payment_method_type === 'bank_transfer'
+            || filled($transaction->stripe_cash_balance_transaction_id);
+    }
+
     public function creditDeferredStripeSettlement(StripeTransaction $transaction): bool
     {
         if ($transaction->type !== TransactionType::TOPUP) {
@@ -203,6 +243,16 @@ class StripePaymentWalletService
                 amount: $netAmount,
                 reference: $transaction,
                 description: 'Stripe payment reversal #'.$transaction->id,
+            );
+
+            $this->railMirror->debitAllocation(
+                customerId: (int) $transaction->customer_id,
+                currency: (string) $transaction->currency,
+                amountCents: $netAmount,
+                idempotencyKey: 'stripe_reversal_wise:'.$transaction->id,
+                reason: 'stripe_payment_reversal',
+                reference: $transaction,
+                allowNegative: true,
             );
 
             $transaction->update(['balance_settled_at' => null]);

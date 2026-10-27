@@ -13,17 +13,18 @@ class SettlementService
 {
     public function __construct(
         protected TopupWallesterFundingPolicy $topupFundingPolicy,
+        protected BankTransferLiquidityService $bankTransferLiquidity,
     ) {}
 
     /**
-     * Cron fallback/retry after payout.paid became the settlement source of truth.
-     * Does not credit wallet by available_on — only re-dispatches retriable partner funding
-     * and reports transactions still awaiting Stripe payout past available_on.
+     * Retries partner funding and releases IBAN transfers whose Stripe available_on has arrived.
+     * Card top-ups and merchant payments still wait for payout.paid.
      *
-     * @return array{retried: int, skipped: int, awaiting_payout_stale: int}
+     * @return array{retried: int, skipped: int, awaiting_payout_stale: int, bank_transfers_released: int}
      */
     public function runDailySettlement(Carbon $date): array
     {
+        $bankTransfersReleased = $this->bankTransferLiquidity->releaseDue($date);
         $retried = 0;
         $skipped = 0;
 
@@ -82,12 +83,14 @@ class SettlementService
             'retried' => $retried,
             'skipped' => $skipped,
             'awaiting_payout_stale' => $awaitingPayoutStale,
+            'bank_transfers_released' => $bankTransfersReleased,
         ]);
 
         return [
             'retried' => $retried,
             'skipped' => $skipped,
             'awaiting_payout_stale' => $awaitingPayoutStale,
+            'bank_transfers_released' => $bankTransfersReleased,
             // Keep legacy keys for command output compatibility.
             'batches' => 0,
             'transactions' => $retried,

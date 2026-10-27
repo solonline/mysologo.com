@@ -60,7 +60,7 @@ class StripePaymentWalletPendingTest extends TestCase
             ->where('currency', 'EUR')
             ->firstOrFail();
 
-        $this->assertSame(0, (int) $balance->available);
+        $this->assertSame(0, (int) $balance->wallester_allocated);
         $this->assertSame(4_875, (int) $balance->pending);
     }
 
@@ -103,6 +103,47 @@ class StripePaymentWalletPendingTest extends TestCase
         $this->assertNull($balance);
     }
 
+    public function test_bank_transfer_credits_pending_until_stripe_liquidity(): void
+    {
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'email_verified_at' => now(),
+            'doc_status' => 'approved',
+        ]);
+
+        $transaction = StripeTransaction::query()->create([
+            'customer_id' => $customer->id,
+            'type' => TransactionType::BANK_TRANSFER,
+            'payment_method_type' => 'bank_transfer',
+            'direction' => 'credit',
+            'amount' => 300,
+            'stripe_fee' => 2,
+            'platform_fee' => 0,
+            'net_amount' => 298,
+            'currency' => 'EUR',
+            'status' => 'succeeded',
+            'available_on' => now()->addDays(5),
+            'balance_settled_at' => null,
+            'partner_funding_status' => PartnerFundingStatus::NotRequired,
+            'stripe_deferred_net_amount' => 298,
+            'wallester_funding_net_amount' => 0,
+        ]);
+
+        app(StripePaymentWalletService::class)->creditFromStripePayment($transaction);
+        app(StripePaymentWalletService::class)->creditFromStripePayment($transaction->fresh());
+
+        $transaction->refresh();
+        $balance = CustomerBalance::query()
+            ->where('customer_id', $customer->id)
+            ->where('currency', 'EUR')
+            ->firstOrFail();
+
+        $this->assertSame(PartnerFundingStatus::NotRequired, $transaction->partner_funding_status);
+        $this->assertNull($transaction->balance_settled_at);
+        $this->assertSame(0, (int) $balance->wallester_allocated);
+        $this->assertSame(298, (int) $balance->pending);
+    }
+
     public function test_platform_fee_does_not_credit_platform_wallet(): void
     {
         $platform = Customer::query()->create([
@@ -118,7 +159,7 @@ class StripePaymentWalletPendingTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $platform->id,
             'currency' => 'EUR',
-            'available' => 100,
+            'wallester_allocated' => 100,
             'pending' => 0,
         ]);
 
@@ -147,7 +188,7 @@ class StripePaymentWalletPendingTest extends TestCase
         $this->assertSame(100, (int) CustomerBalance::query()
             ->where('customer_id', $platform->id)
             ->where('currency', 'EUR')
-            ->value('available'));
+            ->value('wallester_allocated'));
 
         $this->assertDatabaseMissing('ledger_entries', [
             'customer_id' => $platform->id,

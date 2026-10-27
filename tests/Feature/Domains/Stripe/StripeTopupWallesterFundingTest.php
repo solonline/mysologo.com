@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Domains\Stripe;
 
+use App\Domains\Customer\Jobs\SendCustomerNotificationEmailJob;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Onboarding\Enums\IntegrationAccountStatus;
 use App\Domains\Stripe\Contracts\StripeGatewayInterface;
@@ -12,7 +13,6 @@ use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
-use App\Domains\Customer\Jobs\SendCustomerNotificationEmailJob;
 use App\Domains\Wallet\Services\FundingPartnerMovementService;
 use App\Domains\Wallet\Services\LedgerService;
 use App\Domains\Wallet\Services\TopupWallesterFundingPolicy;
@@ -146,7 +146,7 @@ class StripeTopupWallesterFundingTest extends TestCase
             ->first();
 
         $this->assertNotNull($balance);
-        $this->assertSame(0, (int) $balance->available);
+        $this->assertSame(0, (int) $balance->wallester_allocated);
         $this->assertSame(4_875, (int) $balance->pending);
 
         $this->assertTrue(
@@ -275,7 +275,7 @@ class StripeTopupWallesterFundingTest extends TestCase
             ->where('currency', 'EUR')
             ->firstOrFail();
 
-        $this->assertSame(2_875, (int) $balance->available);
+        $this->assertSame(2_875, (int) $balance->wallester_allocated);
         $this->assertSame(0, (int) $balance->pending);
 
         $master->refresh();

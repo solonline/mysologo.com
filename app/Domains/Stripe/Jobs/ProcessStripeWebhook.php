@@ -14,6 +14,10 @@ class ProcessStripeWebhook implements ShouldQueue
 
     public function handle(StripeService $stripeService): void
     {
+        if (StripeService::isTestModeEvent($this->payload)) {
+            return;
+        }
+
         $this->enqueuePayoutPaidIfPresent();
         $stripeService->handleWebhook($this->payload);
     }

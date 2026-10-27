@@ -9,6 +9,7 @@ use App\Domains\Stripe\Enums\StripePaymentIntentStatus;
 use App\Domains\Stripe\Services\StripeService;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
+use App\Models\Setting;
 use App\Models\StripePaymentIntent;
 use App\Models\StripePaymentMethodFee;
 use App\Models\StripeTransaction;
@@ -148,6 +149,11 @@ class StripeTopupDailyLimitTest extends TestCase
         $this->createStripeAccount($customer);
         $this->mockStripeGateway();
 
+        Setting::query()->updateOrCreate(
+            ['key' => 'stripe.eur.public_key'],
+            ['label' => 'Produção — Chave pública (pk_)', 'type' => 'text', 'value' => 'pk_live_topup_account'],
+        );
+
         $token = $customer->createToken('test')->plainTextToken;
 
         $this->withToken($token)
@@ -161,6 +167,7 @@ class StripeTopupDailyLimitTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('payment_intent.type', TransactionType::TOPUP->value)
             ->assertJsonPath('payment_intent.payment_method_type', 'card')
+            ->assertJsonPath('publishable_key', 'pk_live_topup_account')
             ->assertJsonMissing(['transaction' => []]);
     }
 

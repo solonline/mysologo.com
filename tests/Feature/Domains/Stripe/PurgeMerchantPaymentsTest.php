@@ -10,7 +10,6 @@ use App\Domains\Wallet\Services\LedgerService;
 use App\Domains\Wallet\Services\PlatformRevenueService;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
-use App\Models\LedgerEntry;
 use App\Models\Merchant;
 use App\Models\MerchantPaymentRequest;
 use App\Models\StripePaymentIntent;
@@ -95,14 +94,14 @@ class PurgeMerchantPaymentsTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame(80, (int) $merchantBalance->pending);
-        $this->assertSame(0, (int) $merchantBalance->available);
+        $this->assertSame(0, (int) $merchantBalance->wallester_allocated);
 
         $platformBalance = CustomerBalance::query()
             ->where('customer_id', $platform->id)
             ->where('currency', 'EUR')
             ->firstOrFail();
 
-        $this->assertSame(1, (int) $platformBalance->available);
+        $this->assertSame(1, (int) $platformBalance->wallester_allocated);
 
         $this->assertDatabaseMissing('merchant_payment_requests', [
             'stripe_payment_intent_id' => $purge->stripe_payment_intent_id,

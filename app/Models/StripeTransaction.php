@@ -191,4 +191,47 @@ class StripeTransaction extends Model
     {
         return $this->feesPending() ? null : $this->stripe_fee + $this->platform_fee;
     }
+
+    /**
+     * Transferência bancária segue a data de liquidez da Stripe (available_on),
+     * mesmo que a main já tenha adiantado o valor.
+     */
+    public function customerFundsAvailable(): bool
+    {
+        if ((string) $this->status !== 'succeeded' || $this->awaitsStripeLiquidityDate()) {
+            return false;
+        }
+
+        return $this->balance_settled_at !== null;
+    }
+
+    /**
+     * O pagamento Stripe pode já estar succeeded. Para o cliente, uma transferência
+     * com liquidez futura — ou ainda sem payout — fica pending até essa data.
+     */
+    public function customerFacingStatus(): string
+    {
+        $status = (string) $this->status;
+
+        if ($status === 'succeeded' && ! $this->customerFundsAvailable()) {
+            return 'pending';
+        }
+
+        return $status;
+    }
+
+    public function awaitsStripeLiquidityDate(): bool
+    {
+        if ($this->payment_method_type !== 'bank_transfer' && blank($this->stripe_cash_balance_transaction_id)) {
+            return false;
+        }
+
+        $availableOn = $this->available_on?->timezone(config('app.timezone'))->startOfDay();
+
+        if ($availableOn === null) {
+            return false;
+        }
+
+        return $availableOn->isAfter(now()->timezone(config('app.timezone'))->startOfDay());
+    }
 }

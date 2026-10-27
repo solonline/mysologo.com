@@ -88,7 +88,7 @@ class StripeCashBalanceFundingTest extends TestCase
             'customer_id' => $customer->id,
             'stripe_payment_intent_id' => 'pi_bank_topup_1',
             'stripe_cash_balance_transaction_id' => 'ccsbtxn_test_1',
-            'type' => TransactionType::TOPUP->value,
+            'type' => TransactionType::BANK_TRANSFER->value,
             'payment_method_type' => 'bank_transfer',
             'amount' => 100,
             'status' => 'succeeded',
@@ -158,7 +158,7 @@ class StripeCashBalanceFundingTest extends TestCase
         $this->assertDatabaseCount('stripe_transactions', 0);
     }
 
-    public function test_charge_updated_after_cash_balance_reconciliation_dispatches_wallester_job(): void
+    public function test_charge_updated_after_cash_balance_reconciliation_waits_for_stripe_payout(): void
     {
         Bus::fake([FundWallesterTopupFromStripeJob::class]);
 
@@ -228,9 +228,7 @@ class StripeCashBalanceFundingTest extends TestCase
             ],
         ]);
 
-        Bus::assertDispatched(FundWallesterTopupFromStripeJob::class, function (FundWallesterTopupFromStripeJob $job) use ($transaction): bool {
-            return $job->stripeTransactionId === $transaction->id;
-        });
+        Bus::assertNotDispatched(FundWallesterTopupFromStripeJob::class);
 
         $expectedPlatformFee = $feeConfig->fresh()->calculatePlatformFee($amount);
         $expectedNetAmount = $amount - $stripeFeeFromBalance - $expectedPlatformFee;
@@ -240,7 +238,180 @@ class StripeCashBalanceFundingTest extends TestCase
         $this->assertSame($stripeFeeFromBalance, (int) $transaction->stripe_fee);
         $this->assertSame($expectedPlatformFee, (int) $transaction->platform_fee);
         $this->assertSame($expectedNetAmount, (int) $transaction->net_amount);
+        $this->assertSame(0, (int) $transaction->immediate_gross_amount);
+        $this->assertSame(0, (int) $transaction->wallester_funding_net_amount);
+        $this->assertSame($expectedNetAmount, (int) $transaction->stripe_deferred_net_amount);
+        $this->assertNull($transaction->balance_settled_at);
         $this->assertSame($feeConfig->id, (int) $transaction->stripe_payment_method_fee_id);
+        $this->assertSame($expectedNetAmount, (int) \App\Models\CustomerBalance::query()
+            ->where('customer_id', $customer->id)
+            ->where('currency', 'EUR')
+            ->value('pending'));
+        $this->assertSame(0, (int) \App\Models\CustomerBalance::query()
+            ->where('customer_id', $customer->id)
+            ->where('currency', 'EUR')
+            ->value('wallester_allocated'));
+    }
+
+    public function test_funds_available_reconciles_funded_cash_balance_without_a_second_payment_intent(): void
+    {
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'doc_status' => 'approved',
+        ]);
+        $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE, 'cus_funds_available');
+
+        $gateway = Mockery::mock(StripeGatewayInterface::class);
+        $gateway->shouldReceive('listCashBalanceTransactions')
+            ->twice()
+            ->andReturn([
+                'status' => 'success',
+                'data' => [
+                    'data' => [$this->sampleFundedCashBalancePayload('cus_funds_available')],
+                ],
+            ]);
+        $gateway->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'pi_funds_available',
+                    'status' => 'succeeded',
+                ],
+            ]);
+        $this->app->instance(StripeGatewayInterface::class, $gateway);
+
+        $payload = [
+            'type' => 'cash_balance.funds_available',
+            'data' => [
+                'object' => [
+                    'object' => 'cash_balance',
+                    'customer' => 'cus_funds_available',
+                    'available' => ['eur' => 100],
+                ],
+            ],
+        ];
+
+        app(StripeService::class)->handleWebhook($payload);
+        app(StripeService::class)->handleWebhook($payload);
+
+        $this->assertSame(1, StripeTransaction::query()->count());
+        $this->assertSame(TransactionType::BANK_TRANSFER, StripeTransaction::query()->first()->type);
+    }
+
+    public function test_funded_webhook_stores_available_on_from_the_charge_balance_transaction(): void
+    {
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'doc_status' => 'approved',
+        ]);
+        $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE, 'cus_available_on');
+
+        $availableOn = now()->addDays(5)->startOfDay();
+
+        $gateway = Mockery::mock(StripeGatewayInterface::class);
+        $gateway->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'pi_available_on',
+                    'status' => 'succeeded',
+                    'latest_charge' => 'ch_available_on',
+                ],
+            ]);
+        $gateway->shouldReceive('getCharge')
+            ->once()
+            ->with('ch_available_on', 'eur')
+            ->andReturn([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'ch_available_on',
+                    'balance_transaction' => 'txn_available_on',
+                ],
+            ]);
+        $gateway->shouldReceive('getBalanceTransaction')
+            ->once()
+            ->with('txn_available_on')
+            ->andReturn([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'txn_available_on',
+                    'available_on' => $availableOn->timestamp,
+                ],
+            ]);
+        $this->app->instance(StripeGatewayInterface::class, $gateway);
+
+        app(StripeService::class)->handleWebhook([
+            'type' => 'customer_cash_balance_transaction.created',
+            'data' => [
+                'object' => $this->sampleFundedCashBalancePayload('cus_available_on'),
+            ],
+        ]);
+
+        $transaction = StripeTransaction::query()->first();
+
+        $this->assertSame('ch_available_on', $transaction->stripe_charge_id);
+        $this->assertSame($availableOn->toDateString(), $transaction->available_on->toDateString());
+    }
+
+    public function test_funded_webhook_stores_available_on_from_a_py_charge(): void
+    {
+        $customer = $this->createRetailCustomer([
+            'status' => CustomerLifecycleStatus::ACTIVE,
+            'doc_status' => 'approved',
+        ]);
+        $this->createStripeAccount($customer, IntegrationAccountStatus::ACTIVE, 'cus_available_on_py');
+
+        $availableOn = now()->addDays(5)->startOfDay();
+
+        $gateway = Mockery::mock(StripeGatewayInterface::class);
+        $gateway->shouldReceive('createPaymentIntent')
+            ->once()
+            ->andReturn([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'pi_available_on_py',
+                    'status' => 'succeeded',
+                    'latest_charge' => 'py_available_on',
+                ],
+            ]);
+        $gateway->shouldReceive('getCharge')
+            ->once()
+            ->with('py_available_on', 'eur')
+            ->andReturn([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'py_available_on',
+                    'balance_transaction' => 'txn_available_on_py',
+                ],
+            ]);
+        $gateway->shouldReceive('getBalanceTransaction')
+            ->once()
+            ->with('txn_available_on_py')
+            ->andReturn([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'txn_available_on_py',
+                    'available_on' => $availableOn->timestamp,
+                ],
+            ]);
+        $this->app->instance(StripeGatewayInterface::class, $gateway);
+
+        app(StripeService::class)->handleWebhook([
+            'type' => 'customer_cash_balance_transaction.created',
+            'data' => [
+                'object' => $this->sampleFundedCashBalancePayload('cus_available_on_py'),
+            ],
+        ]);
+
+        $transaction = StripeTransaction::query()->first();
+
+        $this->assertSame(TransactionType::BANK_TRANSFER, $transaction->type);
+        $this->assertSame('py_available_on', $transaction->stripe_charge_id);
+        $this->assertSame($availableOn->toDateString(), $transaction->available_on->toDateString());
+        $this->assertNull($transaction->balance_settled_at);
+        $this->assertSame(0, (int) $transaction->wallester_funding_net_amount);
     }
 
     /** @return array<string, mixed> */
@@ -264,7 +435,7 @@ class StripeCashBalanceFundingTest extends TestCase
                     'type' => 'eu_bank_transfer',
                 ],
             ],
-            'livemode' => false,
+            'livemode' => true,
             'net_amount' => 100,
             'type' => 'funded',
         ];

@@ -12,6 +12,7 @@ use App\Domains\Stripe\Enums\StripePaymentIntentPurpose;
 use App\Domains\Stripe\Enums\StripePaymentIntentStatus;
 use App\Domains\Stripe\Jobs\ProcessStripePayoutPaidJob;
 use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
+use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Domains\Wallet\Services\StripePaymentWalletService;
@@ -566,8 +567,31 @@ class StripeService
         return $result['data'];
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public static function isTestModeEvent(array $payload): bool
+    {
+        if (($payload['livemode'] ?? null) === false) {
+            return true;
+        }
+
+        $object = $payload['data']['object'] ?? null;
+
+        return is_array($object) && ($object['livemode'] ?? null) === false;
+    }
+
     public function handleWebhook(array $payload, bool $dispatchPartnerFunding = true): void
     {
+        if (self::isTestModeEvent($payload)) {
+            Log::channel('stripe')->info('Stripe webhook de teste ignorado', [
+                'event' => $payload['id'] ?? null,
+                'type' => $payload['type'] ?? null,
+            ]);
+
+            return;
+        }
+
         $this->dispatchPartnerFunding = $dispatchPartnerFunding;
 
         $eventType = $payload['type'] ?? null;
@@ -580,6 +604,7 @@ class StripeService
             'charge.updated' => $this->handleChargeUpdated($object),
             'customer_cash_balance_settings.updated', 'customer.cash_balance_settings.updated' => $this->integrationAccounts->handleStripeWebhook($eventType, $object),
             'customer_cash_balance_transaction.created', 'customer.cash_balance_transaction.created' => $this->handleCashBalanceTransactionCreated($object),
+            'cash_balance.funds_available' => $this->handleCashBalanceFundsAvailable($object),
             'payout.paid' => $this->handlePayoutPaid($object),
             default => Log::channel('stripe')->info('Stripe webhook ignorado', ['type' => $eventType]),
         };
@@ -732,7 +757,7 @@ class StripeService
             $paymentIntentRecord = $this->paymentIntents->createFromStripeResponse(
                 customer: $customer,
                 intent: $intent,
-                type: TransactionType::TOPUP,
+                type: TransactionType::BANK_TRANSFER,
                 purpose: StripePaymentIntentPurpose::BankTransferTopup,
                 amount: $netAmount,
                 currency: $currency,
@@ -766,6 +791,8 @@ class StripeService
             return;
         }
 
+        $this->captureBankTransferLiquidity($transaction, $intent);
+
         Log::channel('stripe')->info('Stripe webhook: cash balance reconciliado com PaymentIntent', [
             'transaction_id' => $transaction->id,
             'stripe_payment_intent_id' => $intent['id'],
@@ -774,7 +801,127 @@ class StripeService
             'net_amount' => $netAmount,
             'currency' => $currency,
             'payment_intent_status' => $intentStatus,
+            'available_on' => $transaction->fresh()->available_on?->toDateString(),
         ]);
+    }
+
+    /**
+     * Saldo ainda por aplicar no cash balance do customer. A data de liquidez não vem neste objeto.
+     *
+     * @param  array<string, mixed>  $object
+     */
+    private function handleCashBalanceFundsAvailable(array $object): void
+    {
+        $stripeCustomerId = $object['customer'] ?? null;
+
+        if (! is_string($stripeCustomerId) || $stripeCustomerId === '') {
+            Log::channel('stripe')->warning('Stripe webhook: cash_balance.funds_available sem customer', $object);
+
+            return;
+        }
+
+        $available = is_array($object['available'] ?? null) ? $object['available'] : [];
+        $currencies = [];
+
+        foreach ($available as $currency => $amount) {
+            if ((int) $amount > 0 && is_string($currency) && $currency !== '') {
+                $currencies[] = strtolower($currency);
+            }
+        }
+
+        if ($currencies === []) {
+            $currencies = ['eur'];
+        }
+
+        foreach ($currencies as $currency) {
+            $result = $this->stripeGateway->listCashBalanceTransactions(
+                $stripeCustomerId,
+                now()->subDays(14)->getTimestamp(),
+                now()->getTimestamp(),
+                $currency,
+            );
+
+            if (($result['status'] ?? null) !== 'success') {
+                Log::channel('stripe')->warning('Stripe webhook: falha ao listar cash balance transactions', [
+                    'stripe_customer_id' => $stripeCustomerId,
+                    'currency' => $currency,
+                    'message' => $result['message'] ?? null,
+                ]);
+
+                continue;
+            }
+
+            foreach ($result['data']['data'] ?? [] as $transaction) {
+                if (! is_array($transaction) || ($transaction['type'] ?? null) !== 'funded') {
+                    continue;
+                }
+
+                $this->handleCashBalanceFunded($transaction);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $intent
+     */
+    private function captureBankTransferLiquidity(StripeTransaction $transaction, array $intent): void
+    {
+        $charge = $intent['latest_charge'] ?? null;
+        $chargeId = null;
+        $balanceTransaction = null;
+
+        if (is_string($charge) && (str_starts_with($charge, 'ch_') || str_starts_with($charge, 'py_'))) {
+            $chargeId = $charge;
+            $fetched = $this->stripeGateway->getCharge($chargeId, strtolower((string) $transaction->currency));
+
+            if (($fetched['status'] ?? null) === 'success' && is_array($fetched['data'] ?? null)) {
+                $balanceTransaction = $fetched['data']['balance_transaction'] ?? null;
+            }
+        } elseif (is_array($charge)) {
+            $chargeId = is_string($charge['id'] ?? null) ? $charge['id'] : null;
+            $balanceTransaction = $charge['balance_transaction'] ?? null;
+        }
+
+        $availableOn = null;
+        $balanceTransactionId = null;
+
+        if (is_array($balanceTransaction)) {
+            $balanceTransactionId = is_string($balanceTransaction['id'] ?? null) ? $balanceTransaction['id'] : null;
+            if (isset($balanceTransaction['available_on'])) {
+                $availableOn = $this->stripeAvailableOnDate((int) $balanceTransaction['available_on']);
+            }
+        } elseif (is_string($balanceTransaction) && str_starts_with($balanceTransaction, 'txn_')) {
+            $balanceTransactionId = $balanceTransaction;
+        }
+
+        if ($availableOn === null && is_string($balanceTransactionId)) {
+            $result = $this->stripeGateway->getBalanceTransaction($balanceTransactionId);
+
+            if (($result['status'] ?? null) === 'success' && isset($result['data']['available_on'])) {
+                $availableOn = $this->stripeAvailableOnDate((int) $result['data']['available_on']);
+            }
+        }
+
+        $updates = [];
+
+        if (is_string($chargeId) && $chargeId !== '') {
+            $updates['stripe_charge_id'] = $chargeId;
+        }
+
+        if (is_string($availableOn) && $availableOn !== '') {
+            $updates['available_on'] = $availableOn;
+        }
+
+        if ($updates !== []) {
+            $transaction->update($updates);
+        }
+    }
+
+    private function stripeAvailableOnDate(int $timestamp): string
+    {
+        return Carbon::createFromTimestamp($timestamp)
+            ->timezone(config('app.timezone'))
+            ->toDateString();
     }
 
     private function handlePaymentIntentSucceeded(array $intent): void
@@ -891,11 +1038,11 @@ class StripeService
     {
         $balance = CustomerBalance::firstOrCreate(
             ['customer_id' => $customerId, 'currency' => strtoupper($currency)],
-            ['available' => 0, 'pending' => 0],
+            ['wallester_allocated' => 0, 'pending' => 0, 'wise_allocated' => 0],
         );
 
         CustomerBalance::where('id', $balance->id)->update([
-            'available' => DB::raw("available + {$available}"),
+            'wallester_allocated' => DB::raw("wallester_allocated + {$available}"),
             'pending' => DB::raw("pending + {$pending}"),
         ]);
     }
@@ -985,7 +1132,7 @@ class StripeService
 
         $realStripeFee = $result['data']['fee'] ?? null;
         $availableOn = isset($result['data']['available_on'])
-            ? Carbon::createFromTimestamp($result['data']['available_on'])->toDateString()
+            ? $this->stripeAvailableOnDate((int) $result['data']['available_on'])
             : null;
 
         if ($realStripeFee === null) {
@@ -1037,7 +1184,17 @@ class StripeService
 
         $transaction = $transaction->fresh();
 
-        if ($transaction->type === TransactionType::TOPUP) {
+        $fundingStatus = $transaction->partner_funding_status;
+        $fundingAlreadyArmed = $fundingStatus === PartnerFundingStatus::Pending
+            || $fundingStatus === PartnerFundingStatus::Completed
+            || $fundingStatus === PartnerFundingStatus::AwaitingLiquidity
+            || $this->topupFundingPolicy->hasCompletedMovement($transaction)
+            || $this->topupFundingPolicy->hasPendingMovement($transaction);
+
+        if (
+            ! $fundingAlreadyArmed
+            && in_array($transaction->type, [TransactionType::TOPUP, TransactionType::BANK_TRANSFER], true)
+        ) {
             $allocation = $this->topupFundingPolicy->allocate($transaction);
 
             $transaction->update([

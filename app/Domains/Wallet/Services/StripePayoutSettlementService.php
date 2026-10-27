@@ -7,6 +7,8 @@ use App\Domains\Stripe\Jobs\ProcessStripePayoutPaidJob;
 use App\Domains\Wallester\Jobs\FundWallesterTopupFromStripeJob;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionType;
+use App\Models\CustomerBalance;
+use App\Models\RailMirrorEvent;
 use App\Models\StripeTransaction;
 use Illuminate\Support\Facades\Log;
 
@@ -18,6 +20,8 @@ class StripePayoutSettlementService
         protected StripeGatewayInterface $stripeGateway,
         protected StripePaymentWalletService $stripePaymentWallet,
         protected TopupWallesterFundingPolicy $topupFundingPolicy,
+        protected LedgerService $ledger,
+        protected RailMirrorService $railMirror,
     ) {}
 
     /**
@@ -157,7 +161,24 @@ class StripePayoutSettlementService
         }
 
         if ($transaction->type === TransactionType::TOPUP) {
+            if (
+                $transaction->payment_method_type === 'bank_transfer'
+                || filled($transaction->stripe_cash_balance_transaction_id)
+            ) {
+                Log::channel('stripe')->info('stripe_payout_settlement: IBAN top-up waits for available_on', [
+                    'payout_id' => $payoutId,
+                    'transaction_id' => $transaction->id,
+                    'available_on' => $transaction->available_on?->toDateString(),
+                ]);
+
+                return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
+            }
+
             return $this->settleTopup($transaction, $payoutId);
+        }
+
+        if ($transaction->type === TransactionType::BANK_TRANSFER) {
+            return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
         }
 
         Log::channel('stripe')->info('stripe_payout_settlement: unsupported transaction type skipped', [
@@ -174,16 +195,6 @@ class StripePayoutSettlementService
      */
     private function settleMerchantPayment(StripeTransaction $transaction, string $payoutId): array
     {
-        $status = $transaction->partner_funding_status;
-
-        if ($status === PartnerFundingStatus::Completed || $status === PartnerFundingStatus::NotRequired) {
-            return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
-        }
-
-        if ($this->topupFundingPolicy->hasCompletedMovement($transaction)) {
-            return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
-        }
-
         $fundingNet = max(0, (int) $transaction->net_amount);
 
         if ($fundingNet <= 0) {
@@ -197,30 +208,15 @@ class StripePayoutSettlementService
             return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
         }
 
-        $transaction->update([
-            'wallester_funding_net_amount' => $fundingNet,
-            'stripe_deferred_net_amount' => 0,
-            'partner_funding_status' => PartnerFundingStatus::Pending,
-            'partner_funding_failure_reason' => null,
-        ]);
+        $released = $this->releasePendingFunding($transaction, $fundingNet);
+        $wiseCredited = $this->creditWiseAllocation($transaction, $fundingNet);
+        $wallesterDispatched = $this->dispatchWallesterFunding($transaction->fresh(), $fundingNet, $payoutId, 'merchant');
 
-        if ($this->topupFundingPolicy->hasPendingMovement($transaction->fresh())) {
-            return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
-        }
-
-        if (! $this->dispatchPartnerFunding) {
-            return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
-        }
-
-        FundWallesterTopupFromStripeJob::dispatch($transaction->id);
-
-        Log::channel('stripe')->info('stripe_payout_settlement: merchant armed for Wallester funding', [
-            'payout_id' => $payoutId,
-            'transaction_id' => $transaction->id,
-            'wallester_funding_net_amount' => $fundingNet,
-        ]);
-
-        return ['deferred_credited' => false, 'wallester_dispatched' => true, 'skipped' => false];
+        return [
+            'deferred_credited' => false,
+            'wallester_dispatched' => $wallesterDispatched,
+            'skipped' => ! $released && ! $wiseCredited && ! $wallesterDispatched,
+        ];
     }
 
     /**
@@ -228,39 +224,141 @@ class StripePayoutSettlementService
      */
     private function settleTopup(StripeTransaction $transaction, string $payoutId): array
     {
+        $fundingNet = max(0, (int) $transaction->net_amount);
+
+        if ($fundingNet <= 0) {
+            return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
+        }
+
         $deferredCredited = false;
-        $wallesterDispatched = false;
 
         if ((int) ($transaction->stripe_deferred_net_amount ?? 0) > 0 && $transaction->balance_settled_at === null) {
             $deferredCredited = $this->stripePaymentWallet->creditDeferredStripeSettlement($transaction->fresh());
         }
 
-        $fresh = $transaction->fresh();
-
-        if (
-            $this->dispatchPartnerFunding
-            && $fresh
-            && $this->topupFundingPolicy->requiresPartnerFunding($fresh)
-            && $this->topupFundingPolicy->isRetriable($fresh)
-            && ! $this->topupFundingPolicy->hasPendingMovement($fresh)
-        ) {
-            FundWallesterTopupFromStripeJob::dispatch($fresh->id);
-            $wallesterDispatched = true;
-
-            Log::channel('stripe')->info('stripe_payout_settlement: topup Wallester funding dispatched', [
-                'payout_id' => $payoutId,
-                'transaction_id' => $fresh->id,
-            ]);
-        }
-
-        if (! $deferredCredited && ! $wallesterDispatched) {
-            return ['deferred_credited' => false, 'wallester_dispatched' => false, 'skipped' => true];
-        }
+        $released = $this->releasePendingFunding($transaction->fresh(), $fundingNet);
+        $wiseCredited = $this->creditWiseAllocation($transaction->fresh(), $fundingNet);
+        $wallesterDispatched = $this->dispatchWallesterFunding($transaction->fresh(), $fundingNet, $payoutId, 'topup');
 
         return [
             'deferred_credited' => $deferredCredited,
             'wallester_dispatched' => $wallesterDispatched,
-            'skipped' => false,
+            'skipped' => ! $deferredCredited && ! $released && ! $wiseCredited && ! $wallesterDispatched,
         ];
+    }
+
+    private function releasePendingFunding(StripeTransaction $transaction, int $netAmount): bool
+    {
+        if ($netAmount <= 0 || $this->ledger->hasReleasedPartnerFunding($transaction)) {
+            return false;
+        }
+
+        $pending = (int) CustomerBalance::query()
+            ->where('customer_id', $transaction->customer_id)
+            ->where('currency', strtoupper((string) $transaction->currency))
+            ->value('pending');
+
+        if ($pending < $netAmount) {
+            return false;
+        }
+
+        $this->ledger->releasePendingToAvailable(
+            customerId: $transaction->customer_id,
+            currency: $transaction->currency,
+            amount: $netAmount,
+            reference: $transaction,
+            description: 'Stripe payout funding released #'.$transaction->id,
+        );
+
+        return true;
+    }
+
+    private function creditWiseAllocation(StripeTransaction $transaction, int $netAmount): bool
+    {
+        if ($netAmount <= 0 || $this->wiseAlreadyMirrored($transaction)) {
+            return false;
+        }
+
+        return $this->railMirror->creditAllocation(
+            customerId: (int) $transaction->customer_id,
+            currency: (string) $transaction->currency,
+            amountCents: $netAmount,
+            idempotencyKey: 'stripe_payout_wise:'.$transaction->id,
+            reason: 'stripe_payout',
+            reference: $transaction,
+        );
+    }
+
+    private function dispatchWallesterFunding(
+        StripeTransaction $transaction,
+        int $netAmount,
+        string $payoutId,
+        string $kind,
+    ): bool {
+        if (! $this->dispatchPartnerFunding || $this->wallesterAlreadyCovered($transaction, $netAmount)) {
+            return false;
+        }
+
+        $transaction->update([
+            'wallester_funding_net_amount' => $netAmount,
+            'stripe_deferred_net_amount' => 0,
+            'partner_funding_status' => PartnerFundingStatus::Pending,
+            'partner_funding_failure_reason' => null,
+        ]);
+
+        FundWallesterTopupFromStripeJob::dispatch($transaction->id);
+
+        Log::channel('stripe')->info('stripe_payout_settlement: '.$kind.' armed for Wallester funding', [
+            'payout_id' => $payoutId,
+            'transaction_id' => $transaction->id,
+            'wallester_funding_net_amount' => $netAmount,
+        ]);
+
+        return true;
+    }
+
+    private function wiseAlreadyMirrored(StripeTransaction $transaction): bool
+    {
+        foreach ([
+            'stripe_payout_wise:'.$transaction->id,
+            'stripe_liquidity_wise:'.$transaction->id,
+            'stripe_topup_wise:'.$transaction->id,
+        ] as $key) {
+            if (RailMirrorEvent::query()->where('idempotency_key', $key)->exists()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function wallesterAlreadyCovered(StripeTransaction $transaction, int $netAmount): bool
+    {
+        if ($netAmount <= 0) {
+            return true;
+        }
+
+        if ($this->topupFundingPolicy->hasCompletedMovement($transaction) || $this->topupFundingPolicy->hasPendingMovement($transaction)) {
+            return true;
+        }
+
+        $status = $transaction->partner_funding_status;
+
+        if ($status === PartnerFundingStatus::Completed) {
+            return true;
+        }
+
+        $deferredNet = (int) ($transaction->stripe_deferred_net_amount ?? 0);
+        $wallesterNet = (int) ($transaction->wallester_funding_net_amount ?? 0);
+        $fullyAssigned = $deferredNet === 0 && $wallesterNet >= $netAmount;
+
+        if ($status === PartnerFundingStatus::NotRequired && $deferredNet === 0) {
+            return true;
+        }
+
+        return $fullyAssigned && (
+            $status === PartnerFundingStatus::Pending
+            || (int) ($transaction->immediate_gross_amount ?? 0) > 0
+        );
     }
 }

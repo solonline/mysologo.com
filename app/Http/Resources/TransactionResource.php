@@ -20,7 +20,7 @@ class TransactionResource extends JsonResource
             'net_amount' => $this->resolvedNetAmount(),
             'fees_pending' => $this->feesPending(),
             'currency' => $this->currency,
-            'status' => $this->status,
+            'status' => $this->customerFacingStatus(),
             'payment_method_type' => $this->payment_method_type,
             'description' => $this->description,
 
@@ -57,10 +57,8 @@ class TransactionResource extends JsonResource
             'stripe_charge_id' => $this->stripe_charge_id,
 
             'settles_at' => $this->settles_at,
-            'partner_funding_status' => $this->when(
-                $this->type === TransactionType::TOPUP,
-                $this->partner_funding_status,
-            ),
+            'available_on' => $this->available_on?->timezone(config('app.timezone'))->toDateString(),
+            'funds_available' => $this->customerFundsAvailable(),
             'created_at' => $this->created_at,
         ];
     }
