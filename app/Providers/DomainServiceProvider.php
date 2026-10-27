@@ -20,6 +20,7 @@ use App\Domains\Tpa\TpaServiceProvider;
 use App\Domains\Wallester\WallesterServiceProvider;
 use App\Domains\Wallet\WalletServiceProvider;
 use App\Domains\Whatsapp\WhatsappServiceProvider;
+use App\Domains\Wise\WiseServiceProvider;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -42,6 +43,7 @@ class DomainServiceProvider extends ServiceProvider
         EburyServiceProvider::class,
         StripeServiceProvider::class,
         WallesterServiceProvider::class,
+        WiseServiceProvider::class,
         FxServiceProvider::class,
         BackofficeServiceProvider::class,
         WalletServiceProvider::class,

@@ -5,6 +5,7 @@ namespace App\Domains\Customer\Jobs;
 use App\Application\Documents\TransferReceipt\GenerateTransferReceiptCommand;
 use App\Application\Documents\TransferReceipt\GenerateTransferReceiptHandler;
 use App\Domains\Customer\Mail\CustomerAppNotificationMail;
+use App\Domains\Wise\Contracts\WiseGatewayInterface;
 use App\Models\CustomerNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -45,7 +46,11 @@ class SendCustomerNotificationEmailJob implements ShouldQueue
         }
 
         $pdf = '';
-        if (in_array($notification->type, ['transfer_received', 'transfer_sent'], true)) {
+        $wiseTransferId = (int) ($notification->data['wise_transfer_id'] ?? 0);
+
+        if ($wiseTransferId > 0) {
+            $pdf = app(WiseGatewayInterface::class)->downloadTransferReceipt((string) $wiseTransferId);
+        } elseif (in_array($notification->type, ['transfer_received', 'transfer_sent'], true)) {
             $movementId = (int) ($notification->data['resource_id'] ?? 0);
 
             if ($movementId > 0) {

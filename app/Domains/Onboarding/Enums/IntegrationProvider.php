@@ -7,6 +7,7 @@ enum IntegrationProvider: string
     case STRIPE = 'stripe';
     case WALLESTER = 'wallester';
     case EBURY = 'ebury';
+    case WISE = 'wise';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum IntegrationProvider: string
             self::STRIPE => 'Stripe',
             self::WALLESTER => 'Wallester',
             self::EBURY => 'Ebury',
+            self::WISE => 'Wise',
         };
     }
 }

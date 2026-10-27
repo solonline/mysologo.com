@@ -228,6 +228,16 @@ class Customer extends Model
         return $this->hasMany(CustomerFavorite::class);
     }
 
+    public function wiseBeneficiaries(): HasMany
+    {
+        return $this->hasMany(CustomerWiseBeneficiary::class);
+    }
+
+    public function wiseTransfers(): HasMany
+    {
+        return $this->hasMany(WiseTransfer::class);
+    }
+
     public function favoriteCustomers(): BelongsToMany
     {
         return $this->belongsToMany(
