@@ -38,11 +38,10 @@ class IdentityVerificationService
 
         $vendorData = DiditVendorData::forCustomer($customer->id);
 
+        // Sem redirect Didit: o frontend fecha o iframe via poll/webhook.
         $sessionData = [
             'workflow_id' => $workflowId,
             'vendor_data' => $vendorData,
-            'callback' => config('app.url_frontend').'/verification-pending',
-            'callback_method' => 'initiator',
             'language' => $customer->language ?? 'en',
         ];
 
@@ -57,7 +56,7 @@ class IdentityVerificationService
                     'workflow_id' => $body['workflow_id'] ?? $workflowId,
                     'session_url' => $body['url'] ?? null,
                     'status' => $body['status'] ?? 'pending',
-                    'callback' => $sessionData['callback'],
+                    'callback' => null,
                     'metadata' => $this->buildSessionMetadata($body, $vendorData),
                 ]
             );
