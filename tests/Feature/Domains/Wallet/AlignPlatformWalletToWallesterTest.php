@@ -53,7 +53,8 @@ class AlignPlatformWalletToWallesterTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $platform->id,
             'currency' => 'EUR',
-            'available' => 1598,
+            'wallester_allocated' => 1598,
+            'wise_allocated' => 800,
             'pending' => 0,
         ]);
 
@@ -66,10 +67,13 @@ class AlignPlatformWalletToWallesterTest extends TestCase
         $this->artisan('wallet:align-platform-to-wallester')
             ->assertSuccessful();
 
-        $this->assertSame(522, (int) CustomerBalance::query()
+        $balance = CustomerBalance::query()
             ->where('customer_id', $platform->id)
             ->where('currency', 'EUR')
-            ->value('available'));
+            ->first();
+
+        $this->assertSame(522, (int) $balance?->wallester_allocated);
+        $this->assertSame(522, (int) $balance?->wise_allocated);
 
         $this->assertDatabaseHas('ledger_entries', [
             'customer_id' => $platform->id,
@@ -104,7 +108,8 @@ class AlignPlatformWalletToWallesterTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $platform->id,
             'currency' => 'EUR',
-            'available' => 1598,
+            'wallester_allocated' => 1598,
+            'wise_allocated' => 800,
             'pending' => 0,
         ]);
 
@@ -117,9 +122,12 @@ class AlignPlatformWalletToWallesterTest extends TestCase
         $this->artisan('wallet:align-platform-to-wallester', ['--dry-run' => true])
             ->assertSuccessful();
 
-        $this->assertSame(1598, (int) CustomerBalance::query()
+        $balance = CustomerBalance::query()
             ->where('customer_id', $platform->id)
-            ->value('available'));
+            ->first();
+
+        $this->assertSame(1598, (int) $balance?->wallester_allocated);
+        $this->assertSame(800, (int) $balance?->wise_allocated);
 
         $this->assertSame(0, LedgerEntry::query()
             ->where('customer_id', $platform->id)

@@ -28,6 +28,7 @@ class WalletTransactionService
         protected LedgerService $ledgerService,
         protected FundingPartnerMovementService $fundingPartnerMovements,
         protected CustomerFavoriteService $favorites,
+        protected RailMirrorService $railMirror,
     ) {}
 
     public function list(Customer $customer, int $perPage = 15): LengthAwarePaginator
@@ -147,6 +148,16 @@ class WalletTransactionService
                 'credit' => $credit,
             ];
         });
+
+        $this->railMirror->reallocateBetweenCustomers(
+            fromCustomerId: (int) $sender->id,
+            toCustomerId: (int) $recipient->id,
+            currency: $currency,
+            amountCents: $amount,
+            idempotencyKey: 'p2p_wise:'.$movementKey,
+            fromReference: $result['debit'],
+            toReference: $result['credit'],
+        );
 
         if ($favorite) {
             $this->favorites->add($sender, $recipient);

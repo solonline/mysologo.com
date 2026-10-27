@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wallet\Services;
 
+use App\Domains\Wallester\Services\WallesterSettingsService;
 use App\Domains\Wallet\Enums\LedgerEntryType;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
@@ -13,35 +14,40 @@ class AlignPlatformWalletToWallesterService
 {
     public const DESCRIPTION = 'Alinhamento ao saldo Wallester master';
 
+    /** @var list<string> */
+    private const CURRENCIES = ['EUR', 'USD'];
+
     public function __construct(
         protected WallesterMainAccountSyncService $sync,
         protected LedgerService $ledger,
+        protected WallesterSettingsService $settings,
     ) {}
 
     /**
      * @return list<array{
      *     currency: string,
      *     from_cents: int,
+     *     from_wise_cents: int,
      *     to_cents: int,
      *     delta_cents: int,
+     *     wise_delta_cents: int,
      *     applied: bool,
+     *     wise_applied: bool,
      *     synced: bool
      * }>
      */
     public function execute(bool $dryRun = false): array
     {
-        $platform = Customer::query()->where('type', 'platform')->first();
-
-        if (! $platform instanceof Customer) {
-            return [];
-        }
-
         $results = [];
 
-        $accounts = $platform->platformWallesterMainAccounts()->get();
+        foreach (self::CURRENCIES as $currency) {
+            $account = $this->resolveMasterAccount($currency);
 
-        foreach ($accounts as $account) {
-            $results[] = $this->alignAccount($platform, $account, $dryRun);
+            if (! $account instanceof CustomerWallesterAccount) {
+                continue;
+            }
+
+            $results[] = $this->alignAccount($account, $dryRun);
         }
 
         return $results;
@@ -51,33 +57,41 @@ class AlignPlatformWalletToWallesterService
      * @return array{
      *     currency: string,
      *     from_cents: int,
+     *     from_wise_cents: int,
      *     to_cents: int,
      *     delta_cents: int,
+     *     wise_delta_cents: int,
      *     applied: bool,
+     *     wise_applied: bool,
      *     synced: bool
      * }
      */
-    private function alignAccount(Customer $platform, CustomerWallesterAccount $account, bool $dryRun): array
+    private function alignAccount(CustomerWallesterAccount $account, bool $dryRun): array
     {
         $synced = $this->syncAccount($account);
         $account->refresh();
 
+        $customer = $account->customer;
         $currency = strtoupper((string) ($account->funding_currency ?: $account->currency_code ?: 'EUR'));
         $wallesterCents = (int) ($account->available_amount ?? 0);
 
-        $balance = CustomerBalance::query()
-            ->where('customer_id', $platform->id)
-            ->where('currency', $currency)
-            ->first();
+        $balance = $customer instanceof Customer
+            ? CustomerBalance::query()
+                ->where('customer_id', $customer->id)
+                ->where('currency', $currency)
+                ->first()
+            : null;
 
-        $fromCents = (int) ($balance?->available ?? 0);
+        $fromCents = (int) ($balance?->wallester_allocated ?? 0);
+        $fromWiseCents = (int) ($balance?->wise_allocated ?? 0);
         $delta = $wallesterCents - $fromCents;
-
+        $wiseDelta = $wallesterCents - $fromWiseCents;
         $applied = false;
+        $wiseApplied = false;
 
-        if ($delta !== 0 && ! $dryRun) {
+        if ($customer instanceof Customer && $delta !== 0 && ! $dryRun) {
             $this->ledger->record(
-                customerId: (int) $platform->id,
+                customerId: (int) $customer->id,
                 currency: $currency,
                 entryType: $delta > 0 ? LedgerEntryType::MANUAL_CREDIT : LedgerEntryType::MANUAL_DEBIT,
                 amount: abs($delta),
@@ -90,14 +104,42 @@ class AlignPlatformWalletToWallesterService
             $applied = true;
         }
 
+        if ($customer instanceof Customer && $wiseDelta !== 0 && ! $dryRun) {
+            CustomerBalance::query()->updateOrCreate(
+                ['customer_id' => $customer->id, 'currency' => $currency],
+                ['wise_allocated' => $wallesterCents],
+            );
+            $wiseApplied = true;
+        }
+
         return [
             'currency' => $currency,
             'from_cents' => $fromCents,
+            'from_wise_cents' => $fromWiseCents,
             'to_cents' => $wallesterCents,
             'delta_cents' => $delta,
+            'wise_delta_cents' => $wiseDelta,
             'applied' => $applied,
+            'wise_applied' => $wiseApplied,
             'synced' => $synced,
         ];
+    }
+
+    private function resolveMasterAccount(string $currency): ?CustomerWallesterAccount
+    {
+        try {
+            $accountId = $this->settings->platformMasterAccountId($currency);
+        } catch (Throwable) {
+            return null;
+        }
+
+        if ($accountId === '') {
+            return null;
+        }
+
+        return CustomerWallesterAccount::query()
+            ->where('wallester_account_id', $accountId)
+            ->first();
     }
 
     private function syncAccount(CustomerWallesterAccount $account): bool

@@ -57,7 +57,7 @@ class LedgerAvailableBalanceCalculationTest extends TestCase
         $available = (int) CustomerBalance::query()
             ->where('customer_id', $customer->id)
             ->where('currency', 'EUR')
-            ->value('available');
+            ->value('wallester_allocated');
 
         $this->assertSame(72, $available);
         $this->assertSame(72, $ledger->recalculateBalance($customer->id, 'EUR'));
@@ -122,7 +122,7 @@ class LedgerAvailableBalanceCalculationTest extends TestCase
             ->where('customer_id', $customer->id)
             ->where('currency', 'EUR')
             ->firstOrFail();
-        $this->assertSame(500, (int) $balance->available);
+        $this->assertSame(500, (int) $balance->wallester_allocated);
         $this->assertSame(120, (int) $balance->pending);
     }
 

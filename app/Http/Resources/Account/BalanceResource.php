@@ -13,6 +13,7 @@ class BalanceResource extends JsonResource
             'currency'  => $this->resource['currency'],
             'available' => $this->resource['available'],
             'pending'   => $this->resource['pending'],
+            'captive'   => $this->resource['captive'],
         ];
     }
 }

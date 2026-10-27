@@ -64,18 +64,18 @@ class TransactionRepository implements TransactionRepositoryInterface
             ->where('currency', strtoupper($currency))
             ->first();
 
-        return $balance ? (int) $balance->available : 0;
+        return $balance ? (int) $balance->wallester_allocated : 0;
     }
 
     public function adjustBalance(int $customerId, string $currency, int $delta): void
     {
         $balance = CustomerBalance::firstOrCreate(
             ['customer_id' => $customerId, 'currency' => strtoupper($currency)],
-            ['available' => 0, 'pending' => 0],
+            ['wallester_allocated' => 0, 'pending' => 0, 'wise_allocated' => 0],
         );
 
         CustomerBalance::where('id', $balance->id)->update([
-            'available' => DB::raw("available + {$delta}"),
+            'wallester_allocated' => DB::raw("wallester_allocated + {$delta}"),
         ]);
     }
 

@@ -169,7 +169,7 @@ class BackfillFxPlatformFeeAccountLedgerService
             ->where('currency', $currency)
             ->first();
 
-        $from = (int) ($balance?->available ?? 0);
+        $from = (int) ($balance?->wallester_allocated ?? 0);
         $fromAfterBackfill = $from + $projectedDeltaCents;
         $delta = $target - $fromAfterBackfill;
 

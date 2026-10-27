@@ -22,10 +22,13 @@ use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
 use App\Models\FundingPartnerMovement;
 use App\Models\LedgerEntry;
+use App\Models\RailMirrorEvent;
 use App\Models\StripeTransaction;
+use App\Models\WiseTransfer;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -411,44 +414,50 @@ class FundingPartnerMovementService
         $recorded = (int) (clone $query)->sum('amount');
         $delta = $amountCents - $recorded;
 
-        if ($delta <= 0) {
-            return;
+        if ($delta > 0) {
+            $existing = (clone $query)->first();
+
+            if ($existing instanceof LedgerEntry) {
+                DB::transaction(function () use ($existing, $delta, $amountCents, $account, $feeMovement): void {
+                    $balance = CustomerBalance::query()
+                        ->lockForUpdate()
+                        ->where('customer_id', $account->customer_id)
+                        ->where('currency', strtoupper((string) $feeMovement->currency))
+                        ->first();
+
+                    $existing->update([
+                        'amount' => $amountCents,
+                        'available_after' => (int) $existing->available_after + $delta,
+                        'balance_after' => (int) $existing->balance_after + $delta,
+                    ]);
+
+                    $balance?->increment('wallester_allocated', $delta);
+                });
+            } else {
+                $this->ledger->record(
+                    customerId: (int) $account->customer_id,
+                    currency: (string) $feeMovement->currency,
+                    entryType: LedgerEntryType::PAYMENT_REFUND,
+                    amount: $amountCents,
+                    reference: $refund,
+                    description: 'Câmbio',
+                    metadata: [
+                        'fx_reversal' => true,
+                        'fee_movement_id' => $feeMovement->id,
+                        'partner_external_id' => $refund->partner_external_id,
+                    ],
+                );
+            }
         }
 
-        $existing = (clone $query)->first();
-
-        if ($existing instanceof LedgerEntry) {
-            DB::transaction(function () use ($existing, $delta, $amountCents, $account, $feeMovement): void {
-                $balance = CustomerBalance::query()
-                    ->lockForUpdate()
-                    ->where('customer_id', $account->customer_id)
-                    ->where('currency', strtoupper((string) $feeMovement->currency))
-                    ->first();
-
-                $existing->update([
-                    'amount' => $amountCents,
-                    'available_after' => (int) $existing->available_after + $delta,
-                    'balance_after' => (int) $existing->balance_after + $delta,
-                ]);
-
-                $balance?->increment('available', $delta);
-            });
-
-            return;
-        }
-
-        $this->ledger->record(
+        $this->mirrorWiseFxAllocation(
+            reference: $refund,
             customerId: (int) $account->customer_id,
             currency: (string) $feeMovement->currency,
-            entryType: LedgerEntryType::PAYMENT_REFUND,
-            amount: $amountCents,
-            reference: $refund,
-            description: 'Câmbio',
-            metadata: [
-                'fx_reversal' => true,
-                'fee_movement_id' => $feeMovement->id,
-                'partner_external_id' => $refund->partner_external_id,
-            ],
+            targetCents: max($amountCents, $recorded),
+            direction: 'credit',
+            reason: 'fx_fee_reversal',
+            idempotencyPrefix: 'fx_wise_reversal:'.$refund->id,
         );
     }
 
@@ -851,6 +860,133 @@ class FundingPartnerMovementService
         });
     }
 
+    public function findCardMovementByPartnerExternalId(
+        CustomerWallesterAccount $account,
+        string $partnerExternalId,
+    ): ?FundingPartnerMovement {
+        if ($partnerExternalId === '') {
+            return null;
+        }
+
+        $movement = FundingPartnerMovement::query()
+            ->where('funding_account_type', $account::class)
+            ->where('funding_account_id', $account->id)
+            ->where('partner_external_id', $partnerExternalId)
+            ->first();
+
+        return $movement instanceof FundingPartnerMovement ? $movement : null;
+    }
+
+    public function recastAsAtmWithdrawal(FundingPartnerMovement $movement): FundingPartnerMovement
+    {
+        if ($movement->type === FundingPartnerMovementType::CardWithdrawal) {
+            return $movement;
+        }
+
+        if ($movement->type !== FundingPartnerMovementType::CardPurchase) {
+            return $movement;
+        }
+
+        $movement->update(['type' => FundingPartnerMovementType::CardWithdrawal]);
+
+        LedgerEntry::query()
+            ->where('reference_type', $movement->getMorphClass())
+            ->where('reference_id', $movement->id)
+            ->where('entry_type', LedgerEntryType::CARD_PURCHASE)
+            ->update(['entry_type' => LedgerEntryType::CARD_WITHDRAWAL]);
+
+        return $movement->fresh();
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $metadata
+     */
+    public function recordAtmWithdrawalFee(
+        ?FundingPartnerMovement $withdrawal,
+        CustomerWallesterAccount $account,
+        int $amountCents,
+        string $currency,
+        string $authorizationId,
+        ?string $feePartnerExternalId = null,
+        FundingPartnerMovementSource $source = FundingPartnerMovementSource::Webhook,
+        ?CustomerWallesterCard $card = null,
+        ?array $metadata = null,
+    ): ?FundingPartnerMovement {
+        if ($amountCents <= 0 || $authorizationId === '') {
+            return null;
+        }
+
+        return DB::transaction(function () use (
+            $withdrawal,
+            $account,
+            $amountCents,
+            $currency,
+            $authorizationId,
+            $feePartnerExternalId,
+            $source,
+            $card,
+            $metadata,
+        ): FundingPartnerMovement {
+            $existing = FundingPartnerMovement::query()
+                ->whereIn('idempotency_key', [
+                    'atm-fee:'.$authorizationId,
+                    'fx-fees:'.$authorizationId,
+                ])
+                ->first();
+
+            $description = 'Taxa de saque';
+            $cardId = $card?->id ?? $withdrawal?->customer_wallester_card_id;
+            $storedMetadata = is_array($metadata) ? $metadata : [];
+
+            if ($feePartnerExternalId !== null && $feePartnerExternalId !== '') {
+                $storedMetadata['atm_withdrawal_fee_id'] = $feePartnerExternalId;
+            }
+
+            if ($existing instanceof FundingPartnerMovement) {
+                $currentMetadata = is_array($existing->metadata) ? $existing->metadata : [];
+
+                $existing->update([
+                    'type' => FundingPartnerMovementType::CardWithdrawalFee,
+                    'amount' => $amountCents,
+                    'currency' => strtoupper($currency),
+                    'description' => $description,
+                    'status' => FundingPartnerMovementStatus::Completed,
+                    'customer_wallester_card_id' => $cardId,
+                    'reference_type' => $withdrawal?->getMorphClass(),
+                    'reference_id' => $withdrawal?->id,
+                    'metadata' => array_merge($currentMetadata, $storedMetadata),
+                ]);
+
+                $movement = $existing->fresh();
+            } else {
+                $movement = FundingPartnerMovement::query()->create([
+                    'provider' => IntegrationProvider::WALLESTER,
+                    'funding_account_type' => $account::class,
+                    'funding_account_id' => $account->id,
+                    'external_account_id' => $account->wallester_account_id,
+                    'direction' => FundingPartnerMovementDirection::Out,
+                    'type' => FundingPartnerMovementType::CardWithdrawalFee,
+                    'amount' => $amountCents,
+                    'currency' => strtoupper($currency),
+                    'customer_wallester_card_id' => $cardId,
+                    'partner_external_id' => $feePartnerExternalId ?: 'atm-fee:'.$authorizationId,
+                    'status' => FundingPartnerMovementStatus::Completed,
+                    'source' => $source,
+                    'idempotency_key' => 'atm-fee:'.$authorizationId,
+                    'description' => $description,
+                    'reference_type' => $withdrawal?->getMorphClass(),
+                    'reference_id' => $withdrawal?->id,
+                    'metadata' => $storedMetadata === [] ? null : $storedMetadata,
+                ]);
+            }
+
+            $this->relabelAtmWithdrawalFeeLedger($movement);
+            $this->applyAtmWithdrawalFeeLedger($movement, $account, $amountCents);
+
+            return $movement->fresh();
+        });
+    }
+
     /**
      * Recovery: grava o par out/in de taxa Yoop→subconta já liquidado na Wallester,
      * sem nova transferência e sem ledger.
@@ -1089,6 +1225,7 @@ class FundingPartnerMovementService
     ): void {
         $entryType = match ($movement->type) {
             FundingPartnerMovementType::CardPurchase => LedgerEntryType::CARD_PURCHASE,
+            FundingPartnerMovementType::CardWithdrawal => LedgerEntryType::CARD_WITHDRAWAL,
             FundingPartnerMovementType::CardRefund => LedgerEntryType::CARD_UNLOAD,
             default => null,
         };
@@ -1103,21 +1240,136 @@ class FundingPartnerMovementService
             ->where('entry_type', $entryType)
             ->exists();
 
-        if ($alreadyRecorded) {
+        if (! $alreadyRecorded) {
+            $this->ledger->record(
+                customerId: (int) $account->customer_id,
+                currency: (string) $movement->currency,
+                entryType: $entryType,
+                amount: (int) $movement->amount,
+                reference: $movement,
+                description: $movement->description,
+                metadata: [
+                    'partner_external_id' => $movement->partner_external_id,
+                    'customer_wallester_card_id' => $movement->customer_wallester_card_id,
+                ],
+            );
+        }
+
+        $this->mirrorWiseAllocationForCardMovement($movement, $account, $entryType);
+    }
+
+    private function mirrorWiseAllocationForCardMovement(
+        FundingPartnerMovement $movement,
+        CustomerWallesterAccount $account,
+        LedgerEntryType $entryType,
+    ): void {
+        $amountCents = (int) $movement->amount;
+
+        if ($amountCents <= 0) {
             return;
         }
 
-        $this->ledger->record(
+        try {
+            $railMirror = app(RailMirrorService::class);
+            $idempotencyKey = 'card_wise:'.$movement->id;
+
+            if ($entryType === LedgerEntryType::CARD_PURCHASE || $entryType === LedgerEntryType::CARD_WITHDRAWAL) {
+                $railMirror->debitAllocation(
+                    customerId: (int) $account->customer_id,
+                    currency: (string) $movement->currency,
+                    amountCents: $amountCents,
+                    idempotencyKey: $idempotencyKey,
+                    reason: $entryType === LedgerEntryType::CARD_WITHDRAWAL ? 'card_withdrawal' : 'card_purchase',
+                    reference: $movement,
+                    allowNegative: true,
+                );
+
+                return;
+            }
+
+            if ($entryType === LedgerEntryType::CARD_UNLOAD) {
+                $railMirror->creditAllocation(
+                    customerId: (int) $account->customer_id,
+                    currency: (string) $movement->currency,
+                    amountCents: $amountCents,
+                    idempotencyKey: $idempotencyKey,
+                    reason: 'card_refund',
+                    reference: $movement,
+                );
+            }
+        } catch (Throwable $exception) {
+            Log::channel('wallester')->warning('wise_allocation_card_mirror_failed', [
+                'movement_id' => $movement->id,
+                'customer_id' => $account->customer_id,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function relabelAtmWithdrawalFeeLedger(FundingPartnerMovement $movement): void
+    {
+        LedgerEntry::query()
+            ->where('reference_type', $movement->getMorphClass())
+            ->where('reference_id', $movement->id)
+            ->where('entry_type', LedgerEntryType::PLATFORM_FEE)
+            ->update([
+                'entry_type' => LedgerEntryType::CARD_WITHDRAWAL_FEE,
+                'description' => 'Taxa de saque',
+            ]);
+    }
+
+    private function applyAtmWithdrawalFeeLedger(
+        FundingPartnerMovement $movement,
+        CustomerWallesterAccount $account,
+        int $amountCents,
+    ): void {
+        if ($movement->status !== FundingPartnerMovementStatus::Completed || $amountCents <= 0) {
+            return;
+        }
+
+        $recorded = (int) LedgerEntry::query()
+            ->where('reference_type', $movement->getMorphClass())
+            ->where('reference_id', $movement->id)
+            ->where('entry_type', LedgerEntryType::CARD_WITHDRAWAL_FEE)
+            ->sum('amount');
+
+        $delta = $amountCents - $recorded;
+
+        if ($delta > 0) {
+            $this->ledger->record(
+                customerId: (int) $account->customer_id,
+                currency: (string) $movement->currency,
+                entryType: LedgerEntryType::CARD_WITHDRAWAL_FEE,
+                amount: $delta,
+                reference: $movement,
+                description: 'Taxa de saque',
+                metadata: [
+                    'partner_external_id' => $movement->partner_external_id,
+                    'withdrawal_reference_id' => $movement->reference_id,
+                ],
+            );
+        }
+
+        $mirrored = (int) RailMirrorEvent::query()
+            ->where('reference_type', $movement->getMorphClass())
+            ->where('reference_id', $movement->id)
+            ->where('direction', 'debit')
+            ->sum('amount');
+
+        $wiseDelta = $amountCents - $mirrored;
+
+        if ($wiseDelta <= 0 || $account->customer_id === null) {
+            return;
+        }
+
+        app(RailMirrorService::class)->debitAllocation(
             customerId: (int) $account->customer_id,
             currency: (string) $movement->currency,
-            entryType: $entryType,
-            amount: (int) $movement->amount,
+            amountCents: $wiseDelta,
+            idempotencyKey: 'atm_wise:'.$movement->id.':'.$amountCents,
+            reason: 'atm_withdrawal_fee',
             reference: $movement,
-            description: $movement->description,
-            metadata: [
-                'partner_external_id' => $movement->partner_external_id,
-                'customer_wallester_card_id' => $movement->customer_wallester_card_id,
-            ],
+            allowNegative: true,
         );
     }
 
@@ -1138,22 +1390,96 @@ class FundingPartnerMovementService
 
         $delta = $target - $recorded;
 
-        if ($delta <= 0) {
+        if ($delta > 0) {
+            $this->ledger->record(
+                customerId: (int) $account->customer_id,
+                currency: (string) $movement->currency,
+                entryType: LedgerEntryType::PLATFORM_FEE,
+                amount: $delta,
+                reference: $movement,
+                description: $movement->description ?? 'Câmbio',
+                metadata: [
+                    'partner_external_id' => $movement->partner_external_id,
+                    'purchase_reference_id' => $movement->reference_id,
+                ],
+            );
+        }
+
+        $this->mirrorWiseFxAllocation(
+            reference: $movement,
+            customerId: (int) $account->customer_id,
+            currency: (string) $movement->currency,
+            targetCents: $target,
+            direction: 'debit',
+            reason: 'fx_fee',
+            idempotencyPrefix: 'fx_wise:'.$movement->id,
+        );
+    }
+
+    /**
+     * Espelha em wise_allocated o mesmo delta já lançado em wallester_allocated.
+     * A chave inclui o alvo acumulado para um reprocessamento não debitar outra vez.
+     */
+    private function mirrorWiseFxAllocation(
+        FundingPartnerMovement $reference,
+        int $customerId,
+        string $currency,
+        int $targetCents,
+        string $direction,
+        string $reason,
+        string $idempotencyPrefix,
+    ): void {
+        if ($targetCents <= 0 || $customerId <= 0) {
             return;
         }
 
-        $this->ledger->record(
-            customerId: (int) $account->customer_id,
-            currency: (string) $movement->currency,
-            entryType: LedgerEntryType::PLATFORM_FEE,
-            amount: $delta,
-            reference: $movement,
-            description: $movement->description ?? 'Câmbio',
-            metadata: [
-                'partner_external_id' => $movement->partner_external_id,
-                'purchase_reference_id' => $movement->reference_id,
-            ],
-        );
+        try {
+            $mirrored = (int) RailMirrorEvent::query()
+                ->where('reference_type', $reference->getMorphClass())
+                ->where('reference_id', $reference->id)
+                ->where('reason', $reason)
+                ->where('direction', $direction)
+                ->sum('amount');
+
+            $delta = $targetCents - $mirrored;
+
+            if ($delta <= 0) {
+                return;
+            }
+
+            $railMirror = app(RailMirrorService::class);
+            $idempotencyKey = $idempotencyPrefix.':'.$targetCents;
+
+            if ($direction === 'debit') {
+                $railMirror->debitAllocation(
+                    customerId: $customerId,
+                    currency: $currency,
+                    amountCents: $delta,
+                    idempotencyKey: $idempotencyKey,
+                    reason: $reason,
+                    reference: $reference,
+                    allowNegative: true,
+                );
+
+                return;
+            }
+
+            $railMirror->creditAllocation(
+                customerId: $customerId,
+                currency: $currency,
+                amountCents: $delta,
+                idempotencyKey: $idempotencyKey,
+                reason: $reason,
+                reference: $reference,
+            );
+        } catch (Throwable $exception) {
+            Log::channel('wallester')->warning('wise_allocation_fx_mirror_failed', [
+                'movement_id' => $reference->id,
+                'customer_id' => $customerId,
+                'reason' => $reason,
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -1184,7 +1510,11 @@ class FundingPartnerMovementService
 
     public function listForFundingAccount(Model $fundingAccount, int $perPage = 15): LengthAwarePaginator
     {
-        return FundingPartnerMovement::query()
+        if ($fundingAccount instanceof CustomerWallesterAccount) {
+            $this->syncPendingWiseMirrors($fundingAccount);
+        }
+
+        $page = FundingPartnerMovement::query()
             ->customerVisible()
             ->where('funding_account_type', $fundingAccount::class)
             ->where('funding_account_id', $fundingAccount->id)
@@ -1192,6 +1522,63 @@ class FundingPartnerMovementService
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate($perPage);
+
+        FundingPartnerMovement::hydrateWiseTransfers($page->getCollection());
+
+        return $page;
+    }
+
+    /**
+     * Envios Wise ainda sem espelho (ex. incoming_payment_waiting) passam a ter
+     * a linha :out pendente, para o extrato os mostrar antes do débito Wallester.
+     */
+    public function syncPendingWiseMirrors(CustomerWallesterAccount $account): void
+    {
+        $currency = strtoupper((string) ($account->funding_currency ?: 'EUR'));
+
+        $transfers = WiseTransfer::query()
+            ->where('customer_id', $account->customer_id)
+            ->whereRaw('UPPER(currency) = ?', [$currency])
+            ->get();
+
+        foreach ($transfers as $transfer) {
+            $this->recordPendingWiseMirror($account, $transfer);
+        }
+    }
+
+    public function recordPendingWiseMirror(CustomerWallesterAccount $account, WiseTransfer $transfer): FundingPartnerMovement
+    {
+        $key = 'wise_mirror:'.$transfer->idempotency_key.':out';
+        $existing = FundingPartnerMovement::query()->where('idempotency_key', $key)->first();
+
+        if ($existing instanceof FundingPartnerMovement) {
+            return $existing;
+        }
+
+        $movement = $this->createMovement(
+            provider: IntegrationProvider::WALLESTER,
+            fundingAccount: $account,
+            externalAccountId: (string) $account->wallester_account_id,
+            direction: FundingPartnerMovementDirection::Out,
+            type: FundingPartnerMovementType::AccountTransfer,
+            amountCents: (int) $transfer->amount_cents,
+            currency: strtoupper((string) $transfer->currency),
+            transferGroupId: (string) Str::uuid(),
+            counterpartyExternalAccountId: null,
+            status: FundingPartnerMovementStatus::Pending,
+            source: FundingPartnerMovementSource::Api,
+            idempotencyKey: $key,
+            description: 'Wise transfer mirror #'.$transfer->wise_transfer_id,
+            reference: $transfer,
+        );
+
+        if ($transfer->created_at !== null) {
+            $movement->timestamps = false;
+            $movement->created_at = $transfer->created_at;
+            $movement->save();
+        }
+
+        return $movement;
     }
 
     public function hasCompletedMovement(string $idempotencyKey): bool
@@ -1500,7 +1887,11 @@ class FundingPartnerMovementService
             return [$outMovement->fresh(), $inMovement->fresh()];
         }
 
-        $transferGroupId = (string) ($inMovement?->transfer_group_id ?: Str::uuid());
+        $transferGroupId = (string) ($outMovement?->transfer_group_id ?: $inMovement?->transfer_group_id ?: Str::uuid());
+
+        if ($outMovement instanceof FundingPartnerMovement && (string) $outMovement->transfer_group_id === '') {
+            $outMovement->update(['transfer_group_id' => $transferGroupId]);
+        }
 
         if (! $outMovement instanceof FundingPartnerMovement) {
             $outMovement = $this->createMovement(

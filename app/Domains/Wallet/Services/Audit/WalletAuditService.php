@@ -10,6 +10,7 @@ use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Domains\Wallet\Enums\TransactionDirection;
 use App\Domains\Wallet\Enums\TransactionType;
 use App\Domains\Wallet\Services\LedgerService;
+use App\Domains\Wise\Contracts\WiseGatewayInterface;
 use App\Models\CustomerBalance;
 use App\Models\CustomerWallesterAccount;
 use App\Models\FundingPartnerMovement;
@@ -18,6 +19,7 @@ use App\Models\StripePaymentMethodFee;
 use App\Models\StripeTransaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Throwable;
 
 class WalletAuditService
 {
@@ -25,6 +27,7 @@ class WalletAuditService
 
     public function __construct(
         protected LedgerService $ledgerService,
+        protected WiseGatewayInterface $wiseGateway,
     ) {}
 
     public function run(
@@ -44,6 +47,9 @@ class WalletAuditService
             ...$this->checkTopupWallesterMovements($from, $to, $customerId, $currency),
             ...$this->checkMissingWallesterTopups($from, $to, $customerId, $currency),
             ...$this->checkPartnerFundingStatuses($from, $to, $customerId, $currency),
+            ...$this->checkWiseAllocationMatchesLedger($customerId, $currency),
+            ...$this->checkWallesterMirrorVsWiseAllocation($customerId, $currency),
+            ...$this->checkWiseMasterVsAllocations($currency),
         ];
 
         return new AuditReport($from, $to, $customerId, $currency, $findings);
@@ -276,7 +282,7 @@ class WalletAuditService
                 ->where('currency', $currencyValue)
                 ->first();
 
-            $available = (int) ($balance?->available ?? 0);
+            $available = (int) ($balance?->wallester_allocated ?? 0);
             $pending = (int) ($balance?->pending ?? 0);
 
             $ledgerEntryCount = LedgerEntry::query()
@@ -294,7 +300,7 @@ class WalletAuditService
                     context: [
                         'customer_id' => $customerIdValue,
                         'currency' => $currencyValue,
-                        'available' => $available,
+                        'wallester_allocated' => $available,
                         'pending' => $pending,
                         'expected_from_settled_transactions' => $expectedFromSettledTx,
                     ],
@@ -319,7 +325,7 @@ class WalletAuditService
                     context: [
                         'customer_id' => $customerIdValue,
                         'currency' => $currencyValue,
-                        'available' => $available,
+                        'wallester_allocated' => $available,
                         'pending' => $pending,
                         'uncredited_net_total' => $uncreditedNet,
                     ],
@@ -363,7 +369,7 @@ class WalletAuditService
                     'customer_id' => $balance->customer_id,
                     'currency' => strtoupper($balance->currency),
                     'pending' => (int) $balance->pending,
-                    'available' => (int) $balance->available,
+                    'wallester_allocated' => (int) $balance->wallester_allocated,
                     'explained_pending' => $explainedPending,
                 ],
             );
@@ -429,16 +435,167 @@ class WalletAuditService
                 $findings[] = new AuditFinding(
                     severity: 'critical',
                     code: 'LEDGER_BALANCE_MISMATCH',
-                    message: 'customer_balances.available does not match ledger sum.',
+                    message: 'customer_balances.wallester_allocated does not match ledger sum.',
                     context: [
                         'customer_id' => $balance->customer_id,
                         'currency' => strtoupper($balance->currency),
-                        'available' => (int) $balance->available,
+                        'wallester_allocated' => (int) $balance->wallester_allocated,
                         'ledger_available' => $fromLedger,
                     ],
                 );
             }
         });
+
+        return $findings;
+    }
+
+    /** @return list<AuditFinding> */
+    private function checkWiseAllocationMatchesLedger(?int $customerId, ?string $currency): array
+    {
+        $findings = [];
+
+        $query = CustomerBalance::query();
+
+        if ($customerId !== null) {
+            $query->where('customer_id', $customerId);
+        }
+
+        if ($currency !== null) {
+            $query->where('currency', strtoupper($currency));
+        }
+
+        $query->each(function (CustomerBalance $balance) use (&$findings): void {
+            $wallesterAllocated = (int) $balance->wallester_allocated;
+            $allocated = (int) $balance->wise_allocated;
+
+            if ($wallesterAllocated !== $allocated) {
+                $findings[] = new AuditFinding(
+                    severity: 'critical',
+                    code: 'WISE_ALLOCATION_LEDGER_MISMATCH',
+                    message: 'customer_balances.wise_allocated does not match wallester_allocated.',
+                    context: [
+                        'customer_id' => $balance->customer_id,
+                        'currency' => strtoupper((string) $balance->currency),
+                        'wallester_allocated' => $wallesterAllocated,
+                        'wise_allocated' => $allocated,
+                    ],
+                );
+            }
+        });
+
+        return $findings;
+    }
+
+    /** @return list<AuditFinding> */
+    private function checkWallesterMirrorVsWiseAllocation(?int $customerId, ?string $currency): array
+    {
+        $findings = [];
+
+        $query = CustomerWallesterAccount::query()
+            ->whereNotNull('wallester_account_id');
+
+        if ($customerId !== null) {
+            $query->where('customer_id', $customerId);
+        }
+
+        if ($currency !== null) {
+            $query->where(function (Builder $builder) use ($currency): void {
+                $code = strtoupper($currency);
+                $builder->where('funding_currency', $code)
+                    ->orWhere('currency_code', $code);
+            });
+        }
+
+        $query->each(function (CustomerWallesterAccount $account) use (&$findings): void {
+            $currencyCode = strtoupper((string) ($account->funding_currency ?: $account->currency_code ?: 'EUR'));
+            $wallesterCents = (int) ($account->available_amount ?? 0);
+
+            $allocated = (int) (CustomerBalance::query()
+                ->where('customer_id', $account->customer_id)
+                ->where('currency', $currencyCode)
+                ->value('wise_allocated') ?? 0);
+
+            if ($wallesterCents !== $allocated) {
+                $findings[] = new AuditFinding(
+                    severity: 'warning',
+                    code: 'WALLESTER_WISE_ALLOCATION_MISMATCH',
+                    message: 'Wallester available_amount does not match wise_allocated for customer.',
+                    context: [
+                        'customer_id' => $account->customer_id,
+                        'currency' => $currencyCode,
+                        'wallester_available_cents' => $wallesterCents,
+                        'wise_allocated' => $allocated,
+                        'wallester_account_id' => $account->wallester_account_id,
+                    ],
+                );
+            }
+        });
+
+        return $findings;
+    }
+
+    /** @return list<AuditFinding> */
+    private function checkWiseMasterVsAllocations(?string $currency): array
+    {
+        $findings = [];
+
+        try {
+            $balances = $this->wiseGateway->listBalances();
+        } catch (Throwable $exception) {
+            $findings[] = new AuditFinding(
+                severity: 'warning',
+                code: 'WISE_MASTER_BALANCE_UNAVAILABLE',
+                message: 'Could not fetch Wise master balances for allocation reconciliation.',
+                context: [
+                    'error' => $exception->getMessage(),
+                ],
+            );
+
+            return $findings;
+        }
+
+        $currencies = $currency !== null
+            ? [strtoupper($currency)]
+            : collect($balances)
+                ->pluck('currency')
+                ->filter()
+                ->map(fn ($code) => strtoupper((string) $code))
+                ->unique()
+                ->values()
+                ->all();
+
+        foreach ($currencies as $code) {
+            $master = collect($balances)->first(
+                fn (array $balance): bool => strtoupper((string) ($balance['currency'] ?? '')) === $code
+                    && ($balance['type'] ?? 'STANDARD') === 'STANDARD'
+            );
+
+            if ($master === null) {
+                continue;
+            }
+
+            $amount = $master['amount'] ?? 0;
+            $masterCents = is_array($amount)
+                ? (int) round(((float) ($amount['value'] ?? 0)) * 100)
+                : (int) round(((float) $amount) * 100);
+            $allocatedSum = (int) CustomerBalance::query()
+                ->where('currency', $code)
+                ->sum('wise_allocated');
+
+            if ($masterCents < $allocatedSum) {
+                $findings[] = new AuditFinding(
+                    severity: 'critical',
+                    code: 'WISE_MASTER_BELOW_ALLOCATIONS',
+                    message: 'Wise master STANDARD balance is below the sum of customer wise_allocated.',
+                    context: [
+                        'currency' => $code,
+                        'wise_master_cents' => $masterCents,
+                        'wise_allocated_sum' => $allocatedSum,
+                        'shortfall_cents' => $allocatedSum - $masterCents,
+                    ],
+                );
+            }
+        }
 
         return $findings;
     }

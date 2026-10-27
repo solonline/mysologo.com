@@ -45,7 +45,7 @@ class WalletAuditCommandTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 0,
+            'wallester_allocated' => 0,
             'pending' => 4_731,
         ]);
 
@@ -147,7 +147,7 @@ class WalletAuditCommandTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 1_850,
+            'wallester_allocated' => 1_850,
             'pending' => 0,
         ]);
 

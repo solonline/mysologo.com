@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use App\Domains\Onboarding\Enums\IntegrationProvider;
+use App\Domains\Wallet\Enums\CustomerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Domains\Wallet\Enums\FundingPartnerMovementSource;
 use App\Domains\Wallet\Enums\FundingPartnerMovementStatus;
 use App\Domains\Wallet\Enums\FundingPartnerMovementType;
+use App\Domains\Wise\Enums\WiseTransferStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -130,6 +133,118 @@ class FundingPartnerMovement extends Model
         return $key !== '' && str_starts_with($key, 'p2p:');
     }
 
+    public function isWiseMirror(): bool
+    {
+        $key = (string) $this->idempotency_key;
+
+        return $key !== '' && str_starts_with($key, 'wise_mirror:');
+    }
+
+    public function wiseTransferIdempotencyKey(): ?string
+    {
+        if (! $this->isWiseMirror()) {
+            return null;
+        }
+
+        $key = substr((string) $this->idempotency_key, strlen('wise_mirror:'));
+
+        foreach ([':out', ':in'] as $suffix) {
+            if (str_ends_with($key, $suffix)) {
+                return substr($key, 0, -strlen($suffix));
+            }
+        }
+
+        return $key !== '' ? $key : null;
+    }
+
+    public function wiseTransfer(): ?WiseTransfer
+    {
+        if ($this->relationLoaded('wiseTransfer')) {
+            $related = $this->getRelation('wiseTransfer');
+
+            return $related instanceof WiseTransfer ? $related : null;
+        }
+
+        $key = $this->wiseTransferIdempotencyKey();
+
+        if ($key === null) {
+            return null;
+        }
+
+        $transfer = WiseTransfer::query()->where('idempotency_key', $key)->first();
+        $this->setRelation('wiseTransfer', $transfer);
+
+        return $transfer;
+    }
+
+    public function customerMovementStatus(): CustomerMovementStatus
+    {
+        $wiseStatus = $this->isWiseMirror() ? $this->wiseTransfer()?->status : null;
+
+        if ($wiseStatus instanceof WiseTransferStatus) {
+            return $wiseStatus->customerStatus();
+        }
+
+        return match ($this->status) {
+            FundingPartnerMovementStatus::Pending => CustomerMovementStatus::Pending,
+            FundingPartnerMovementStatus::Completed => CustomerMovementStatus::Completed,
+            FundingPartnerMovementStatus::Failed => CustomerMovementStatus::Failed,
+            FundingPartnerMovementStatus::Canceled => CustomerMovementStatus::Canceled,
+            default => CustomerMovementStatus::Unknown,
+        };
+    }
+
+    public function customerFacingStatus(): string
+    {
+        return $this->customerMovementStatus()->value;
+    }
+
+    public function customerFacingStatusLabel(): string
+    {
+        $wiseStatus = $this->isWiseMirror() ? $this->wiseTransfer()?->status : null;
+
+        if ($wiseStatus instanceof WiseTransferStatus) {
+            return $wiseStatus->label();
+        }
+
+        return $this->customerMovementStatus()->label();
+    }
+
+    /**
+     * @param  Collection<int, self>  $movements
+     */
+    public static function hydrateWiseTransfers(Collection $movements): void
+    {
+        $keys = [];
+
+        foreach ($movements as $movement) {
+            $key = $movement->wiseTransferIdempotencyKey();
+
+            if ($key !== null) {
+                $keys[$key] = $key;
+            }
+        }
+
+        if ($keys === []) {
+            return;
+        }
+
+        $transfers = WiseTransfer::query()
+            ->whereIn('idempotency_key', array_values($keys))
+            ->get()
+            ->keyBy('idempotency_key');
+
+        foreach ($movements as $movement) {
+            $key = $movement->wiseTransferIdempotencyKey();
+
+            if ($key === null) {
+                continue;
+            }
+
+            $movement->setRelation('wiseTransfer', $transfers->get($key));
+        }
+    }
+
     public function isPlatformBalanceAdjustment(): bool
     {
         $key = (string) $this->idempotency_key;
@@ -153,6 +268,8 @@ class FundingPartnerMovement extends Model
     /**
      * Débito fx-platform no cliente retail duplica a linha Câmbio.
      * O débito physical-card-platform-fee duplica a taxa de emissão (o customer vê só o total).
+     * O crédito stripe_topup duplica o carregamento Stripe: o cliente vê a entrada bruta,
+     * o disponível e as taxas nessa transação.
      * O crédito na master/subconta (:in) deve aparecer na conta plataforma.
      *
      * @param  Builder<self>  $query
@@ -165,13 +282,18 @@ class FundingPartnerMovement extends Model
                 ->orWhere(function ($visible): void {
                     $visible
                         ->where('idempotency_key', 'not like', 'fx-platform:%:out')
-                        ->where('idempotency_key', 'not like', 'physical-card-platform-fee:%:out');
+                        ->where('idempotency_key', 'not like', 'physical-card-platform-fee:%:out')
+                        ->where('idempotency_key', 'not like', 'stripe_topup:%');
                 });
         });
     }
 
     public function displayTypeLabel(): string
     {
+        if ($this->isWiseMirror()) {
+            return 'Transferência Wise';
+        }
+
         if ($this->isP2pTransfer()) {
             return 'Transferência entre contas';
         }
@@ -193,6 +315,8 @@ class FundingPartnerMovement extends Model
         return match ($this->type) {
             FundingPartnerMovementType::AccountTransfer => 'Transferência',
             FundingPartnerMovementType::CardPurchase => 'Compra cartão',
+            FundingPartnerMovementType::CardWithdrawal => 'Saque',
+            FundingPartnerMovementType::CardWithdrawalFee => 'Taxa de saque',
             FundingPartnerMovementType::CardRefund => 'Reembolso cartão',
             FundingPartnerMovementType::InboundPayment => 'Entrada',
             FundingPartnerMovementType::Fee => 'Câmbio',
@@ -204,6 +328,10 @@ class FundingPartnerMovement extends Model
 
     public function displaySourceLabel(): string
     {
+        if ($this->isWiseMirror()) {
+            return 'Wise';
+        }
+
         if ($this->isPlatformBalanceAdjustment()) {
             return $this->direction === FundingPartnerMovementDirection::In
                 ? 'Crédito Yoop'
@@ -215,6 +343,24 @@ class FundingPartnerMovement extends Model
 
     public function displayDescription(): ?string
     {
+        if ($this->isWiseMirror()) {
+            $transfer = $this->wiseTransfer();
+            $beneficiary = trim((string) ($transfer?->beneficiary_name ?? ''));
+            $reference = trim((string) ($transfer?->reference ?? ''));
+
+            if ($beneficiary !== '' && $reference !== '') {
+                return $beneficiary.' · '.$reference;
+            }
+
+            if ($beneficiary !== '') {
+                return $beneficiary;
+            }
+
+            if ($reference !== '') {
+                return $reference;
+            }
+        }
+
         if ($this->isStripePlatformFeeTransfer()) {
             return $this->description ?: 'Taxa Yoop';
         }

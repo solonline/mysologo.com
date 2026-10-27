@@ -141,10 +141,10 @@ class LedgerService
         ) {
             $balance = CustomerBalance::lockForUpdate()->firstOrCreate(
                 ['customer_id' => $customerId, 'currency' => $currency],
-                ['available' => 0, 'pending' => 0],
+                ['wallester_allocated' => 0, 'pending' => 0, 'wise_allocated' => 0],
             );
 
-            $availableBefore = (int) $balance->available;
+            $availableBefore = (int) $balance->wallester_allocated;
             $pendingBefore = (int) $balance->pending;
 
             if ($requirePending !== null && $pendingBefore < $requirePending) {
@@ -176,7 +176,7 @@ class LedgerService
             ]);
 
             $balance->update([
-                'available' => $availableAfter,
+                'wallester_allocated' => $availableAfter,
                 'pending' => $pendingAfter,
             ]);
 
@@ -204,6 +204,15 @@ class LedgerService
             ->exists();
     }
 
+    public function pendingHeldFor(Model $reference): int
+    {
+        return (int) LedgerEntry::query()
+            ->where('reference_type', $reference->getMorphClass())
+            ->where('reference_id', $reference->getKey())
+            ->selectRaw('COALESCE(SUM(pending_after - pending_before), 0) as held')
+            ->value('held');
+    }
+
     public function hasReleasedPartnerFunding(StripeTransaction $transaction): bool
     {
         return LedgerEntry::query()
@@ -229,7 +238,7 @@ class LedgerService
     }
 
     /**
-     * Entries that affect customer_balances.available.
+     * Entries that affect customer_balances.wallester_allocated.
      * Pending-bucket credits/debits only move pending and must be excluded
      * (partner funding later posts a separate PARTNER_FUNDING_RELEASED credit).
      */
@@ -251,7 +260,7 @@ class LedgerService
         $fromLedger = $this->recalculateBalance($customerId, $currency);
         $fromBalance = CustomerBalance::where('customer_id', $customerId)
             ->where('currency', $currency)
-            ->value('available') ?? 0;
+            ->value('wallester_allocated') ?? 0;
 
         return $fromLedger === (int) $fromBalance;
     }

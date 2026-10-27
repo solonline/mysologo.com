@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class CustomerBalance extends Model
 {
@@ -12,8 +12,9 @@ class CustomerBalance extends Model
     protected $fillable = [
         'customer_id',
         'currency',
-        'available',
+        'wallester_allocated',
         'pending',
+        'wise_allocated',
     ];
 
     public function customer()

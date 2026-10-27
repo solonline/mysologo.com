@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Domains\Onboarding\Enums\IntegrationProvider;
 use App\Domains\Wallet\Enums\FundingPartnerMovementDirection;
 use App\Models\FundingPartnerMovement;
 use Illuminate\Http\Request;
@@ -21,7 +22,9 @@ class FundingPartnerMovementResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'provider' => $this->provider?->value,
+            'provider' => $this->isWiseMirror()
+                ? IntegrationProvider::WISE->value
+                : $this->provider?->value,
             'external_account_id' => $this->external_account_id,
             'direction' => $direction?->value,
             'type' => $this->type?->value,
@@ -47,7 +50,8 @@ class FundingPartnerMovementResource extends JsonResource
                 ] : null,
             ),
             'partner_external_id' => $this->partner_external_id,
-            'status' => $this->status?->value,
+            'status' => $this->customerFacingStatus(),
+            'status_label' => $this->customerFacingStatusLabel(),
             'source' => $this->source?->value,
             'description' => $this->displayDescription(),
             'failure_reason' => $this->failure_reason,

@@ -2,6 +2,7 @@
 
 namespace App\Domains\Wallet;
 
+use App\Domains\Wallet\Commands\AlignCustomerWalletsToWallesterCommand;
 use App\Domains\Wallet\Commands\AlignPlatformWalletToWallesterCommand;
 use App\Domains\Wallet\Commands\BackfillFxPlatformFeeAccountLedgerCommand;
 use App\Domains\Wallet\Commands\BackfillStripePlatformFeesToSubMasterCommand;
@@ -20,6 +21,7 @@ use App\Domains\Wallet\Services\FundingPartnerTransferResolver;
 use App\Domains\Wallet\Services\LedgerService;
 use App\Domains\Wallet\Services\PartnerTopupFundingCompleter;
 use App\Domains\Wallet\Services\PlatformRevenueService;
+use App\Domains\Wallet\Services\RailMirrorService;
 use App\Domains\Wallet\Services\SettlementService;
 use App\Domains\Wallet\Services\StripePaymentWalletService;
 use App\Domains\Wallet\Services\StripePayoutSettlementService;
@@ -53,6 +55,7 @@ class WalletServiceProvider extends ServiceProvider
         FundingPartnerTransferResolver::class,
         PlatformRevenueService::class,
         AlignPlatformWalletToWallesterService::class,
+        RailMirrorService::class,
         WalletAuditService::class,
     ];
 
@@ -73,6 +76,7 @@ class WalletServiceProvider extends ServiceProvider
             $this->commands([
                 RunWalletAuditCommand::class,
                 RunPlatformRevenueReportCommand::class,
+                AlignCustomerWalletsToWallesterCommand::class,
                 AlignPlatformWalletToWallesterCommand::class,
                 ReassignPlatformFeesToSubMasterCommand::class,
                 BackfillStripePlatformFeesToSubMasterCommand::class,

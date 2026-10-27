@@ -4,6 +4,7 @@ namespace App\Domains\Wallet\Services;
 
 use App\Models\Customer;
 use App\Models\CustomerBalance;
+use App\Models\WiseTransfer;
 
 class WalletAccountService
 {
@@ -16,6 +17,9 @@ class WalletAccountService
     {
         $stripeAccount = $customer->stripeAccount;
         $wallesterAccount = $customer->wallesterAccount;
+        $spendableCents = $wallesterAccount
+            ? $this->wiseAllocatedCents($customer, $wallesterAccount->funding_currency ?? $wallesterAccount->currency_code)
+            : 0;
 
         return [
             'stripe' => $stripeAccount
@@ -47,8 +51,8 @@ class WalletAccountService
                     'bank_name' => $wallesterAccount->bank_name,
                     'currency_code' => $wallesterAccount->currency_code,
                     'status' => $wallesterAccount->status,
-                    'balance' => $wallesterAccount->balance,
-                    'available_amount' => $wallesterAccount->available_amount,
+                    'balance' => $spendableCents,
+                    'available_amount' => $spendableCents,
                 ]
                 : null,
         ];
@@ -69,15 +73,35 @@ class WalletAccountService
     /** @return list<array<string, mixed>> */
     public function getBalances(Customer $customer, ?string $currency = null): array
     {
+        $captiveByCurrency = WiseTransfer::query()
+            ->where('customer_id', $customer->id)
+            ->whereNull('settled_at')
+            ->whereNull('refunded_at')
+            ->when($currency, fn ($query) => $query->whereRaw('UPPER(currency) = ?', [strtoupper($currency)]))
+            ->selectRaw('UPPER(currency) as currency, SUM(amount_cents) as captive_cents')
+            ->groupByRaw('UPPER(currency)')
+            ->pluck('captive_cents', 'currency');
+
         return CustomerBalance::where('customer_id', $customer->id)
-            ->when($currency, fn ($q) => $q->where('currency', strtolower($currency)))
+            ->when($currency, fn ($q) => $q->whereRaw('UPPER(currency) = ?', [strtoupper($currency)]))
             ->get()
             ->map(fn ($b) => [
                 'currency' => strtoupper($b->currency),
-                'available' => $b->available,
-                'pending' => $b->pending,
+                'available' => (int) $b->wise_allocated,
+                'pending' => (int) $b->pending,
+                'captive' => (int) ($captiveByCurrency[strtoupper($b->currency)] ?? 0),
             ])
             ->values()
             ->toArray();
+    }
+
+    private function wiseAllocatedCents(Customer $customer, ?string $currency): int
+    {
+        $currency = strtoupper((string) ($currency ?: 'EUR'));
+
+        return (int) (CustomerBalance::query()
+            ->where('customer_id', $customer->id)
+            ->whereRaw('UPPER(currency) = ?', [$currency])
+            ->value('wise_allocated') ?? 0);
     }
 }
