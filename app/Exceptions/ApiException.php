@@ -40,7 +40,9 @@ class ApiException extends Exception
                     ]);
                 }
 
-                \Log::channel($channel)->error('ApiException', $logData);
+                if($channel && $channel !== 'authLogin'){
+                    \Log::channel($channel)->error('ApiException', $logData);
+                }
             } catch (\Throwable $e) {
                 // fallback: não interrompe fluxo se canal não existir
             }

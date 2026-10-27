@@ -81,7 +81,8 @@ class AuthService implements AuthServiceInterface
             throw new ApiException(
                 ErrorCode::INVALID_CREDENTIALS,
                 401,
-                'Invalid credentials.'
+                'Invalid credentials.',
+                'authLogin'
             );
         }
 
