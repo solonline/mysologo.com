@@ -446,10 +446,10 @@ class WallesterGateway implements WallesterGatewayInterface
         try {
             $result = $fn();
 
-            Log::channel('wallester')->info("wallester_api: {$operation}", $this->logContext([
-                ...$context,
-                'response' => $result,
-            ]));
+            // Log::channel('wallester')->info("wallester_api: {$operation}", $this->logContext([
+            //     ...$context,
+            //     'response' => $result,
+            // ]));
 
             return $result;
         } catch (RequestException $e) {

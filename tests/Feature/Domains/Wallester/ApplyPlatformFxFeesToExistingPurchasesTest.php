@@ -61,7 +61,7 @@ class ApplyPlatformFxFeesToExistingPurchasesTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 9537,
+            'wallester_allocated' => 9537,
             'pending' => 0,
         ]);
 
@@ -152,7 +152,7 @@ class ApplyPlatformFxFeesToExistingPurchasesTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 9532,
+            'wallester_allocated' => 9532,
         ]);
 
         $this->artisan('wallester:apply-platform-fx-fees')

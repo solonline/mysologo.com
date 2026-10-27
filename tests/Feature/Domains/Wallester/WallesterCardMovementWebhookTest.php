@@ -13,6 +13,7 @@ use App\Models\Customer;
 use App\Models\CustomerBalance;
 use App\Models\CustomerWallesterCard;
 use App\Models\FundingPartnerMovement;
+use App\Models\RailMirrorEvent;
 use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -93,7 +94,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 10000,
+            'wallester_allocated' => 10000,
             'pending' => 0,
         ]);
 
@@ -141,7 +142,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 9910,
+            'wallester_allocated' => 9910,
         ]);
     }
 
@@ -195,7 +196,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 1000,
+            'wallester_allocated' => 1000,
             'pending' => 0,
         ]);
 
@@ -235,7 +236,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 1000,
+            'wallester_allocated' => 1000,
         ]);
     }
 
@@ -247,7 +248,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 5000,
+            'wallester_allocated' => 5000,
             'pending' => 0,
         ]);
 
@@ -267,7 +268,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 4500,
+            'wallester_allocated' => 4500,
         ]);
     }
 
@@ -287,7 +288,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 1000,
+            'wallester_allocated' => 1000,
             'pending' => 0,
         ]);
 
@@ -335,7 +336,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 910,
+            'wallester_allocated' => 910,
         ]);
     }
 
@@ -355,7 +356,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 10000,
+            'wallester_allocated' => 10000,
             'pending' => 0,
         ]);
 
@@ -408,7 +409,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 9537,
+            'wallester_allocated' => 9537,
         ]);
     }
 
@@ -500,7 +501,8 @@ class WallesterCardMovementWebhookTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 10000,
+            'wallester_allocated' => 10000,
+            'wise_allocated' => 10000,
             'pending' => 0,
         ]);
 
@@ -583,8 +585,26 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 9532,
+            'wallester_allocated' => 9532,
+            'wise_allocated' => 9532,
         ]);
+        $this->assertDatabaseHas('rail_mirror_events', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'direction' => 'debit',
+            'amount' => 14,
+            'reason' => 'fx_fee',
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', $this->lidlAuthorizationPayload())->assertOk();
+
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'wallester_allocated' => 9532,
+            'wise_allocated' => 9532,
+        ]);
+        $this->assertSame(1, RailMirrorEvent::query()->where('reason', 'fx_fee')->count());
     }
 
     public function test_fx_purchase_sends_platform_fee_to_sub_master_account(): void
@@ -620,7 +640,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 10000,
+            'wallester_allocated' => 10000,
             'pending' => 0,
         ]);
 
@@ -662,7 +682,7 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $platform->id,
             'currency' => 'EUR',
-            'available' => 5,
+            'wallester_allocated' => 5,
         ]);
     }
 
@@ -759,7 +779,8 @@ class WallesterCardMovementWebhookTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 20000,
+            'wallester_allocated' => 20000,
+            'wise_allocated' => 20000,
             'pending' => 0,
         ]);
 
@@ -830,7 +851,14 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 12941,
+            'wallester_allocated' => 12941,
+            'wise_allocated' => 12941,
+        ]);
+        $this->assertDatabaseHas('rail_mirror_events', [
+            'customer_id' => $customer->id,
+            'direction' => 'credit',
+            'amount' => 141,
+            'reason' => 'fx_fee_reversal',
         ]);
     }
 
@@ -845,7 +873,8 @@ class WallesterCardMovementWebhookTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 6854,
+            'wallester_allocated' => 6854,
+            'wise_allocated' => 6854,
             'pending' => 0,
         ]);
 
@@ -934,7 +963,8 @@ class WallesterCardMovementWebhookTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 11630,
+            'wallester_allocated' => 11630,
+            'wise_allocated' => 11630,
         ]);
     }
 
@@ -1095,6 +1125,155 @@ class WallesterCardMovementWebhookTest extends TestCase
                 'created_at' => '2026-09-08T09:24:00Z',
             ],
         ];
+    }
+
+    public function test_webhook_stores_atm_withdrawal_and_fee_apart_from_fx(): void
+    {
+        $customer = $this->createActiveCustomer();
+        $account = $this->createWallesterAccount($customer, IntegrationAccountStatus::ACTIVE, 'ade77db0-ea4a-4519-89a2-2400da18b8ae');
+
+        CustomerWallesterCard::query()->create([
+            'customer_wallester_account_id' => $account->id,
+            'wallester_card_id' => '048e25fd-2419-4790-8695-1f1b74961a58',
+            'type' => 'Physical',
+            'status' => 'Active',
+            'name' => 'Main Card',
+        ]);
+
+        CustomerBalance::query()->create([
+            'customer_id' => $customer->id,
+            'currency' => 'EUR',
+            'wallester_allocated' => 20000,
+            'wise_allocated' => 20000,
+            'pending' => 0,
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => 'a7a7677e-f8da-4092-8ba2-d333543dcd67',
+                'card_id' => '048e25fd-2419-4790-8695-1f1b74961a58',
+                'type' => 'ATMWithdrawal',
+                'account_amount' => -40,
+                'account_currency_code' => 'EUR',
+                'group' => 'Withdraw',
+                'merchant_name' => 'PapelariaTacticasSere',
+                'response_code' => 'WithdrawalsSwitchedOff',
+                'is_declined' => true,
+                'is_reversal' => false,
+            ],
+        ])->assertOk();
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => '6ed857b6-ca57-4817-a179-82cd9bc9c2cc',
+                'card_id' => '048e25fd-2419-4790-8695-1f1b74961a58',
+                'type' => 'ATMWithdrawal',
+                'account_amount' => -40,
+                'account_currency_code' => 'EUR',
+                'transaction_amount' => -40,
+                'transaction_currency_code' => 'EUR',
+                'fees_amount' => 2,
+                'group' => 'Withdraw',
+                'merchant_name' => 'PapelariaTacticasSere',
+                'response_code' => 'Approved',
+                'is_declined' => false,
+                'approved_amount' => -40,
+            ],
+        ])->assertOk();
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'create',
+            'type' => 'fee',
+            'data' => [
+                'id' => '34d6d393-245e-4e14-9437-835b6e656744',
+                'type' => 'AuthorizationATMWithdrawalEEAComplexFee',
+                'amount' => -2,
+                'currency_code' => 'EUR',
+                'account_id' => 'ade77db0-ea4a-4519-89a2-2400da18b8ae',
+                'card_id' => '048e25fd-2419-4790-8695-1f1b74961a58',
+                'authorization_id' => '6ed857b6-ca57-4817-a179-82cd9bc9c2cc',
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('funding_partner_movements', [
+            'partner_external_id' => 'a7a7677e-f8da-4092-8ba2-d333543dcd67',
+            'type' => FundingPartnerMovementType::CardWithdrawal->value,
+            'status' => FundingPartnerMovementStatus::Failed->value,
+            'failure_reason' => 'WithdrawalsSwitchedOff',
+            'description' => 'PapelariaTacticasSere',
+            'amount' => 4000,
+        ]);
+
+        $withdrawal = FundingPartnerMovement::query()
+            ->where('partner_external_id', '6ed857b6-ca57-4817-a179-82cd9bc9c2cc')
+            ->first();
+
+        $this->assertNotNull($withdrawal);
+        $this->assertSame(FundingPartnerMovementType::CardWithdrawal, $withdrawal->type);
+        $this->assertSame('Saque', $withdrawal->displayTypeLabel());
+        $this->assertSame(4000, (int) $withdrawal->amount);
+        $this->assertSame(200, (int) $withdrawal->fees_amount);
+
+        $fee = FundingPartnerMovement::query()
+            ->where('reference_id', $withdrawal->id)
+            ->where('type', FundingPartnerMovementType::CardWithdrawalFee)
+            ->first();
+
+        $this->assertNotNull($fee);
+        $this->assertSame('Taxa de saque', $fee->displayTypeLabel());
+        $this->assertSame('Taxa de saque', $fee->description);
+        $this->assertSame(200, (int) $fee->amount);
+        $this->assertSame('34d6d393-245e-4e14-9437-835b6e656744', $fee->metadata['atm_withdrawal_fee_id'] ?? null);
+
+        $this->assertDatabaseMissing('funding_partner_movements', [
+            'description' => 'Câmbio',
+        ]);
+        $this->assertDatabaseMissing('funding_partner_movements', [
+            'idempotency_key' => 'fx-platform:6ed857b6-ca57-4817-a179-82cd9bc9c2cc:out',
+        ]);
+
+        $this->assertDatabaseHas('ledger_entries', [
+            'reference_id' => $withdrawal->id,
+            'entry_type' => LedgerEntryType::CARD_WITHDRAWAL->value,
+            'amount' => 4000,
+            'description' => 'PapelariaTacticasSere',
+        ]);
+        $this->assertDatabaseHas('ledger_entries', [
+            'reference_id' => $fee->id,
+            'entry_type' => LedgerEntryType::CARD_WITHDRAWAL_FEE->value,
+            'amount' => 200,
+            'description' => 'Taxa de saque',
+        ]);
+        $this->assertDatabaseCount('ledger_entries', 2);
+        $this->assertDatabaseHas('customer_balances', [
+            'customer_id' => $customer->id,
+            'wallester_allocated' => 15800,
+            'wise_allocated' => 15800,
+        ]);
+
+        $this->postJson('/api/webhooks/wallester', [
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => [
+                'id' => '6ed857b6-ca57-4817-a179-82cd9bc9c2cc',
+                'card_id' => '048e25fd-2419-4790-8695-1f1b74961a58',
+                'type' => 'ATMWithdrawal',
+                'account_amount' => -40,
+                'account_currency_code' => 'EUR',
+                'fees_amount' => 2,
+                'group' => 'Withdraw',
+                'merchant_name' => 'PapelariaTacticasSere',
+                'is_declined' => false,
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseCount('ledger_entries', 2);
+        $this->assertSame(15800, (int) CustomerBalance::query()->where('customer_id', $customer->id)->value('wallester_allocated'));
+        $this->assertSame(15800, (int) CustomerBalance::query()->where('customer_id', $customer->id)->value('wise_allocated'));
     }
 
     private function createActiveCustomer()

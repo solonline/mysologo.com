@@ -54,7 +54,7 @@ class SyncWallesterCardMovementsCommandTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 5000,
+            'wallester_allocated' => 5000,
             'pending' => 0,
         ]);
 

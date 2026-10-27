@@ -45,6 +45,12 @@ class WallesterCardMovementIngestService
     ): void {
         $payload = $this->normalizePayload($payload);
 
+        if ($this->payloadMapper->isAtmWithdrawalFee($payload)) {
+            $this->ingestAtmWithdrawalFee($payload, $source);
+
+            return;
+        }
+
         if ($this->payloadMapper->isFxFeeEvent($payload)) {
             return;
         }
@@ -72,10 +78,13 @@ class WallesterCardMovementIngestService
             return;
         }
 
-        $isRefund = $this->isRefundEvent($payload);
-        $movementType = $isRefund
-            ? FundingPartnerMovementType::CardRefund
-            : FundingPartnerMovementType::CardPurchase;
+        $isWithdrawal = $this->payloadMapper->isAtmWithdrawal($payload);
+        $isRefund = ! $isWithdrawal && $this->isRefundEvent($payload);
+        $movementType = match (true) {
+            $isRefund => FundingPartnerMovementType::CardRefund,
+            $isWithdrawal => FundingPartnerMovementType::CardWithdrawal,
+            default => FundingPartnerMovementType::CardPurchase,
+        };
         $direction = $isRefund
             ? FundingPartnerMovementDirection::In
             : FundingPartnerMovementDirection::Out;
@@ -91,7 +100,7 @@ class WallesterCardMovementIngestService
             partnerExternalId: $externalId,
             source: $source,
             card: $card,
-            description: is_string($payload['merchant_name'] ?? null) ? $payload['merchant_name'] : null,
+            description: $this->movementDescription($payload, $isWithdrawal),
             metadata: $payload,
             originalAmountCents: $amounts['original_amount_cents'],
             originalCurrency: $amounts['original_currency'],
@@ -99,6 +108,24 @@ class WallesterCardMovementIngestService
             status: $declined ? FundingPartnerMovementStatus::Failed : FundingPartnerMovementStatus::Completed,
             failureReason: $declined ? $this->declineReason($payload) : null,
         );
+
+        if ($isWithdrawal) {
+            $movement = $this->movements->recastAsAtmWithdrawal($movement);
+
+            if (! $declined && (int) $movement->fees_amount > 0) {
+                $this->movements->recordAtmWithdrawalFee(
+                    withdrawal: $movement,
+                    account: $account,
+                    amountCents: (int) $movement->fees_amount,
+                    currency: (string) $movement->currency,
+                    authorizationId: (string) $movement->partner_external_id,
+                    source: $source,
+                    card: $card,
+                );
+            }
+
+            return;
+        }
 
         try {
             if ($movement->type === FundingPartnerMovementType::CardRefund
@@ -223,6 +250,57 @@ class WallesterCardMovementIngestService
         $status = trim((string) ($payload['status'] ?? ''));
 
         return $status !== '' ? $status : 'declined';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function movementDescription(array $payload, bool $isWithdrawal): ?string
+    {
+        $merchantName = $payload['merchant_name'] ?? null;
+        $merchantName = is_string($merchantName) ? trim($merchantName) : '';
+
+        if ($merchantName !== '') {
+            return $merchantName;
+        }
+
+        return $isWithdrawal ? 'Saque' : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function ingestAtmWithdrawalFee(array $payload, FundingPartnerMovementSource $source): void
+    {
+        $authorizationId = (string) ($payload['authorization_id'] ?? '');
+        $feeId = (string) ($payload['id'] ?? '');
+        $amounts = $this->payloadMapper->mapAmounts($payload);
+
+        if ($amounts['amount_cents'] <= 0 || ($authorizationId === '' && $feeId === '')) {
+            return;
+        }
+
+        $account = $this->resolveAccount($payload);
+
+        if (! $account instanceof CustomerWallesterAccount) {
+            return;
+        }
+
+        $withdrawal = $authorizationId !== ''
+            ? $this->movements->findCardMovementByPartnerExternalId($account, $authorizationId)
+            : null;
+
+        $this->movements->recordAtmWithdrawalFee(
+            withdrawal: $withdrawal,
+            account: $account,
+            amountCents: $amounts['amount_cents'],
+            currency: $amounts['currency'],
+            authorizationId: $authorizationId !== '' ? $authorizationId : $feeId,
+            feePartnerExternalId: $feeId !== '' ? $feeId : null,
+            source: $source,
+            card: $this->resolveCard($payload, $account),
+            metadata: $payload,
+        );
     }
 
     /**

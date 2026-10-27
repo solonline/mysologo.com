@@ -11,8 +11,40 @@ class WallesterCardMovementPayloadMapper
     /**
      * @param  array<string, mixed>  $payload
      */
+    public function isAtmWithdrawalFee(array $payload): bool
+    {
+        foreach ($this->typeCandidates($payload) as $type) {
+            if (str_contains($type, 'atmwithdrawal') && str_contains($type, 'fee')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function isAtmWithdrawal(array $payload): bool
+    {
+        if ($this->isAtmWithdrawalFee($payload)) {
+            return false;
+        }
+
+        foreach ($this->typeCandidates($payload) as $type) {
+            if ($type === 'atmwithdrawal' || (str_contains($type, 'atmwithdrawal') && ! str_contains($type, 'fee'))) {
+                return true;
+            }
+        }
+
+        $group = strtolower((string) ($payload['group'] ?? data_get($payload, 'data.group', '')));
+
+        return $group === 'withdraw';
+    }
+
     public function isFxFeeEvent(array $payload): bool
     {
+        if ($this->isAtmWithdrawalFee($payload)) {
+            return false;
+        }
+
         $envelopeType = strtolower((string) (
             $payload['wallester_event_type']
             ?? $payload['event_type']
@@ -66,6 +98,21 @@ class WallesterCardMovementPayloadMapper
                 ? strtoupper($originalCurrency)
                 : null,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<string>
+     */
+    private function typeCandidates(array $payload): array
+    {
+        $candidates = [
+            strtolower((string) ($payload['transaction_type'] ?? '')),
+            strtolower((string) ($payload['type'] ?? '')),
+            strtolower((string) data_get($payload, 'data.type', '')),
+        ];
+
+        return array_values(array_filter($candidates, static fn (string $type): bool => $type !== ''));
     }
 
     private function optionalCents(mixed $amount): ?int

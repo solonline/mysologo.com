@@ -766,7 +766,7 @@ class WallesterCardTest extends TestCase
         ]);
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
-            'available' => -500,
+            'wallester_allocated' => -500,
         ]);
     }
 

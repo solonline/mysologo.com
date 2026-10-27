@@ -45,7 +45,7 @@ class NormalizeSwallowedWallesterFxPurchasesTest extends TestCase
         CustomerBalance::query()->create([
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 44406,
+            'wallester_allocated' => 44406,
             'pending' => 0,
         ]);
 
@@ -124,7 +124,7 @@ class NormalizeSwallowedWallesterFxPurchasesTest extends TestCase
         $this->assertDatabaseHas('customer_balances', [
             'customer_id' => $customer->id,
             'currency' => 'EUR',
-            'available' => 43961,
+            'wallester_allocated' => 43961,
         ]);
         $this->assertTrue(app(NormalizeSwallowedWallesterFxPurchasesService::class)->execute($customer->id)->isEmpty());
     }

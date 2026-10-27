@@ -745,7 +745,7 @@ class WallesterService
             'delivery_address' => $deliveryAddress,
             'security' => array_merge([
                 'contactless_enabled' => true,
-                'withdrawal_enabled' => false,
+                'withdrawal_enabled' => true,
             ], $security, [
                 'internet_purchase_enabled' => true,
             ]),

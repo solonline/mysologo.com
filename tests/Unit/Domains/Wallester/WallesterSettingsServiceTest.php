@@ -92,6 +92,34 @@ class WallesterSettingsServiceTest extends TestCase
         );
     }
 
+    public function test_throws_when_rsa_public_key_is_the_yoop_signing_key(): void
+    {
+        $resource = openssl_pkey_new([
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+
+        if ($resource === false) {
+            $this->markTestSkipped('OpenSSL key generation is unavailable in this environment.');
+        }
+
+        $privateKeyPem = '';
+        openssl_pkey_export($resource, $privateKeyPem);
+        $details = openssl_pkey_get_details($resource);
+        $this->assertIsArray($details);
+        $this->assertIsString($details['key'] ?? null);
+
+        Setting::query()->where('key', 'wallester.private_key')->update(['value' => $privateKeyPem]);
+        Setting::query()->where('key', 'wallester.rsa_public_key')->update(['value' => $details['key']]);
+
+        $service = app(WallesterSettingsService::class);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Wallester RSA public key matches the Yoop signing key.');
+
+        $service->rsaPublicKey();
+    }
+
     public function test_throws_when_rsa_public_key_is_missing(): void
     {
         Setting::query()->where('key', 'wallester.rsa_public_key')->update(['value' => '']);

@@ -37,6 +37,27 @@ class WallesterCardMovementPayloadMapperTest extends TestCase
             'transaction_type' => 'paywavelowvaluepurchase',
             'type' => 'payWaveLowValuePurchase',
         ]));
+
+        $this->assertFalse($mapper->isFxFeeEvent([
+            'event' => 'create',
+            'type' => 'fee',
+            'data' => ['type' => 'AuthorizationATMWithdrawalEEAComplexFee'],
+        ]));
+        $this->assertTrue($mapper->isAtmWithdrawalFee([
+            'event' => 'create',
+            'type' => 'fee',
+            'data' => ['type' => 'AuthorizationATMWithdrawalEEAComplexFee'],
+        ]));
+        $this->assertTrue($mapper->isAtmWithdrawal([
+            'event' => 'notification',
+            'type' => 'authorization',
+            'data' => ['type' => 'ATMWithdrawal', 'group' => 'Withdraw'],
+        ]));
+        $this->assertFalse($mapper->isAtmWithdrawal([
+            'event' => 'create',
+            'type' => 'fee',
+            'data' => ['type' => 'AuthorizationATMWithdrawalEEAComplexFee'],
+        ]));
     }
 
     public function test_maps_quoted_amount_without_wallester_fee(): void

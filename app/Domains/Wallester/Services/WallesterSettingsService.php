@@ -76,7 +76,43 @@ class WallesterSettingsService
             throw new RuntimeException('Wallester RSA public key is not configured.');
         }
 
-        return $this->normalizeRsaPublicKey(str_replace('\\n', "\n", trim($value)));
+        $pem = $this->normalizeRsaPublicKey(str_replace('\\n', "\n", trim($value)));
+        $this->assertRsaPublicKeyIsNotSigningKey($pem);
+
+        return $pem;
+    }
+
+    private function assertRsaPublicKeyIsNotSigningKey(string $publicKeyPem): void
+    {
+        $publicModulus = $this->rsaModulus($publicKeyPem, private: false);
+
+        if ($publicModulus === null) {
+            return;
+        }
+
+        try {
+            $privateModulus = $this->rsaModulus($this->privateKey(), private: true);
+        } catch (RuntimeException) {
+            return;
+        }
+
+        if ($privateModulus !== null && hash_equals($privateModulus, $publicModulus)) {
+            throw new RuntimeException('Wallester RSA public key matches the Yoop signing key. Use the Wallester CVV public key.');
+        }
+    }
+
+    private function rsaModulus(string $pem, bool $private): ?string
+    {
+        $key = $private ? openssl_pkey_get_private($pem) : openssl_pkey_get_public($pem);
+
+        if ($key === false) {
+            return null;
+        }
+
+        $details = openssl_pkey_get_details($key);
+        $modulus = $details['rsa']['n'] ?? null;
+
+        return is_string($modulus) && $modulus !== '' ? $modulus : null;
     }
 
     private function normalizeRsaPublicKey(string $value): string
