@@ -18,6 +18,9 @@ use App\Http\Middleware\MaintenanceModeMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
@@ -37,6 +40,10 @@ return Application::configure(basePath: dirname(__DIR__))
                     ->middleware('web')
                     ->group(base_path('routes/web.php'));
             }
+
+            Route::middleware('webhooks')
+                ->prefix('api')
+                ->group(base_path('routes/webhooks.php'));
 
             // Rotas de domínio para a API
             $apiDomain = config('app.api_domain');
@@ -67,6 +74,12 @@ return Application::configure(basePath: dirname(__DIR__))
             MaintenanceModeMiddleware::class,
         ]);
 
+        // Webhooks de parceiros ficam fora do grupo api para serem recebidos
+        // mesmo com a API em manutenção.
+        $middleware->group('webhooks', [
+            SubstituteBindings::class,
+        ]);
+
         // Adiciona o CorsMiddleware globalmente
         $middleware->append([
             CorsMiddleware::class,
@@ -74,8 +87,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->prependToPriorityList(
             [
-                \Illuminate\Routing\Middleware\ThrottleRequests::class,
-                \Illuminate\Routing\Middleware\ThrottleRequestsWithRedis::class,
+                ThrottleRequests::class,
+                ThrottleRequestsWithRedis::class,
             ],
             AuthMerchant::class,
         );
