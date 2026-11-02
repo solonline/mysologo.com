@@ -10,19 +10,21 @@ use Illuminate\Console\Command;
 class AlignCustomerWalletsToWallesterCommand extends Command
 {
     protected $signature = 'wallet:align-customers-to-wallester
-                            {--dry-run : Mostra o delta sem gravar}';
+                            {--dry-run : Mostra o delta sem gravar}
+                            {--mirror : Fecha pendente sem payout Stripe e transferências Wise cativas, e iguala os livros ao disponível Wallester}';
 
     protected $description = 'Alinha o ledger e o wise_allocated de cada cliente ao disponível Wallester.';
 
     public function handle(AlignCustomerWalletsToWallesterService $aligner): int
     {
         $dryRun = (bool) $this->option('dry-run');
+        $mirror = (bool) $this->option('mirror');
 
         $this->info($dryRun
-            ? 'wallet:align-customers-to-wallester — dry-run'
-            : 'wallet:align-customers-to-wallester — a alinhar ledger e Wise ao disponível Wallester...');
+            ? 'wallet:align-customers-to-wallester — dry-run'.($mirror ? ' --mirror' : '')
+            : 'wallet:align-customers-to-wallester — a alinhar ledger e Wise ao disponível Wallester'.($mirror ? ' (mirror)' : '').'...');
 
-        $results = $aligner->execute($dryRun);
+        $results = $mirror ? $aligner->mirror($dryRun) : $aligner->execute($dryRun);
 
         if ($results === []) {
             $this->warn('Nenhuma conta Wallester encontrada.');
@@ -30,17 +32,23 @@ class AlignCustomerWalletsToWallesterCommand extends Command
             return self::SUCCESS;
         }
 
+        $headers = ['Cliente', 'Moeda', 'Ledger', 'Wise', 'Wallester', 'Δ ledger', 'Δ wise', 'Sync', 'Gravado'];
+
+        if ($mirror) {
+            array_splice($headers, 7, 0, ['Pendente', 'Cativas']);
+        }
+
         $this->table(
-            ['Cliente', 'Moeda', 'Ledger', 'Wise', 'Wallester', 'Δ ledger', 'Δ wise', 'Sync', 'Gravado'],
-            array_map(function (array $row) use ($dryRun): array {
+            $headers,
+            array_map(function (array $row) use ($dryRun, $mirror): array {
                 $written = match (true) {
                     ! $row['synced'] => 'não',
                     $dryRun => 'dry-run',
-                    $row['applied'] || $row['wise_applied'] => 'sim',
+                    $row['applied'] || $row['wise_applied'] || $row['pending_reversed_cents'] > 0 || $row['transfers_closed'] > 0 => 'sim',
                     default => 'já igual',
                 };
 
-                return [
+                $line = [
                     $row['customer_id'].' '.$row['customer_name'],
                     $row['currency'],
                     number_format($row['from_cents'] / 100, 2, ',', '.'),
@@ -48,9 +56,17 @@ class AlignCustomerWalletsToWallesterCommand extends Command
                     $row['to_cents'] === null ? '—' : number_format($row['to_cents'] / 100, 2, ',', '.'),
                     $row['synced'] ? number_format($row['delta_cents'] / 100, 2, ',', '.') : '—',
                     $row['synced'] ? number_format($row['wise_delta_cents'] / 100, 2, ',', '.') : '—',
-                    $row['synced'] ? 'sim' : 'falhou',
-                    $written,
                 ];
+
+                if ($mirror) {
+                    $line[] = $row['synced'] ? number_format($row['pending_reversed_cents'] / 100, 2, ',', '.') : '—';
+                    $line[] = $row['synced'] ? (string) $row['transfers_closed'] : '—';
+                }
+
+                $line[] = $row['synced'] ? 'sim' : 'falhou';
+                $line[] = $written;
+
+                return $line;
             }, $results),
         );
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domains\Kyc\Support\CustomerKycMedia;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Domains\Wallester\Services\PlatformMasterCurrencyResolver;
 use Carbon\Carbon;
@@ -251,6 +252,10 @@ class Customer extends Model
     public function publicAvatarUrl(): ?string
     {
         if (! $this->show_profile_pic || ! $this->avatar) {
+            return null;
+        }
+
+        if (CustomerKycMedia::isKycPath($this->avatar)) {
             return null;
         }
 

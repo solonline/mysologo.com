@@ -5,7 +5,9 @@ namespace App\Domains\Merchant\Jobs;
 use App\Domains\Merchant\Services\MerchantWebhookSigner;
 use App\Domains\Wallet\Enums\PartnerFundingStatus;
 use App\Models\MerchantPaymentRequest;
+use App\Models\MerchantWebhookDelivery;
 use App\Models\StripeTransaction;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\ConnectionException;
@@ -67,17 +69,42 @@ class DispatchMerchantWebhook implements ShouldQueue
             ]);
         }
 
+        $sentAt = now();
+        $startedAt = hrtime(true);
+
         try {
             $response = Http::timeout(10)
                 ->withHeaders($headers)
                 ->withBody($rawBody, 'application/json')
                 ->post($webhookUrl);
         } catch (ConnectionException $exception) {
+            $this->recordDelivery(
+                deliveryId: $deliveryId,
+                payload: $payload,
+                webhookUrl: $webhookUrl,
+                responseStatus: null,
+                responseBody: null,
+                durationMs: $this->elapsedMilliseconds($startedAt),
+                errorMessage: $exception->getMessage(),
+                sentAt: $sentAt,
+            );
+
             throw new RuntimeException(
                 'DispatchMerchantWebhook: falha de rede — '.$exception->getMessage(),
                 previous: $exception,
             );
         }
+
+        $this->recordDelivery(
+            deliveryId: $deliveryId,
+            payload: $payload,
+            webhookUrl: $webhookUrl,
+            responseStatus: $response->status(),
+            responseBody: $response->body(),
+            durationMs: $this->elapsedMilliseconds($startedAt),
+            errorMessage: null,
+            sentAt: $sentAt,
+        );
 
         if ($response->successful()) {
             return;
@@ -99,6 +126,58 @@ class DispatchMerchantWebhook implements ShouldQueue
         }
 
         throw new RuntimeException("DispatchMerchantWebhook: HTTP {$status}");
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function recordDelivery(
+        string $deliveryId,
+        array $payload,
+        string $webhookUrl,
+        ?int $responseStatus,
+        ?string $responseBody,
+        ?int $durationMs,
+        ?string $errorMessage,
+        CarbonInterface $sentAt,
+    ): void {
+        try {
+            MerchantWebhookDelivery::query()->create([
+                'merchant_id' => $this->paymentRequest->merchant_id,
+                'merchant_payment_request_id' => $this->paymentRequest->id,
+                'delivery_id' => $deliveryId,
+                'event_id' => (string) ($payload['id'] ?? ''),
+                'event_type' => (string) ($payload['type'] ?? ''),
+                'destination_url' => $webhookUrl,
+                'request_body' => $payload,
+                'response_status' => $responseStatus,
+                'response_body' => $this->truncateResponseBody($responseBody),
+                'attempt' => $this->attempts(),
+                'duration_ms' => $durationMs,
+                'error_message' => $errorMessage,
+                'sent_at' => $sentAt,
+            ]);
+        } catch (Throwable $exception) {
+            Log::channel('merchant')->warning('DispatchMerchantWebhook: falha ao gravar entrega', [
+                'payment_request_uuid' => $this->paymentRequest->uuid,
+                'delivery_id' => $deliveryId,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function truncateResponseBody(?string $body): ?string
+    {
+        if ($body === null || $body === '') {
+            return $body;
+        }
+
+        return mb_strcut($body, 0, 8192, 'UTF-8');
+    }
+
+    private function elapsedMilliseconds(int $startedAt): int
+    {
+        return (int) round((hrtime(true) - $startedAt) / 1_000_000);
     }
 
     /**

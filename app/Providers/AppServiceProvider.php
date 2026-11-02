@@ -83,11 +83,30 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
+        $isRoot = function_exists('posix_geteuid') && posix_geteuid() === 0;
+        $webUser = 'www-data';
+        $canChown = $isRoot && function_exists('posix_getpwnam') && posix_getpwnam($webUser);
+
         foreach (config('logging.directories', []) as $directory) {
             $path = storage_path('logs/'.$directory);
 
             if (! is_dir($path)) {
-                mkdir($path, 02775, true);
+                $previousUmask = umask(0);
+
+                try {
+                    mkdir($path, 02775, true);
+                } finally {
+                    umask($previousUmask);
+                }
+            }
+
+            if ($isRoot && is_dir($path)) {
+                chmod($path, 02775);
+
+                if ($canChown) {
+                    chown($path, $webUser);
+                    chgrp($path, $webUser);
+                }
             }
         }
     }

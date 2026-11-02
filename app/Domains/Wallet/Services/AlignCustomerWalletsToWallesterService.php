@@ -3,15 +3,21 @@
 namespace App\Domains\Wallet\Services;
 
 use App\Domains\Wallet\Enums\LedgerEntryType;
+use App\Domains\Wallet\Enums\PartnerFundingStatus;
+use App\Domains\Wise\Enums\WiseTransferStatus;
 use App\Models\Customer;
 use App\Models\CustomerBalance;
 use App\Models\CustomerWallesterAccount;
+use App\Models\StripeTransaction;
+use App\Models\WiseTransfer;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class AlignCustomerWalletsToWallesterService
 {
     public const DESCRIPTION = 'Alinhamento ao saldo Wallester';
+
+    public const PENDING_DESCRIPTION = 'Alinhamento ao saldo Wallester: pendente sem payout';
 
     public function __construct(
         protected WallesterMainAccountSyncService $sync,
@@ -30,10 +36,56 @@ class AlignCustomerWalletsToWallesterService
      *     wise_delta_cents: int,
      *     applied: bool,
      *     wise_applied: bool,
-     *     synced: bool
+     *     synced: bool,
+     *     pending_reversed_cents: int,
+     *     transfers_closed: int
      * }>
      */
     public function execute(bool $dryRun = false): array
+    {
+        return $this->run($dryRun, mirror: false);
+    }
+
+    /**
+     * @return list<array{
+     *     customer_id: int,
+     *     customer_name: string,
+     *     currency: string,
+     *     from_cents: int,
+     *     from_wise_cents: int,
+     *     to_cents: int|null,
+     *     delta_cents: int,
+     *     wise_delta_cents: int,
+     *     applied: bool,
+     *     wise_applied: bool,
+     *     synced: bool,
+     *     pending_reversed_cents: int,
+     *     transfers_closed: int
+     * }>
+     */
+    public function mirror(bool $dryRun = false): array
+    {
+        return $this->run($dryRun, mirror: true);
+    }
+
+    /**
+     * @return list<array{
+     *     customer_id: int,
+     *     customer_name: string,
+     *     currency: string,
+     *     from_cents: int,
+     *     from_wise_cents: int,
+     *     to_cents: int|null,
+     *     delta_cents: int,
+     *     wise_delta_cents: int,
+     *     applied: bool,
+     *     wise_applied: bool,
+     *     synced: bool,
+     *     pending_reversed_cents: int,
+     *     transfers_closed: int
+     * }>
+     */
+    private function run(bool $dryRun, bool $mirror): array
     {
         /** @var array<string, array{customer: Customer, currency: string, available: int, synced: bool}> $groups */
         $groups = [];
@@ -79,6 +131,7 @@ class AlignCustomerWalletsToWallesterService
                 wallesterCents: $group['available'],
                 synced: $group['synced'],
                 dryRun: $dryRun,
+                mirror: $mirror,
             );
         }
 
@@ -97,7 +150,9 @@ class AlignCustomerWalletsToWallesterService
      *     wise_delta_cents: int,
      *     applied: bool,
      *     wise_applied: bool,
-     *     synced: bool
+     *     synced: bool,
+     *     pending_reversed_cents: int,
+     *     transfers_closed: int
      * }
      */
     private function alignGroup(
@@ -106,6 +161,7 @@ class AlignCustomerWalletsToWallesterService
         int $wallesterCents,
         bool $synced,
         bool $dryRun,
+        bool $mirror,
     ): array {
         $balance = CustomerBalance::query()
             ->where('customer_id', $customer->id)
@@ -128,7 +184,29 @@ class AlignCustomerWalletsToWallesterService
                 'applied' => false,
                 'wise_applied' => false,
                 'synced' => false,
+                'pending_reversed_cents' => 0,
+                'transfers_closed' => 0,
             ];
+        }
+
+        $pendingReversed = 0;
+        $transfersClosed = 0;
+
+        if ($mirror) {
+            $pendingReversed = $this->excessPendingCents((int) $customer->id, $currency, (int) ($balance?->pending ?? 0));
+            $transfersClosed = $this->closeOpenWiseTransfers((int) $customer->id, $currency, $dryRun);
+
+            if (! $dryRun && $pendingReversed > 0) {
+                $this->ledger->reversePendingCredit(
+                    customerId: (int) $customer->id,
+                    currency: $currency,
+                    amount: $pendingReversed,
+                    description: self::PENDING_DESCRIPTION,
+                    metadata: [
+                        'source' => 'wallester_available',
+                    ],
+                );
+            }
         }
 
         $delta = $wallesterCents - $fromCents;
@@ -170,7 +248,40 @@ class AlignCustomerWalletsToWallesterService
             'applied' => $applied,
             'wise_applied' => $wiseApplied,
             'synced' => true,
+            'pending_reversed_cents' => $pendingReversed,
+            'transfers_closed' => $transfersClosed,
         ];
+    }
+
+    private function excessPendingCents(int $customerId, string $currency, int $pending): int
+    {
+        $protected = (int) StripeTransaction::query()
+            ->where('customer_id', $customerId)
+            ->whereRaw('UPPER(currency) = ?', [$currency])
+            ->where('partner_funding_status', PartnerFundingStatus::AwaitingStripePayout->value)
+            ->whereNull('related_transaction_id')
+            ->sum('net_amount');
+
+        return max(0, $pending - $protected);
+    }
+
+    private function closeOpenWiseTransfers(int $customerId, string $currency, bool $dryRun): int
+    {
+        $ids = WiseTransfer::query()
+            ->where('customer_id', $customerId)
+            ->whereRaw('UPPER(currency) = ?', [$currency])
+            ->whereNull('settled_at')
+            ->whereNull('refunded_at')
+            ->pluck('id');
+
+        if (! $dryRun && $ids->isNotEmpty()) {
+            WiseTransfer::query()->whereIn('id', $ids)->update([
+                'status' => WiseTransferStatus::Cancelled->value,
+                'refunded_at' => now(),
+            ]);
+        }
+
+        return $ids->count();
     }
 
     private function syncAccount(CustomerWallesterAccount $account): bool

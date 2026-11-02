@@ -4,6 +4,7 @@ use App\Domains\Backoffice\Controllers\AccountPayableController;
 use App\Domains\Backoffice\Controllers\AuditLogController;
 use App\Domains\Backoffice\Controllers\Auth\LoginController;
 use App\Domains\Backoffice\Controllers\CustomerController;
+use App\Domains\Backoffice\Controllers\CustomerKycMediaController;
 use App\Domains\Backoffice\Controllers\CustomerMerchantFeeController;
 use App\Domains\Backoffice\Controllers\CustomerTpaController;
 use App\Domains\Backoffice\Controllers\DashboardController;
@@ -41,6 +42,10 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
     Route::post('/customers', [CustomerController::class, 'store'])->name('.customers.store')->middleware('can:customers.create');
     Route::get('/customers/username-search', [CustomerController::class, 'searchUsernames'])->name('.customers.username-search')->middleware('can:customers.view');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('.customers.show')->middleware('can:customers.view');
+    Route::get('/customers/{customer}/documents/{document}/media/{field}', [CustomerKycMediaController::class, 'show'])
+        ->where('field', 'front_image|back_image|full_front_image|full_back_image|portrait_image|front_video|back_video|front_image_camera_front|back_image_camera_front')
+        ->name('.customers.documents.media')
+        ->middleware('can:customers.view');
     Route::get('/customers/{customer}/transactions', [TransactionController::class, 'customer'])->name('.customers.transactions')->middleware('can:customers.view');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('.customers.update')->middleware('can:customers.edit');
     Route::post('/customers/{customer}/phone/verify', [CustomerController::class, 'sendCurrentPhoneVerification'])->name('.customers.phone.verify.send')->middleware('can:customers.edit');

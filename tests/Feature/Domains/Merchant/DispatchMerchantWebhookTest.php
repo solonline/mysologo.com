@@ -7,6 +7,7 @@ use App\Domains\Merchant\Services\MerchantWebhookSigner;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Models\Merchant;
 use App\Models\MerchantPaymentRequest;
+use App\Models\MerchantWebhookDelivery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -81,6 +82,16 @@ class DispatchMerchantWebhookTest extends TestCase
                 && ($payload['data']['funds_available_at'] === null)
                 && ($payload['data']['funds_available'] ?? null) === false;
         });
+
+        $delivery = MerchantWebhookDelivery::query()->first();
+
+        $this->assertNotNull($delivery);
+        $this->assertSame('payment_request.completed', $delivery->event_type);
+        $this->assertSame(200, $delivery->response_status);
+        $this->assertSame($paymentRequest->uuid, $delivery->request_body['data']['uuid'] ?? null);
+        $this->assertSame(1500, $delivery->request_body['data']['amount'] ?? null);
+        $this->assertSame('ORD-HMAC', $delivery->request_body['data']['external_reference'] ?? null);
+        $this->assertNotNull($delivery->sent_at);
     }
 
     public function test_webhook_includes_fees_and_funds_available_at_from_transaction(): void
@@ -187,7 +198,7 @@ class DispatchMerchantWebhookTest extends TestCase
     public function test_webhook_retries_on_server_error(): void
     {
         Http::fake([
-            'https://loja.test/down' => Http::response(['error' => 'down'], 503),
+            'https://loja.test/down' => Http::response(['error' => 'down'], 500),
         ]);
 
         $customer = $this->createRetailCustomer([
@@ -216,10 +227,19 @@ class DispatchMerchantWebhookTest extends TestCase
             'expires_at' => now()->addDay(),
         ]);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('HTTP 503');
+        try {
+            (new DispatchMerchantWebhook($paymentRequest))->handle(app(MerchantWebhookSigner::class));
+            $this->fail('Era esperado HTTP 500.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('HTTP 500', $exception->getMessage());
+        }
 
-        (new DispatchMerchantWebhook($paymentRequest))->handle(app(MerchantWebhookSigner::class));
+        $delivery = MerchantWebhookDelivery::query()->first();
+
+        $this->assertNotNull($delivery);
+        $this->assertSame(500, $delivery->response_status);
+        $this->assertSame('payment_request.completed', $delivery->event_type);
+        $this->assertSame($paymentRequest->uuid, $delivery->request_body['data']['uuid'] ?? null);
     }
 
     public function test_payment_request_webhook_url_overrides_merchant(): void

@@ -6,7 +6,9 @@ use App\Domains\Merchant\Mail\SecurePayWelcomeMail;
 use App\Domains\Onboarding\Enums\CustomerLifecycleStatus;
 use App\Models\Merchant;
 use App\Models\MerchantPaymentRequest;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Tests\Concerns\InteractsWithOnboarding;
 use Tests\TestCase;
@@ -282,6 +284,53 @@ class CustomerMerchantTest extends TestCase
                 'webhook_secret' => true,
             ])
             ->assertUnprocessable();
+    }
+
+    public function test_rotate_webhook_secret_replaces_value_encrypted_with_another_key(): void
+    {
+        $customer = $this->createActiveCustomer();
+
+        $merchant = Merchant::query()->create([
+            'customer_id' => $customer->id,
+            'name' => 'Loja MAC',
+            'slug' => 'loja-mac',
+            'api_key' => hash('sha256', 'yoop_test_old_key'),
+            'webhook_secret' => 'whsec_'.str_repeat('22', 32),
+            'mode' => 'test',
+            'is_active' => true,
+        ]);
+
+        DB::table('merchants')->where('id', $merchant->id)->update([
+            'webhook_secret' => base64_encode(json_encode([
+                'iv' => base64_encode(random_bytes(16)),
+                'value' => base64_encode('cipher'),
+                'mac' => hash('sha256', 'wrong'),
+                'tag' => '',
+            ], JSON_THROW_ON_ERROR)),
+        ]);
+
+        $merchant->refresh();
+
+        try {
+            $merchant->webhook_secret;
+            $this->fail('O ciphertext antigo devia falhar o MAC.');
+        } catch (DecryptException) {
+        }
+
+        $token = $customer->createToken('test')->plainTextToken;
+
+        $response = $this->withToken($token)
+            ->postJson('/api/merchant/'.$merchant->id.'/credentials/rotate', [
+                'webhook_secret' => true,
+            ])
+            ->assertOk();
+
+        $newWebhookSecret = $response->json('webhook_secret');
+        $this->assertIsString($newWebhookSecret);
+        $this->assertStringStartsWith('whsec_', $newWebhookSecret);
+
+        $merchant->refresh();
+        $this->assertSame($newWebhookSecret, $merchant->webhook_secret);
     }
 
     public function test_customer_can_have_one_test_merchant_and_many_live(): void

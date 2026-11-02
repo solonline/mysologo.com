@@ -18,6 +18,7 @@ class UploadDocumentMediaJobTest extends TestCase
     {
         parent::setUp();
         $this->prepareOnboardingFeatureTest();
+        Storage::fake('local');
         Storage::fake('public');
     }
 
@@ -45,6 +46,7 @@ class UploadDocumentMediaJobTest extends TestCase
 
         $this->assertSame($expectedPath, $document->portrait_image);
         $this->assertSame($expectedPath, $customer->avatar);
-        Storage::disk('public')->assertExists($expectedPath);
+        Storage::disk('local')->assertExists($expectedPath);
+        Storage::disk('public')->assertMissing($expectedPath);
     }
 }

@@ -69,8 +69,10 @@ class CustomerMerchantController extends Controller
 
     public function credentials(Request $request, int $merchant): JsonResponse
     {
+      
         $owned = $this->resolveOwnedMerchant($request, $merchant);
         $result = $this->merchantService->getCredentials($owned);
+
 
         return (new MerchantResource($result['merchant']))
             ->additional([

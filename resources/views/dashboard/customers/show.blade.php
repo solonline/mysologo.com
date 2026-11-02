@@ -13,11 +13,7 @@
     </a>
     <div class="flex items-center gap-4">
         @php
-            $avatarUrl = filled($customer->avatar)
-                ? (str_starts_with($customer->avatar, 'http://') || str_starts_with($customer->avatar, 'https://')
-                    ? $customer->avatar
-                    : Storage::url($customer->avatar))
-                : null;
+            $avatarUrl = \App\Domains\Kyc\Support\CustomerKycMedia::url($customer->avatar);
         @endphp
         @if ($avatarUrl)
         <img src="{{ $avatarUrl }}" alt="{{ $customer->name }}"
@@ -48,17 +44,7 @@
 @section('content')
 
 @php
-    $resolveMediaUrl = function (?string $path): ?string {
-        if ($path === null || $path === '') {
-            return null;
-        }
-
-        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            return $path;
-        }
-
-        return Storage::url($path);
-    };
+    $resolveMediaUrl = fn (?string $path): ?string => \App\Domains\Kyc\Support\CustomerKycMedia::url($path);
 
     $formatDateTime = function ($value, string $fallback = '—'): string {
         if ($value === null || $value === '') {

@@ -2,6 +2,7 @@
 
 namespace App\Domains\Kyc\Jobs;
 
+use App\Domains\Kyc\Support\CustomerKycMedia;
 use App\Models\CustomerRetailDocument;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -36,7 +37,8 @@ class UploadDocumentMediaJob implements ShouldQueue
             $extension = pathinfo(parse_url($this->mediaUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
             $filename = "customer/{$document->customer_id}/didit/{$document->id}/{$this->field}.{$extension}";
 
-            Storage::disk('public')->put($filename, $contents);
+            Storage::disk(CustomerKycMedia::DISK)->put($filename, $contents);
+            Storage::disk('public')->delete($filename);
 
             $document->{$this->field} = $filename;
             $document->save();

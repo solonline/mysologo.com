@@ -76,7 +76,10 @@ class MerchantRepository implements MerchantRepositoryInterface
 
     public function updateWebhookSecret(Merchant $merchant, string $webhookSecret): Merchant
     {
-        $merchant->update(['webhook_secret' => $webhookSecret]);
+        Merchant::query()->whereKey($merchant->getKey())->update([
+            'webhook_secret' => encrypt($webhookSecret, false),
+            'updated_at' => now(),
+        ]);
 
         return $merchant->fresh();
     }
