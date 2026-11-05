@@ -10,7 +10,7 @@ Criar um link de pagamento para um cliente final pagar na página Yoop (`/pay/{u
 X-Merchant-Key: {api_key}
 ```
 
-Sem Bearer token neste fluxo. A `api_key` é fornecida após activação do merchant (mostrar/rodar credenciais é feito na app Yoop, não nestes endpoints de parceiro).
+Sem Bearer token neste fluxo. A `api_key` é fornecida na activação do merchant. A app do customer não regista nem mostra credenciais.
 
 ## Fluxo
 
@@ -156,7 +156,7 @@ Quando o pagamento fica `completed`, a Yoop envia `POST` para o `webhook_url` do
 
 ### Assinatura HMAC
 
-No registo do merchant a API devolve `webhook_secret` (**uma vez**). Guardem-no com segurança. Para voltar a ver ou gerar um novo secret, use a app Yoop (conta do merchant).
+O `webhook_secret` é entregue na activação do merchant (**uma vez**). Guardem-no com segurança. A app do customer não volta a mostrá-lo nem a gerar outro.
 
 ```text
 signed_payload = "{timestamp}.{raw_body}"
@@ -242,7 +242,7 @@ Implementa a integração merchant Yoop no nosso backend (e, se fizer sentido, n
 - Todos os pedidos à API de parceiros usam o header: `X-Merchant-Key: {api_key}`
 - Não uses Bearer/Sanctum nestes endpoints
 - Base URL: `{YOOP_BASE_URL}/api` (ex.: `https://api.exemplo.com/api`)
-- A `api_key` e o `webhook_secret` vêm da activação do merchant / app Yoop — guarda-os em secrets/env
+- A `api_key` e o `webhook_secret` vêm da activação do merchant — guarda-os em secrets/env
 
 ## Criar pagamento
 - `POST /merchant/payment-requests`

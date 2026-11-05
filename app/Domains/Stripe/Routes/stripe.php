@@ -25,8 +25,5 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/create-funding', [StripeController::class, 'createFunding'])
             ->middleware('throttle:stripe-intent');
         Route::get('/get-funding-instructions', [StripeController::class, 'getFundingInstructions']);
-        Route::post('/terminal/{paymentIntent}/capture', [StripeController::class, 'captureTerminal'])
-            ->where('paymentIntent', '[0-9]+')
-            ->middleware('throttle:stripe-intent');
     });
 });

@@ -15,6 +15,7 @@ class PermissionLabelsSeeder extends Seeder
         'customers.edit' => 'Editar clientes',
         'customers.delete' => 'Eliminar clientes',
         'customers.adjustments_balance' => 'Ajustar saldo',
+        'customers.balance_adjustment_otp' => 'Receber SMS de confirmação de saldo',
         'users.view' => 'Ver utilizadores',
         'users.create' => 'Criar utilizadores',
         'users.edit' => 'Editar utilizadores',

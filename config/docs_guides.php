@@ -84,12 +84,6 @@ return [
             'file' => 'partners/payment-requests.md',
         ],
         [
-            'slug' => 'terminal-topup',
-            'title' => 'Terminal (POS)',
-            'description' => 'Emparelhar TPA, connection token, intent e captura.',
-            'file' => 'partners/terminal-topup.md',
-        ],
-        [
             'slug' => 'ai-prompt',
             'title' => 'Prompt para IA',
             'description' => 'Texto pronto a colar num assistente para integrar a API.',

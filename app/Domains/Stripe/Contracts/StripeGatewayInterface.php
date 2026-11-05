@@ -41,8 +41,6 @@ interface StripeGatewayInterface
 
     public function capturePaymentIntent(string $paymentIntentId): array;
 
-    public function createTerminalConnectionToken(string $currency = 'eur'): array;
-
     public function applyCustomerBalance(string $paymentIntentId, array $params = []): array;
 
     /**

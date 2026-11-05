@@ -50,7 +50,6 @@ class GetDashboardOverviewQuery
             'total_balance' => 0,
             'maintenance_mode' => $this->settingsService->getByKey('system.maintenance_mode') === 'true',
             'platform_customers' => Customer::where('type', 'platform')->count(),
-            'merchant_customers' => Customer::whereHas('merchants')->count(),
         ];
 
         $recentCustomers = Customer::where('type', '!=', 'platform')->latest()->limit(10)->get();

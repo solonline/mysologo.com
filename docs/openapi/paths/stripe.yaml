@@ -117,34 +117,6 @@ stripe-create-intent-payment:
       '429':
         $ref: '../components/responses.yaml#/RateLimited'
 
-stripe-terminal-capture:
-  post:
-    tags: [Stripe]
-    summary: Capturar pagamento terminal
-    operationId: stripeTerminalCapture
-    description: |
-      Captura PaymentIntent após leitura do cartão no terminal.
-
-      A intenção de pagamento deve pertencer ao customer autenticado e estar em estado capturável.
-    security:
-      - bearerAuth: []
-    parameters:
-      - name: paymentIntent
-        in: path
-        required: true
-        schema:
-          type: integer
-    responses:
-      '200':
-        content:
-          application/json:
-            schema:
-              $ref: '../components/schemas.yaml#/MessageResponse'
-      '404':
-        $ref: '../components/responses.yaml#/NotFound'
-      '429':
-        $ref: '../components/responses.yaml#/RateLimited'
-
 stripe-show-payment-intent:
   get:
     tags: [Stripe]

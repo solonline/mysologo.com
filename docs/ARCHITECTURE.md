@@ -20,8 +20,8 @@
 │  │  Auth API   │  │ Customer API │  │       Stripe API          │   │
 │  │ /login      │  │ /me          │  │ /create-intent-payment    │   │
 │  │ /register   │  │ /update      │  │ /create-funding           │   │
-│  │ /login-pin  │  │ /find/:user  │  │ /terminal/create-intent   │   │
-│  │ /login-tpa  │  │ /phone/*     │  │ /fee-estimates            │   │
+│  │ /login-pin  │  │ /find/:user  │  │ /payment-intents/:id      │   │
+│  │             │  │ /phone/*     │  │ /fee-estimates            │   │
 │  └─────────────┘  └──────────────┘  └───────────────────────────┘   │
 │                                                                     │
 │  ┌──────────────┐  ┌─────────────┐  ┌───────────────────────────┐   │
@@ -112,10 +112,6 @@ customers.type
      │◀──────────────────────│  { token: ... }      │
      │                      │                      │
      │  POST /login-pin      │  (autenticação por PIN + device token)
-     │──────────────────────▶│                      │
-     │◀──────────────────────│  { token: ... }      │
-     │                      │                      │
-     │  POST /login-tpa      │  (Third Party Access)
      │──────────────────────▶│                      │
      │◀──────────────────────│  { token: ... }      │
 ```
@@ -372,8 +368,7 @@ customers
      ├──▶ rewards                     (ganho do customer; program_id → reward_programs)
      │      └── referred_id nullable (único; só programa referral)
      ├──▶ reward_programs             (catálogo: slug, description, valid_from/until)
-     └──▶ tpas                        (third party access tokens)
-           └── customer_fee_configs (taxas do TPA)
+     └──▶ tpas                        (histórico; sem API de terminal)
 
 stripe_transactions                   (todas as ops financeiras Stripe)
 ├── customer_id → customers
@@ -479,5 +474,3 @@ idempotency_keys                      (previne duplicação de requests)
 | `throttle:api` | Laravel RateLimit | 60 req/min por utilizador |
 | `throttle:stripe-intent` | Laravel RateLimit | 10 req/min — top-up da app (por utilizador) |
 | `throttle:merchant-payment-requests` | Laravel RateLimit | 120 req/min — criar payment request (por merchant) |
-| `throttle:merchant-terminal-token` | Laravel RateLimit | 60 req/min — connection token POS (por merchant) |
-| `throttle:merchant-terminal-intent` | Laravel RateLimit | 60 req/min — create-intent POS (por merchant) |

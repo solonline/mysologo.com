@@ -55,9 +55,6 @@ app/Domains/Backoffice/
 - [x] `CustomerController` no domínio Backoffice
 - [x] `UpdateCustomerFromBackofficeAction` — `status` via `CustomerLifecycleService::transitionTo`
 
-### Fase 2b — TPA do cliente (feito)
-- [x] `CustomerTpaController` + actions de fees/unlink
-
 ### Fase 3 — Administração (feito)
 - [x] Users → `ListUsersQuery` + `Create/Update/DeleteStaffUserAction`
 - [x] Roles → `ListRolesQuery` + `Create/Update/DeleteRoleAction`
@@ -103,7 +100,7 @@ app/Domains/Backoffice/
 ### Domínios Wallet + Merchant (novo)
 
 - **Wallet** — dashboard/saldos/transações/P2P (`api/v2/wallet/*`)
-- **Merchant** — registo merchant, payment requests, página `/pay/{uuid}` (`api/v2/merchant/*`)
+- **Merchant** — payment requests de parceiro e página `/pay/{uuid}` (`api/merchant/*`)
 
 ## Padrão por ecrã
 

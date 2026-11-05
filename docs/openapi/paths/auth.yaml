@@ -284,35 +284,6 @@ auth-login-pin:
       '422':
         $ref: '../components/responses.yaml#/ValidationError'
 
-auth-login-tpa:
-  post:
-    tags: [Auth]
-    summary: Login via terminal (TPA)
-    operationId: authLoginTpa
-    description: |
-      Autenticação para operadores de terminal físico (TPA).
-      Combina credenciais do cliente com `tpa_serial` do equipamento.
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            required: [email, password, tpa_serial]
-            properties:
-              email:
-                type: string
-                format: email
-              password:
-                type: string
-              tpa_serial:
-                type: string
-    responses:
-      '200':
-        description: Sessão TPA
-      '401':
-        $ref: '../components/responses.yaml#/Unauthorized'
-
 auth-logout:
   post:
     tags: [Auth]

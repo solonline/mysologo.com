@@ -40,10 +40,8 @@ info:
     | Limite | Rotas | Máx. |
     |--------|-------|------|
     | `api` | Geral | 60/min por utilizador |
-    | `stripe-intent` | Top-up app (`/stripe/create-intent-payment`, capture terminal) | 10/min por utilizador |
+    | `stripe-intent` | Top-up app (`/stripe/create-intent-payment`) | 10/min por utilizador |
     | `merchant-payment-requests` | Criar payment request | 120/min por merchant |
-    | `merchant-terminal-token` | Connection token POS | 60/min por merchant |
-    | `merchant-terminal-intent` | Create-intent POS | 60/min por merchant |
 
     ## Idempotência
 
@@ -76,7 +74,7 @@ servers:
 
 x-tagGroups:
   - name: Autenticação & Onboarding
-    tags: [Auth, Onboarding, Kyc, Tpa]
+    tags: [Auth, Onboarding, Kyc]
   - name: Perfil & Notificações
     tags: [Customer, Reward]
   - name: Carteira & Pagamentos
@@ -93,8 +91,6 @@ tags:
     description: Verificação de telefone por SMS.
   - name: Kyc
     description: Verificação de identidade (Didit).
-  - name: Tpa
-    description: Terminais físicos — associação e login.
   - name: Customer
     description: Perfil, telefone, documentos corporate, notificações.
   - name: Reward
@@ -106,7 +102,7 @@ tags:
   - name: Wallester
     description: Cartões, transacções e 3DS Out-of-Band (cliente autenticado).
   - name: Merchant
-    description: Payment requests e terminal. [Doc parceiros](/docs/partners).
+    description: Payment requests. [Doc parceiros](/docs/partners).
   - name: Settings
     description: Configuração e informação do sistema.
 
@@ -122,8 +118,6 @@ paths:
     $ref: './paths/auth.yaml#/auth-login'
   /auth/login-pin:
     $ref: './paths/auth.yaml#/auth-login-pin'
-  /auth/login-tpa:
-    $ref: './paths/auth.yaml#/auth-login-tpa'
   /auth/logout:
     $ref: './paths/auth.yaml#/auth-logout'
   /auth/forgot-password:
@@ -148,12 +142,6 @@ paths:
     $ref: './paths/kyc.yaml#/kyc-health'
   /kyc/identity/session:
     $ref: './paths/kyc.yaml#/kyc-identity-session'
-
-  # Tpa
-  /tpa/health:
-    $ref: './paths/tpa.yaml#/tpa-health'
-  /tpa/link:
-    $ref: './paths/tpa.yaml#/tpa-link'
 
   # Customer
   /customer/health:
@@ -224,8 +212,6 @@ paths:
     $ref: './paths/stripe.yaml#/stripe-create-intent-payment'
   /stripe/payment-intents/{paymentIntent}:
     $ref: './paths/stripe.yaml#/stripe-show-payment-intent'
-  /stripe/terminal/{paymentIntent}/capture:
-    $ref: './paths/stripe.yaml#/stripe-terminal-capture'
 
   # Wallester
   /wallester/health:
@@ -271,25 +257,8 @@ paths:
   # Merchant
   /merchant/health:
     $ref: './paths/merchant.yaml#/merchant-health'
-  /merchant:
-    $ref: './paths/merchant.yaml#/merchant-index'
-  /merchant/register:
-    $ref: './paths/merchant.yaml#/merchant-register'
-  /merchant/{merchant}:
-    $ref: './paths/merchant.yaml#/merchant-customer-update'
-  /merchant/{merchant}/credentials:
-    $ref: './paths/merchant.yaml#/merchant-customer-credentials/get'
-  /merchant/{merchant}/credentials/rotate:
-    $ref: './paths/merchant.yaml#/merchant-customer-credentials/post'
   /merchant/payment-requests:
-    get:
-      $ref: './paths/merchant.yaml#/merchant-customer-payment-requests/get'
-    post:
-      $ref: './paths/merchant.yaml#/merchant-payment-requests/post'
-  /merchant/terminal/connection-token:
-    $ref: './paths/merchant.yaml#/merchant-terminal-connection-token'
-  /merchant/terminal/create-intent:
-    $ref: './paths/merchant.yaml#/merchant-terminal-create-intent'
+    $ref: './paths/merchant.yaml#/merchant-payment-requests'
 
   # Settings
   /settings/health:

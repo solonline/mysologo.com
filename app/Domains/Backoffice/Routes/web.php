@@ -5,8 +5,6 @@ use App\Domains\Backoffice\Controllers\AuditLogController;
 use App\Domains\Backoffice\Controllers\Auth\LoginController;
 use App\Domains\Backoffice\Controllers\CustomerController;
 use App\Domains\Backoffice\Controllers\CustomerKycMediaController;
-use App\Domains\Backoffice\Controllers\CustomerMerchantFeeController;
-use App\Domains\Backoffice\Controllers\CustomerTpaController;
 use App\Domains\Backoffice\Controllers\DashboardController;
 use App\Domains\Backoffice\Controllers\NewsController;
 use App\Domains\Backoffice\Controllers\NotificationController;
@@ -62,14 +60,6 @@ Route::prefix('dashboard')->name('dashboard')->middleware('auth:web')->group(fun
     Route::post('/customers/{customer}/balance-adjustments/{adjustment}/confirm', [CustomerController::class, 'confirmBalanceAdjustment'])->name('.customers.balance-adjustments.confirm');
     Route::post('/customers/{customer}/balance-adjustments/{adjustment}/resend', [CustomerController::class, 'resendBalanceAdjustment'])->name('.customers.balance-adjustments.resend');
     Route::post('/customers/{customer}/balance-adjustments/{adjustment}/cancel', [CustomerController::class, 'cancelBalanceAdjustment'])->name('.customers.balance-adjustments.cancel');
-    Route::middleware('can:customers.view')->group(function () {
-        Route::delete('/customers/{customer}/tpas/{tpa}', [CustomerTpaController::class, 'destroy'])->name('.customers.tpas.destroy');
-        Route::post('/customers/{customer}/tpas/{tpa}/fees', [CustomerTpaController::class, 'storeFee'])->name('.customers.tpas.fees.store');
-        Route::delete('/customers/{customer}/tpas/{tpa}/fees/{fee}', [CustomerTpaController::class, 'destroyFee'])->name('.customers.tpas.fees.destroy');
-        Route::post('/customers/{customer}/merchants/{merchant}/fees', [CustomerMerchantFeeController::class, 'storeFee'])->name('.customers.merchants.fees.store');
-        Route::delete('/customers/{customer}/merchants/{merchant}/fees/{fee}', [CustomerMerchantFeeController::class, 'destroyFee'])->name('.customers.merchants.fees.destroy');
-    });
-
     Route::middleware('can:transactions.view')->group(function () {
         Route::get('/transactions', [TransactionController::class, 'index'])->name('.transactions');
         Route::get('/platform-revenue', [PlatformRevenueController::class, 'index'])->name('.platform-revenue');

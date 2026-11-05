@@ -21,6 +21,8 @@ use Illuminate\Validation\ValidationException;
 
 class RequestCustomerBalanceAdjustmentAction
 {
+    public const OTP_RECIPIENT_PERMISSION = 'customers.balance_adjustment_otp';
+
     public function __construct(
         protected SmsGatewayInterface $smsGateway,
     ) {}
@@ -33,7 +35,6 @@ class RequestCustomerBalanceAdjustmentAction
         string $description,
     ): CustomerBalanceAdjustment {
         $this->assertSuperAdmin($actor);
-        $this->assertActorPhone($actor);
 
         if ($amountCents < 1) {
             throw ValidationException::withMessages([
@@ -48,7 +49,9 @@ class RequestCustomerBalanceAdjustmentAction
             $this->assertSufficientLedgerBalance($customer, $currency, $amountCents);
         }
 
-        $adjustment = DB::transaction(function () use ($customer, $actor, $direction, $amountCents, $currency, $description) {
+        $recipient = $this->pickOtpRecipient();
+
+        $adjustment = DB::transaction(function () use ($customer, $actor, $recipient, $direction, $amountCents, $currency, $description) {
             $this->cancelPendingAdjustments($customer);
 
             $adjustment = CustomerBalanceAdjustment::query()->create([
@@ -63,19 +66,19 @@ class RequestCustomerBalanceAdjustmentAction
                 'idempotency_key' => 'manual_adj:'.(string) Str::uuid(),
             ]);
 
-            $this->createApproval($adjustment, $actor);
+            $this->createApproval($adjustment, $recipient);
 
             return $adjustment->fresh(['approvals']);
         });
 
-        $approval = $adjustment->approvals->firstWhere('user_id', $actor->id);
+        $approval = $adjustment->approvals->firstWhere('user_id', $recipient->id);
         if (! $approval instanceof CustomerBalanceAdjustmentApproval) {
             throw ValidationException::withMessages([
                 'adjustment' => 'Falha ao criar aprovação SMS.',
             ]);
         }
 
-        $this->sendOtpSms($actor, $approval, $adjustment);
+        $this->sendOtpSms($recipient, $approval, $adjustment);
 
         return $adjustment->fresh(['approvals']);
     }
@@ -89,15 +92,25 @@ class RequestCustomerBalanceAdjustmentAction
         }
     }
 
-    private function assertActorPhone(User $actor): void
+    private function pickOtpRecipient(): User
     {
-        $phone = preg_replace('/\D+/', '', (string) $actor->phone) ?: '';
+        $recipients = User::permission(self::OTP_RECIPIENT_PERMISSION)
+            ->get()
+            ->filter(fn (User $user): bool => $this->normalizedPhone($user) !== '')
+            ->values();
 
-        if ($phone === '') {
+        if ($recipients->isEmpty()) {
             throw ValidationException::withMessages([
-                'phone' => 'O seu utilizador precisa de um telefone configurado para receber o SMS de autenticação.',
+                'phone' => 'Não há nenhum utilizador com telefone e permissão para receber o SMS de confirmação.',
             ]);
         }
+
+        return $recipients->random();
+    }
+
+    private function normalizedPhone(User $user): string
+    {
+        return preg_replace('/\D+/', '', (string) $user->phone) ?: '';
     }
 
     private function requireActiveWallesterAccount(Customer $customer): CustomerWallesterAccount
@@ -149,13 +162,13 @@ class RequestCustomerBalanceAdjustmentAction
 
     private function createApproval(
         CustomerBalanceAdjustment $adjustment,
-        User $actor,
+        User $recipient,
     ): CustomerBalanceAdjustmentApproval {
         $code = (string) random_int(100000, 999999);
 
         return CustomerBalanceAdjustmentApproval::query()->create([
             'adjustment_id' => $adjustment->id,
-            'user_id' => $actor->id,
+            'user_id' => $recipient->id,
             'code' => $code,
             'code_expires_at' => now()->addMinutes(2),
             'sms_sent_at' => null,
@@ -164,11 +177,11 @@ class RequestCustomerBalanceAdjustmentAction
     }
 
     private function sendOtpSms(
-        User $actor,
+        User $recipient,
         CustomerBalanceAdjustmentApproval $approval,
         CustomerBalanceAdjustment $adjustment,
     ): void {
-        $phone = preg_replace('/\D+/', '', (string) $actor->phone) ?: (string) $actor->phone;
+        $phone = $this->normalizedPhone($recipient);
         $amount = number_format($adjustment->amount_cents / 100, 2, ',', '.');
         $directionLabel = $adjustment->direction->label();
 
@@ -177,7 +190,7 @@ class RequestCustomerBalanceAdjustmentAction
 
         SmsLogger::info('balance_adjustment_sms_dispatch', [
             'adjustment_id' => $adjustment->id,
-            'user_id' => $actor->id,
+            'user_id' => $recipient->id,
             'phone' => $phone,
             'code' => $approval->code,
         ]);
@@ -186,7 +199,7 @@ class RequestCustomerBalanceAdjustmentAction
 
         SmsLogger::info('balance_adjustment_sms_result', [
             'adjustment_id' => $adjustment->id,
-            'user_id' => $actor->id,
+            'user_id' => $recipient->id,
             'phone' => $phone,
             'provider_status' => $result['status'] ?? 'unknown',
             'http_code' => $result['http_code'] ?? null,

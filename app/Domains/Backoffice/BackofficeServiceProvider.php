@@ -13,26 +13,21 @@ use App\Domains\Backoffice\Actions\CreateStaffUserAction;
 use App\Domains\Backoffice\Actions\CreateStripeFeeAction;
 use App\Domains\Backoffice\Actions\DeleteAccountPayableAction;
 use App\Domains\Backoffice\Actions\DeleteAccountPayableAttachmentAction;
-use App\Domains\Backoffice\Actions\DeleteMerchantPaymentMethodFeeAction;
 use App\Domains\Backoffice\Actions\DeleteNewsAction;
 use App\Domains\Backoffice\Actions\DeleteRoleAction;
 use App\Domains\Backoffice\Actions\DeleteStaffUserAction;
 use App\Domains\Backoffice\Actions\DeleteStripeFeeAction;
-use App\Domains\Backoffice\Actions\DeleteTpaPaymentMethodFeeAction;
 use App\Domains\Backoffice\Actions\MarkAccountPayablePaidAction;
 use App\Domains\Backoffice\Actions\RetryAwaitingWallesterTopupsAction;
 use App\Domains\Backoffice\Actions\RetryCustomerProvisioningAction;
 use App\Domains\Backoffice\Actions\RetryStripeFundingAction;
 use App\Domains\Backoffice\Actions\StoreAccountPayableAttachmentsAction;
-use App\Domains\Backoffice\Actions\UnlinkCustomerTpaAction;
 use App\Domains\Backoffice\Actions\UpdateAccountPayableAction;
 use App\Domains\Backoffice\Actions\UpdateCustomerFromBackofficeAction;
 use App\Domains\Backoffice\Actions\UpdateNewsAction;
 use App\Domains\Backoffice\Actions\UpdateRoleAction;
 use App\Domains\Backoffice\Actions\UpdateStaffUserAction;
 use App\Domains\Backoffice\Actions\UpdateStripeFeeAction;
-use App\Domains\Backoffice\Actions\UpsertMerchantPaymentMethodFeeAction;
-use App\Domains\Backoffice\Actions\UpsertTpaPaymentMethodFeeAction;
 use App\Domains\Backoffice\Queries\GetAcceptedCurrenciesQuery;
 use App\Domains\Backoffice\Queries\GetAuditLogDetailQuery;
 use App\Domains\Backoffice\Queries\GetCustomerDetailQuery;
@@ -86,11 +81,6 @@ class BackofficeServiceProvider extends ServiceProvider
         CreateCustomerWallesterCardAction::class,
         LinkCustomerWallesterCardAction::class,
         RetryAwaitingWallesterTopupsAction::class,
-        UnlinkCustomerTpaAction::class,
-        UpsertTpaPaymentMethodFeeAction::class,
-        DeleteTpaPaymentMethodFeeAction::class,
-        UpsertMerchantPaymentMethodFeeAction::class,
-        DeleteMerchantPaymentMethodFeeAction::class,
         CreateStaffUserAction::class,
         UpdateStaffUserAction::class,
         DeleteStaffUserAction::class,

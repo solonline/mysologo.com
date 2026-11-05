@@ -35,22 +35,6 @@ class MerchantRateLimitTest extends TestCase
         $this->assertStringContainsString((string) $merchantB->id, $limitB->key);
     }
 
-    public function test_terminal_limiters_are_60_per_minute_and_use_separate_buckets(): void
-    {
-        $customer = $this->createActiveCustomer(['currency' => 'EUR']);
-        $merchant = $this->makeMerchant($customer, 'limit-tpa', 'yoop_test_limit_tpa');
-        $request = $this->merchantRequest($merchant);
-
-        $token = RateLimiter::limiter('merchant-terminal-token')($request);
-        $intent = RateLimiter::limiter('merchant-terminal-intent')($request);
-
-        $this->assertInstanceOf(Limit::class, $token);
-        $this->assertInstanceOf(Limit::class, $intent);
-        $this->assertSame(60, $token->maxAttempts);
-        $this->assertSame(60, $intent->maxAttempts);
-        $this->assertNotSame($token->key, $intent->key);
-    }
-
     public function test_merchant_api_returns_429_after_payment_request_limit(): void
     {
         $customer = $this->createActiveCustomer(['currency' => 'EUR']);

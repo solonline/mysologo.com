@@ -145,11 +145,6 @@ class StripeHttpClient
         return $this->client()->charges->retrieve($chargeId)->toArray();
     }
 
-    public function createTerminalConnectionToken(): array
-    {
-        return $this->client()->terminal->connectionTokens->create([])->toArray();
-    }
-
     public function applyCustomerBalance(string $paymentIntentId, array $params = []): array
     {
         return $this->client()->paymentIntents->applyCustomerBalance($paymentIntentId, $params)->toArray();

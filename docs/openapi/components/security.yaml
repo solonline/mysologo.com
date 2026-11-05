@@ -11,5 +11,4 @@ merchantKey:
   in: header
   name: X-Merchant-Key
   description: |
-    API key do merchant, emitida na app Yoop após activação (devolvida uma vez no
-    registo / rotate). Usada em payment requests e terminal. Não usar Bearer.
+    API key do merchant. Usada em payment requests. Não usar Bearer.

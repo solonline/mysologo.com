@@ -19,7 +19,6 @@ Route::post('/register-retail', [AuthController::class, 'registerRetail'])->name
 Route::post('/register-corporate', [AuthController::class, 'registerCorporate'])->name('auth.register-corporate');
 Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
 Route::post('/login-pin', [AuthController::class, 'loginWithPin'])->name('auth.login-pin');
-Route::post('/login-tpa', [AuthController::class, 'loginWithTpa'])->name('auth.login-tpa');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('auth.forgot-password');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('auth.reset-password');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum')->name('auth.logout');

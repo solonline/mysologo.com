@@ -15,8 +15,6 @@ Use esta página como contrato para o front-end e integradores. O backend é a f
 | `POST` | `/api/auth/register-corporate` |
 | `POST` | `/api/auth/login-pin` |
 
-`POST /api/auth/login-tpa` **não** devolve AuthSession — ver [Terminal / POS](/docs/partners/guides/terminal-topup).
-
 ## Estrutura de topo
 
 ```json

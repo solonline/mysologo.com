@@ -22,6 +22,7 @@ class RolesSeeder extends Seeder
             'customers.edit',
             'customers.delete',
             'customers.adjustments_balance',
+            'customers.balance_adjustment_otp',
             // Utilizadores
             'users.view',
             'users.create',
@@ -81,6 +82,7 @@ class RolesSeeder extends Seeder
         $admin->syncPermissions(
             Permission::where('guard_name', 'web')
                 ->where('name', 'not like', 'roles.%')
+                ->where('name', '!=', 'customers.balance_adjustment_otp')
                 ->get()
         );
 

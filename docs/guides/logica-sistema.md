@@ -72,7 +72,7 @@ flowchart TD
 
 A sequência até ao Didit é a que o utilizador percorre na app. **Criar PIN não vem logo a seguir ao KYC**: o PIN só é aceite com conta `ACTIVE`. Entre a aprovação Didit e o PIN o backend provisiona Wallester/Stripe (e Ebury quando aplicável) via jobs e webhooks.
 
-Depois de `ACTIVE`, as secções **não** seguem o prefixo `/api/{domínio}`: agrupam-se por **fluxo** (top-up cartão, IBAN, P2P, extractos, cartões, 3DS, terminal POS, merchant).
+Depois de `ACTIVE`, as secções **não** seguem o prefixo `/api/{domínio}`: agrupam-se por **fluxo** (top-up cartão, IBAN, P2P, extractos, cartões, 3DS).
 
 ### Estados (`lifecycle.status`)
 
@@ -309,8 +309,6 @@ O PIN vive no **dispositivo** (`device_token`), não na conta. Sem PIN criado ne
 
 Depois do onboarding (e no dia a dia), a **app** entra por password ou PIN. Ambos devolvem `AuthSession` — o PIN traz um snapshot mais leve e **não cria** sessão Didit nova.
 
-Login de **terminal POS** não é aqui: ver [Terminal / POS](#15-terminal--pos).
-
 ### `POST /api/auth/login`
 
 **Quando:** ecrã email + senha (onboarding a meio ou conta já activa).
@@ -465,7 +463,7 @@ Webhook que fecha o ciclo: `POST /api/webhooks/stripe` (secção 19).
 
 ## 10. Top-up por transferência (IBAN)
 
-Carregar a wallet por transferência bancária para o vIBAN Stripe. Não misturar com o terminal POS.
+Carregar a wallet por transferência bancária para o vIBAN Stripe.
 
 ### `POST /api/stripe/create-funding`
 
@@ -849,116 +847,19 @@ sequenceDiagram
 
 ## 15. Terminal / POS
 
-Um único fluxo: emparelhar o equipamento, abrir sessão, criar o pagamento no Stripe Terminal e capturar. **Não** é o top-up da wallet na app.
-
-Há **três autenticações** distintas — não misturar:
-
-| Passo | Quem chama | Auth |
-|-------|------------|------|
-| Pairing e login TPA | Terminal / operador | email + password (+ serial) |
-| Connection token e create-intent | POS com API key | `X-Merchant-Key` (`auth.merchant`) |
-| Capture | App / backend do customer | Bearer Sanctum + tríade |
-
-```mermaid
-sequenceDiagram
-    participant POS
-    participant API as Yoop API
-    participant Stripe
-    POS->>API: POST /tpa/link
-    POS->>API: POST /auth/login-tpa
-    POS->>API: POST /merchant/terminal/connection-token
-    POS->>API: POST /merchant/terminal/create-intent
-    POS->>Stripe: lê cartão presente
-    POS->>API: POST /stripe/terminal/id/capture
-```
-
-Guias: [Terminal](/docs/partners/guides/terminal-topup).
-
-### `POST /api/tpa/link`
-
-**Quando:** primeira configuração do terminal físico.
-
-**Pré-requisitos:** público. Body: `email`, `password`, `tpa_serial` (único, ainda não ligado).
-
-**O que o sistema faz:** autentica o customer, associa o serial com status `active`, devolve token + dados do TPA.
-
-**Passo seguinte:** `POST /api/auth/login-tpa` nas sessões seguintes.
-
-### `POST /api/auth/login-tpa`
-
-**Quando:** o terminal já está ligado e precisa de sessão.
-
-**Pré-requisitos:** público. Body: `email`, `password`, `tpa_serial`. O TPA tem de estar `active`.
-
-**O que o sistema faz:** emite token **sem** expiry explícito (`tpa_login_{serial}`). Resposta `TpaAuthResource`: `token`, `context: tpa`, `user`, `tpa { id, serial, status }` — **não** é o `AuthSession` da app.
-
-### `POST /api/merchant/terminal/connection-token`
-
-**Quando:** o SDK Stripe Terminal no POS precisa de se ligar.
-
-**Pré-requisitos:** `X-Merchant-Key`. Throttle `merchant-terminal-token` (60/min por merchant).
-
-**O que o sistema faz:** devolve um connection token Stripe Terminal.
-
-### `POST /api/merchant/terminal/create-intent`
-
-**Quando:** iniciar um pagamento com cartão presente.
-
-**Pré-requisitos:** `X-Merchant-Key`, header `Idempotency-Key`. Throttle `merchant-terminal-intent` (60/min por merchant).
-
-**O que o sistema faz:** cria PaymentIntent `card_present`.
-
-**Passo seguinte:** o POS lê o cartão no Stripe; depois `POST /api/stripe/terminal/{id}/capture`.
-
-### `POST /api/stripe/terminal/{paymentIntent}/capture`
-
-**Quando:** capturar o PaymentIntent depois do cartão presente.
-
-**Pré-requisitos:** Bearer **customer** + tríade (não é a API key merchant). Throttle `stripe-intent`. O `{paymentIntent}` é o id interno Yoop, já criado no passo anterior.
-
-**O que o sistema faz:** captura o PI se estiver capturável. `{ "message": "Captura solicitada com sucesso." }`.
+O terminal físico (TPA) e o Stripe Terminal (connection token, create-intent e captura) foram removidos da API e do backoffice. O carregamento da wallet continua na [secção 9](#9-top-up-com-cartão) e na [secção 10](#10-top-up-por-transferência-iban).
 
 ---
 
-## 16. Merchant (o customer como loja)
+## 16. Payment requests de parceiro
 
-Registo da loja, credenciais e links de pagamento. Rotas com Bearer do **customer** usam só `auth:sanctum` — **não** a tríade. Terminal POS está na [secção 15](#15-terminal--pos).
-
-O grupo com `X-Merchant-Key` serve o POS / integrador (criar payment request sem ser o dono na app).
+A app do customer não regista nem gere merchants. O integrador cria o link com `X-Merchant-Key`.
 
 Guia: [Payment requests](/docs/partners/guides/payment-requests).
 
-### `GET /api/merchant`
-
-Lista os merchants do customer autenticado.
-
-### `POST /api/merchant/register`
-
-Cria merchant e gera `api_key` + `webhook_secret` — a **api_key só aparece nesta resposta**. Body: `name`, `mode?`, `webhook_url?`, `allowed_currencies?`.
-
-### `PATCH /api/merchant/{merchant}`
-
-Actualiza um merchant owned e activo (`name`, `slug`, `webhook_url`, `mode`).
-
-### `GET /api/merchant/{merchant}/credentials`
-
-Devolve `webhook_secret`. A `api_key` **não** é recuperável daqui.
-
-### `POST /api/merchant/{merchant}/credentials/rotate`
-
-Roda `api_key` e/ou `webhook_secret` (flags boolean). Guardar a nova key de imediato.
-
-### `GET /api/merchant/payment-requests`
-
-Vendas/pedidos de **todos** os merchants do customer (`uuid`, `amount`, URL `/pay/{uuid}`, `status`, `settlement_status`). Não misturar com o ledger da wallet.
-
-### `POST /api/merchant/{merchant}/payment-requests`
-
-Cria link de pagamento (throttle `merchant-payment-requests`, 120/min por merchant). Body: `amount`, dados do pagador, `expires_in?`, `payment_method_types` (`card` \| `mb_way`), …
-
 ### `POST /api/merchant/payment-requests`
 
-Igual, mas com `X-Merchant-Key` (integrador / POS), sem Bearer do dono.
+Cria link de pagamento com `X-Merchant-Key` (throttle `merchant-payment-requests`, 120/min por merchant). Body: `amount`, dados do pagador, `expires_in?`, `payment_method_types` (`card` \| `mb_way`), …
 
 ---
 
@@ -1076,7 +977,7 @@ Detalhe: [Webhooks](/docs/guides/webhooks).
 
 Públicos, sem lógica de negócio. Úteis para load balancer e smoke tests:
 
-`GET /up` (Laravel) e `GET /api/{auth|onboarding|kyc|customer|wallet|stripe|wallester|merchant|settings|tpa|ebury}/health` → `{ "domain": "…", "status": "ok" }`.
+`GET /up` (Laravel) e `GET /api/{auth|onboarding|kyc|customer|wallet|stripe|wallester|merchant|settings|ebury}/health` → `{ "domain": "…", "status": "ok" }`.
 
 ---
 
@@ -1099,6 +1000,5 @@ Públicos, sem lógica de negócio. Úteis para load balancer e smoke tests:
 | 3DS | pending → approve/reject (webhooks Wallester 3DS) |
 | Extrato | `GET /wallet/funding-accounts/{id}/movements` |
 | Recompensas | `GET /reward/my-rewards` |
-| Terminal POS | `tpa/link` → `login-tpa` → `connection-token` → `create-intent` → `capture` |
 
 O backend continua a ser a fonte de verdade: se `capabilities.can_transact` for `false`, não forçar wallet, PIN ou pagamentos.

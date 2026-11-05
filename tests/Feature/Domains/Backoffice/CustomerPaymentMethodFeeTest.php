@@ -10,6 +10,7 @@ use App\Models\Tpa;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Concerns\InteractsWithOnboarding;
@@ -28,89 +29,10 @@ class CustomerPaymentMethodFeeTest extends TestCase
         Permission::findOrCreate('customers.view', 'web');
     }
 
-    public function test_staff_can_create_and_update_merchant_fee(): void
+    public function test_merchant_fee_routes_are_not_registered(): void
     {
-        $user = $this->userWithPermission('customers.view');
-        $customer = $this->createActiveCustomer();
-        $merchant = $this->createMerchant($customer, 'Loja Taxas');
-
-        $this->actingAs($user, 'web')
-            ->from(route('dashboard.customers.show', $customer))
-            ->post(route('dashboard.customers.merchants.fees.store', [$customer, $merchant]), [
-                'payment_method' => 'card',
-                'label' => 'Cartão',
-                'fee_percentage' => '0.0150',
-                'fee_fixed' => '0.25',
-                'currency' => 'eur',
-                'is_active' => '1',
-            ])
-            ->assertRedirect(route('dashboard.customers.show', $customer));
-
-        $this->assertDatabaseCount('customer_payment_method_fees', 1);
-        $this->assertDatabaseHas('customer_payment_method_fees', [
-            'customer_id' => $customer->id,
-            'merchant_id' => $merchant->id,
-            'tpa_id' => null,
-            'payment_method' => 'card',
-            'label' => 'Cartão',
-            'currency' => 'EUR',
-            'is_active' => true,
-        ]);
-
-        $this->actingAs($user, 'web')
-            ->post(route('dashboard.customers.merchants.fees.store', [$customer, $merchant]), [
-                'payment_method' => 'card',
-                'label' => 'Cartão atualizado',
-                'fee_percentage' => '0.0200',
-                'fee_fixed' => '0.10',
-                'currency' => 'EUR',
-                'is_active' => '1',
-            ])
-            ->assertRedirect();
-
-        $this->assertDatabaseCount('customer_payment_method_fees', 1);
-        $this->assertDatabaseHas('customer_payment_method_fees', [
-            'merchant_id' => $merchant->id,
-            'label' => 'Cartão atualizado',
-            'fee_percentage' => '0.0200',
-            'fee_fixed' => '0.1000',
-        ]);
-    }
-
-    public function test_staff_cannot_store_fee_for_merchant_of_another_customer(): void
-    {
-        $user = $this->userWithPermission('customers.view');
-        $customer = $this->createActiveCustomer();
-        $otherCustomer = $this->createActiveCustomer();
-        $otherMerchant = $this->createMerchant($otherCustomer, 'Loja Alheia');
-
-        $this->actingAs($user, 'web')
-            ->post(route('dashboard.customers.merchants.fees.store', [$customer, $otherMerchant]), [
-                'payment_method' => 'card',
-                'label' => 'Cartão',
-                'fee_percentage' => '0.0150',
-                'fee_fixed' => '0.25',
-                'currency' => 'EUR',
-                'is_active' => '1',
-            ])
-            ->assertForbidden();
-
-        $this->assertDatabaseCount('customer_payment_method_fees', 0);
-    }
-
-    public function test_staff_can_delete_merchant_fee(): void
-    {
-        $user = $this->userWithPermission('customers.view');
-        $customer = $this->createActiveCustomer();
-        $merchant = $this->createMerchant($customer, 'Loja Delete');
-        $fee = $this->createMerchantFee($customer, $merchant);
-
-        $this->actingAs($user, 'web')
-            ->from(route('dashboard.customers.show', $customer))
-            ->delete(route('dashboard.customers.merchants.fees.destroy', [$customer, $merchant, $fee]))
-            ->assertRedirect(route('dashboard.customers.show', $customer));
-
-        $this->assertDatabaseMissing('customer_payment_method_fees', ['id' => $fee->id]);
+        $this->assertFalse(Route::has('dashboard.customers.merchants.fees.store'));
+        $this->assertFalse(Route::has('dashboard.customers.merchants.fees.destroy'));
     }
 
     public function test_find_active_for_merchant_returns_active_and_ignores_inactive(): void
@@ -167,7 +89,6 @@ class CustomerPaymentMethodFeeTest extends TestCase
 
     public function test_tpa_fee_stays_isolated_from_merchant_fee(): void
     {
-        $user = $this->userWithPermission('customers.view');
         $customer = $this->createActiveCustomer();
         $merchant = $this->createMerchant($customer, 'Loja Isolada');
         $tpa = Tpa::query()->create([
@@ -176,16 +97,16 @@ class CustomerPaymentMethodFeeTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->actingAs($user, 'web')
-            ->post(route('dashboard.customers.tpas.fees.store', [$customer, $tpa]), [
-                'payment_method' => 'card',
-                'label' => 'TPA Cartão',
-                'fee_percentage' => '0.0100',
-                'fee_fixed' => '0.05',
-                'currency' => 'EUR',
-                'is_active' => '1',
-            ])
-            ->assertRedirect();
+        CustomerPaymentMethodFee::query()->create([
+            'customer_id' => $customer->id,
+            'tpa_id' => $tpa->id,
+            'payment_method' => 'card',
+            'label' => 'TPA Cartão',
+            'fee_percentage' => 0.0100,
+            'fee_fixed' => 0.05,
+            'currency' => 'EUR',
+            'is_active' => true,
+        ]);
 
         $this->createMerchantFee($customer, $merchant, [
             'payment_method' => 'card',
@@ -208,57 +129,6 @@ class CustomerPaymentMethodFeeTest extends TestCase
         $this->assertTrue($merchantFee->isMerchant());
         $this->assertSame('TPA Cartão', $tpaFee->label);
         $this->assertSame('Merchant Cartão', $merchantFee->label);
-    }
-
-    public function test_customer_show_displays_merchant_fees(): void
-    {
-        $user = $this->userWithPermission('customers.view');
-        $customer = $this->createActiveCustomer();
-        $merchant = $this->createMerchant($customer, 'Loja Show Fees');
-        $this->createMerchantFee($customer, $merchant, [
-            'label' => 'Taxa SecurePay Cartão',
-        ]);
-
-        $this->actingAs($user, 'web')
-            ->get(route('dashboard.customers.show', $customer))
-            ->assertOk()
-            ->assertSee('Loja Show Fees')
-            ->assertSee('Taxa SecurePay Cartão')
-            ->assertDontSee('Adicionar Taxa');
-    }
-
-    public function test_customer_show_allows_adding_fee_for_another_currency(): void
-    {
-        $user = $this->userWithPermission('customers.view');
-        $customer = $this->createActiveCustomer();
-        $merchant = $this->createMerchant($customer, 'Loja Multi Moeda');
-        $merchant->update(['allowed_currencies' => ['EUR', 'USD']]);
-        $this->createMerchantFee($customer, $merchant, [
-            'currency' => 'EUR',
-            'label' => 'Taxa EUR',
-        ]);
-
-        $this->actingAs($user, 'web')
-            ->get(route('dashboard.customers.show', $customer))
-            ->assertOk()
-            ->assertSee('Taxa EUR')
-            ->assertSee('Adicionar Taxa')
-            ->assertSee('USD', false)
-            ->assertDontSee('Método de Pagamento');
-    }
-
-    public function test_customer_show_allows_adding_fee_when_merchant_has_none(): void
-    {
-        $user = $this->userWithPermission('customers.view');
-        $customer = $this->createActiveCustomer();
-        $this->createMerchant($customer, 'Loja Sem Taxa');
-
-        $this->actingAs($user, 'web')
-            ->get(route('dashboard.customers.show', $customer))
-            ->assertOk()
-            ->assertSee('Loja Sem Taxa')
-            ->assertSee('Adicionar Taxa')
-            ->assertSee('Nenhuma taxa personalizada');
     }
 
     private function createActiveCustomer(): Customer

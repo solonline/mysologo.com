@@ -54,12 +54,12 @@ class ConfirmCustomerBalanceAdjustmentAction
 
         $approval = CustomerBalanceAdjustmentApproval::query()
             ->where('adjustment_id', $adjustment->id)
-            ->where('user_id', $actor->id)
+            ->latest('id')
             ->first();
 
         if (! $approval instanceof CustomerBalanceAdjustmentApproval) {
             throw ValidationException::withMessages([
-                'code' => 'Não existe aprovação SMS pendente para o seu utilizador.',
+                'code' => 'Não existe aprovação SMS pendente para este ajuste.',
             ]);
         }
 

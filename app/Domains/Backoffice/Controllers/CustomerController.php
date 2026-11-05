@@ -89,7 +89,7 @@ class CustomerController extends Controller
         $pendingBalanceAdjustment = CustomerBalanceAdjustment::query()
             ->where('customer_id', $customer->id)
             ->where('status', CustomerBalanceAdjustmentStatus::PendingApproval)
-            ->with('approvals')
+            ->with('approvals.user')
             ->latest('id')
             ->first();
 
@@ -438,7 +438,7 @@ class CustomerController extends Controller
             return null;
         }
 
-        $adjustment->loadMissing('approvals');
+        $adjustment->loadMissing('approvals.user');
 
         return [
             'id' => $adjustment->id,
@@ -451,6 +451,7 @@ class CustomerController extends Controller
             'status' => $adjustment->status->value,
             'required_approvals' => $adjustment->required_approvals,
             'verified_approvals' => $adjustment->approvals->whereNotNull('verified_at')->count(),
+            'otp_phone_masked' => $adjustment->otpPhoneMasked(),
         ];
     }
 }

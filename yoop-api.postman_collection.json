@@ -80,11 +80,6 @@
             "key": "notification_id",
             "value": "1",
             "type": "string"
-        },
-        {
-            "key": "tpa_serial",
-            "value": "",
-            "type": "string"
         }
     ],
     "item": [
@@ -248,45 +243,6 @@
                         "body": {
                             "mode": "raw",
                             "raw": "{\n    \"email\": \"john@example.com\",\n    \"device_token\": \"{{device_token}}\",\n    \"pin\": \"1234\"\n}"
-                        }
-                    },
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "type": "text/javascript",
-                                "exec": [
-                                    "var json = pm.response.json();",
-                                    "var token = (json.data && json.data.token) ? json.data.token : json.token;",
-                                    "if (token) { pm.collectionVariables.set('token', token); }"
-                                ]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Login via TPA",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/auth/login-tpa",
-                        "auth": {
-                            "type": "noauth"
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"password\": \"secret123\",\n    \"tpa_serial\": \"{{tpa_serial}}\"\n}"
                         }
                     },
                     "event": [
@@ -513,54 +469,6 @@
                             }
                         ],
                         "url": "{{base_url}}/kyc/identity/session"
-                    }
-                }
-            ]
-        },
-        {
-            "name": "TPA",
-            "item": [
-                {
-                    "name": "Health",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/tpa/health",
-                        "auth": {
-                            "type": "noauth"
-                        }
-                    }
-                },
-                {
-                    "name": "Link TPA",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/tpa/link",
-                        "auth": {
-                            "type": "noauth"
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"email\": \"john@example.com\",\n    \"password\": \"secret123\",\n    \"tpa_serial\": \"{{tpa_serial}}\"\n}"
-                        }
                     }
                 }
             ]
@@ -1155,20 +1063,6 @@
                         ],
                         "url": "{{base_url}}/stripe/get-funding-instructions"
                     }
-                },
-                {
-                    "name": "Capture Terminal Payment",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/stripe/terminal/{{payment_intent_id}}/capture"
-                    }
                 }
             ]
         },
@@ -1189,131 +1083,6 @@
                         "url": "{{base_url}}/merchant/health",
                         "auth": {
                             "type": "noauth"
-                        }
-                    }
-                },
-                {
-                    "name": "List My Merchants",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/merchant"
-                    }
-                },
-                {
-                    "name": "Register Merchant",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/merchant/register",
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"name\": \"My Shop\",\n    \"mode\": \"test\",\n    \"webhook_url\": \"https://example.com/webhooks/yoop\",\n    \"allowed_currencies\": [\n        \"EUR\"\n    ]\n}"
-                        }
-                    }
-                },
-                {
-                    "name": "Update Merchant",
-                    "request": {
-                        "method": "PATCH",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/merchant/{{merchant_id}}",
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"name\": \"My Shop\",\n    \"mode\": \"test\"\n}"
-                        }
-                    }
-                },
-                {
-                    "name": "Show Credentials",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/merchant/{{merchant_id}}/credentials"
-                    }
-                },
-                {
-                    "name": "Rotate Credentials",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/merchant/{{merchant_id}}/credentials/rotate"
-                    }
-                },
-                {
-                    "name": "List Payment Requests",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/merchant/payment-requests"
-                    }
-                },
-                {
-                    "name": "Create Payment Request (customer)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/merchant/{{merchant_id}}/payment-requests",
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"amount\": 2500,\n    \"description\": \"Order #123\",\n    \"payment_method_types\": [\n        \"card\",\n        \"mb_way\"\n    ]\n}"
                         }
                     }
                 },
@@ -1357,93 +1126,6 @@
                         "body": {
                             "mode": "raw",
                             "raw": "{\n    \"amount\": 5000,\n    \"description\": \"Order #123\",\n    \"external_reference\": \"ext-123\",\n    \"payment_method_types\": [\n        \"card\",\n        \"mb_way\"\n    ]\n}"
-                        }
-                    }
-                },
-                {
-                    "name": "Terminal Connection Token",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/merchant/terminal/connection-token",
-                        "auth": {
-                            "type": "apikey",
-                            "apikey": [
-                                {
-                                    "key": "key",
-                                    "value": "X-Merchant-Key",
-                                    "type": "string"
-                                },
-                                {
-                                    "key": "value",
-                                    "value": "{{merchant_api_key}}",
-                                    "type": "string"
-                                },
-                                {
-                                    "key": "in",
-                                    "value": "header",
-                                    "type": "string"
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Create Terminal Payment Intent",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Accept",
-                                "value": "application/json",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Idempotency-Key",
-                                "value": "{{$guid}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "X-Merchant-Key",
-                                "value": "{{merchant_api_key}}",
-                                "type": "text"
-                            }
-                        ],
-                        "url": "{{base_url}}/merchant/terminal/create-intent",
-                        "auth": {
-                            "type": "apikey",
-                            "apikey": [
-                                {
-                                    "key": "key",
-                                    "value": "X-Merchant-Key",
-                                    "type": "string"
-                                },
-                                {
-                                    "key": "value",
-                                    "value": "{{merchant_api_key}}",
-                                    "type": "string"
-                                },
-                                {
-                                    "key": "in",
-                                    "value": "header",
-                                    "type": "string"
-                                }
-                            ]
-                        },
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"tpa_serial_number\": \"{{tpa_serial}}\",\n    \"amount\": 2000,\n    \"currency\": \"EUR\"\n}"
                         }
                     }
                 }

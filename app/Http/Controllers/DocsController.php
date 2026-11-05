@@ -58,7 +58,7 @@ class DocsController extends Controller
 
         return view('docs.guides.index', [
             'title' => 'Guias — Parceiros',
-            'description' => 'Integração merchant e terminal.',
+            'description' => 'Integração merchant.',
             'navActive' => 'guides-partners',
             'audience' => 'partners',
             'guides' => $this->guides->guidesFor('partners'),

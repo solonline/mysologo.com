@@ -18,7 +18,6 @@ use App\Models\CustomerWallesterAccount;
 use App\Models\CustomerWallesterCard;
 use App\Models\FundingPartnerMovement;
 use App\Models\Merchant;
-use App\Models\MerchantPaymentRequest;
 use App\Models\StripeTransaction;
 use App\Models\User;
 use App\Models\WiseTransfer;
@@ -511,8 +510,10 @@ class CustomerDashboardShowTest extends TestCase
         $this->assertSame(10, substr_count($response->getContent(), 'data-customer-movement'));
     }
 
-    public function test_customer_show_displays_merchant_info_and_payment_requests(): void
+    public function test_customer_show_does_not_offer_securepay(): void
     {
+        $this->withoutVite();
+
         $user = $this->userWithPermission('customers.view');
         $customer = $this->createRetailCustomer([
             'status' => CustomerLifecycleStatus::ACTIVE,
@@ -521,7 +522,7 @@ class CustomerDashboardShowTest extends TestCase
             'currency' => 'EUR',
         ]);
 
-        $merchant = Merchant::query()->create([
+        Merchant::query()->create([
             'customer_id' => $customer->id,
             'name' => 'Loja Backoffice',
             'slug' => 'loja-backoffice-'.uniqid(),
@@ -531,45 +532,13 @@ class CustomerDashboardShowTest extends TestCase
             'is_active' => true,
         ]);
 
-        $transaction = StripeTransaction::query()->create([
-            'customer_id' => $customer->id,
-            'type' => TransactionType::MERCHANT_PAYMENT,
-            'payment_method_type' => 'card',
-            'direction' => 'credit',
-            'amount' => 2599,
-            'stripe_fee' => 0,
-            'platform_fee' => 0,
-            'net_amount' => 2599,
-            'currency' => 'EUR',
-            'status' => 'succeeded',
-            'description' => 'Pedido BO',
-            'stripe_created_at' => now(),
-        ]);
-
-        MerchantPaymentRequest::query()->create([
-            'merchant_id' => $merchant->id,
-            'transaction_id' => $transaction->id,
-            'amount' => 2599,
-            'currency' => 'EUR',
-            'description' => 'Pedido BO',
-            'external_reference' => 'ORD-BO-42',
-            'status' => 'completed',
-            'paid_at' => now(),
-            'expires_at' => now()->addHour(),
-            'language' => 'pt',
-        ]);
-
         $response = $this->actingAs($user, 'web')
             ->get(route('dashboard.customers.show', $customer));
 
         $response->assertOk();
-        $response->assertSee('SecurePay');
-        $response->assertSee('Loja Backoffice');
-        $response->assertSee('https://loja.exemplo.com/webhook');
-        $response->assertSee('25,99');
-        $response->assertSee('ORD-BO-42');
-        $response->assertSee('Pago');
-        $response->assertSee('Transações');
+        $response->assertDontSee('SecurePay');
+        $response->assertDontSee('Loja Backoffice');
+        $response->assertDontSee('securepay.png', false);
     }
 
     public function test_platform_customer_show_uses_wallester_master_cash(): void

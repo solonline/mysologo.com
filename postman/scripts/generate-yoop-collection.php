@@ -128,7 +128,6 @@ $collection = [
         ['key' => 'merchant_id', 'value' => '1', 'type' => 'string'],
         ['key' => 'news_id', 'value' => '1', 'type' => 'string'],
         ['key' => 'notification_id', 'value' => '1', 'type' => 'string'],
-        ['key' => 'tpa_serial', 'value' => '', 'type' => 'string'],
     ],
     'item' => [
         folder('Auth', [
@@ -168,11 +167,6 @@ $collection = [
                 'event' => $saveToken,
                 'body' => ['email' => 'john@example.com', 'device_token' => '{{device_token}}', 'pin' => '1234'],
             ]),
-            req('Login via TPA', 'POST', 'auth/login-tpa', [
-                'auth' => $noAuth,
-                'event' => $saveToken,
-                'body' => ['email' => 'john@example.com', 'password' => 'secret123', 'tpa_serial' => '{{tpa_serial}}'],
-            ]),
             req('Logout', 'POST', 'auth/logout'),
             req('Forgot Password', 'POST', 'auth/forgot-password', [
                 'auth' => $noAuth,
@@ -201,17 +195,6 @@ $collection = [
         folder('KYC', [
             req('Health', 'GET', 'kyc/health', ['auth' => $noAuth]),
             req('Create Identity Session', 'POST', 'kyc/identity/session'),
-        ]),
-        folder('TPA', [
-            req('Health', 'GET', 'tpa/health', ['auth' => $noAuth]),
-            req('Link TPA', 'POST', 'tpa/link', [
-                'auth' => $noAuth,
-                'body' => [
-                    'email' => 'john@example.com',
-                    'password' => 'secret123',
-                    'tpa_serial' => '{{tpa_serial}}',
-                ],
-            ]),
         ]),
         folder('Customer', [
             req('Health', 'GET', 'customer/health', ['auth' => $noAuth]),
@@ -303,32 +286,9 @@ $collection = [
                 'body' => ['amount' => 5000, 'currency' => 'EUR'],
             ]),
             req('Get Funding Instructions', 'GET', 'stripe/get-funding-instructions'),
-            req('Capture Terminal Payment', 'POST', 'stripe/terminal/{{payment_intent_id}}/capture'),
         ]),
         folder('Merchant', [
             req('Health', 'GET', 'merchant/health', ['auth' => $noAuth]),
-            req('List My Merchants', 'GET', 'merchant'),
-            req('Register Merchant', 'POST', 'merchant/register', [
-                'body' => [
-                    'name' => 'My Shop',
-                    'mode' => 'test',
-                    'webhook_url' => 'https://example.com/webhooks/yoop',
-                    'allowed_currencies' => ['EUR'],
-                ],
-            ]),
-            req('Update Merchant', 'PATCH', 'merchant/{{merchant_id}}', [
-                'body' => ['name' => 'My Shop', 'mode' => 'test'],
-            ]),
-            req('Show Credentials', 'GET', 'merchant/{{merchant_id}}/credentials'),
-            req('Rotate Credentials', 'POST', 'merchant/{{merchant_id}}/credentials/rotate'),
-            req('List Payment Requests', 'GET', 'merchant/payment-requests'),
-            req('Create Payment Request (customer)', 'POST', 'merchant/{{merchant_id}}/payment-requests', [
-                'body' => [
-                    'amount' => 2500,
-                    'description' => 'Order #123',
-                    'payment_method_types' => ['card', 'mb_way'],
-                ],
-            ]),
             req('Create Payment Request (partner)', 'POST', 'merchant/payment-requests', [
                 'auth' => $merchantAuth,
                 'body' => [
@@ -336,21 +296,6 @@ $collection = [
                     'description' => 'Order #123',
                     'external_reference' => 'ext-123',
                     'payment_method_types' => ['card', 'mb_way'],
-                ],
-            ]),
-            req('Terminal Connection Token', 'POST', 'merchant/terminal/connection-token', [
-                'auth' => $merchantAuth,
-            ]),
-            req('Create Terminal Payment Intent', 'POST', 'merchant/terminal/create-intent', [
-                'auth' => $merchantAuth,
-                'headers' => array_merge($jsonHeaders, [
-                    ['key' => 'Idempotency-Key', 'value' => '{{$guid}}', 'type' => 'text'],
-                    ['key' => 'X-Merchant-Key', 'value' => '{{merchant_api_key}}', 'type' => 'text'],
-                ]),
-                'body' => [
-                    'tpa_serial_number' => '{{tpa_serial}}',
-                    'amount' => 2000,
-                    'currency' => 'EUR',
                 ],
             ]),
         ]),
@@ -396,7 +341,6 @@ $env = [
         ['key' => 'merchant_api_key', 'value' => '', 'type' => 'secret', 'enabled' => true],
         ['key' => 'device_token', 'value' => 'postman-device-1', 'type' => 'default', 'enabled' => true],
         ['key' => 'username', 'value' => 'johndoe', 'type' => 'default', 'enabled' => true],
-        ['key' => 'tpa_serial', 'value' => '', 'type' => 'default', 'enabled' => true],
     ],
     '_postman_variable_scope' => 'environment',
     '_postman_exported_using' => 'Postman',

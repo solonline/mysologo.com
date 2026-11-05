@@ -35,18 +35,6 @@ class AppServiceProvider extends ServiceProvider
                 ->by($this->merchantLimitKey($request, 'payment-requests'))
                 ->response($this->tooManyAttemptsResponse());
         });
-
-        RateLimiter::for('merchant-terminal-token', function (Request $request) {
-            return Limit::perMinute(60)
-                ->by($this->merchantLimitKey($request, 'terminal-token'))
-                ->response($this->tooManyAttemptsResponse());
-        });
-
-        RateLimiter::for('merchant-terminal-intent', function (Request $request) {
-            return Limit::perMinute(60)
-                ->by($this->merchantLimitKey($request, 'terminal-intent'))
-                ->response($this->tooManyAttemptsResponse());
-        });
     }
 
     private function merchantLimitKey(Request $request, string $prefix): string

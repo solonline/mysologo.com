@@ -1,6 +1,6 @@
 # Prompt para IA — API Merchant Yoop
 
-Prompt pronto a colar num assistente de código para implementar a integração de parceiro Yoop (payment requests + webhook HMAC + opcionalmente terminal POS).
+Prompt pronto a colar num assistente de código para implementar a integração de parceiro Yoop (payment requests + webhook HMAC).
 
 Copie o bloco completo.
 
@@ -13,7 +13,7 @@ Copie o bloco completo.
 - API de merchants/parceiros (não app do consumidor final)
 - Autenticação: header `X-Merchant-Key: {api_key}` em todos os pedidos
 - Base URL: `{YOOP_BASE_URL}/api`
-- Credenciais (`api_key`, `webhook_secret`) são fornecidas na activação do merchant / app Yoop — nunca as hardcodes; usa env/secrets
+- Credenciais (`api_key`, `webhook_secret`) são fornecidas na activação do merchant — nunca as hardcodes; usa env/secrets
 
 ## A) Payment requests (links de pagamento)
 1. `POST /merchant/payment-requests` com JSON:
@@ -46,15 +46,6 @@ Copie o bloco completo.
 - Retries: até 10 com backoff; endpoint deve ser idempotente (`uuid` ou `X-Yoop-Delivery-Id`)
 - Responder 2xx só após processar; erros 4xx (exceto 408/429) não são reintentados
 
-## C) Terminal POS (opcional, se o produto tiver TPA)
-- O TPA liga-se ao **customer** dono do merchant: `POST /tpa/link` `{ email, password, tpa_serial }` (não uses `X-Merchant-Key` neste passo)
-- Sessões seguintes do equipamento: `POST /auth/login-tpa` com os mesmos campos
-1. `POST /merchant/terminal/connection-token` (`X-Merchant-Key`) → `secret` para o SDK do terminal (60/min por merchant)
-2. `POST /merchant/terminal/create-intent` com `Idempotency-Key` (UUID) e body `{ tpa_serial_number, amount, currency }` — o serial tem de pertencer ao customer do merchant (60/min por merchant)
-3. Usar `client_secret` no SDK para cobrar no reader
-4. `payment_intent.id` é o ID interno Yoop
-5. `POST /stripe/terminal/{payment_intent.id}/capture` com Bearer Sanctum do **customer** (conta ACTIVE), não com a API key
-
 ## Regras
 - Não uses Bearer token nestes endpoints de parceiro
 - Não inventes rotas ou campos
@@ -72,5 +63,4 @@ Copie o bloco completo.
 ## Guias relacionados
 
 - [Payment requests](/docs/partners/guides/payment-requests)
-- [Terminal (POS)](/docs/partners/guides/terminal-topup)
 - [Referência OpenAPI parceiros](/docs/partners)

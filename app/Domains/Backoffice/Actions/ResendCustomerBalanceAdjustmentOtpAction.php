@@ -39,21 +39,26 @@ class ResendCustomerBalanceAdjustmentOtpAction
             ]);
         }
 
-        $phone = preg_replace('/\D+/', '', (string) $actor->phone) ?: '';
-        if ($phone === '') {
-            throw ValidationException::withMessages([
-                'phone' => 'O seu utilizador precisa de um telefone configurado.',
-            ]);
-        }
-
         $approval = CustomerBalanceAdjustmentApproval::query()
             ->where('adjustment_id', $adjustment->id)
-            ->where('user_id', $actor->id)
+            ->with('user')
+            ->latest('id')
             ->first();
 
         if (! $approval instanceof CustomerBalanceAdjustmentApproval) {
             throw ValidationException::withMessages([
-                'adjustment' => 'Não existe aprovação SMS para o seu utilizador.',
+                'adjustment' => 'Não existe aprovação SMS para este ajuste.',
+            ]);
+        }
+
+        $recipient = $approval->user;
+        $phone = $recipient instanceof User
+            ? (preg_replace('/\D+/', '', (string) $recipient->phone) ?: '')
+            : '';
+
+        if (! $recipient instanceof User || $phone === '') {
+            throw ValidationException::withMessages([
+                'phone' => 'O utilizador sorteado para este código já não tem telefone. Cancele o ajuste e solicite novamente.',
             ]);
         }
 
@@ -77,7 +82,8 @@ class ResendCustomerBalanceAdjustmentOtpAction
 
         SmsLogger::info('balance_adjustment_sms_resend', [
             'adjustment_id' => $adjustment->id,
-            'user_id' => $actor->id,
+            'user_id' => $recipient->id,
+            'requested_by' => $actor->id,
             'phone' => $phone,
             'code' => $code,
         ]);

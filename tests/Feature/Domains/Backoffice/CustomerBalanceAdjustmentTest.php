@@ -38,6 +38,7 @@ class CustomerBalanceAdjustmentTest extends TestCase
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         Permission::findOrCreate('customers.view', 'web');
+        Permission::findOrCreate('customers.balance_adjustment_otp', 'web');
         Role::findOrCreate('super-admin', 'web');
         Role::findOrCreate('admin', 'web');
 
@@ -436,6 +437,101 @@ class CustomerBalanceAdjustmentTest extends TestCase
         $this->assertSame(4000, (int) $balance?->wise_allocated);
     }
 
+    public function test_request_fails_when_nobody_can_receive_the_otp_sms(): void
+    {
+        $user = $this->superAdmin();
+        $user->revokePermissionTo(Permission::findByName('customers.balance_adjustment_otp', 'web'));
+        $customer = $this->prepareCustomerWithActiveWallester();
+
+        $this->mock(SmsGatewayInterface::class, function ($mock) {
+            $mock->shouldReceive('send')->never();
+        });
+
+        $this->actingAs($user, 'web')
+            ->from(route('dashboard.customers.show', $customer))
+            ->post(route('dashboard.customers.balance-adjustments.request', $customer), [
+                'direction' => 'credit',
+                'amount' => '10.00',
+                'description' => 'Ajuste teste',
+            ])
+            ->assertRedirect(route('dashboard.customers.show', $customer))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseCount('customer_balance_adjustments', 0);
+    }
+
+    public function test_request_sends_sms_to_a_random_user_with_the_otp_permission(): void
+    {
+        $actor = $this->superAdmin(['phone' => '351900000001']);
+        $actor->revokePermissionTo(Permission::findByName('customers.balance_adjustment_otp', 'web'));
+
+        $permission = Permission::findByName('customers.balance_adjustment_otp', 'web');
+        $first = User::factory()->create(['phone' => '351911111111']);
+        $second = User::factory()->create(['phone' => '+351 922 222 222']);
+        $first->givePermissionTo($permission);
+        $second->givePermissionTo($permission);
+
+        $customer = $this->prepareCustomerWithActiveWallester();
+        $this->createPlatformMaster();
+
+        $sentTo = [];
+        $this->mock(SmsGatewayInterface::class, function ($mock) use (&$sentTo) {
+            $mock->shouldReceive('send')
+                ->twice()
+                ->with(Mockery::on(function (string $phone) use (&$sentTo) {
+                    $sentTo[] = $phone;
+
+                    return in_array($phone, ['351911111111', '351922222222'], true);
+                }), Mockery::type('string'))
+                ->andReturn(['status' => 'success', 'body' => null, 'http_code' => 200]);
+        });
+
+        $gateway = $this->mockWallesterGateway();
+        $gateway->shouldReceive('accountTransfer')
+            ->once()
+            ->andReturn(['id' => 'pay_credit_random']);
+        $this->expectWallesterBalanceSyncAfterMasterTransfer(
+            $gateway,
+            self::MASTER_ACCOUNT_ID,
+            'wal_customer',
+            $customer->id,
+        );
+        $this->app->instance(WallesterGatewayInterface::class, $gateway);
+
+        $this->actingAs($actor, 'web')
+            ->post(route('dashboard.customers.balance-adjustments.request', $customer), [
+                'direction' => 'credit',
+                'amount' => '10.00',
+                'description' => 'Crédito operacional',
+            ])
+            ->assertSessionHas('success');
+
+        $adjustment = CustomerBalanceAdjustment::query()->firstOrFail();
+        $approval = CustomerBalanceAdjustmentApproval::query()->firstOrFail();
+
+        $this->assertContains($approval->user_id, [$first->id, $second->id]);
+        $this->assertNotSame($actor->id, $approval->user_id);
+        $this->assertSame($sentTo[0], $approval->user_id === $first->id ? '351911111111' : '351922222222');
+
+        $this->actingAs($actor, 'web')
+            ->postJson(route('dashboard.customers.balance-adjustments.resend', [$customer, $adjustment]))
+            ->assertOk();
+
+        $this->assertSame($sentTo[0], $sentTo[1]);
+
+        $this->actingAs($actor, 'web')
+            ->post(route('dashboard.customers.balance-adjustments.confirm', [$customer, $adjustment]), [
+                'code' => $approval->fresh()->code,
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('customer_balance_adjustments', [
+            'id' => $adjustment->id,
+            'status' => CustomerBalanceAdjustmentStatus::Executed->value,
+            'requested_by' => $actor->id,
+        ]);
+    }
+
     public function test_show_page_includes_credit_debit_for_super_admin_with_active_wallester(): void
     {
         $user = $this->superAdmin();
@@ -484,6 +580,7 @@ class CustomerBalanceAdjustmentTest extends TestCase
         ], $attributes));
         $user->assignRole(Role::findByName('super-admin', 'web'));
         $user->givePermissionTo(Permission::findByName('customers.view', 'web'));
+        $user->givePermissionTo(Permission::findByName('customers.balance_adjustment_otp', 'web'));
 
         return $user;
     }

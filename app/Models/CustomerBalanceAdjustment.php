@@ -63,4 +63,19 @@ class CustomerBalanceAdjustment extends Model
     {
         return $this->verifiedApprovalsCount() >= $this->required_approvals;
     }
+
+    public function otpPhoneMasked(): ?string
+    {
+        $approval = $this->relationLoaded('approvals')
+            ? $this->approvals->sortByDesc('id')->first()
+            : $this->approvals()->with('user')->latest('id')->first();
+
+        $digits = preg_replace('/\D+/', '', (string) $approval?->user?->phone) ?: '';
+
+        if ($digits === '') {
+            return null;
+        }
+
+        return '••••'.substr($digits, -4);
+    }
 }

@@ -8,11 +8,9 @@ use App\Domains\Stripe\Clients\StripeHttpClient;
 use App\Domains\Stripe\Services\StripeService;
 use App\Exceptions\ApiException;
 use App\Http\Requests\Stripe\CreatePaymentIntentRequest;
-use App\Http\Requests\Stripe\CreateTerminalPaymentIntentRequest;
 use App\Http\Resources\Stripe\FeeEstimateResource;
 use App\Http\Resources\Stripe\PaymentMethodResource;
 use App\Http\Resources\Stripe\StripePaymentIntentResource;
-use App\Models\StripePaymentIntent;
 use App\Models\StripePaymentMethodFee;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -97,76 +95,6 @@ class StripeController extends Controller
         }
 
         return StripePaymentIntentResource::make($record);
-    }
-
-    /**
-     * Create Terminal Payment Intent
-     *
-     * Creates a Stripe PaymentIntent for a card-present (Terminal) top-up. Returns a `client_secret` to be passed to the Stripe Terminal SDK reader. Amounts are in the smallest currency unit (e.g. cents for EUR).
-     *
-     * @tags Stripe, Terminal
-     */
-    public function terminalConnectionToken(Request $request): JsonResponse
-    {
-        $currency = strtolower($request->input('currency', 'eur'));
-
-        try {
-            $secret = $this->stripeService->createTerminalConnectionToken($currency);
-        } catch (ApiException $e) {
-            return response()->json($e->toArray(), $e->status);
-        }
-
-        return response()->json(['secret' => $secret]);
-    }
-
-    public function createTerminal(CreateTerminalPaymentIntentRequest $request): JsonResponse
-    {
-        $customer = $request->attributes->get('merchant')->customer;
-        $data = $request->validated();
-
-        try {
-            $result = $this->stripeService->createTerminalPaymentIntent(
-                customer: $customer,
-                amount: $data['amount'],
-                currency: $data['currency'] ?? 'eur',
-                tpaSerialNumber: $data['tpa_serial_number']
-            );
-        } catch (ApiException $e) {
-            return response()->json($e->toArray(), $e->status);
-        }
-
-        return response()->json([
-            'payment_intent' => new StripePaymentIntentResource($result['payment_intent']),
-            'client_secret' => $result['client_secret'],
-        ], 201);
-    }
-
-    /**
-     * Capture Terminal Payment
-     *
-     * Captures a previously created Terminal PaymentIntent after the card has been read. The payment intent must belong to the authenticated customer and be in a capturable state.
-     *
-     * @tags Stripe, Terminal
-     */
-    public function captureTerminal(Request $request, int $paymentIntent): JsonResponse
-    {
-        $customer = $request->user();
-
-        $record = StripePaymentIntent::where('id', $paymentIntent)
-            ->where('customer_id', $customer->id)
-            ->first();
-
-        if (! $record) {
-            return response()->json(['message' => 'Intenção de pagamento não encontrada.'], 404);
-        }
-
-        try {
-            $this->stripeService->captureTerminalPayment($record);
-        } catch (ApiException $e) {
-            return response()->json($e->toArray(), $e->status);
-        }
-
-        return response()->json(['message' => 'Captura solicitada com sucesso.']);
     }
 
     /**

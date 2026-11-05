@@ -4,7 +4,6 @@ namespace App\Domains\Auth\Controllers;
 
 use App\Domains\Auth\DTOs\LoginCustomerDTO;
 use App\Domains\Auth\DTOs\LoginWithPinDTO;
-use App\Domains\Auth\DTOs\LoginWithTpaDTO;
 use App\Domains\Auth\Jobs\SendPasswordResetEmail;
 use App\Domains\Auth\Resources\AuthSessionResource;
 use App\Domains\Auth\Services\AuthService;
@@ -15,11 +14,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginPinRequest;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Requests\Auth\LoginTpaRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Customer\RegisterCustomerCorporateRequest;
 use App\Http\Requests\Customer\RegisterCustomerRequest;
-use App\Http\Resources\Auth\TpaAuthResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 
@@ -140,27 +137,6 @@ class AuthController extends Controller
         $result = $this->authService->loginWithPin($dto);
 
         return $this->respondWithAuth($result);
-    }
-
-    /**
-     * Login via TPA
-     *
-     * Authenticates a customer from a linked TPA terminal. The device must be linked first via `POST /tpa/link`.
-     *
-     * @tags Authentication
-     *
-     * @unauthenticated
-     */
-    public function loginWithTpa(LoginTpaRequest $request): TpaAuthResource
-    {
-        $result = $this->authService->loginWithTpa(LoginWithTpaDTO::fromArray($request->validated()));
-
-        return TpaAuthResource::make([
-            'token' => $result['token'],
-            'context' => $result['context'],
-            'user' => $result['user'],
-            'tpa' => $result['tpa'],
-        ]);
     }
 
     /**

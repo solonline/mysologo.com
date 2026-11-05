@@ -16,7 +16,6 @@ use App\Domains\Reward\RewardServiceProvider;
 use App\Domains\Settings\SettingsServiceProvider;
 use App\Domains\Sms\SmsServiceProvider;
 use App\Domains\Stripe\StripeServiceProvider;
-use App\Domains\Tpa\TpaServiceProvider;
 use App\Domains\Wallester\WallesterServiceProvider;
 use App\Domains\Wallet\WalletServiceProvider;
 use App\Domains\Whatsapp\WhatsappServiceProvider;
@@ -51,7 +50,6 @@ class DomainServiceProvider extends ServiceProvider
         CustomerServiceProvider::class,
         PushServiceProvider::class,
         SettingsServiceProvider::class,
-        TpaServiceProvider::class,
         WhatsappServiceProvider::class,
         DocumentsServiceProvider::class,
         RewardServiceProvider::class,

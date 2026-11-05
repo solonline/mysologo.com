@@ -135,12 +135,6 @@ class StripeGateway implements StripeGatewayInterface
         );
     }
 
-    public function createTerminalConnectionToken(string $currency = 'eur'): array
-    {
-        return $this->run('createTerminalConnectionToken', fn () => $this->client->forCurrency($currency)->createTerminalConnectionToken()
-        );
-    }
-
     public function applyCustomerBalance(string $paymentIntentId, array $params = []): array
     {
         return $this->run('applyCustomerBalance', fn () => $this->client->applyCustomerBalance($paymentIntentId, $params)

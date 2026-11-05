@@ -11,10 +11,9 @@ info:
     # API para integradores externos
 
     Endpoints que merchants e parceiros podem consumir.
-    A `api_key` é emitida na app Yoop após activação do merchant.
+    A `api_key` autentica o merchant nos endpoints de parceiro.
 
     Guias: [payment requests](/docs/partners/guides/payment-requests),
-    [terminal POS](/docs/partners/guides/terminal-topup),
     [prompt para IA](/docs/partners/guides/ai-prompt).
 
     ## Autenticação
@@ -38,8 +37,6 @@ info:
     | Rota | Limite (por merchant) |
     |------|--------|
     | `POST /merchant/payment-requests` | 120/min |
-    | `POST /merchant/terminal/connection-token` | 60/min |
-    | `POST /merchant/terminal/create-intent` | 60/min |
 
     Resposta `429` com `Retry-After` se exceder. Os limites são por merchant, não por IP.
 
@@ -77,12 +74,6 @@ info:
     | `settlement_status=available` / `funds_available=true` | Disponíveis na wallet Yoop do merchant |
     | `funds_available_at` | Data prevista (`YYYY-MM-DD`), ou `null` até o Stripe informar |
 
-    ## Terminal (POS)
-
-    1. `POST /merchant/terminal/connection-token` → `secret` para o SDK do terminal
-    2. `POST /merchant/terminal/create-intent` com `Idempotency-Key` (UUID)
-    3. Capture: `POST /stripe/terminal/{id}/capture` com Bearer do **customer** dono (não é esta API de parceiros — ver [guia](/docs/partners/guides/terminal-topup))
-
   contact:
     name: Equipa Yoop
     email: hello@yooppayments.eu
@@ -95,15 +86,11 @@ servers:
 
 tags:
   - name: Merchant
-    description: Payment requests, webhooks HMAC e terminal POS.
+    description: Payment requests e webhooks HMAC.
 
 paths:
   /merchant/payment-requests:
     $ref: './paths/merchant.yaml#/merchant-payment-requests'
-  /merchant/terminal/connection-token:
-    $ref: './paths/merchant.yaml#/merchant-terminal-connection-token'
-  /merchant/terminal/create-intent:
-    $ref: './paths/merchant.yaml#/merchant-terminal-create-intent'
 
 components:
   securitySchemes:
@@ -118,10 +105,6 @@ components:
       $ref: './components/schemas.yaml#/MerchantPaymentRequest'
     MerchantPaymentWebhook:
       $ref: './components/schemas.yaml#/MerchantPaymentWebhook'
-    TerminalConnectionToken:
-      $ref: './components/schemas.yaml#/TerminalConnectionToken'
-    TerminalPaymentIntent:
-      $ref: './components/schemas.yaml#/TerminalPaymentIntent'
   responses:
     Unauthorized:
       $ref: './components/responses.yaml#/Unauthorized'

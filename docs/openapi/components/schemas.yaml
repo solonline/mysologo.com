@@ -534,22 +534,6 @@ MerchantPaymentWebhook:
       paid_at: "2026-07-23T12:05:00+01:00"
       funds_available_at: "2026-07-28"
 
-TerminalConnectionToken:
-  type: object
-  properties:
-    secret:
-      type: string
-      description: Secret para inicializar o SDK do terminal no POS
-
-TerminalPaymentIntent:
-  type: object
-  properties:
-    client_secret:
-      type: string
-      description: Client secret do PaymentIntent para o reader
-    payment_intent:
-      $ref: '#/StripePaymentIntentSession'
-
 HealthCheck:
   type: object
   properties:

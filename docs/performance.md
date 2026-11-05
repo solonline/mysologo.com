@@ -6,7 +6,7 @@
 |---|---|---|
 | **Webhooks Stripe** | Job assíncrono na fila `stripe-webhooks` | Implementado |
 | **Cache de dados estáticos** | `Cache::remember` (5 min) em payment methods e fees | Implementado |
-| **Rate Limiting** | `stripe-intent` (10/min por user); merchants: 120/min payment requests, 60/min terminal (por merchant) | Implementado |
+| **Rate Limiting** | `stripe-intent` (10/min por user); merchants: 120/min payment requests (por merchant) | Implementado |
 | **Gestão de filas** | Laravel Horizon | **Pendente para produção** |
 | **Throughput do servidor** | Laravel Octane (FrankenPHP) | **Pendente para produção** |
 
@@ -42,10 +42,6 @@ RateLimiter::for('stripe-intent', function (Request $request) {
 RateLimiter::for('merchant-payment-requests', function (Request $request) {
     return Limit::perMinute(120)->by(/* merchant_id */);
 });
-
-// Terminal POS: 60/min por merchant (token e create-intent são baldes separados)
-RateLimiter::for('merchant-terminal-token', ...);
-RateLimiter::for('merchant-terminal-intent', ...);
 ```
 
 **Rotas Stripe (app)** — `throttle:stripe-intent`:
@@ -55,8 +51,6 @@ Route::post('/create-intent-payment', [...])
     ->middleware(['idempotency', 'throttle:stripe-intent']);
 Route::post('/create-funding', [...])
     ->middleware('throttle:stripe-intent');
-Route::post('/terminal/{paymentIntent}/capture', [...])
-    ->middleware('throttle:stripe-intent');
 ```
 
 **Rotas merchant (parceiros)** — `app/Domains/Merchant/Routes/merchant.php`:
@@ -64,10 +58,6 @@ Route::post('/terminal/{paymentIntent}/capture', [...])
 ```php
 Route::post('/payment-requests', [...])
     ->middleware('throttle:merchant-payment-requests');
-Route::post('/terminal/connection-token', [...])
-    ->middleware('throttle:merchant-terminal-token');
-Route::post('/terminal/create-intent', [...])
-    ->middleware(['idempotency', 'throttle:merchant-terminal-intent']);
 ```
 
 ### Ajustar limites

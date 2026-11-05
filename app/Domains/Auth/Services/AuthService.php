@@ -9,7 +9,6 @@ use App\Domains\Auth\Events\UserRegistered;
 use App\Domains\Onboarding\Services\OnboardingStatusResolver;
 use App\Domains\Auth\DTOs\LoginCustomerDTO;
 use App\Domains\Auth\DTOs\LoginWithPinDTO;
-use App\Domains\Auth\DTOs\LoginWithTpaDTO;
 use App\Domains\Customer\DTOs\RegisterCustomerDTO;
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorCode;
@@ -139,34 +138,6 @@ class AuthService implements AuthServiceInterface
             'user' => $customer,
             'token' => $token,
             'onboarding_status' => $this->onboardingStatusResolver->resolveForPinLogin($customer),
-        ];
-    }
-
-    public function loginWithTpa(LoginWithTpaDTO $dto): array
-    {
-        $customer = $this->customerRepository->findByEmail($dto->email);
-
-        if (!$customer || !Hash::check($dto->password, $customer->password)) {
-            throw new ApiException(ErrorCode::INVALID_CREDENTIALS, 401, 'Invalid credentials.');
-        }
-
-        $tpa = $customer->tpas()->where('serial', $dto->tpaSerial)->first();
-
-        if (!$tpa) {
-            throw new ApiException(ErrorCode::TPA_NOT_FOUND, 404, 'TPA not found for this customer.');
-        }
-
-        if ($tpa->status !== 'active') {
-            throw new ApiException(ErrorCode::TPA_NOT_ACTIVE, 403, 'TPA is not active.');
-        }
-
-        $token = $customer->createToken('tpa_login_' . $tpa->serial)->plainTextToken;
-
-        return [
-            'user'    => $customer,
-            'token'   => $token,
-            'context' => 'tpa',
-            'tpa'     => $tpa,
         ];
     }
 
